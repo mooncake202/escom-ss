@@ -20,6 +20,9 @@ import RevisarAvances from './features/gestion-actividades/CU-AH-04-revisar-avan
 import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-horas/AcumuladoHoras'
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
 import ContactoProfesor from './features/gestion-administrativa/CU-ADM-01-contacto-profesor/ContactoProfesor'
+import GestionarRecursos from './features/gestion-administrativa/CU-ADM-06-gestionar-recursos/GestionarRecursos'
+import PublicarAnuncios from './features/gestion-administrativa/CU-ADM-09-anuncios-coordinacion/PublicarAnuncios'
+import AnunciosProfesor from './features/gestion-administrativa/CU-ADM-12-anuncios-profesor/AnunciosProfesor'
 
 
 
@@ -48,6 +51,9 @@ function App() {
         <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
         <Route path="/alumno/contacto-profesor" element={<ContactoProfesor />} />
+        <Route path="/coordinacion/admin/recursos" element={<GestionarRecursos />} />
+        <Route path="/coordinacion/admin/anuncios" element={<PublicarAnuncios />} />
+        <Route path="/profesor/anuncios" element={<AnunciosProfesor />} />
 
 
 
