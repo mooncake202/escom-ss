@@ -1,0 +1,422 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─── USUARIOS BASE ───────────────────────────────────────────
+
+model usuario {
+  id         Int      @id @default(autoincrement())
+  correoInst String   @unique @db.VarChar(255)
+  password   String   @db.VarChar(255)
+  rol        String   @db.VarChar(50)
+
+  alumno       alumno?
+  coordinacion coordinacion?
+  profesor     profesor?
+  firma        firma?
+
+  anuncios_autor               anuncio[]                    @relation("AnuncioAutor")
+  
+  recursos_actualizados        recurso[]
+  documentos_subidos           documento[]
+  reporte_historial_como_actor reporte_historial_estados[]
+  reporte_firmas               reporte_firmas[]
+  calendario_creado            calendario_institucional[]
+  caracteristicas_asignadas    profesor_caracteristica[]  @relation("CaracteristicaAsignador")
+
+
+  @@index([id])
+}
+
+model coordinacion {
+  id             Int     @id @default(autoincrement())
+  usuario_id     Int     @unique
+  nombreCompleto String  @unique @db.VarChar(255)
+  usuario        usuario @relation(fields: [usuario_id], references: [id])
+
+  @@index([usuario_id])
+}
+
+model alumno {
+  id             Int     @id @default(autoincrement())
+  usuario_id     Int     @unique
+  nombres        String  @db.VarChar(100)
+  apellidos      String  @db.VarChar(100)
+  boleta         String  @unique @db.VarChar(50)
+  carrera        String  @db.VarChar(255)
+  telefono       String  @unique @db.VarChar(20)
+  correoPersonal String  @unique @db.VarChar(255)
+  creditos       Int
+  bajaTemporal   Boolean @default(false)
+  usuario        usuario @relation(fields: [usuario_id], references: [id])
+  horas          horas?
+  solicitud      solicitud?
+
+  @@index([usuario_id])
+  @@index([id])
+}
+
+model profesor {
+  id             Int     @id @default(autoincrement())
+  usuario_id     Int     @unique
+  nombreCompleto String  @unique @db.VarChar(255)
+  telefono       String? @unique @db.VarChar(20)
+  departamento   String  @db.VarChar(255)
+  usuario        usuario @relation(fields: [usuario_id], references: [id])
+
+  ofertas_servicio              oferta_servicio[]
+  caracteristicas               profesor_caracteristica[]
+  caracteristicas_solicitudes   profesor_caracteristica_solicitud[]
+  anuncios                      anuncio[]                            @relation("AnuncioProfesor")
+
+  @@index([usuario_id])
+  @@index([id])
+}
+
+// ─── CARACTERÍSTICAS PROFESOR ────────────────────────────────
+
+model profesor_caracteristica {
+  id              Int      @id @default(autoincrement())
+  profesor_id     Int
+  tipo            String   @db.VarChar(50)
+  cuposExtra      Int
+  fechaAsignacion DateTime
+  asignadoPor     Int
+  profesor        profesor @relation(fields: [profesor_id], references: [id])
+  asignador       usuario  @relation("CaracteristicaAsignador", fields: [asignadoPor], references: [id])  
+
+  @@unique([profesor_id, tipo])
+  @@index([profesor_id])
+  @@index([asignadoPor])
+}
+
+model profesor_caracteristica_solicitud {
+  id             Int      @id @default(autoincrement())
+  profesor_id    Int
+  tipo           String   @db.VarChar(50)
+  estado         String   @db.VarChar(20)
+  motivacion     String   @db.Text
+  comentario     String?  @db.Text
+  fechaCreacion  DateTime
+  fechaRespuesta DateTime?
+  profesor       profesor @relation(fields: [profesor_id], references: [id])
+
+  @@index([profesor_id])
+  @@index([estado])
+}
+
+// ─── HORAS ───────────────────────────────────────────────────
+
+model horas {
+  id               Int    @id @default(autoincrement())
+  alumno_id        Int    @unique
+  horasAcumuladas  Int    @default(0)
+  horasRechazadas  Int    @default(0)
+  faltasSeguidas   Int    @default(0)
+  faltasAcumuladas Int    @default(0)
+  alumno           alumno @relation(fields: [alumno_id], references: [id])
+
+  @@index([alumno_id])
+  @@index([id])
+}
+
+// ─── OFERTAS ─────────────────────────────────────────────────
+
+model oferta_servicio {
+  id              Int                    @id @default(autoincrement())
+  profesor_id     Int
+  tipo            String                 @db.VarChar(20)
+  titulo          String                 @db.VarChar(255)
+  tituloPlatSISS  String                 @db.VarChar(255)
+  descripcion     String                 @db.Text
+  actividades     String                 @db.Text
+  cupos           Int
+  estado          String                 @db.VarChar(20)
+  profesor        profesor               @relation(fields: [profesor_id], references: [id])
+  perfiles        oferta_perfilDeseado[]
+  solicitudes     solicitud[]
+
+  @@index([id])
+  @@index([profesor_id])
+}
+
+model perfilDeseado {
+  id       Int                    @id @default(autoincrement())
+  nombre   String                 @unique @db.VarChar(50)
+  ofertas  oferta_perfilDeseado[]
+}
+
+model oferta_perfilDeseado {
+  oferta_id       Int
+  perfil_id       Int
+  oferta_servicio oferta_servicio @relation(fields: [oferta_id], references: [id])
+  perfil          perfilDeseado   @relation(fields: [perfil_id], references: [id])
+
+  @@id([oferta_id, perfil_id])
+  @@index([perfil_id])
+}
+
+// ─── PERIODO ─────────────────────────────────────────────────
+
+model periodo {
+  id              Int         @id @default(autoincrement())
+  semestre        String      @db.VarChar(7)
+  fechaInicio     DateTime    @db.Date
+  fechaFin        DateTime    @db.Date
+  fechaLimExpedi  DateTime    @db.Date
+  solicitudes     solicitud[]
+
+  @@index([id])
+}
+
+// ─── SOLICITUD ───────────────────────────────────────────────
+
+model solicitud {
+  id              Int      @id @default(autoincrement())
+  alumno_id       Int      @unique
+  oferta_id       Int
+  periodo_id      Int
+  estatus         String   @db.VarChar(50)
+  motivacion      String   @db.Text
+  motivo_rechazo  String?  @db.Text
+  alumno          alumno   @relation(fields: [alumno_id], references: [id])
+  oferta          oferta_servicio @relation(fields: [oferta_id], references: [id])
+  periodo         periodo  @relation(fields: [periodo_id], references: [id])
+
+  actividades     actividad[]
+  bitacoras       bitacora[]
+  reportes        reporte[]
+  documentos      solicitud_documentos[]
+
+  @@index([oferta_id])
+  @@index([periodo_id])
+  @@index([id])
+}
+
+// ─── ACTIVIDADES Y BITÁCORAS ─────────────────────────────────
+
+model actividad {
+  id                  Int                   @id @default(autoincrement())
+  solicitud_id        Int
+  titulo              String                @db.VarChar(255)
+  descripcion         String?               @db.Text
+  entregableEsperado  String                @db.Text
+  fecha_limite        DateTime?             @db.Date
+  fechaCreacion       DateTime
+  solicitud           solicitud             @relation(fields: [solicitud_id], references: [id])
+  bitacora_actividades bitacora_actividades[]
+
+  @@index([solicitud_id])
+}
+
+model bitacora {
+  id             Int                   @id @default(autoincrement())
+  solicitud_id   Int
+  fecha          DateTime              @db.Date
+  horaInicio     DateTime?             @db.Time
+  horaFin        DateTime?             @db.Time
+  estado         String                @db.VarChar(30)
+  fechaCreacion  DateTime
+  fechaRevision  DateTime?
+  solicitud      solicitud             @relation(fields: [solicitud_id], references: [id])
+  actividades    bitacora_actividades[]
+
+  @@unique([solicitud_id, fecha])
+  @@index([solicitud_id])
+}
+
+model bitacora_actividades {
+  id           Int       @id @default(autoincrement())
+  bitacora_id  Int
+  actividad_id Int
+  descripcion  String    @db.Text
+  progreso     Int
+  evidencia    String    @db.Text
+  bitacora     bitacora  @relation(fields: [bitacora_id], references: [id])
+  actividad    actividad @relation(fields: [actividad_id], references: [id])
+
+  @@unique([bitacora_id, actividad_id])
+  @@index([bitacora_id])
+  @@index([actividad_id])
+}
+
+// ─── REPORTES ────────────────────────────────────────────────
+
+model reporte {
+  id                   Int       @id @default(autoincrement())
+  solicitud_id         Int
+  tipo                 String    @db.VarChar(20)
+  numero               Int?      @db.SmallInt
+  fechaInicio          DateTime  @db.Date
+  fechaFin             DateTime  @db.Date
+  fechaLimite          DateTime  @db.Date
+  diasLaborados        Int       @default(0)
+  horasReportadas      Int       @default(0)
+  observaciones        String?   @db.Text
+  contenido            String?   @db.Text
+  estado               String    @db.VarChar(40)
+  fechaCreacion        DateTime
+  fechaModificacion    DateTime?
+  reporte_documento_id Int?
+  solicitud            solicitud  @relation(fields: [solicitud_id], references: [id])
+  documento            documento? @relation(fields: [reporte_documento_id], references: [id])
+  dias                 reporte_dias[]
+  historial            reporte_historial_estados[]
+  firmas               reporte_firmas[]
+
+  @@unique([solicitud_id, fechaInicio])
+  @@index([solicitud_id])
+}
+
+model reporte_dias {
+  id         Int      @id @default(autoincrement())
+  reporte_id Int
+  fecha      DateTime @db.Date
+  reporte    reporte  @relation(fields: [reporte_id], references: [id])
+
+  @@unique([reporte_id, fecha])
+  @@index([reporte_id])
+}
+
+model reporte_historial_estados {
+  id             Int       @id @default(autoincrement())
+  reporte_id     Int
+  estadoAnterior String?   @db.VarChar(60)
+  estadoNuevo    String    @db.VarChar(60)
+  actor_id       Int?
+  comentario     String?   @db.Text
+  fechaCreacion  DateTime
+  reporte        reporte   @relation(fields: [reporte_id], references: [id])
+  actor          usuario?  @relation(fields: [actor_id], references: [id])
+
+  @@index([reporte_id])
+  @@index([actor_id])
+}
+
+model reporte_firmas {
+  id         Int      @id @default(autoincrement())
+  reporte_id Int
+  tipo       String   @db.VarChar(20)
+  usuario_id Int
+  fechaFirma DateTime
+  reporte    reporte  @relation(fields: [reporte_id], references: [id])
+  usuario    usuario  @relation(fields: [usuario_id], references: [id])
+
+  @@unique([reporte_id, tipo])
+}
+
+// ─── FIRMA ───────────────────────────────────────────────────
+
+model firma {
+  id            Int      @id @default(autoincrement())
+  usuario_id    Int      @unique
+  hash          String   @db.VarChar(512)
+  fechaCreacion DateTime
+  rutaImagen    String   @db.VarChar(500)
+  usuario       usuario  @relation(fields: [usuario_id], references: [id])
+
+  @@index([usuario_id])
+}
+
+// ─── DOCUMENTOS ──────────────────────────────────────────────
+
+model documento {
+  id            Int      @id @default(autoincrement())
+  tipo          String   @db.VarChar(50)
+  nombre        String   @db.VarChar(255)
+  ruta          String   @db.VarChar(500)
+  mimeType      String   @db.VarChar(100)
+  tamanio       Int
+  subidoPor     Int
+  fechaCreacion DateTime
+  usuario       usuario  @relation(fields: [subidoPor], references: [id])
+  reportes      reporte[]
+  solicitudes   solicitud_documentos[]
+
+  @@index([subidoPor])
+  @@index([tipo])
+}
+
+model solicitud_documentos {
+  id           Int       @id @default(autoincrement())
+  solicitud_id Int
+  documento_id Int
+  tipo         String    @db.VarChar(50)
+  solicitud    solicitud @relation(fields: [solicitud_id], references: [id])
+  documento    documento @relation(fields: [documento_id], references: [id])
+
+  @@unique([solicitud_id, documento_id])
+  @@index([solicitud_id])
+  @@index([documento_id])
+}
+
+// ─── CALENDARIO ──────────────────────────────────────────────
+
+model calendario_institucional {
+  id            Int      @id @default(autoincrement())
+  titulo        String   @db.VarChar(255)
+  semestre      String   @db.VarChar(6)
+  tipo          String   @db.VarChar(20)
+  creadoPor     Int
+  fechaCreacion DateTime
+  usuario       usuario  @relation(fields: [creadoPor], references: [id])
+  vacacional    calendario_vacacional?
+  inhabil       calendario_inhabil?
+
+  @@index([creadoPor])
+  @@index([tipo])
+  @@index([semestre])
+}
+
+model calendario_vacacional {
+  id            Int                      @id @default(autoincrement())
+  calendario_id Int                      @unique
+  fechaInicio   DateTime                 @db.Date
+  fechaFin      DateTime                 @db.Date
+  calendario    calendario_institucional @relation(fields: [calendario_id], references: [id])
+
+  @@index([calendario_id])
+}
+
+model calendario_inhabil {
+  id            Int                      @id @default(autoincrement())
+  calendario_id Int                      @unique
+  fechaInhabil  DateTime                 @unique @db.Date
+  horaDesde     DateTime                 @db.Time
+  calendario    calendario_institucional @relation(fields: [calendario_id], references: [id])
+
+  @@index([calendario_id])
+  @@index([fechaInhabil])
+}
+
+// ─── ANUNCIOS Y RECURSOS ─────────────────────────────────────
+
+model anuncio {
+  id            Int      @id @default(autoincrement())
+  autor_id      Int
+  profesor_id   Int?
+  titulo        String   @db.VarChar(255)
+  contenido     String   @db.Text
+  fechaCreacion DateTime
+  autor         usuario  @relation("AnuncioAutor", fields: [autor_id], references: [id])
+  profesor      profesor? @relation("AnuncioProfesor", fields: [profesor_id], references: [id])
+
+  @@index([autor_id])
+  @@index([profesor_id])
+}
+
+model recurso {
+  id                 Int      @id @default(autoincrement())
+  titulo             String   @db.VarChar(255)
+  url                String   @db.VarChar(500)
+  fechaActualizacion DateTime
+  actualizadoPor     Int
+  usuario            usuario  @relation(fields: [actualizadoPor], references: [id])
+
+  @@index([actualizadoPor])
+}
