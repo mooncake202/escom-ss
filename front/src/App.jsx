@@ -19,7 +19,7 @@ import RegistrarBitacora from './features/gestion-actividades/CU-AH-03-registrar
 import RevisarAvances from './features/gestion-actividades/CU-AH-04-revisar-avances/RevisarAvances'
 import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-horas/AcumuladoHoras'
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
-
+import ContactoProfesor from './features/gestion-administrativa/CU-ADM-01-contacto-profesor/ContactoProfesor'
 
 
 
@@ -47,6 +47,7 @@ function App() {
         <Route path="/alumno/historial"          element={<HistorialActividades rol="alumno" />} />
         <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
+        <Route path="/alumno/contacto-profesor" element={<ContactoProfesor />} />
 
 
 
