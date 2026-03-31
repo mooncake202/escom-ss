@@ -1,7 +1,7 @@
 import { RADIUS } from "@/themes/colors";
 import { OrigenBadge } from "./OrigenBadge";
 
-export function AnuncioDetalle({ anuncio, onCerrar, formatFecha, C }) {
+export function AnuncioDetalle({ anuncio, leido, onCerrar, onMarcarLeido, formatFecha, C }) {
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
@@ -36,9 +36,26 @@ export function AnuncioDetalle({ anuncio, onCerrar, formatFecha, C }) {
       <hr style={{ border: "none", borderTop: `1px solid ${C.borderDefault}`, margin: "0 0 1.25rem" }} />
 
       {/* Contenido */}
-      <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.7 }}>
+      <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.textMuted, lineHeight: 1.7 }}>
         {anuncio.contenido}
       </p>
+
+      {/* Botón marcar como leído */}
+      <button
+        onClick={() => onMarcarLeido(anuncio.id)}
+        disabled={leido}
+        style={{
+          width: "100%", padding: "9px", borderRadius: RADIUS.md,
+          fontSize: 13, fontWeight: 600, fontFamily: "inherit",
+          cursor: leido ? "default" : "pointer",
+          background: leido ? C.bgInput : C.accentSoft,
+          border: `1px solid ${leido ? C.borderDefault : C.accent}`,
+          color: leido ? C.textDisabled : C.accentText,
+          transition: "background 0.15s, color 0.15s",
+        }}
+      >
+        {leido ? "Ya leído" : "Marcar como leído"}
+      </button>
     </div>
   );
 }

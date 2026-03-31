@@ -55,11 +55,18 @@ export function formatFecha(fechaStr) {
 
 export function useAnunciosSistema() {
   const [seleccionado, setSeleccionado] = useState(null);
+  const [leidos, setLeidos]             = useState(new Set());
+
+  function marcarLeido(id) {
+    setLeidos(prev => new Set([...prev, id]));
+  }
 
   return {
     alumno:      ALUMNO,
     anuncios:    ANUNCIOS,
     seleccionado,
     setSeleccionado,
+    leidos,
+    marcarLeido,
   };
 }

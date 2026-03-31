@@ -6,7 +6,7 @@ import { useAnunciosSistema, formatFecha } from "./hooks/useAnunciosSistema";
 
 export default function AnunciosSistema() {
   const { C } = useTheme();
-  const { alumno, anuncios, seleccionado, setSeleccionado } = useAnunciosSistema();
+  const { alumno, anuncios, seleccionado, setSeleccionado, leidos, marcarLeido } = useAnunciosSistema();
 
   return (
     <DashboardLayout
@@ -46,6 +46,7 @@ export default function AnunciosSistema() {
                   key={a.id}
                   anuncio={a}
                   seleccionado={seleccionado?.id === a.id}
+                  leido={leidos.has(a.id)}
                   onSeleccionar={setSeleccionado}
                   formatFecha={formatFecha}
                   C={C}
@@ -57,7 +58,9 @@ export default function AnunciosSistema() {
             {seleccionado && (
               <AnuncioDetalle
                 anuncio={seleccionado}
+                leido={leidos.has(seleccionado.id)}
                 onCerrar={() => setSeleccionado(null)}
+                onMarcarLeido={marcarLeido}
                 formatFecha={formatFecha}
                 C={C}
               />
