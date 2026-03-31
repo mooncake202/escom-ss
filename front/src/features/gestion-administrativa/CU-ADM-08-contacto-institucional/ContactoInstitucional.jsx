@@ -13,14 +13,15 @@ function IconSVG({ path, C }) {
   );
 }
 
-export default function ContactoInstitucional() {
+export default function ContactoInstitucional({ rol = "alumno" }) {
   const { C } = useTheme();
-  const { alumno, tieneInfo, contacto } = useContactoInstitucional();
+  const { usuarios, tieneInfo, contacto } = useContactoInstitucional();
+  const usuario = usuarios[rol] ?? usuarios.alumno;
 
   // ── Estado vacío ─────────────────────────────────────────────
   if (!tieneInfo) {
     return (
-      <DashboardLayout titulo="Contacto del equipo" subtitulo="CU-ADM-08 · Alumno" rol="alumno" usuario={alumno.nombre}>
+      <DashboardLayout titulo="Contacto institucional" subtitulo={`CU-ADM-08 · ${rol}`} rol={rol} usuario={usuario}>
         <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
@@ -51,7 +52,7 @@ export default function ContactoInstitucional() {
 
   // ── Flujo principal ───────────────────────────────────────────
   return (
-    <DashboardLayout titulo="Contacto del equipo" subtitulo="CU-ADM-08 · Alumno" rol="alumno" usuario={alumno.nombre}>
+    <DashboardLayout titulo="Contacto institucional" subtitulo={`CU-ADM-08 · ${rol}`} rol={rol} usuario={usuario}>
       <div style={{ maxWidth: 560, margin: "0 auto", width: "100%" }}>
 
         {/* Encabezado del departamento */}
