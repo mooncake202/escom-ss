@@ -1,13 +1,13 @@
-import { useTheme, RADIUS } from "@/themes/colors";
-import { DashboardLayout }      from "@/components/layout/DashboardLayout";
-// import { PageContent }          from "@/components/layout/PageContent";
-import { ProfesorHeader }       from "./components/ProfesorHeader";
-import { ContactRow }           from "./components/ContactRow";
-import { useContactoProfesor }  from "./hooks/useContactoProfesor";
+import { useTheme, RADIUS }      from "@/themes/colors";
+import { DashboardLayout }        from "@/components/layout/DashboardLayout";
+import { ProfesorHeader }         from "./components/ProfesorHeader";
+import { ContactRow }             from "./components/ContactRow";
+import { IntegranteCard }         from "../CU-ADM-03-contacto-equipo/components/IntegranteCard";
+import { useContactoProfesor }    from "./hooks/useContactoProfesor";
 
 export default function ContactoProfesor() {
   const { C } = useTheme();
-  const { profesor, alumno } = useContactoProfesor();
+  const { profesor, alumno, enProyecto, proyecto, integrantes } = useContactoProfesor();
 
   // — Estado vacío: sin profesor asignado —
   if (!profesor) {
@@ -17,6 +17,7 @@ export default function ContactoProfesor() {
         subtitulo="CU-ADM-01 · Alumno"
         rol="alumno"
         usuario={alumno.nombre}
+        enProyecto={enProyecto}
       >
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "2rem 1rem" }}>
           <div style={{
@@ -46,6 +47,7 @@ export default function ContactoProfesor() {
         subtitulo="CU-ADM-01 · Alumno"
         rol="alumno"
         usuario={alumno.nombre}
+        enProyecto={enProyecto}
       >
         <div style={{ maxWidth: 600, margin: "0 auto", padding: "2rem 1rem" }}>
           <ProfesorHeader profesor={profesor} C={C} />
@@ -73,14 +75,19 @@ export default function ContactoProfesor() {
       subtitulo="CU-ADM-01 · Alumno"
       rol="alumno"
       usuario={alumno.nombre}
+      enProyecto={enProyecto}
     >
       <div style={{ maxWidth: 600, margin: "0 auto", padding: "2rem 1rem" }}>
 
-        {/* Tarjeta principal del profesor */}
+        {/* ── Sección: contacto del profesor ── */}
+        <p style={{ margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          Mi profesor
+        </p>
+
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.lg,
           border: `1px solid ${C.borderDefault}`,
-          marginBottom: "1.25rem", overflow: "hidden",
+          marginBottom: "0.75rem", overflow: "hidden",
         }}>
           {/* Encabezado */}
           <div style={{
@@ -116,10 +123,7 @@ export default function ContactoProfesor() {
             </span>
             <a
               href={`mailto:${profesor.correo}`}
-              style={{
-                fontSize: 13, color: C.accentText,
-                textDecoration: "none", fontFamily: "monospace",
-              }}
+              style={{ fontSize: 13, color: C.accentText, textDecoration: "none", fontFamily: "monospace" }}
             >
               {profesor.correo}
             </a>
@@ -130,13 +134,36 @@ export default function ContactoProfesor() {
             <ContactRow key={i} tipo={c.tipo} valor={c.valor} C={C} />
           ))}
 
-          {/* Quitar el borde inferior del último elemento */}
           <div style={{ height: 1, background: C.bgCard, marginTop: -1 }} />
         </div>
 
-        <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
+        <p style={{ margin: "0 0 2rem", fontSize: 11, color: C.textDisabled }}>
           Solo se muestran los medios de contacto habilitados por el profesor en el sistema.
         </p>
+
+        {/* ── Sección: equipo (solo si está en proyecto) ── */}
+        {enProyecto && (
+          <>
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Mi equipo · {proyecto.nombre}
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+              {integrantes.map(integrante => (
+                <IntegranteCard
+                  key={integrante.id}
+                  integrante={integrante}
+                  esTuPerfil={integrante.id === alumno.id}
+                  C={C}
+                />
+              ))}
+            </div>
+
+            <p style={{ margin: "1rem 0 0", fontSize: 11, color: C.textDisabled }}>
+              Solo se muestran los datos de contacto que cada integrante ha habilitado en su perfil.
+            </p>
+          </>
+        )}
 
       </div>
     </DashboardLayout>

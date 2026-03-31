@@ -23,6 +23,9 @@ import ContactoProfesor from './features/gestion-administrativa/CU-ADM-01-contac
 import GestionarRecursos from './features/gestion-administrativa/CU-ADM-06-gestionar-recursos/GestionarRecursos'
 import PublicarAnuncios from './features/gestion-administrativa/CU-ADM-09-anuncios-coordinacion/PublicarAnuncios'
 import AnunciosProfesor from './features/gestion-administrativa/CU-ADM-12-anuncios-profesor/AnunciosProfesor'
+import AnunciosSistema from './features/gestion-administrativa/CU-ADM-02-anuncios/AnunciosSistema'
+import ContactoInstitucional from './features/gestion-administrativa/CU-ADM-08-contacto-institucional/ContactoInstitucional'
+//import ContactoEquipo from './features/gestion-administrativa/CU-ADM-03-contacto-equipo/ContactoEquipo'
 
 
 
@@ -54,7 +57,10 @@ function App() {
         <Route path="/coordinacion/admin/recursos" element={<GestionarRecursos />} />
         <Route path="/coordinacion/admin/anuncios" element={<PublicarAnuncios />} />
         <Route path="/profesor/anuncios" element={<AnunciosProfesor />} />
-
+        <Route path="/alumno/anuncios" element={<AnunciosSistema />} />
+        <Route path="/alumno/contacto-institucional"       element={<ContactoInstitucional rol="alumno" />} />
+        <Route path="/profesor/contacto-institucional"     element={<ContactoInstitucional rol="profesor" />} />
+        {/*<Route path="/coordinacion/contacto-institucional" element={<ContactoInstitucional rol="coordinacion" />} />      <Route path="/alumno/contacto-equipo" element={<ContactoEquipo />} />*/}
 
 
       </Routes>

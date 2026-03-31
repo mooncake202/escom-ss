@@ -19,6 +19,7 @@ const ICONS = {
   config:       "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0",
   recursos:     "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z",
   anuncios:     "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 00-4-5.659V4a2 2 0 10-4 0v1.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
+  institucion:  "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75 M9 7a4 4 0 100 8 4 4 0 000-8z",
   chevron:      "M9 18l6-6-6-6",
   logout:       "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
 };
@@ -29,7 +30,9 @@ const NAV_ITEMS = {
     { key: "dashboard",   label: "Inicio",       path: "/dashboard",             icon: "dashboard" },
     { key: "solicitudes", label: "Mi solicitud", path: "/registro",              icon: "solicitudes" },
     { key: "actividades", label: "Actividades",  path: "/actividades",           icon: "actividades" },
-    { key: "contacto",    label: "Mi profesor",  path: "/alumno/contacto-profesor", icon: "contacto" },
+    { key: "anuncios",    label: "Anuncios",     path: "/alumno/anuncios",          icon: "anuncios" },
+    { key: "contacto",    label: "Mi profesor",  path: "/alumno/contacto-profesor",      icon: "contacto" },
+    { key: "institucion", label: "Coordinación", path: "/alumno/contacto-institucional",  icon: "institucion" },
     { key: "reportes",    label: "Reportes",     path: "/reportes",              icon: "reportes" },
     { key: "config",      label: "Configuración",path: "/configuracion",         icon: "config" },
   ],
@@ -37,8 +40,9 @@ const NAV_ITEMS = {
     { key: "dashboard",   label: "Inicio",       path: "/dashboard",             icon: "dashboard" },
     { key: "solicitudes", label: "Solicitudes",  path: "/profesor/solicitudes",  icon: "solicitudes" },
     { key: "actividades", label: "Actividades",  path: "/profesor/actividades",  icon: "actividades" },
-    { key: "anuncios",    label: "Anuncios",     path: "/profesor/anuncios",     icon: "anuncios" },
-    { key: "reportes",    label: "Reportes",     path: "/profesor/reportes",     icon: "reportes" },
+    { key: "anuncios",    label: "Anuncios",          path: "/profesor/anuncios",               icon: "anuncios" },
+    { key: "institucion", label: "Coordinación",     path: "/profesor/contacto-institucional",  icon: "institucion" },
+    { key: "reportes",    label: "Reportes",          path: "/profesor/reportes",               icon: "reportes" },
     { key: "config",      label: "Configuración",path: "/configuracion",         icon: "config" },
   ],
   coordinacion: [
@@ -46,19 +50,22 @@ const NAV_ITEMS = {
     { key: "solicitudes", label: "Solicitudes",  path: "/coordinacion/solicitudes",   icon: "solicitudes" },
     { key: "actividades", label: "Actividades",  path: "/coordinacion/actividades",   icon: "actividades" },
     { key: "recursos",    label: "Recursos",     path: "/coordinacion/admin/recursos", icon: "recursos" },
-    { key: "anuncios",    label: "Anuncios",     path: "/coordinacion/admin/anuncios", icon: "anuncios" },
-    { key: "reportes",    label: "Reportes",     path: "/coordinacion/reportes",      icon: "reportes" },
+    { key: "anuncios",    label: "Anuncios",          path: "/coordinacion/admin/anuncios",         icon: "anuncios" },
+    { key: "institucion", label: "Contacto inst.",   path: "/coordinacion/contacto-institucional", icon: "institucion" },
+    { key: "reportes",    label: "Reportes",          path: "/coordinacion/reportes",               icon: "reportes" },
     { key: "config",      label: "Configuración",path: "/configuracion",              icon: "config" },
   ],
 };
 
-export function Sidebar({ rol = "profesor" }) {
+export function Sidebar({ rol = "profesor", enProyecto = false }) {
   const { C } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const items = NAV_ITEMS[rol] ?? NAV_ITEMS.profesor;
+  const items = (NAV_ITEMS[rol] ?? NAV_ITEMS.profesor).filter(
+  item => item.key !== "equipo" || enProyecto
+);
   const W_collapsed = 56;
   const W_expanded  = 220;
   const W = expanded ? W_expanded : W_collapsed;
