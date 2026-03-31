@@ -1,6 +1,5 @@
 import { useTheme, RADIUS }              from "@/themes/colors";
 import { DashboardLayout }               from "@/components/layout/DashboardLayout";
-import { PageContent }                   from "@/components/layout/PageContent";
 import { DatePicker }                    from "./components/DatePicker";
 import { TipoBadge, TIPO_CONFIG }        from "./components/TipoBadge";
 import { EventoForm }                    from "./components/EventoForm";
@@ -8,6 +7,7 @@ import { EventoRow, formatFechaDisplay } from "./components/EventoRow";
 import {
   useCalendarioInstitucional,
   COORDINACION, TIPOS, MESES, DIAS_SEM, ANIOS_DISPONIBLES,
+  CICLOS_DISPONIBLES, rangoSemestre,
   getDiasEnMes, getPrimerDia, toISO, esFinDeSemana,
 } from "./hooks/useCalendarioInstitucional";
 
@@ -18,7 +18,9 @@ export default function CalendarioInstitucional() {
     mes, setMes, anio, setAnio, diaSelec,
     modo, evActivo, form, errores, toast, ultimaMod, tooltip, setTooltip,
     filtroTipo, setFiltroTipo, filtroDesde, setFiltroDesde, filtroHasta, setFiltroHasta,
-    hayFiltroActivo,
+    filtroCiclo, setFiltroCiclo,
+    filtroPeriodo, setFiltroPeriodo,
+    hayFiltroActivo, limpiarFiltros,
     irMesAnterior, irMesSiguiente,
     handleChange, handleClickDia, handleGuardar, handleEliminar,
     abrirNuevo, abrirEditar, abrirEliminar, cancelar,
@@ -36,7 +38,7 @@ export default function CalendarioInstitucional() {
       rol="coordinacion"
       usuario={COORDINACION.nombre}
     >
-      <PageContent maxWidth={860}>
+      <div style={{ maxWidth: 860, margin: "0 auto", width: "100%" }}>
 
         {/* Toast */}
         {toast && (
@@ -220,29 +222,96 @@ export default function CalendarioInstitucional() {
         </div>
 
         {/* ── FILTROS ── */}
-        <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderDefault}`, padding: "0.875rem 1.25rem", marginBottom: "1.25rem", display: "flex", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+        <div style={{
+          background: C.bgCard, borderRadius: RADIUS.lg,
+          border: `1px solid ${C.borderDefault}`,
+          padding: "0.875rem 1.25rem", marginBottom: "1.25rem",
+          display: "flex", alignItems: "center", gap: "1rem", flexWrap: "wrap",
+        }}>
+
+          {/* Botones de tipo */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {["Todas", "Periodo de prestación", "Día inhábil", "Periodo vacacional"].map(t => (
-              <button key={t} onClick={() => setFiltroTipo(t)} style={{ padding: "6px 12px", borderRadius: RADIUS.full, fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", background: filtroTipo === t ? C.accent : "transparent", border: `1px solid ${filtroTipo === t ? C.accent : C.borderDefault}`, color: filtroTipo === t ? "#fff" : C.textMuted, transition: "all 0.15s" }}>
+              <button
+                key={t} onClick={() => setFiltroTipo(t)}
+                style={{
+                  padding: "6px 12px", borderRadius: RADIUS.full,
+                  fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                  background: filtroTipo === t ? C.accent : "transparent",
+                  border: `1px solid ${filtroTipo === t ? C.accent : C.borderDefault}`,
+                  color: filtroTipo === t ? "#fff" : C.textMuted,
+                  transition: "all 0.15s",
+                }}
+              >
                 {t}
               </button>
             ))}
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: C.textDisabled, whiteSpace: "nowrap" }}>Desde</span>
-              <DatePicker value={filtroDesde} onChange={v => setFiltroDesde(v)} placeholder="dd/mm/aaaa" small />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 12, color: C.textDisabled, whiteSpace: "nowrap" }}>Hasta</span>
-              <DatePicker value={filtroHasta} onChange={v => setFiltroHasta(v)} placeholder="dd/mm/aaaa" minDate={filtroDesde || ""} small />
-            </div>
-            {hayFiltroActivo && (
-              <button onClick={() => { setFiltroTipo("Todas"); setFiltroDesde(""); setFiltroHasta(""); }} style={{ padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12, cursor: "pointer", background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textMuted, fontFamily: "inherit" }}>
-                Limpiar
-              </button>
+
+          {/* Separador */}
+          <div style={{ width: 1, height: 24, background: C.borderDefault, flexShrink: 0 }} />
+
+          {/* Filtro por semestre */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12, color: C.textDisabled, whiteSpace: "nowrap" }}>Ciclo:</span>
+            <select
+              value={filtroCiclo}
+              onChange={e => { setFiltroCiclo(e.target.value); setFiltroPeriodo(""); }}
+              style={{
+                padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
+                background: C.bgInput, border: `1px solid ${filtroCiclo ? C.accent : C.borderDefault}`,
+                color: filtroCiclo ? C.textPrimary : C.textDisabled,
+                cursor: "pointer", fontFamily: "inherit", outline: "none",
+              }}
+            >
+              <option value="">Año...</option>
+              {CICLOS_DISPONIBLES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+
+            <select
+              value={filtroPeriodo}
+              onChange={e => setFiltroPeriodo(e.target.value)}
+              disabled={!filtroCiclo}
+              style={{
+                padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
+                background: C.bgInput,
+                border: `1px solid ${filtroPeriodo ? C.accent : C.borderDefault}`,
+                color: filtroPeriodo ? C.textPrimary : C.textDisabled,
+                cursor: filtroCiclo ? "pointer" : "default",
+                fontFamily: "inherit", outline: "none",
+                opacity: filtroCiclo ? 1 : 0.45,
+              }}
+            >
+              <option value="">Semestre...</option>
+              <option value="01">01 · Ago–Ene</option>
+              <option value="02">02 · Ene–Jul</option>
+            </select>
+
+            {/* Etiqueta del rango seleccionado */}
+            {filtroCiclo && filtroPeriodo && (
+              <span style={{
+                fontSize: 11, color: C.accentText, fontWeight: 600,
+                padding: "3px 8px", borderRadius: RADIUS.full,
+                background: C.accentSoft,
+              }}>
+                {rangoSemestre(parseInt(filtroCiclo), filtroPeriodo).label}
+              </span>
             )}
           </div>
+
+          {/* Limpiar */}
+          {hayFiltroActivo && (
+            <button
+              onClick={limpiarFiltros}
+              style={{
+                marginLeft: "auto", padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
+                cursor: "pointer", background: "transparent",
+                border: `1px solid ${C.borderDefault}`, color: C.textMuted, fontFamily: "inherit",
+              }}
+            >
+              Limpiar
+            </button>
+          )}
         </div>
 
         {/* Botón agregar */}
@@ -290,7 +359,7 @@ export default function CalendarioInstitucional() {
           ))}
         </div>
 
-      </PageContent>
+      </div>
     </DashboardLayout>
   );
 }

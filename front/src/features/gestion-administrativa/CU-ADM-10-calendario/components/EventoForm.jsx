@@ -120,32 +120,9 @@ export function EventoForm({ modo, form, errores, hoy, onChange, onGuardar, onCa
         </div>
       )}
 
-      {/* Periodo de prestación */}
+      {/* Periodo de prestación — sin campo semestre */}
       {form.tipo === "Periodo de prestación" && (
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-          <div style={{ flex: "1 1 140px" }}>
-            <label style={labelStyle}>Semestre <span style={{ color: C.danger }}>*</span></label>
-            <input
-              name="semestre" value={form.semestre}
-              onChange={e => {
-                const raw  = e.target.value.replace(/\D/g, "").slice(0, 6);
-                const fmtd = raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4)}` : raw;
-                onChange({ target: { name: "semestre", value: fmtd } });
-              }}
-              placeholder="AAAA-01" maxLength={7}
-              style={inputStyle(!!errores.semestre)}
-            />
-            {errores.semestre
-              ? <p style={errStyle}>{errores.semestre}</p>
-              : form.semestre && /^\d{4}-(01|02)$/.test(form.semestre) && (
-                <p style={{ margin: "4px 0 0", fontSize: 11, color: C.textDisabled }}>
-                  {form.semestre.endsWith("-01")
-                    ? `Ene–Jul ${form.semestre.slice(0, 4)}`
-                    : `Ago ${form.semestre.slice(0, 4)}–Ene ${parseInt(form.semestre.slice(0, 4)) + 1}`}
-                </p>
-              )
-            }
-          </div>
           <div style={{ flex: "1 1 160px" }}>
             <label style={labelStyle}>Fecha de inicio <span style={{ color: C.danger }}>*</span></label>
             <DatePicker
@@ -190,3 +167,4 @@ export function EventoForm({ modo, form, errores, hoy, onChange, onGuardar, onCa
       </div>
     </div>
   );
+}

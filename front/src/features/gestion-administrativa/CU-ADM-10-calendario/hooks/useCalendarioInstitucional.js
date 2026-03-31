@@ -1,13 +1,49 @@
 import { useState, useMemo, useEffect } from "react";
-import { DIAS_INHABILES_INICIALES } from "@/data/diasInhabiles";
 
-export const COORDINACION = { nombre: "Lic. Morales Vega" };
-export const TIPOS        = ["Periodo de prestación", "Día inhábil", "Periodo vacacional"];
-export const MESES        = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-export const DIAS_SEM     = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DIAS_INHABILES_INICIALES = [
+  { nombre: "Año Nuevo",                           fecha: "2026-01-01" },
+  { nombre: "Día de la Constitución",              fecha: "2026-02-02" },
+  { nombre: "Natalicio de Benito Juárez",          fecha: "2026-03-16" },
+  { nombre: "Jueves Santo",                        fecha: "2026-04-02" },
+  { nombre: "Viernes Santo",                       fecha: "2026-04-03" },
+  { nombre: "Día del Trabajo",                     fecha: "2026-05-01" },
+  { nombre: "Aniversario de la Batalla de Puebla", fecha: "2026-05-05" },
+  { nombre: "Día de la Independencia",             fecha: "2026-09-16" },
+  { nombre: "Día de Muertos",                      fecha: "2026-11-02" },
+  { nombre: "Revolución Mexicana",                 fecha: "2026-11-16" },
+  { nombre: "Navidad",                             fecha: "2026-12-25" },
+];
+
+export const COORDINACION     = { nombre: "Lic. Morales Vega" };
+export const TIPOS            = ["Periodo de prestación", "Día inhábil", "Periodo vacacional"];
+export const MESES            = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+export const DIAS_SEM         = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
 const HOY_ANIO = new Date().getFullYear();
 export const ANIOS_DISPONIBLES = [HOY_ANIO - 1, HOY_ANIO, HOY_ANIO + 1];
+
+// Ciclos disponibles para el filtro — centrados en el año actual
+export const CICLOS_DISPONIBLES = [HOY_ANIO - 1, HOY_ANIO, HOY_ANIO + 1];
+
+// Dado un ciclo y periodo calcula el rango ISO de fechas
+
+export function rangoSemestre(ciclo, periodo) {
+  if (periodo === "01") {
+    // Semestre 1: Ago(ciclo-1) – Ene(ciclo)
+    return {
+      desde: `${ciclo - 1}-08-01`,
+      hasta: `${ciclo}-01-31`,
+      label: `Ago ${ciclo - 1} – Ene ${ciclo}`,
+    };
+  }
+  // Semestre 2: Ene(ciclo) – Jul(ciclo)
+  return {
+    desde: `${ciclo}-01-01`,
+    hasta: `${ciclo}-07-31`,
+    label: `Ene ${ciclo} – Jul ${ciclo}`,
+  };
+}
+
 
 let nextId = 10;
 
@@ -31,14 +67,14 @@ const EVENTOS_INICIALES = [
 
 export const FORM_VACIO = {
   nombre: "", tipo: "",
-  fecha: "", hora: "", semestre: "",
+  fecha: "", hora: "",
   fechaInicio: "", fechaTermino: "", fechaLimiteExpediente: "",
   fechaInicioVac: "", fechaFinVac: "",
 };
 
-export function getDiasEnMes(y, m)  { return new Date(y, m + 1, 0).getDate(); }
-export function getPrimerDia(y, m)  { return new Date(y, m, 1).getDay(); }
-export function toISO(y, m, d)      { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
+export function getDiasEnMes(y, m) { return new Date(y, m + 1, 0).getDate(); }
+export function getPrimerDia(y, m) { return new Date(y, m, 1).getDay(); }
+export function toISO(y, m, d)     { return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`; }
 
 export function esFinDeSemana(fechaISO) {
   const d = new Date(fechaISO + "T12:00:00");
@@ -87,15 +123,28 @@ export function useCalendarioInstitucional() {
   const [toast, setToast]         = useState(null);
   const [ultimaMod, setUltimaMod] = useState("15 de enero de 2026, 10:00");
   const [tooltip, setTooltip]     = useState(null);
-  const [filtroTipo, setFiltroTipo]   = useState("Todas");
-  const [filtroDesde, setFiltroDesde] = useState("");
-  const [filtroHasta, setFiltroHasta] = useState("");
 
-  function mostrarToast(msg, tipo = "success") {
-    setToast({ msg, tipo });
-    setTimeout(() => setToast(null), 4000);
+  // ── Filtros ─────────────────────────────────────────────────
+  const [filtroTipo,   setFiltroTipo]   = useState("Todas");
+  const [filtroCiclo,  setFiltroCiclo]  = useState("");   // "2025" | ""
+  const [filtroPeriodo, setFiltroPeriodo] = useState(""); // "01" | "02" | ""
+
+  // Rango derivado del filtro de semestre
+  const { filtroDesde, filtroHasta } = useMemo(() => {
+    if (!filtroCiclo || !filtroPeriodo) return { filtroDesde: "", filtroHasta: "" };
+    const { desde, hasta } = rangoSemestre(parseInt(filtroCiclo), filtroPeriodo);
+    return { filtroDesde: desde, filtroHasta: hasta };
+  }, [filtroCiclo, filtroPeriodo]);
+
+  const hayFiltroActivo = filtroTipo !== "Todas" || (filtroCiclo && filtroPeriodo);
+
+  function limpiarFiltros() {
+    setFiltroTipo("Todas");
+    setFiltroCiclo("");
+    setFiltroPeriodo("");
   }
 
+  // ── Derivados ────────────────────────────────────────────────
   const evsPorFecha = useMemo(() => {
     const filtrados = filtroTipo === "Todas" ? eventos : eventos.filter(ev => ev.tipo === filtroTipo);
     return filtrados.reduce((acc, ev) => {
@@ -131,7 +180,8 @@ export function useCalendarioInstitucional() {
   const eventosFiltrados = useMemo(() => {
     return eventos.filter(ev => {
       if (filtroTipo !== "Todas" && ev.tipo !== filtroTipo) return false;
-      if (ev.tipo === "Periodo de prestación" && (filtroDesde || filtroHasta)) {
+      if (!filtroDesde && !filtroHasta) return true;
+      if (ev.tipo === "Periodo de prestación") {
         const pIn = ev.fechaInicio || ""; const pFin = ev.fechaTermino || "";
         if (filtroDesde && pFin && pFin < filtroDesde) return false;
         if (filtroHasta && pIn  && pIn  > filtroHasta) return false;
@@ -143,8 +193,6 @@ export function useCalendarioInstitucional() {
       return true;
     });
   }, [eventos, filtroTipo, filtroDesde, filtroHasta]);
-
-  const hayFiltroActivo = filtroTipo !== "Todas" || filtroDesde || filtroHasta;
 
   const { mesMin, anioMin, mesMax, anioMax } = useMemo(() => {
     if (!hayFiltroActivo || eventosFiltrados.length === 0)
@@ -167,20 +215,14 @@ export function useCalendarioInstitucional() {
     return { anioMin: yMin, mesMin: mMin - 1, anioMax: yMax, mesMax: mMax - 1 };
   }, [hayFiltroActivo, eventosFiltrados]);
 
+  // Al cambiar filtro de semestre, saltar al primer mes con eventos
   useEffect(() => {
-    if (!hayFiltroActivo) return;
-    const fechas = [];
-    eventosFiltrados.forEach(ev => {
-      if (ev.tipo === "Periodo de prestación")      { if (ev.fechaInicio)    fechas.push(ev.fechaInicio); }
-      else if (ev.tipo === "Periodo vacacional")    { if (ev.fechaInicioVac) fechas.push(ev.fechaInicioVac); }
-      else                                          { if (ev.fecha)          fechas.push(ev.fecha); }
-    });
-    if (fechas.length === 0) return;
-    const [y, m] = [...fechas].sort()[0].split("-").map(Number);
+    if (!filtroDesde) return;
+    const [y, m] = filtroDesde.split("-").map(Number);
     setAnio(y); setMes(m - 1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroTipo, filtroDesde, filtroHasta]);
+  }, [filtroDesde]);
 
+  // ── Navegación ───────────────────────────────────────────────
   function irMesAnterior() {
     const dA = mes === 0 ? anio - 1 : anio; const dM = mes === 0 ? 11 : mes - 1;
     if (mesMin !== null && (dA < anioMin || (dA === anioMin && dM < mesMin))) return;
@@ -192,6 +234,7 @@ export function useCalendarioInstitucional() {
     setAnio(dA); setMes(dM);
   }
 
+  // ── Form ─────────────────────────────────────────────────────
   function handleChange(e) {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
@@ -209,8 +252,6 @@ export function useCalendarioInstitucional() {
       if (!form.hora) e.hora = "La hora es obligatoria.";
     }
     if (form.tipo === "Periodo de prestación") {
-      if (!form.semestre) e.semestre = "El semestre es obligatorio.";
-      else if (!/^\d{4}-(01|02)$/.test(form.semestre)) e.semestre = "Formato: AAAA-01 o AAAA-02";
       if (!form.fechaInicio)  e.fechaInicio  = "La fecha de inicio es obligatoria.";
       if (!form.fechaTermino) e.fechaTermino = "La fecha de término es obligatoria.";
       if (form.fechaInicio && form.fechaTermino && form.fechaTermino < form.fechaInicio)
@@ -235,7 +276,7 @@ export function useCalendarioInstitucional() {
   function abrirEditar(ev) {
     setForm({
       nombre: ev.nombre, tipo: ev.tipo,
-      fecha: ev.fecha || "", hora: ev.hora || "", semestre: ev.semestre || "",
+      fecha: ev.fecha || "", hora: ev.hora || "",
       fechaInicio: ev.fechaInicio || "", fechaTermino: ev.fechaTermino || "",
       fechaLimiteExpediente: ev.fechaLimiteExpediente || "",
       fechaInicioVac: ev.fechaInicioVac || "", fechaFinVac: ev.fechaFinVac || "",
@@ -251,7 +292,7 @@ export function useCalendarioInstitucional() {
     if (Object.keys(e).length > 0) { setErrores(e); return; }
     const nuevoEv =
       form.tipo === "Periodo de prestación"
-        ? { tipo: form.tipo, nombre: form.nombre.trim(), semestre: form.semestre, fechaInicio: form.fechaInicio, fechaTermino: form.fechaTermino, fechaLimiteExpediente: form.fechaLimiteExpediente }
+        ? { tipo: form.tipo, nombre: form.nombre.trim(), fechaInicio: form.fechaInicio, fechaTermino: form.fechaTermino, fechaLimiteExpediente: form.fechaLimiteExpediente }
       : form.tipo === "Periodo vacacional"
         ? { tipo: form.tipo, nombre: form.nombre.trim(), fechaInicioVac: form.fechaInicioVac, fechaFinVac: form.fechaFinVac }
       : { tipo: form.tipo, nombre: form.nombre.trim(), fecha: form.fecha, hora: form.hora };
@@ -277,6 +318,11 @@ export function useCalendarioInstitucional() {
     setDiaSelec(null); cancelar();
   }
 
+  function mostrarToast(msg, tipo = "success") {
+    setToast({ msg, tipo });
+    setTimeout(() => setToast(null), 4000);
+  }
+
   function handleClickDia(fechaISO) {
     if (modo === "eliminar") return;
     if (esFinDeSemana(fechaISO)) return;
@@ -293,8 +339,10 @@ export function useCalendarioInstitucional() {
     hoy, eventos, eventosFiltrados, evsPorFecha, periodosPorFecha,
     mes, setMes, anio, setAnio, diaSelec,
     modo, evActivo, form, errores, toast, ultimaMod, tooltip, setTooltip,
-    filtroTipo, setFiltroTipo, filtroDesde, setFiltroDesde, filtroHasta, setFiltroHasta,
-    hayFiltroActivo,
+    filtroTipo, setFiltroTipo,
+    filtroCiclo, setFiltroCiclo,
+    filtroPeriodo, setFiltroPeriodo,
+    hayFiltroActivo, limpiarFiltros,
     irMesAnterior, irMesSiguiente,
     handleChange, handleClickDia, handleGuardar, handleEliminar,
     abrirNuevo, abrirEditar, abrirEliminar, cancelar,
