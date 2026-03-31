@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 const DATOS_INSTITUCIONALES = {
-  nombre:     "García López Ana",
+  nombre:     "Ana García López",
   boleta:     "2022630001",
   carrera:    "Ingeniería en Sistemas Computacionales",
   correoInst: "agarcia0001@alumno.ipn.mx",
