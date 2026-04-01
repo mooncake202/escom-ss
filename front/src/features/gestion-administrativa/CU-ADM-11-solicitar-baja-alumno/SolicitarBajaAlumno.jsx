@@ -1,9 +1,8 @@
 import { useTheme, RADIUS }           from "@/themes/colors";
 import { DashboardLayout }             from "@/components/layout/DashboardLayout";
-import { PageContent }                 from "@/components/layout/PageContent";
-import { AlumnoSelectorCard }          from "./components/AlumnoSelectorCard";
+import { AlumnoSelectorCard }          from "./components/AlumnoSelectorCards";
 import { BajaForm }                    from "./components/BajaForm";
-import { useBajaAlumnoProfesor }       from "./hooks/useBajaAlumnoProfesor";
+import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
 
 export default function BajaAlumnoProfesor() {
   const { C } = useTheme();
@@ -20,7 +19,7 @@ export default function BajaAlumnoProfesor() {
       rol="profesor"
       usuario={profesor.nombre}
     >
-      <PageContent maxWidth={900}>
+      <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
 
         {/* ── Empty state: sin alumnos activos ── */}
         {alumnos.length === 0 && (
@@ -93,7 +92,7 @@ export default function BajaAlumnoProfesor() {
             display: "grid",
             gridTemplateColumns: "320px 1fr",
             gap: "1.5rem",
-            alignItems: "start",
+            alignItems: "stretch",
           }}>
             {/* Columna izquierda — lista de alumnos */}
             <div>
@@ -117,12 +116,15 @@ export default function BajaAlumnoProfesor() {
             </div>
 
             {/* Columna derecha — formulario o placeholder */}
-            <div>
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {!alumnoSeleccionado ? (
                 <div style={{
+                  flex: 1,
                   background: C.bgCard, borderRadius: RADIUS.lg,
                   border: `1px solid ${C.borderDefault}`,
-                  padding: "4rem 2rem", textAlign: "center",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center",
+                  padding: "2rem", textAlign: "center",
                 }}>
                   <p style={{ fontSize: 28, margin: "0 0 0.75rem" }}>👈</p>
                   <p style={{ margin: 0, fontSize: 14, color: C.textMuted }}>
@@ -144,7 +146,7 @@ export default function BajaAlumnoProfesor() {
           </div>
         )}
 
-      </PageContent>
+      </div>
     </DashboardLayout>
   );
 }
