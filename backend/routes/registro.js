@@ -76,16 +76,28 @@ router.post("/", async (req, res) => {
     connection = await db.getConnection();
     await connection.beginTransaction();
 
+
+
     // Reducir cupos de forma atómica
-    const [update] = await connection.query(
-      `UPDATE oferta_servicio SET cuposTotales = cuposTotales - 1 WHERE id = ? AND cuposTotales > 0`
+    const [[oferta]] = await connection.query(
+      `SELECT o.cuposTotales,
+        COUNT(s.id) AS ocupados
+      FROM oferta_servicio o
+      LEFT JOIN solicitud s ON s.oferta_id = o.id 
+        AND s.estatus != 'espera_respuesta_de_profesor'
+      WHERE o.id = ?
+      GROUP BY o.id`,
       [data.oferta]
     );
-    if (update.affectedRows === 0) {
+    if (!oferta || (oferta.cuposTotales - oferta.ocupados) <= 0) {
       await connection.rollback();
       connection.release();
       return res.status(400).json({ mensaje: "Lo sentimos, el cupo se acaba de llenar" });
     }
+
+
+
+    
 
     // Hash de contraseña
     const hashedPassword = await bcrypt.hash(password, 10);

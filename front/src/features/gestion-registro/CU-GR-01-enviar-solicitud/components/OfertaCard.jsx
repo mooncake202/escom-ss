@@ -1,6 +1,8 @@
 import { RADIUS } from "../../../../themes/colors";
 
 export function OfertaCard({ oferta, selected, onSelect, C }) {
+  const perfiles = oferta.perfiles ? oferta.perfiles.split(",") : [];
+
   return (
     <div
       onClick={() => onSelect(oferta.id)}
@@ -19,21 +21,42 @@ export function OfertaCard({ oferta, selected, onSelect, C }) {
           justifyContent: "center", fontSize: 12, color: "#fff", fontWeight: 700,
         }}>✓</div>
       )}
+
       <h4 style={{ margin: "0 0 6px", color: C.textPrimary, fontSize: 15 }}>{oferta.titulo}</h4>
+
       <p style={{ margin: "0 0 6px", fontSize: 13, color: C.textMuted }}>
         <span style={{ color: C.accentText, fontWeight: 600 }}>Profesor:</span> {oferta.profesor}
       </p>
-      <p style={{ margin: "0 0 10px", fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
+
+      <p style={{ margin: "0 0 6px", fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
         {oferta.descripcion}
       </p>
-      <div style={{
-        display: "inline-block", padding: "4px 10px", borderRadius: RADIUS.full,
-        background: oferta.cupos > 3 ? C.successSoft : C.dangerSoft,
-        color: oferta.cupos > 3 ? C.success : C.danger,
-        fontSize: 12, fontWeight: 600,
-      }}>
-        {oferta.cupos} cupos disponibles
+
+      <p style={{ margin: "0 0 10px", fontSize: 13, color: C.textMuted, lineHeight: 1.5 }}>
+        <span style={{ color: C.accentText, fontWeight: 600 }}>Actividades:</span> {oferta.actividades}
+      </p>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+        <div style={{
+          display: "inline-block", padding: "4px 10px", borderRadius: RADIUS.full,
+          background: oferta.cuposDisponibles  > 3 ? C.successSoft : C.dangerSoft,
+          color: oferta.cuposDisponibles > 3 ? C.success : C.danger,
+          fontSize: 12, fontWeight: 600,
+        }}>
+          {oferta.cuposDisponibles} cupos disponibles
+        </div>
+
+        {perfiles.map(p => (
+          <div key={p} style={{
+            display: "inline-block", padding: "4px 10px", borderRadius: RADIUS.full,
+            background: C.bgInput, border: `1px solid ${C.borderSubtle}`,
+            color: C.textMuted, fontSize: 12,
+          }}>
+            {p}
+          </div>
+        ))}
       </div>
+
     </div>
   );
 }
