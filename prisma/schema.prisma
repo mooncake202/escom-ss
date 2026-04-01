@@ -23,7 +23,7 @@ model usuario {
   recursos_actualizados        recurso[]
   reporte_firmas               reporte_firmas[]
   reporte_historial_como_actor reporte_historial_estados[]
-
+  revisiones_realizadas solicitud_revision[] @relation
   @@index([id])
 }
 
@@ -131,6 +131,7 @@ model oferta_servicio {
 
   @@index([id])
   @@index([profesor_id])
+
 }
 
 model periodo {
@@ -153,6 +154,10 @@ model solicitud {
   motivacion    String                 @db.Text
   motivoRechazo String?                @db.Text
   tipoRechazo   tipoRechazo            @default(ninguno)
+  registroSISSConfirmado    Boolean @default(false)
+  cartaCompromisoConfirmada Boolean @default(false)
+
+  revisiones solicitud_revision[]
   actividades   actividad[]
   bitacoras     bitacora[]
   reportes      reporte[]
@@ -165,6 +170,23 @@ model solicitud {
   @@index([periodo_id])
   @@index([id])
 }
+
+model solicitud_revision {
+  id           Int            @id @default(autoincrement())
+  solicitud_id Int
+  etapa        etapaRevision
+  estado       estadoRevision @default(pendiente)
+  comentario   String?        @db.Text
+  revisadoPor  Int?
+  fechaRevision DateTime?
+  solicitud    solicitud      @relation(fields: [solicitud_id], references: [id])
+  revisor      usuario?       @relation(fields: [revisadoPor], references: [id])
+
+  @@index([solicitud_id])
+  @@index([etapa])
+}
+
+
 
 model actividad {
   id                   Int                    @id @default(autoincrement())
@@ -433,4 +455,17 @@ enum tipoRechazo {
   ninguno
   definitivo
   corregible
+}
+
+enum etapaRevision {
+  documentacion_y_registroSISS
+  carta_compromiso
+  expediente
+}
+
+enum estadoRevision {
+  pendiente
+  aprobada
+  rechazada_corregible
+  rechazada_definitiva
 }
