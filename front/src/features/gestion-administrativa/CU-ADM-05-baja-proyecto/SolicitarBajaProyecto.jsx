@@ -1,7 +1,5 @@
 import { useTheme, RADIUS }              from "@/themes/colors";
 import { DashboardLayout }               from "@/components/layout/DashboardLayout";
-import { PageContent }                   from "@/components/layout/PageContent";
-import { BackButton }                    from "@/components/layout/BackButton";
 import { Campo }                         from "./components/Campo";
 import { ProyectoCard }                  from "./components/ProyectoCard";
 import { useSolicitarBajaProyecto }      from "./hooks/useSolicitarBajaProyecto";
@@ -32,8 +30,7 @@ export default function SolicitarBajaProyecto() {
         rol="alumno"
         usuario={alumno.nombre}
       >
-        <PageContent maxWidth={640}>
-          <BackButton to="/dashboard" label="Proyectos" />
+        <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
             border: `1px solid ${C.borderDefault}`,
@@ -47,7 +44,7 @@ export default function SolicitarBajaProyecto() {
               por lo que no puedes registrar una solicitud de baja.
             </p>
           </div>
-        </PageContent>
+        </div>
       </DashboardLayout>
     );
   }
@@ -61,8 +58,7 @@ export default function SolicitarBajaProyecto() {
         rol="alumno"
         usuario={alumno.nombre}
       >
-        <PageContent maxWidth={640}>
-          <BackButton to="/dashboard" label="Proyectos" />
+        <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
             border: `1px solid ${C.warning}`, padding: "2rem",
@@ -81,7 +77,7 @@ export default function SolicitarBajaProyecto() {
               Pendiente de procesamiento
             </span>
           </div>
-        </PageContent>
+        </div>
       </DashboardLayout>
     );
   }
@@ -95,7 +91,7 @@ export default function SolicitarBajaProyecto() {
         rol="alumno"
         usuario={alumno.nombre}
       >
-        <PageContent maxWidth={640}>
+        <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
             border: `1px solid ${C.success}`,
@@ -140,7 +136,7 @@ export default function SolicitarBajaProyecto() {
               Ir a mis proyectos
             </button>
           </div>
-        </PageContent>
+        </div>
       </DashboardLayout>
     );
   }
@@ -153,8 +149,7 @@ export default function SolicitarBajaProyecto() {
       rol="alumno"
       usuario={alumno.nombre}
     >
-      <PageContent maxWidth={640}>
-        <BackButton to="/dashboard" label="Proyectos" />
+      <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
 
         {/* Aviso */}
         <div style={{
@@ -219,7 +214,7 @@ export default function SolicitarBajaProyecto() {
           </div>
         </div>
 
-      </PageContent>
+      </div>
     </DashboardLayout>
   );
 }
