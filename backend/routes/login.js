@@ -17,7 +17,7 @@ router.post("/", async (req, res) => {
 
     const [[usuario]] = await db.query(
       `SELECT id, correoInst, password, rol
-       FROM usuarios
+       FROM usuario
        WHERE correoInst = ?`,
       [correoInst.trim()]
     );

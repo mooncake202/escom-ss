@@ -42,11 +42,14 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
       <Field label="Periodo autorizado este semestre" C={C}>
         <SelectField C={C} name="periodo" value={form.periodo} onChange={handleChange}>
           <option value="">Seleccionar periodo</option>
-          {periodos && periodos.map(p => (<option key={p.id} value={p.id}>
-              {new Date(p.fecha_inicio).toLocaleDateString()} — {new Date(p.fecha_fin).toLocaleDateString()}
-            </option>
-
-          ))}
+          {periodos && periodos.map(p => {
+  console.log("periodo:", p);  
+  return (
+    <option key={p.id} value={p.id}>
+      {new Date(p.fechaInicio).toLocaleDateString("es-MX")} — {new Date(p.fechaFin).toLocaleDateString("es-MX")}
+    </option>
+  );
+})}
 
         </SelectField>
 

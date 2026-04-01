@@ -56,7 +56,7 @@ router.post("/", async (req, res) => {
 
     // 2. Verificar correo y boleta duplicado
     const [[existente]] = await db.query(
-      `SELECT id FROM usuarios WHERE correoInst = ?`,
+      `SELECT id FROM usuario WHERE correoInst = ?`,
       [correoInst]
     );
     if (existente) {
@@ -64,7 +64,7 @@ router.post("/", async (req, res) => {
     }
 
     const [[existe]]=await db.query(
-      `SELECT id FROM alumnos WHERE boleta = ?`,
+      `SELECT id FROM alumno WHERE boleta = ?`,
       [data.boleta]
     );
     if (existe) {
@@ -78,7 +78,7 @@ router.post("/", async (req, res) => {
 
     // Reducir cupos de forma atómica
     const [update] = await connection.query(
-      `UPDATE ofertas_servicio SET cupos = cupos - 1 WHERE id = ? AND cupos > 0`,
+      `UPDATE oferta_servicio SET cuposTotales = cuposTotales - 1 WHERE id = ? AND cuposTotales > 0`
       [data.oferta]
     );
     if (update.affectedRows === 0) {
@@ -92,14 +92,14 @@ router.post("/", async (req, res) => {
 
     // Insertar usuario
     const [usuario] = await connection.query(
-      `INSERT INTO usuarios (correoInst, password, rol) VALUES (?, ?, ?)`,
-      [correoInst, hashedPassword, "AlumnoSinAsignar"]
+      `INSERT INTO usuario (correoInst, password, rol) VALUES (?, ?, ?)`,
+      [correoInst, hashedPassword, "alumno_sin_asignar"]
     );
     const usuarioId = usuario.insertId;
 
     // Insertar alumno
     const [alumno] = await connection.query(
-      `INSERT INTO alumnos (usuario_id, nombres, apellidos, boleta, carrera, telefono, correo_personal, creditos)
+      `INSERT INTO alumno (usuario_id, nombres, apellidos, boleta, carrera, telefono, correoPersonal, creditos)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [usuarioId, nombres, apellidos, data.boleta, data.carrera, data.telefono, correoPersonal, data.creditos]
     );
@@ -107,9 +107,9 @@ router.post("/", async (req, res) => {
 
     // Insertar solicitud
     await connection.query(
-      `INSERT INTO solicitudes (alumno_id, oferta_id, creditos, periodo, estado, motivacion)
-      VALUES (?, ?, ?, ?, ?, ?)`,
-      [alumnoId, data.oferta, data.creditos, data.periodo, "PendienteProfesor", data.motivacion]
+      `INSERT INTO solicitud (alumno_id, oferta_id, periodo_id, estatus, motivacion)
+      VALUES (?, ?, ?, ?, ?)`,
+      [alumnoId, data.oferta, data.periodo, "espera_respuesta_de_profesor", data.motivacion]
     );
 
     await connection.commit();

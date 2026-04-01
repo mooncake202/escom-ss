@@ -10,11 +10,11 @@ try {
         o.titulo,
         o.descripcion,
         o.tipo,
-        o.cupos,
-        p.nombre AS profesor
-        FROM ofertas_servicio o
-        JOIN profesores p ON o.profesor_id = p.id
-        WHERE o.cupos > 0
+        o.cuposTotales,
+        p.nombreCompleto AS profesor
+        FROM oferta_servicio o
+        JOIN profesor p ON o.profesor_id = p.id
+        WHERE o.cuposTotales > 0
     `);
     res.json(rows);
 } catch (err) {
