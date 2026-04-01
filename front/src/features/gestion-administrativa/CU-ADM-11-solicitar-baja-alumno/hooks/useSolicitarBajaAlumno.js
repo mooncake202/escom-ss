@@ -32,6 +32,7 @@ export function useBajaAlumnoProfesor() {
   const [motivo, setMotivo]                         = useState("");
   const [errores, setErrores]                       = useState({});
   const [enviado, setEnviado]                       = useState(false);
+  const [busqueda, setBusqueda]                     = useState("");
 
   function seleccionarAlumno(alumno) {
     setAlumnoSeleccionado(alumno);
@@ -64,10 +65,17 @@ export function useBajaAlumnoProfesor() {
     setEnviado(false);
   }
 
+  const alumnosFiltrados = MOCK_ALUMNOS.filter(a => {
+    const q = busqueda.toLowerCase();
+    return a.nombre.toLowerCase().includes(q) || a.boleta.includes(q);
+  });
+
   return {
     profesor:           PROFESOR,
-    alumnos:            MOCK_ALUMNOS,
+    totalAlumnos:       MOCK_ALUMNOS.length,
+    alumnos:            alumnosFiltrados,
     alumnoSeleccionado, motivo, errores, enviado,
+    busqueda, setBusqueda,
     seleccionarAlumno, handleMotivoChange,
     handleSubmit, handleNuevaSolicitud,
   };

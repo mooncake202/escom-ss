@@ -7,7 +7,8 @@ import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
 export default function BajaAlumnoProfesor() {
   const { C } = useTheme();
   const {
-    profesor, alumnos, alumnoSeleccionado, motivo, errores, enviado,
+    profesor, alumnos, totalAlumnos, alumnoSeleccionado, motivo, errores, enviado,
+    busqueda, setBusqueda,
     seleccionarAlumno, handleMotivoChange,
     handleSubmit, handleNuevaSolicitud,
   } = useBajaAlumnoProfesor();
@@ -22,7 +23,7 @@ export default function BajaAlumnoProfesor() {
       <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
 
         {/* ── Empty state: sin alumnos activos ── */}
-        {alumnos.length === 0 && (
+        {totalAlumnos === 0 && (
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.lg,
             border: `1px solid ${C.borderDefault}`,
@@ -87,7 +88,7 @@ export default function BajaAlumnoProfesor() {
         )}
 
         {/* ── Layout principal: lista + formulario ── */}
-        {alumnos.length > 0 && !enviado && (
+        {totalAlumnos > 0 && !enviado && (
           <div style={{
             display: "grid",
             gridTemplateColumns: "320px 1fr",
@@ -102,7 +103,24 @@ export default function BajaAlumnoProfesor() {
               }}>
                 Mis alumnos ({alumnos.length})
               </p>
+              <input
+                type="text"
+                value={busqueda}
+                onChange={e => setBusqueda(e.target.value)}
+                placeholder="Buscar por nombre o boleta..."
+                style={{
+                  width: "100%", padding: "8px 12px", marginBottom: "0.75rem",
+                  boxSizing: "border-box", background: C.bgInput,
+                  border: `1px solid ${C.borderDefault}`, borderRadius: 8,
+                  color: C.textPrimary, fontSize: 13, outline: "none", fontFamily: "inherit",
+                }}
+              />
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {alumnos.length === 0 && (
+                  <p style={{ margin: 0, fontSize: 13, color: C.textMuted, textAlign: "center", padding: "1.5rem 0" }}>
+                    Sin coincidencias para "{busqueda}"
+                  </p>
+                )}
                 {alumnos.map(a => (
                   <AlumnoSelectorCard
                     key={a.id}
