@@ -1,9 +1,10 @@
 
 const MOCK_PROFESOR = {
-  nombre: "Dr. Torres Vega",
-  correo: "torres.vega@escom.ipn.mx",
+  nombre:       "Dr. Torres Vega",
+  correo:       "torres.vega@escom.ipn.mx",
+  departamento: "Departamento de Ciencias de la Computación",
   contactos: [
-    { tipo: "Teléfono de oficina", valor: "55 5729-6000 ext. 52101" },
+    { tipo: "Teléfono personal",   valor: "55 1234 5678" },
     { tipo: "Horario de atención", valor: "Lunes y miércoles, 10:00–12:00 h" },
     { tipo: "Cubículo",            valor: "Edificio de Cómputo, planta baja, CB-03" },
   ],

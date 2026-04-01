@@ -129,6 +129,22 @@ export default function ContactoProfesor() {
             </a>
           </div>
 
+          {/* Departamento */}
+          {profesor.departamento && (
+            <div style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              gap: "1rem", padding: "12px 16px",
+              borderBottom: `1px solid ${C.borderDefault}`,
+            }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.textDisabled, flexShrink: 0, minWidth: 160 }}>
+                Departamento
+              </span>
+              <span style={{ fontSize: 13, color: C.textPrimary }}>
+                {profesor.departamento}
+              </span>
+            </div>
+          )}
+
           {/* Medios adicionales */}
           {profesor.contactos.map((c, i) => (
             <ContactRow key={i} tipo={c.tipo} valor={c.valor} C={C} />

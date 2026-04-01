@@ -25,6 +25,12 @@ import PublicarAnuncios from './features/gestion-administrativa/CU-ADM-09-anunci
 import AnunciosProfesor from './features/gestion-administrativa/CU-ADM-12-anuncios-profesor/AnunciosProfesor'
 import AnunciosSistema from './features/gestion-administrativa/CU-ADM-02-anuncios/AnunciosSistema'
 import ContactoInstitucional from './features/gestion-administrativa/CU-ADM-08-contacto-institucional/ContactoInstitucional'
+import ActualizarDatos from './features/gestion-administrativa/CU-ADM-04-actualizar-datos/ActualizarDatos'
+import CalendarioInstitucional from './features/gestion-administrativa/CU-ADM-10-calendario/CalendarioInstitucional'
+import SolicitarBajaProyecto from './features/gestion-administrativa/CU-ADM-05-baja-proyecto/SolicitarBajaProyecto'
+import SolicitarBajaAlumno from './features/gestion-administrativa/CU-ADM-11-solicitar-baja-alumno/SolicitarBajaAlumno'
+import BajaServicioSocial from './features/gestion-administrativa/CU-ADM-14-baja-servicio-social/BajaServicioSocial'
+import ActualizarDatosProfesor from './features/gestion-administrativa/CU-ADM-13-profesor-actualizar-datos/ActualizarDatosProfesor'
 //import ContactoEquipo from './features/gestion-administrativa/CU-ADM-03-contacto-equipo/ContactoEquipo'
 
 
@@ -58,6 +64,12 @@ function App() {
         <Route path="/coordinacion/admin/anuncios" element={<PublicarAnuncios />} />
         <Route path="/profesor/anuncios" element={<AnunciosProfesor />} />
         <Route path="/alumno/anuncios" element={<AnunciosSistema />} />
+        <Route path="/alumno/datos" element={<ActualizarDatos />} />
+        <Route path="/coordinacion/calendario" element={<CalendarioInstitucional />} />
+        <Route path="/alumno/baja-proyecto" element={<SolicitarBajaProyecto />} />
+        <Route path="/profesor/solicitar-baja-alumno" element={<SolicitarBajaAlumno />} />
+        <Route path="/alumno/baja-servicio-social" element={<BajaServicioSocial />} />
+        <Route path="/profesor/datos-personales" element={<ActualizarDatosProfesor />} />
         <Route path="/alumno/contacto-institucional"       element={<ContactoInstitucional rol="alumno" />} />
         <Route path="/profesor/contacto-institucional"     element={<ContactoInstitucional rol="profesor" />} />
         {/*<Route path="/coordinacion/contacto-institucional" element={<ContactoInstitucional rol="coordinacion" />} />      <Route path="/alumno/contacto-equipo" element={<ContactoEquipo />} />*/}
