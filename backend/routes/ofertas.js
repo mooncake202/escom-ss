@@ -12,7 +12,7 @@ try {
         o.actividades,
         o.tipo,
         o.cuposTotales,
-        (o.cuposTotales - COUNT(s.id)) AS cuposDisponibles,
+        (o.cuposTotales + IFNULL(o.cuposExtraInvestigador,0) - COUNT(s.id)) AS cuposDisponibles,
         p.nombreCompleto AS profesor,
         GROUP_CONCAT(pd.nombre ORDER BY pd.nombre SEPARATOR ',') AS perfiles
         FROM oferta_servicio o

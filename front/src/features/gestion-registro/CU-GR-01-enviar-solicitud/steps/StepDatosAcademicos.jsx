@@ -43,7 +43,7 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
         <SelectField C={C} name="periodo" value={form.periodo} onChange={handleChange}>
           <option value="">Seleccionar periodo</option>
           {periodos && periodos.map(p => {
-  console.log("periodo:", p);  
+  
   return (
     <option key={p.id} value={p.id}>
       {new Date(p.fechaInicio).toLocaleDateString("es-MX")} — {new Date(p.fechaFin).toLocaleDateString("es-MX")}

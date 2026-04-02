@@ -3,10 +3,11 @@ import { RADIUS } from "../../../../themes/colors";
 const CARRERA_LABEL = { ISC: "Ing. Sistemas Computacionales", IA: "Inteligencia Artificial", LCD: "Lic. Ciencia de Datos" };
 
 export function SolicitudCard({ solicitud, onVer, C }) {
-  console.log(solicitud.tituloOferta) // ← agrega esta línea
-  const fecha = new Date(solicitud.periodoInicio + "T00:00:00").toLocaleDateString("es-MX", {
-  day: "2-digit", month: "short", year: "numeric",
-});
+  console.log(solicitud.tituloOferta) 
+
+  const fecha = new Date(solicitud.fechaCreacion).toLocaleDateString("es-MX", {
+    day: "2-digit", month: "short", year: "numeric",
+  });
 
   return (
     <div style={{

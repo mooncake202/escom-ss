@@ -45,11 +45,17 @@ model alumno {
   carrera        String     @db.VarChar(255)
   telefono       String     @unique @db.VarChar(20)
   correoPersonal String     @unique @db.VarChar(255)
+  semestre Int 
+
+
   creditos       Int
   bajaTemporal   Boolean    @default(false)
   usuario        usuario    @relation(fields: [usuario_id], references: [id])
   horas          horas?
   solicitud      solicitud?
+
+  anuncios_vistos anuncio_visto[]
+
 
   @@index([usuario_id])
   @@index([id])
@@ -61,6 +67,7 @@ model profesor {
   nombreCompleto              String                              @unique @db.VarChar(255)
   telefono                    String?                             @unique @db.VarChar(20)
   departamento                String                              @db.VarChar(255)
+  cubiculo String
   anuncios                    anuncio[]                           @relation("AnuncioProfesor")
   ofertas_servicio            oferta_servicio[]
   usuario                     usuario                             @relation(fields: [usuario_id], references: [id])
@@ -389,8 +396,24 @@ model anuncio {
   autor         usuario   @relation("AnuncioAutor", fields: [autor_id], references: [id])
   profesor      profesor? @relation("AnuncioProfesor", fields: [profesor_id], references: [id])
 
+
+  visto_por anuncio_visto[]
+
+
   @@index([autor_id])
   @@index([profesor_id])
+}
+
+
+model anuncio_visto {
+  alumno_id  Int
+  anuncio_id Int
+  visto_en   DateTime
+
+  alumno  alumno  @relation(fields: [alumno_id], references: [id])
+  anuncio anuncio @relation(fields: [anuncio_id], references: [id])
+
+  @@id([alumno_id, anuncio_id])
 }
 
 model recurso {

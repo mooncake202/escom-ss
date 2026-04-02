@@ -17,6 +17,7 @@ router.get("/:usuarioId/solicitudes", async (req, res) => {
         a.creditos,
         p.fechaInicio AS periodoInicio,
         p.fechaFin AS periodoFin,
+        s.fechaCreacion,
         o.titulo AS tituloOferta,
         s.motivacion,
         s.estatus
@@ -58,11 +59,18 @@ router.post("/solicitudes/:solicitudId/decidir", async (req, res) => {
         [req.params.solicitudId]
       );
     } else {
-      // Rechazar — borrar solicitud en cascada
+      // Rechazar — guardar motivo (sin borrar aún)
       await connection.query(
-        `DELETE FROM solicitud WHERE id = ?`,
+        `UPDATE solicitud 
+        SET estatus = 'espera_respuesta_de_profesor',
+            motivoRechazo = 'No cumple con el perfil requerido',
+            tipoRechazo = 'definitivo'
+        WHERE id = ?`,
         [req.params.solicitudId]
       );
+
+      // 🔥 LOG TEMPORAL
+      console.log("⚠️ borrado en cascada activado (pendiente implementación)");
     }
 
     await connection.commit();

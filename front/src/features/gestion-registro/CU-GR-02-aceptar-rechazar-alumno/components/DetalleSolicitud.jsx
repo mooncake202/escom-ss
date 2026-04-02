@@ -73,7 +73,7 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
           <InfoRow label="Créditos declarados" value={`${solicitud.creditos}%`} C={C} />
           <InfoRow label="Periodo inicio"   value={fmtFecha(solicitud.periodoInicio)} C={C} />
           <InfoRow label="Periodo término"  value={fmtFecha(solicitud.periodoFin)}    C={C} />
-          <InfoRow label="Fecha de envío"   value={fmtFecha(solicitud.fechaEnvio)}    C={C} />
+          <InfoRow label="Fecha de envío"   value={fmtFecha(solicitud.fechaCreacion)}    C={C} />
           <InfoRow label="Vacante" value={solicitud.tituloOferta} C={C} />
           <InfoRow label="Habilidades y motivación" value={solicitud.motivacion} C={C} />
           
