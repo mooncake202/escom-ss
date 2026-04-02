@@ -156,6 +156,9 @@ model solicitud {
   tipoRechazo   tipoRechazo            @default(ninguno)
   registroSISSConfirmado    Boolean @default(false)
   cartaCompromisoConfirmada Boolean @default(false)
+  fechaCreacion         DateTime
+  fechaSISSConfirmado   DateTime?
+  fechaCartaConfirmada  DateTime?
 
   revisiones solicitud_revision[]
   actividades   actividad[]

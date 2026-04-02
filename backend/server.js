@@ -6,6 +6,10 @@ const registroRoutes = require("./routes/registro");
 const periodosRoutes = require("./routes/fechas_periodo");
 const loginRoute = require("./routes/login");
 const alumnoRoutes = require("./routes/alumno");
+const profesorRoutes = require("./routes/profesor");
+
+
+
 
 const app = express();
 
@@ -17,6 +21,8 @@ app.use("/registro", registroRoutes);
 app.use("/periodos", periodosRoutes);
 app.use("/login", loginRoute);
 app.use("/alumno", alumnoRoutes);
+app.use("/profesor", profesorRoutes);
+
 
 
 app.listen(3000,()=>{

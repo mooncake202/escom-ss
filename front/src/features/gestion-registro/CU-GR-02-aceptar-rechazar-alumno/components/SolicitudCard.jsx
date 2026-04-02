@@ -4,9 +4,9 @@ const CARRERA_LABEL = { ISC: "Ing. Sistemas Computacionales", IA: "Inteligencia 
 
 export function SolicitudCard({ solicitud, onVer, C }) {
   console.log(solicitud.tituloOferta) // ← agrega esta línea
-  const fecha = new Date(solicitud.fechaEnvio).toLocaleDateString("es-MX", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  const fecha = new Date(solicitud.periodoInicio + "T00:00:00").toLocaleDateString("es-MX", {
+  day: "2-digit", month: "short", year: "numeric",
+});
 
   return (
     <div style={{

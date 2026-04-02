@@ -119,10 +119,26 @@ router.post("/", async (req, res) => {
 
     // Insertar solicitud
     await connection.query(
-      `INSERT INTO solicitud (alumno_id, oferta_id, periodo_id, estatus, motivacion)
-      VALUES (?, ?, ?, ?, ?)`,
-      [alumnoId, data.oferta, data.periodo, "espera_respuesta_de_profesor", data.motivacion]
+      `INSERT INTO solicitud 
+      (alumno_id, oferta_id, periodo_id, estatus, motivacion, motivoRechazo, tipoRechazo, registroSISSConfirmado, cartaCompromisoConfirmada, fechaCreacion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      [
+        alumnoId,
+        data.oferta,
+        data.periodo,
+        "espera_respuesta_de_profesor",
+        data.motivacion,
+        null,
+        "ninguno",
+        false,
+        false
+      ]
     );
+
+    
+
+
+
 
     await connection.commit();
     connection.release();

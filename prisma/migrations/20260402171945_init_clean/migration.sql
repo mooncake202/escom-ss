@@ -64,7 +64,7 @@ CREATE TABLE `profesor` (
 CREATE TABLE `profesor_caracteristica` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `profesor_id` INTEGER NOT NULL,
-    `tipo` VARCHAR(50) NOT NULL,
+    `tipo` ENUM('presidente_academia', 'coordinador', 'jefe_departamento', 'funcionario', 'coordinador_club', 'proyecto_investigacion') NOT NULL,
     `cuposExtra` INTEGER NOT NULL,
     `fechaAsignacion` DATETIME(3) NOT NULL,
     `asignadoPor` INTEGER NOT NULL,
@@ -79,8 +79,8 @@ CREATE TABLE `profesor_caracteristica` (
 CREATE TABLE `profesor_caracteristica_solicitud` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `profesor_id` INTEGER NOT NULL,
-    `tipo` VARCHAR(50) NOT NULL,
-    `estado` VARCHAR(20) NOT NULL,
+    `tipo` ENUM('presidente_academia', 'coordinador', 'jefe_departamento', 'funcionario', 'coordinador_club', 'proyecto_investigacion') NOT NULL,
+    `estado` ENUM('pendiente', 'aprobada', 'rechazada') NOT NULL,
     `motivacion` TEXT NOT NULL,
     `comentario` TEXT NULL,
     `fechaCreacion` DATETIME(3) NOT NULL,
@@ -110,35 +110,18 @@ CREATE TABLE `horas` (
 CREATE TABLE `oferta_servicio` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `profesor_id` INTEGER NOT NULL,
-    `tipo` VARCHAR(20) NOT NULL,
+    `tipo` ENUM('proyecto', 'individual') NOT NULL,
     `titulo` VARCHAR(255) NOT NULL,
     `tituloPlatSISS` VARCHAR(255) NOT NULL,
     `descripcion` TEXT NOT NULL,
     `actividades` TEXT NOT NULL,
-    `cupos` INTEGER NOT NULL,
-    `estado` VARCHAR(20) NOT NULL,
+    `cuposTotales` INTEGER NOT NULL,
+    `estado` ENUM('activa', 'pendiente', 'finalizado') NOT NULL,
+    `cuposExtraInvestigador` INTEGER NULL,
 
     INDEX `oferta_servicio_id_idx`(`id`),
     INDEX `oferta_servicio_profesor_id_idx`(`profesor_id`),
     PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `perfilDeseado` (
-    `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `nombre` VARCHAR(50) NOT NULL,
-
-    UNIQUE INDEX `perfilDeseado_nombre_key`(`nombre`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `oferta_perfilDeseado` (
-    `oferta_id` INTEGER NOT NULL,
-    `perfil_id` INTEGER NOT NULL,
-
-    INDEX `oferta_perfilDeseado_perfil_id_idx`(`perfil_id`),
-    PRIMARY KEY (`oferta_id`, `perfil_id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
@@ -159,14 +142,35 @@ CREATE TABLE `solicitud` (
     `alumno_id` INTEGER NOT NULL,
     `oferta_id` INTEGER NOT NULL,
     `periodo_id` INTEGER NOT NULL,
-    `estatus` VARCHAR(50) NOT NULL,
+    `estatus` ENUM('espera_respuesta_de_profesor', 'espera_validacion_documentacion_y_registroSISS', 'espera_validacion_carta_compromiso', 'espera_validacion_expediente', 'Aprobada') NOT NULL,
     `motivacion` TEXT NOT NULL,
-    `motivo_rechazo` TEXT NULL,
+    `motivoRechazo` TEXT NULL,
+    `tipoRechazo` ENUM('ninguno', 'definitivo', 'corregible') NOT NULL DEFAULT 'ninguno',
+    `registroSISSConfirmado` BOOLEAN NOT NULL DEFAULT false,
+    `cartaCompromisoConfirmada` BOOLEAN NOT NULL DEFAULT false,
+    `fechaCreacion` DATETIME(3) NOT NULL,
+    `fechaSISSConfirmado` DATETIME(3) NULL,
+    `fechaCartaConfirmada` DATETIME(3) NULL,
 
     UNIQUE INDEX `solicitud_alumno_id_key`(`alumno_id`),
     INDEX `solicitud_oferta_id_idx`(`oferta_id`),
     INDEX `solicitud_periodo_id_idx`(`periodo_id`),
     INDEX `solicitud_id_idx`(`id`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `solicitud_revision` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `solicitud_id` INTEGER NOT NULL,
+    `etapa` ENUM('documentacion_y_registroSISS', 'carta_compromiso', 'expediente') NOT NULL,
+    `estado` ENUM('pendiente', 'aprobada', 'rechazada_corregible', 'rechazada_definitiva') NOT NULL DEFAULT 'pendiente',
+    `comentario` TEXT NULL,
+    `revisadoPor` INTEGER NULL,
+    `fechaRevision` DATETIME(3) NULL,
+
+    INDEX `solicitud_revision_solicitud_id_idx`(`solicitud_id`),
+    INDEX `solicitud_revision_etapa_idx`(`etapa`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -189,8 +193,8 @@ CREATE TABLE `bitacora` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `solicitud_id` INTEGER NOT NULL,
     `fecha` DATE NOT NULL,
-    `horaInicio` TIME NULL,
-    `horaFin` TIME NULL,
+    `horaInicio` TIME(0) NULL,
+    `horaFin` TIME(0) NULL,
     `estado` VARCHAR(30) NOT NULL,
     `fechaCreacion` DATETIME(3) NOT NULL,
     `fechaRevision` DATETIME(3) NULL,
@@ -234,6 +238,7 @@ CREATE TABLE `reporte` (
     `reporte_documento_id` INTEGER NULL,
 
     INDEX `reporte_solicitud_id_idx`(`solicitud_id`),
+    INDEX `reporte_reporte_documento_id_fkey`(`reporte_documento_id`),
     UNIQUE INDEX `reporte_solicitud_id_fechaInicio_key`(`solicitud_id`, `fechaInicio`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -272,6 +277,7 @@ CREATE TABLE `reporte_firmas` (
     `usuario_id` INTEGER NOT NULL,
     `fechaFirma` DATETIME(3) NOT NULL,
 
+    INDEX `reporte_firmas_usuario_id_fkey`(`usuario_id`),
     UNIQUE INDEX `reporte_firmas_reporte_id_tipo_key`(`reporte_id`, `tipo`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -350,7 +356,7 @@ CREATE TABLE `calendario_inhabil` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `calendario_id` INTEGER NOT NULL,
     `fechaInhabil` DATE NOT NULL,
-    `horaDesde` TIME NOT NULL,
+    `horaDesde` TIME(0) NOT NULL,
 
     UNIQUE INDEX `calendario_inhabil_calendario_id_key`(`calendario_id`),
     UNIQUE INDEX `calendario_inhabil_fechaInhabil_key`(`fechaInhabil`),
@@ -385,6 +391,24 @@ CREATE TABLE `recurso` (
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
+-- CreateTable
+CREATE TABLE `oferta_perfildeseado` (
+    `oferta_id` INTEGER NOT NULL,
+    `perfil_id` INTEGER NOT NULL,
+
+    INDEX `oferta_perfilDeseado_perfil_id_idx`(`perfil_id`),
+    PRIMARY KEY (`oferta_id`, `perfil_id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `perfildeseado` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `nombre` VARCHAR(50) NOT NULL,
+
+    UNIQUE INDEX `perfilDeseado_nombre_key`(`nombre`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- AddForeignKey
 ALTER TABLE `coordinacion` ADD CONSTRAINT `coordinacion_usuario_id_fkey` FOREIGN KEY (`usuario_id`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
@@ -395,10 +419,10 @@ ALTER TABLE `alumno` ADD CONSTRAINT `alumno_usuario_id_fkey` FOREIGN KEY (`usuar
 ALTER TABLE `profesor` ADD CONSTRAINT `profesor_usuario_id_fkey` FOREIGN KEY (`usuario_id`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `profesor_caracteristica` ADD CONSTRAINT `profesor_caracteristica_profesor_id_fkey` FOREIGN KEY (`profesor_id`) REFERENCES `profesor`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `profesor_caracteristica` ADD CONSTRAINT `profesor_caracteristica_asignadoPor_fkey` FOREIGN KEY (`asignadoPor`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `profesor_caracteristica` ADD CONSTRAINT `profesor_caracteristica_asignadoPor_fkey` FOREIGN KEY (`asignadoPor`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `profesor_caracteristica` ADD CONSTRAINT `profesor_caracteristica_profesor_id_fkey` FOREIGN KEY (`profesor_id`) REFERENCES `profesor`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `profesor_caracteristica_solicitud` ADD CONSTRAINT `profesor_caracteristica_solicitud_profesor_id_fkey` FOREIGN KEY (`profesor_id`) REFERENCES `profesor`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -410,12 +434,6 @@ ALTER TABLE `horas` ADD CONSTRAINT `horas_alumno_id_fkey` FOREIGN KEY (`alumno_i
 ALTER TABLE `oferta_servicio` ADD CONSTRAINT `oferta_servicio_profesor_id_fkey` FOREIGN KEY (`profesor_id`) REFERENCES `profesor`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `oferta_perfilDeseado` ADD CONSTRAINT `oferta_perfilDeseado_oferta_id_fkey` FOREIGN KEY (`oferta_id`) REFERENCES `oferta_servicio`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `oferta_perfilDeseado` ADD CONSTRAINT `oferta_perfilDeseado_perfil_id_fkey` FOREIGN KEY (`perfil_id`) REFERENCES `perfilDeseado`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `solicitud` ADD CONSTRAINT `solicitud_alumno_id_fkey` FOREIGN KEY (`alumno_id`) REFERENCES `alumno`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -425,31 +443,37 @@ ALTER TABLE `solicitud` ADD CONSTRAINT `solicitud_oferta_id_fkey` FOREIGN KEY (`
 ALTER TABLE `solicitud` ADD CONSTRAINT `solicitud_periodo_id_fkey` FOREIGN KEY (`periodo_id`) REFERENCES `periodo`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `solicitud_revision` ADD CONSTRAINT `solicitud_revision_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `solicitud_revision` ADD CONSTRAINT `solicitud_revision_revisadoPor_fkey` FOREIGN KEY (`revisadoPor`) REFERENCES `usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `actividad` ADD CONSTRAINT `actividad_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `bitacora` ADD CONSTRAINT `bitacora_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `bitacora_actividades` ADD CONSTRAINT `bitacora_actividades_bitacora_id_fkey` FOREIGN KEY (`bitacora_id`) REFERENCES `bitacora`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE `bitacora_actividades` ADD CONSTRAINT `bitacora_actividades_actividad_id_fkey` FOREIGN KEY (`actividad_id`) REFERENCES `actividad`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `reporte` ADD CONSTRAINT `reporte_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `bitacora_actividades` ADD CONSTRAINT `bitacora_actividades_bitacora_id_fkey` FOREIGN KEY (`bitacora_id`) REFERENCES `bitacora`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `reporte` ADD CONSTRAINT `reporte_reporte_documento_id_fkey` FOREIGN KEY (`reporte_documento_id`) REFERENCES `documento`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `reporte` ADD CONSTRAINT `reporte_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `reporte_dias` ADD CONSTRAINT `reporte_dias_reporte_id_fkey` FOREIGN KEY (`reporte_id`) REFERENCES `reporte`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `reporte_historial_estados` ADD CONSTRAINT `reporte_historial_estados_reporte_id_fkey` FOREIGN KEY (`reporte_id`) REFERENCES `reporte`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `reporte_historial_estados` ADD CONSTRAINT `reporte_historial_estados_actor_id_fkey` FOREIGN KEY (`actor_id`) REFERENCES `usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `reporte_historial_estados` ADD CONSTRAINT `reporte_historial_estados_actor_id_fkey` FOREIGN KEY (`actor_id`) REFERENCES `usuario`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE `reporte_historial_estados` ADD CONSTRAINT `reporte_historial_estados_reporte_id_fkey` FOREIGN KEY (`reporte_id`) REFERENCES `reporte`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `reporte_firmas` ADD CONSTRAINT `reporte_firmas_reporte_id_fkey` FOREIGN KEY (`reporte_id`) REFERENCES `reporte`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -464,10 +488,10 @@ ALTER TABLE `firma` ADD CONSTRAINT `firma_usuario_id_fkey` FOREIGN KEY (`usuario
 ALTER TABLE `documento` ADD CONSTRAINT `documento_subidoPor_fkey` FOREIGN KEY (`subidoPor`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `solicitud_documentos` ADD CONSTRAINT `solicitud_documentos_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `solicitud_documentos` ADD CONSTRAINT `solicitud_documentos_documento_id_fkey` FOREIGN KEY (`documento_id`) REFERENCES `documento`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE `solicitud_documentos` ADD CONSTRAINT `solicitud_documentos_documento_id_fkey` FOREIGN KEY (`documento_id`) REFERENCES `documento`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE `solicitud_documentos` ADD CONSTRAINT `solicitud_documentos_solicitud_id_fkey` FOREIGN KEY (`solicitud_id`) REFERENCES `solicitud`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `calendario_institucional` ADD CONSTRAINT `calendario_institucional_creadoPor_fkey` FOREIGN KEY (`creadoPor`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -486,3 +510,9 @@ ALTER TABLE `anuncio` ADD CONSTRAINT `anuncio_profesor_id_fkey` FOREIGN KEY (`pr
 
 -- AddForeignKey
 ALTER TABLE `recurso` ADD CONSTRAINT `recurso_actualizadoPor_fkey` FOREIGN KEY (`actualizadoPor`) REFERENCES `usuario`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `oferta_perfildeseado` ADD CONSTRAINT `oferta_perfilDeseado_oferta_id_fkey` FOREIGN KEY (`oferta_id`) REFERENCES `oferta_servicio`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `oferta_perfildeseado` ADD CONSTRAINT `oferta_perfilDeseado_perfil_id_fkey` FOREIGN KEY (`perfil_id`) REFERENCES `perfildeseado`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
