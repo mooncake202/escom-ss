@@ -19,7 +19,7 @@ import RegistrarBitacora from './features/gestion-actividades/CU-AH-03-registrar
 import RevisarAvances from './features/gestion-actividades/CU-AH-04-revisar-avances/RevisarAvances'
 import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-horas/AcumuladoHoras'
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
-
+import EsperandoProfesor from './features/gestion-registro/esperas/EsperandoProfesor'
 
 
 
@@ -29,6 +29,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/registro" element={<RegistroSolicitud />} />
+        <Route path="/alumnoSinAsignar/esperando_profesor" element={<EsperandoProfesor />} />
         <Route path="/profesor/solicitudes" element={<SolicitudesPendientes />} />
         <Route path="/alumnoSinAsignar/siss" element={<RegistroSISS />} />
         <Route path="/alumnoSinAsignar/documentacion" element={<AdjuntarDocumentacion />} />
