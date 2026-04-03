@@ -25,18 +25,22 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
         <InputField C={C} name="creditos" type="number" placeholder="Necesitas mínimo el 70%" min="0" max="100" value={form.creditos} onChange={handleChange} />
         <ErrorMsg field="creditos" errors={errors} C={C} />
 
-      <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
-        <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          🔗{" "}
-          <a href="https://www.youtube.com/watch?v=U5akJxmjZ-s" target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
-            Solicita tu constancia de créditos aquí GUARDA ESTE DOCUMENTO
-          </a>
-        </p>
-      </div>
+        <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
+          <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+            🔗{" "}
+            <a href="https://www.youtube.com/watch?v=U5akJxmjZ-s" target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
+              Solicita tu constancia de créditos aquí GUARDA ESTE DOCUMENTO
+            </a>
+          </p>
+        </div>
 
       </Field>
 
-      
+      <Field label="Semestre actual" hint="Coloca el semestre exacto que muestra tu constancia" C={C}>
+        <InputField C={C} name="semestre" type="number" placeholder="Ej. 7" min="0" max="100" value={form.semestre} onChange={handleChange} />
+        <ErrorMsg field="semestre" errors={errors} C={C} />
+
+      </Field>
 
 
       <Field label="Periodo autorizado este semestre" C={C}>

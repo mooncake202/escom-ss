@@ -9,7 +9,10 @@ router.get("/solicitud/:usuarioId", async (req, res) => {
         a.nombres, a.apellidos,
         o.titulo AS vacante,
         p.nombreCompleto AS profesor,
-        s.estatus, s.motivacion
+        s.estatus, 
+        s.motivacion,
+        s.motivoRechazo,
+        s.tipoRechazo
       FROM usuario u
       JOIN alumno a ON a.usuario_id = u.id
       JOIN solicitud s ON s.alumno_id = a.id
@@ -24,6 +27,22 @@ router.get("/solicitud/:usuarioId", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ mensaje: "Error al obtener datos" });
+  }
+});
+
+
+router.post("/solicitud/:usuarioId/reset", async (req, res) => {
+  try {
+    console.log("🔥 aqui borrado cascada");
+
+    // luego aquí harás el delete real
+    // DELETE FROM solicitud WHERE alumno_id = ?
+
+    res.json({ mensaje: "Solicitud reiniciadaAAAAAAAAAAAAAAAAA" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ mensaje: "Error al reiniciar solicitud" });
   }
 });
 

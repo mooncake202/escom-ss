@@ -158,6 +158,7 @@ model solicitud {
   oferta_id     Int
   periodo_id    Int
   estatus       pasosRegistroSolicitud
+  estatusAnterior pasosRegistroSolicitud?
   motivacion    String                 @db.Text
   motivoRechazo String?                @db.Text
   tipoRechazo   tipoRechazo            @default(ninguno)
@@ -475,6 +476,8 @@ enum pasosRegistroSolicitud {
   espera_validacion_carta_compromiso
   espera_validacion_expediente
   Aprobada
+  rechazada_corregible
+  rechazada_definitiva
 }
 
 enum tipoRechazo {

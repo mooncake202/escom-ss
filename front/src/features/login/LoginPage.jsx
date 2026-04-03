@@ -78,42 +78,54 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await postLogin(form);
-      const { rol, estatus, registroSISSConfirmado, cartaCompromisoConfirmada, numDocumentos } = res.usuario;
+      const { rol, estatus, tipoRechazo, estatusAnterior, registroSISSConfirmado, cartaCompromisoConfirmada, numDocumentos } = res.usuario;
 
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
       
       if (rol === "profesor") {
         navigate("/profesor/solicitudes");
-      } else if (rol === "coordinacion") {
-        navigate("/coordinacion/dashboard");
-
-      } else if (rol === "alumno_sin_asignar") {
-        if (estatus === "espera_respuesta_de_profesor") {
-          navigate("/alumnoSinAsignar/esperando_profesor");
-        } else if (estatus === "espera_validacion_documentacion_y_registroSISS") {
-          if (!registroSISSConfirmado) {
-            navigate("/alumnoSinAsignar/siss");
-          } else if (numDocumentos === 0) {
-            navigate("/alumnoSinAsignar/documentacion");
-          } else {
-            navigate("/alumnoSinAsignar/esperando_coordinacion");
-          }
-        } else if (estatus === "espera_validacion_carta_compromiso") {
-          if (!cartaCompromisoConfirmada) {
-            navigate("/alumnoSinAsignar/carta-compromiso");
-          } else {
-            navigate("/alumnoSinAsignar/esperando_coordinacion");
-          }
-        } else if (estatus === "espera_validacion_expediente") {
-          if (numDocumentos === 0) {
-            navigate("/alumnoSinAsignar/expediente");
-          } else {
-            navigate("/alumnoSinAsignar/esperando_coordinacion");
-          }
-        }
-      } else if (rol === "alumno_asignado") {
+      } 
+      
+      else if (rol === "coordinacion") {
+      navigate("/coordinacion/dashboard");
+      } 
+      
+      else if (rol === "alumno_asignado") {
         navigate("/alumno/dashboard");
       }
+
+
+      else if (rol === "alumno_sin_asignar") {
+        const estatusEfectivo =
+        tipoRechazo && tipoRechazo !== "ninguno"
+          ? estatusAnterior
+          : estatus;
+
+      if (estatusEfectivo === "espera_respuesta_de_profesor") {
+        navigate("/alumnoSinAsignar/esperando_profesor");
+      }
+      
+      
+      else {
+        console.log("estatus no manejado:", estatusEfectivo);
+      }
+
+
+
+
+
+
+
+
+
+      } 
+
+
+
+
+
+
+      
 
 
 

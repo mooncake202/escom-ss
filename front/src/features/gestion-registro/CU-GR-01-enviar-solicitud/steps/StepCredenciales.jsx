@@ -67,6 +67,7 @@ const finFormateado = finSeleccionado
             ["Inicio seleccionado", inicioFormateado],
             ["Oferta", ofertaSeleccionada],
             ["Fin seleccionado", finFormateado],
+            ["Semestre", form.semestre]
             
 
             

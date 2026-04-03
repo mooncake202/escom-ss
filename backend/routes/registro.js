@@ -34,6 +34,8 @@ function validar(data) {
   if (!passwordRegex.test(data.password.trim()))             return "Contraseña débil: mínimo 8 caracteres, mayúscula, minúscula, número y símbolo";
   if (data.password.trim() !== data.confirmarPassword)       return "Las contraseñas no coinciden";
   if (!data.motivacion)                                      return "Ingresa tu motivación y aportaciones que harías a la oferta";
+  if (!data.semestre)                                        return "Semestre requerido";
+  if (data.semestre < 1 || data.semestre > 12) return "Semestre inválido";
   return null;
 }
 
@@ -111,9 +113,9 @@ router.post("/", async (req, res) => {
 
     // Insertar alumno
     const [alumno] = await connection.query(
-      `INSERT INTO alumno (usuario_id, nombres, apellidos, boleta, carrera, telefono, correoPersonal, creditos)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [usuarioId, nombres, apellidos, data.boleta, data.carrera, data.telefono, correoPersonal, data.creditos]
+      `INSERT INTO alumno (usuario_id, nombres, apellidos, boleta, carrera, telefono, correoPersonal, creditos, semestre)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [usuarioId, nombres, apellidos, data.boleta, data.carrera, data.telefono, correoPersonal, data.creditos, data.semestre]
     );
     const alumnoId = alumno.insertId;
 

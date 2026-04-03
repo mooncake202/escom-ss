@@ -55,14 +55,15 @@ router.post("/solicitudes/:solicitudId/decidir", async (req, res) => {
       // Crear registro en solicitud_revision
       await connection.query(
         `INSERT INTO solicitud_revision (solicitud_id, etapa, estado)
-         VALUES (?, 'documentacion_y_registroSISS', 'pendiente')`,
+        VALUES (?, 'documentacion_y_registroSISS', 'pendiente')`,
         [req.params.solicitudId]
       );
     } else {
       // Rechazar — guardar motivo (sin borrar aún)
       await connection.query(
         `UPDATE solicitud 
-        SET estatus = 'espera_respuesta_de_profesor',
+        SET estatusAnterior = estatus,
+            estatus = 'rechazada_definitiva',
             motivoRechazo = 'No cumple con el perfil requerido',
             tipoRechazo = 'definitivo'
         WHERE id = ?`,
