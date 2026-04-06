@@ -70,11 +70,6 @@ export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, on
               {errores.motivo}
             </p>
           )}
-          {!errores.motivo && (
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: C.textDisabled }}>
-              Explica brevemente los motivos que justifican la solicitud de baja.
-            </p>
-          )}
         </div>
 
         {/* Botones */}

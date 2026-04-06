@@ -7,10 +7,11 @@ import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
 export default function BajaAlumnoProfesor() {
   const { C } = useTheme();
   const {
-    profesor, alumnos, totalAlumnos, alumnoSeleccionado, motivo, errores, enviado,
+    profesor, alumnos, totalAlumnos, alumnosConBaja,
+    alumnoSeleccionado, motivo, errores,
     busqueda, setBusqueda,
-    seleccionarAlumno, handleMotivoChange,
-    handleSubmit, handleNuevaSolicitud,
+    toast, dismissToast,
+    seleccionarAlumno, handleMotivoChange, handleSubmit,
   } = useBajaAlumnoProfesor();
 
   return (
@@ -21,6 +22,28 @@ export default function BajaAlumnoProfesor() {
       usuario={profesor.nombre}
     >
       <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
+
+        {/* ── Toast ── */}
+        {toast && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            gap: "1rem", marginBottom: "1.25rem", padding: "12px 16px",
+            borderRadius: RADIUS.md, background: "rgba(34,197,94,0.1)",
+            border: "1px solid #22c55e",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none"
+                stroke="#22c55e" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span style={{ fontSize: 13, color: "#22c55e", fontWeight: 500 }}>{toast}</span>
+            </div>
+            <button onClick={dismissToast} style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "#22c55e", fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0,
+            }}>✕</button>
+          </div>
+        )}
 
         {/* ── Empty state: sin alumnos activos ── */}
         {totalAlumnos === 0 && (
@@ -39,56 +62,8 @@ export default function BajaAlumnoProfesor() {
           </div>
         )}
 
-        {/* ── Confirmación de envío ── */}
-        {enviado && alumnoSeleccionado && (
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.success}`,
-            padding: "2.5rem 2rem", textAlign: "center",
-          }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              background: C.successSoft,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 1.25rem",
-            }}>
-              <svg width={28} height={28} viewBox="0 0 24 24" fill="none"
-                stroke={C.success} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <h3 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
-              Solicitud enviada
-            </h3>
-            <p style={{ margin: "0 0 0.25rem", fontSize: 14, color: C.textMuted }}>
-              La solicitud de baja de <strong>{alumnoSeleccionado.nombre}</strong> fue registrada con estado:
-            </p>
-            <span style={{
-              display: "inline-block", margin: "0.5rem 0 1.25rem",
-              padding: "4px 14px", borderRadius: RADIUS.full,
-              background: C.warningSoft, color: C.warning, fontSize: 13, fontWeight: 700,
-            }}>
-              Pendiente de procesamiento
-            </span>
-            <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled, lineHeight: 1.6 }}>
-              Coordinación revisará la solicitud y decidirá si las horas acumuladas
-              del alumno son contabilizadas. El alumno será notificado del resultado.
-            </p>
-            <button
-              onClick={handleNuevaSolicitud}
-              style={{
-                padding: "10px 28px", borderRadius: RADIUS.md,
-                background: C.accent, border: "none", color: "#fff",
-                fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              Nueva solicitud
-            </button>
-          </div>
-        )}
-
         {/* ── Layout principal: lista + formulario ── */}
-        {totalAlumnos > 0 && !enviado && (
+        {totalAlumnos > 0 && (
           <div style={{
             display: "grid",
             gridTemplateColumns: "320px 1fr",
@@ -126,6 +101,7 @@ export default function BajaAlumnoProfesor() {
                     key={a.id}
                     alumno={a}
                     seleccionado={alumnoSeleccionado?.id === a.id}
+                    tieneBaja={alumnosConBaja.has(a.id)}
                     onSeleccionar={seleccionarAlumno}
                     C={C}
                   />

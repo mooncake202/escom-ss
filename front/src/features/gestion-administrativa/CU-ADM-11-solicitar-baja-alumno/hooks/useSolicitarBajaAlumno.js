@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 const PROFESOR = { nombre: "Dr. Torres Vega" };
 
@@ -31,14 +31,17 @@ export function useBajaAlumnoProfesor() {
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
   const [motivo, setMotivo]                         = useState("");
   const [errores, setErrores]                       = useState({});
-  const [enviado, setEnviado]                       = useState(false);
   const [busqueda, setBusqueda]                     = useState("");
+  const [alumnosConBaja, setAlumnosConBaja]         = useState(new Set());
+  const [toast, setToast]                           = useState(null);
+
+  const dismissToast = useCallback(() => setToast(null), []);
 
   function seleccionarAlumno(alumno) {
+    if (alumnosConBaja.has(alumno.id)) return;
     setAlumnoSeleccionado(alumno);
     setMotivo("");
     setErrores({});
-    setEnviado(false);
   }
 
   function handleMotivoChange(e) {
@@ -55,14 +58,14 @@ export function useBajaAlumnoProfesor() {
   function handleSubmit() {
     const e = validar();
     if (Object.keys(e).length > 0) { setErrores(e); return; }
-    setEnviado(true);
-  }
 
-  function handleNuevaSolicitud() {
+    setAlumnosConBaja(prev => new Set(prev).add(alumnoSeleccionado.id));
+    setToast(`Solicitud de baja de ${alumnoSeleccionado.nombre} registrada correctamente.`);
     setAlumnoSeleccionado(null);
     setMotivo("");
     setErrores({});
-    setEnviado(false);
+
+    setTimeout(() => setToast(null), 4000);
   }
 
   const alumnosFiltrados = MOCK_ALUMNOS.filter(a => {
@@ -74,9 +77,10 @@ export function useBajaAlumnoProfesor() {
     profesor:           PROFESOR,
     totalAlumnos:       MOCK_ALUMNOS.length,
     alumnos:            alumnosFiltrados,
-    alumnoSeleccionado, motivo, errores, enviado,
+    alumnosConBaja,
+    alumnoSeleccionado, motivo, errores,
     busqueda, setBusqueda,
-    seleccionarAlumno, handleMotivoChange,
-    handleSubmit, handleNuevaSolicitud,
+    toast, dismissToast,
+    seleccionarAlumno, handleMotivoChange, handleSubmit,
   };
 }

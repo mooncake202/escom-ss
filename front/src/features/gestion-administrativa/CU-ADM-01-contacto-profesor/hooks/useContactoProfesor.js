@@ -20,7 +20,7 @@ const MOCK_ALUMNO = { nombre: "García López Ana", matricula: "2022630001", id:
 
 // true  → alumno en proyecto (muestra sección de equipo)
 // false → alumno individual (no muestra sección de equipo)
-const MOCK_EN_PROYECTO = true;
+const MOCK_EN_PROYECTO = false;
 
 const MOCK_PROYECTO = {
   nombre: "Sistema de gestión de inventarios",
