@@ -49,7 +49,7 @@ model alumno {
 
 
   creditos       Int
-  bajaTemporal   Boolean    @default(false)
+  
   usuario        usuario    @relation(fields: [usuario_id], references: [id])
   horas          horas?
   solicitud      solicitud?
