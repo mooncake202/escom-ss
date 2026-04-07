@@ -27,6 +27,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        -- rutas REGISTRO--
         <Route path="/" element={<LoginPage />} />
         <Route path="/registro" element={<RegistroSolicitud />} />
         <Route path="/alumnoSinAsignar/esperando_profesor" element={<EsperandoProfesor />} />
@@ -38,6 +39,8 @@ function App() {
         <Route path="/coordinacion/carta-presencial" element={<ValidarEntregaPresencial />} />
         <Route path="/alumnoSinAsignar/expediente" element={<SubirExpediente />} />
         <Route path="/coordinacion/expedientes" element={<RevisarExpediente />} />
+        
+        -- rutas ACTIVIDADES--
         <Route path="/profesor/actividades" element={<AsignarActividades />} />
         <Route path="/alumno/actividades" element={<ConsultarActividades />} />
         <Route path="/alumno/bitacora" element={<RegistrarBitacora />} />

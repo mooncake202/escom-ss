@@ -9,9 +9,11 @@ const MOCK_ALUMNOS = [
     carrera:  "ISC",
     correoInst: "jgarcia0412@alumno.ipn.mx",
     actividades: [
-      { id: 1, titulo: "Análisis de requerimientos", descripcion: "Levantar requerimientos del sistema con el cliente.", entregable: "Documento de requerimientos", estado: "En progreso", progreso: 60, fechaAsignacion: "2026-03-15T09:00:00" },
-      { id: 2, titulo: "Diseño de base de datos", descripcion: "Modelar el esquema de la BD del sistema.", entregable: "Diagrama ER", estado: "Sin comenzar", progreso: 0, fechaAsignacion: "2026-03-18T10:00:00" },
+      { id: 1, titulo: "Análisis de requerimientos", descripcion: "Levantar requerimientos del sistema con el cliente.", entregable: "Documento de requerimientos", estado: "En progreso", progreso: 60, fechaAsignacion: "2026-03-15T09:00:00",   fechaLimite: "2026-04-01", },
+      { id: 2, titulo: "Diseño de base de datos", descripcion: "Modelar el esquema de la BD del sistema.", entregable: "Diagrama ER", estado: "Sin comenzar", progreso: 0, fechaAsignacion: "2026-03-18T10:00:00", fechaLimite: "2026-04-15" },
     ],
+    proyecto: "Sistema Web",
+    
   },
   {
     id: 2,
@@ -20,12 +22,14 @@ const MOCK_ALUMNOS = [
     carrera:  "IA",
     correoInst: "aramirez0187@alumno.ipn.mx",
     actividades: [
-      { id: 3, titulo: "Preparación del dataset", descripcion: "Limpiar y normalizar los datos para el modelo.", entregable: "Dataset limpio en CSV", estado: "Completada", progreso: 100, fechaAsignacion: "2026-03-10T08:00:00" },
+      { id: 3, titulo: "Preparación del dataset", descripcion: "Limpiar y normalizar los datos para el modelo.", entregable: "Dataset limpio en CSV", estado: "Completada", progreso: 100, fechaAsignacion: "2026-03-10T08:00:00", fechaLimite: "2026-04-10" },
     ],
+    proyecto: "Base de datos para IA",
+  
   },
 ];
 
-const FORM_INICIAL = { titulo: "", descripcion: "", entregable: "" };
+const FORM_INICIAL = { titulo: "", descripcion: "", entregable: "", fechaLimite: "" };
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -60,8 +64,10 @@ export function useAsignarActividades() {
     const errs = {};
     if (!form.titulo.trim())      errs.titulo      = "El título es obligatorio";
     if (!form.descripcion.trim()) errs.descripcion = "La descripción es obligatoria";
+    if (!form.fechaLimite) errs.fechaLimite = "La fecha límite es obligatoria";
     setErrores(errs);
     return Object.keys(errs).length === 0;
+
   };
 
   // RN-AH-04: registra fecha y hora, RN-AH-07: estado inicial "Sin comenzar"
@@ -78,6 +84,7 @@ export function useAsignarActividades() {
       estado:          "Sin comenzar",
       progreso:        0,
       fechaAsignacion: new Date().toISOString(),
+      fechaLimite: form.fechaLimite,
     };
 
     setAlumnos(prev => prev.map(a =>

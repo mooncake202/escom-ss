@@ -19,6 +19,13 @@ export function ActividadRow({ actividad, C }) {
         </span>
       </div>
       <p style={{ margin: "0 0 6px", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>{actividad.descripcion}</p>
+      <p style={{ fontSize: 12, color: C.textMuted }}>
+        Fecha límite: {
+          actividad.fechaLimite
+            ? new Date(actividad.fechaLimite).toLocaleDateString("es-MX")
+            : "Sin definir"
+        }
+      </p>
       {actividad.entregable && (
         <p style={{ margin: "0 0 6px", fontSize: 12, color: C.textDisabled }}>
           Entregable: {actividad.entregable}
