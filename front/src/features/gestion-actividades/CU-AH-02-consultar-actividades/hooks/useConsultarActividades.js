@@ -10,6 +10,8 @@ const MOCK_ACTIVIDADES = [
     estado:          "En progreso",
     progreso:        60,
     fechaAsignacion: "2026-03-15T09:00:00",
+    fechaLimite:     "2026-03-25T17:00:00",
+
   },
   {
     id: 2,
@@ -19,6 +21,8 @@ const MOCK_ACTIVIDADES = [
     estado:          "Sin comenzar",
     progreso:        0,
     fechaAsignacion: "2026-03-18T10:00:00",
+    fechaLimite:     "2026-03-28T17:00:00",
+
   },
   {
     id: 3,
@@ -28,6 +32,7 @@ const MOCK_ACTIVIDADES = [
     estado:          "Completada",
     progreso:        100,
     fechaAsignacion: "2026-03-10T08:00:00",
+    fechaLimite:     "2026-03-20T17:00:00",
   },
 ];
 

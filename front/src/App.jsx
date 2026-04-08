@@ -43,11 +43,14 @@ function App() {
         -- rutas ACTIVIDADES--
         <Route path="/profesor/actividades" element={<AsignarActividades />} />
         <Route path="/alumno/actividades" element={<ConsultarActividades />} />
+
         <Route path="/alumno/bitacora" element={<RegistrarBitacora />} />
         <Route path="/profesor/bitacoras" element={<RevisarAvances />} />
+
         <Route path="/alumno/horas"          element={<AcumuladoHoras rol="alumno" />} />
         <Route path="/profesor/horas"        element={<AcumuladoHoras rol="profesor" />} />
         <Route path="/coordinacion/horas"    element={<AcumuladoHoras rol="coordinacion" />} />
+        
         <Route path="/alumno/historial"          element={<HistorialActividades rol="alumno" />} />
         <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />

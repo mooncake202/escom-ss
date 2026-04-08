@@ -77,6 +77,8 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
           {/* Datos jornada — RN-AH-33 */}
           <p style={{ margin: "0 0 10px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Jornada</p>
           <InfoRow label="Alumno"      value={bitacora.alumno.nombre}  C={C} />
+          <InfoRow label="Oferta"      value={bitacora.alumno.oferta}  C={C} />
+
           <InfoRow label="Fecha"       value={fecha}                   C={C} />
           <InfoRow label="Hora inicio" value={bitacora.horaInicio}     C={C} />
           <InfoRow label="Hora fin"    value={bitacora.horaFin}        C={C} />

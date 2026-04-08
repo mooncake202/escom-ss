@@ -75,8 +75,10 @@ export function HistorialRow({ registro, expandido, onToggle, C }) {
             {/* BITÁCORA */}
             {esBitacora && (
               <>
+                
                 {/* Avances */}
                 <div>
+                  
                   <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                     Actividades trabajadas
                   </p>
@@ -118,6 +120,7 @@ export function HistorialRow({ registro, expandido, onToggle, C }) {
             {!esBitacora && (
               <>
                 <div>
+                  <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em"  }}>Fecha límite de entrega: {registro.fechaLimite}</p>
                   <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>Descripción</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>{registro.descripcion}</p>
                 </div>

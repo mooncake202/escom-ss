@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 
 const MOCK_ALUMNO = {
   horasAcumuladas: 124,
-  horasDeuda:       8,
+  horasDeuda:       0,
   horasTotales:   480,
   jornada: null,
 };
@@ -18,7 +18,7 @@ const ACTIVIDADES_VALIDAS = MOCK_ACTIVIDADES.filter(
 );
 
 function calcularLimite(horasDeuda) {
-  return horasDeuda > 0 ? 6 : 4;
+  return horasDeuda > 0 ? 4 : 4;
 }
 
 function segundosAHHMM(seg) {
