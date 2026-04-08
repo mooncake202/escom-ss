@@ -23,6 +23,20 @@ import HistorialActividades from './features/gestion-actividades/CU-AH-06-histor
 import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solicitud/EsperandoProfesor'
 
 
+
+import RequisitosLiberacion from './features/liberacion-ss/CU-LSS-01-Validación-requisitos-previos/ValidacionRequisitos'
+import EvaluacionFirmado from './features/liberacion-ss/CU-LSS-02-firmado-evaluacion/Evaluacion'
+import CartaTermino from './features/liberacion-ss/CU-LSS-03-generar-carta-termino/CartaTermino'
+
+import IntegracionExpediente from './features/liberacion-ss/CU-LSS-04-integracion-expediente/IntegracionExpediente'
+
+import RevisionResolucion from './features/liberacion-ss/CU-LSS-05-revision-resolusión/RevisionResolucion'
+
+
+
+
+RequisitosLiberacion
+
 function App() {
   return (
     <BrowserRouter>
@@ -50,13 +64,28 @@ function App() {
         <Route path="/alumno/horas"          element={<AcumuladoHoras rol="alumno" />} />
         <Route path="/profesor/horas"        element={<AcumuladoHoras rol="profesor" />} />
         <Route path="/coordinacion/horas"    element={<AcumuladoHoras rol="coordinacion" />} />
-        
+
         <Route path="/alumno/historial"          element={<HistorialActividades rol="alumno" />} />
         <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
 
+        -- rutas fin--
+        <Route path="/alumno/requisitos-liberacion"    element={<RequisitosLiberacion rol="alumno" />} />
+
+        <Route path="/alumno/evaluacionFirmado"    element={<EvaluacionFirmado rol="alumno" />} />
+        <Route path="/profesor/evaluacionFirmado"    element={<EvaluacionFirmado rol="profesor" />} />
+        <Route path="/coordinacion/evaluacionFirmado"    element={<EvaluacionFirmado rol="coordinacion" />} />
 
 
+        <Route path="/alumno/carta-termino"    element={<CartaTermino rol="alumno" />} />
+        <Route path="/coordinacion/carta-termino"    element={<CartaTermino rol="coordinacion" />} />
+
+
+        <Route path="/alumno/integracion-expediente"    element={<IntegracionExpediente rol="alumno" />} />
+        <Route path="/coordinacion/integracion-expediente"    element={<IntegracionExpediente rol="coordinacion" />} />
+
+        <Route path="/alumno/revision-resolucion"    element={<RevisionResolucion rol="alumno" />} />
+        <Route path="/coordinacion/revision-resolucion"    element={<RevisionResolucion rol="coordinacion" />} /> 
       </Routes>
     </BrowserRouter>
   );
