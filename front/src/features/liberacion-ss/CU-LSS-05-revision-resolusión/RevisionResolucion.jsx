@@ -1,18 +1,23 @@
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
-import { ProcesoLSSLayout } from "../CU-LSS-01-Validación-requisitos-previos/components/ProcesoLSSLayout";
+import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
+
 import { useRevisionResolucion } from "./hooks/useRevisionResolucion";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 
 const MOCK = {
   usuario: "Admin Coordinación",
-  rol: "coordinacion", // coordinacion | alumno
+  
 };
 
 // ——— Sub-componentes ————————————————————————————
 
 function ResumenDocumentos({ C }) {
   const docs = [
-    { label: "Carta compromiso", nombre: "carta_compromiso.pdf" },
-    { label: "Carta de término", nombre: "carta_termino_escaneada.pdf" },
+    { label: "Expediente", nombre: "LAGARZA_ORTEGA_ANA_KAREN_2022630667.pdf" }
+    
   ];
 
   return (
@@ -188,7 +193,7 @@ function VistaAprobado({ rol, C }) {
 }
 
 // Vista resolución final: rechazado
-function VistaRechazado({ observacionesGuardadas, rol, C }) {
+function VistaRechazado({ observacionesGuardadas, rol, C, navigate}) {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", paddingTop: "2rem" }}>
       <div style={{ textAlign: "center", marginBottom: "2rem" }}>
@@ -222,6 +227,7 @@ function VistaRechazado({ observacionesGuardadas, rol, C }) {
 
       {rol === "alumno" && (
         <button
+        onClick={() => navigate("/alumno/integracion-expediente")}
           style={{
             width: "100%",
             padding: "12px",
@@ -234,8 +240,10 @@ function VistaRechazado({ observacionesGuardadas, rol, C }) {
             color: "#fff",
             fontFamily: "inherit",
             boxShadow: SHADOWS.accent,
+            
           }}
         >
+          
           Corregir y reenviar expediente →
         </button>
       )}
@@ -267,8 +275,9 @@ function VistaAlumnoEnRevision({ C }) {
 
 // ——— Página principal ——————————————————————————————
 
-export default function RevisionResolucion() {
+export default function RevisionResolucion({ rol }) {
   const { C } = useTheme();
+  const navigate = useNavigate();
   const {
     estado,
     observaciones,
@@ -279,27 +288,29 @@ export default function RevisionResolucion() {
     rechazar,
   } = useRevisionResolucion();
 
-  const rol = MOCK.rol;
+  const Layout = rol === "alumno"
+  ? ProcesoLSSLayout
+  : DashboardLayout;
 
   // Pantallas de resolución final
   if (estado === "aprobado") {
     return (
-      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
+      <Layout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
         <VistaAprobado rol={rol} C={C} />
-      </ProcesoLSSLayout>
+      </Layout>
     );
   }
 
   if (estado === "rechazado") {
     return (
-      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
-        <VistaRechazado observacionesGuardadas={observacionesGuardadas} rol={rol} C={C} />
-      </ProcesoLSSLayout>
+      <Layout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
+        <VistaRechazado observacionesGuardadas={observacionesGuardadas} rol={rol} C={C} navigate={navigate} />
+      </Layout>
     );
   }
 
   return (
-    <ProcesoLSSLayout
+    <Layout
       pasoActual={5}
       titulo="Revisión y resolución"
       subtitulo="CU-LSS-05"
@@ -332,6 +343,6 @@ export default function RevisionResolucion() {
         {rol === "alumno" && <VistaAlumnoEnRevision C={C} />}
 
       </div>
-    </ProcesoLSSLayout>
+    </Layout>
   );
 }

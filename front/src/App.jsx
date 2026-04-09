@@ -24,18 +24,26 @@ import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solic
 
 
 
-import RequisitosLiberacion from './features/liberacion-ss/CU-LSS-01-Validación-requisitos-previos/ValidacionRequisitos'
-import EvaluacionFirmado from './features/liberacion-ss/CU-LSS-02-firmado-evaluacion/Evaluacion'
-import CartaTermino from './features/liberacion-ss/CU-LSS-03-generar-carta-termino/CartaTermino'
+//nuevos
+import IniciarProcesoEvaluacion from './features/liberacion-ss/CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/ValidacionRequisitos'
 
-import IntegracionExpediente from './features/liberacion-ss/CU-LSS-04-integracion-expediente/IntegracionExpediente'
+import SeguimientoEvaluacionAlumno from './features/liberacion-ss/CU-LSS-02-seguimiento-evaluacion-alumno/SeguimientoEvaluacionAlumno'
+import EvaluarAlumnoProfesor from './features/liberacion-ss/CU-LSS-03-evaluar-alumno-profesor/EvaluarAlumnoProfesor';
+import RevisarEvaluacionAlumnoCoordinacion from './features/liberacion-ss/CU-LSS-04-revisar-evaluacion-coordinacion/FirmarEvaluacionCoordinacion';
 
-import RevisionResolucion from './features/liberacion-ss/CU-LSS-05-revision-resolusión/RevisionResolucion'
+import SeguimientoCartaTerminoAlumno from './features/liberacion-ss/CU-LSS-05-seguimiento-carta-termino-alumno/SeguimientoCartaTerminoAlumno'
+import EstadoCartaTerminoCoordinacion from './features/liberacion-ss/CU-LSS-06-estado-carta-termino-coordinacion/EstadoCartaTerminoCoordinacion'
+
+import IntegracionExpediente from './features/liberacion-ss/CU-LSS-07-integracion-expediente/IntegracionExpediente'
+
+import EstadoResolucion from './features/liberacion-ss/CU-LSS-08-estado-resolusion-alumno/EstadoResolucionAlumno'
+import EvaluacionExpediente from './features/liberacion-ss/CU-LSS-09-evaluacion-expediente-coordinacion/EvaluacionExpedienteCoordinacion'
+
+import ConsultarEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-10-estado-constancia-termino-alumno/ConsultarConstanciaTermino'
+import GestionEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-11-envio-constancia-termino-coordinacion/GestionarConstanciaTermino'  
 
 
 
-
-RequisitosLiberacion
 
 function App() {
   return (
@@ -70,22 +78,29 @@ function App() {
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
 
         -- rutas fin--
-        <Route path="/alumno/requisitos-liberacion"    element={<RequisitosLiberacion rol="alumno" />} />
+        
+--NEUVOS--
+        <Route path="/alumno/iniciar-proceso-evaluacion"    element={<IniciarProcesoEvaluacion rol="alumno" />} />
 
-        <Route path="/alumno/evaluacionFirmado"    element={<EvaluacionFirmado rol="alumno" />} />
-        <Route path="/profesor/evaluacionFirmado"    element={<EvaluacionFirmado rol="profesor" />} />
-        <Route path="/coordinacion/evaluacionFirmado"    element={<EvaluacionFirmado rol="coordinacion" />} />
+        <Route path="/alumno/seguimiento-evaluacion"    element={<SeguimientoEvaluacionAlumno rol="alumno" />} />
+        <Route path="/profesor/evaluar-alumno"    element={<EvaluarAlumnoProfesor rol="profesor" />} />
+        <Route path="/coordinacion/revisar-evaluacion-alumno"    element={<RevisarEvaluacionAlumnoCoordinacion rol="coordinacion" />} />
 
-
-        <Route path="/alumno/carta-termino"    element={<CartaTermino rol="alumno" />} />
-        <Route path="/coordinacion/carta-termino"    element={<CartaTermino rol="coordinacion" />} />
-
-
+        <Route path="/alumno/seguimiento-carta-termino"    element={<SeguimientoCartaTerminoAlumno rol="alumno" />} />
+        <Route path="/coordinacion/estado-carta-termino"    element={<EstadoCartaTerminoCoordinacion rol="coordinacion" />} />
+        
         <Route path="/alumno/integracion-expediente"    element={<IntegracionExpediente rol="alumno" />} />
-        <Route path="/coordinacion/integracion-expediente"    element={<IntegracionExpediente rol="coordinacion" />} />
 
-        <Route path="/alumno/revision-resolucion"    element={<RevisionResolucion rol="alumno" />} />
-        <Route path="/coordinacion/revision-resolucion"    element={<RevisionResolucion rol="coordinacion" />} /> 
+
+        <Route path="/alumno/estado-resolucion"    element={<EstadoResolucion rol="alumno" />} />
+        <Route path="/coordinacion/evaluacion-expediente"    element={<EvaluacionExpediente rol="coordinacion" />} />
+
+        <Route path="/alumno/consultar-constancia-termino"    element={<ConsultarEstadoConstanciaTermino rol="alumno" />} />
+        <Route path="/coordinacion/gestion-constancia-termino"    element={<GestionEstadoConstanciaTermino rol="coordinacion" />} />
+        
+        
+
+
       </Routes>
     </BrowserRouter>
   );
