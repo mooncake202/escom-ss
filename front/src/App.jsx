@@ -4,6 +4,8 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import RegistroSolicitud from './features/gestion-registro/CU-GR-01-enviar-solicitud/RegistroSolicitud'
+import Dashboard from './features/dashboard/dashboards'
+
 import LoginPage from "./features/login/LoginPage";
 import SolicitudesPendientes from './features/gestion-registro/CU-GR-02-aceptar-rechazar-alumno/SolicitudesPendientes'
 import RegistroSISS from './features/gestion-registro/CU-GR-03-registro-siss/RegistroSISS'
@@ -24,7 +26,7 @@ import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solic
 
 
 
-//nuevos
+//LSS
 import IniciarProcesoEvaluacion from './features/liberacion-ss/CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/ValidacionRequisitos'
 
 import SeguimientoEvaluacionAlumno from './features/liberacion-ss/CU-LSS-02-seguimiento-evaluacion-alumno/SeguimientoEvaluacionAlumno'
@@ -49,6 +51,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        -- dashboard --
+        <Route path="/dashboard" element={<Dashboard />} />
+
         -- rutas REGISTRO--
         <Route path="/" element={<LoginPage />} />
         <Route path="/registro" element={<RegistroSolicitud />} />
@@ -77,9 +82,9 @@ function App() {
         <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
         <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
 
-        -- rutas fin--
         
---NEUVOS--
+        
+        --LSS--
         <Route path="/alumno/iniciar-proceso-evaluacion"    element={<IniciarProcesoEvaluacion rol="alumno" />} />
 
         <Route path="/alumno/seguimiento-evaluacion"    element={<SeguimientoEvaluacionAlumno rol="alumno" />} />
