@@ -248,6 +248,7 @@ const DashboardAlumno = ({ C }) => {
           <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"      desc="Teléfono, correo personal" C={C} />
           <ActionItem icon="logout" {...T.danger}  label="Baja del servicio"      desc="Proceso irreversible, requiere justificación" C={C} />
         <AlertBanner type="info" C={C}>Tienes una actualización en el estado de la solicitud de baja del servicio social.</AlertBanner>
+        
 
 
         </Section>
@@ -389,6 +390,8 @@ const DashboardProfesor = ({ C }) => {
           
           <ActionItem icon="check"  {...T.blue}    label="Aceptar o rechazar solicitudes"  desc="3 solicitudes pendientes" C={C} />
         <AlertBanner type="urgente" C={C}>Hay solicitudes de ingreso pendiente de respuesta.</AlertBanner>
+          <ActionItem icon="users" {...T.blue}  label="Consultar información de alumnos"      desc="Datos y cantidad" C={C} />
+
 
         </Section>
 
@@ -532,6 +535,7 @@ const DashboardCoordinacion = ({ C }) => {
           <ActionItem icon="key"      {...T.purple}  label="Gestionar recursos del SS"         desc="Documentos y guías del servicio" C={C} />
           <ActionItem icon="flag"      {...T.danger}  label="Solicitudes de baja"         desc="Gestionar solicitudes de baja" C={C} />
           <AlertBanner type="warning" C={C}>Tienes solicitudes pendientes de baja.</AlertBanner>
+          <ActionItem icon="users" {...T.blue}  label="Consultar información de alumnos por profesor"      desc="Datos y cantidad" C={C} />
 
 
         </Section>

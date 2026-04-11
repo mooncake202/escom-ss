@@ -3,10 +3,15 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import RegistroSolicitud from './features/gestion-registro/CU-GR-01-enviar-solicitud/RegistroSolicitud'
 import Dashboard from './features/dashboard/dashboards'
 
+//CRED
 import LoginPage from "./features/login/LoginPage";
+import RecuperarContraseña from "./features/login/CU-CRED-02-cambiar-contraseña/RecuperarContrasena";
+
+
+//GR
+import RegistroSolicitud from './features/gestion-registro/CU-GR-01-enviar-solicitud/RegistroSolicitud'
 import SolicitudesPendientes from './features/gestion-registro/CU-GR-02-aceptar-rechazar-alumno/SolicitudesPendientes'
 import RegistroSISS from './features/gestion-registro/CU-GR-03-registro-siss/RegistroSISS'
 import AdjuntarDocumentacion from './features/gestion-registro/CU-GR-04-adjuntar-documentacion/AdjuntarDocumentacion'
@@ -44,8 +49,10 @@ import EvaluacionExpediente from './features/liberacion-ss/CU-LSS-09-evaluacion-
 import ConsultarEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-10-estado-constancia-termino-alumno/ConsultarConstanciaTermino'
 import GestionEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-11-envio-constancia-termino-coordinacion/GestionarConstanciaTermino'  
 
-
-
+//ADMIN
+import CartaCompromisoFirmada from './features/gestion-admin/001- enviar-carta-firmada/CartaCompromisofirmada'
+import DocumentosAlumnosAsignados from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteAlumno'
+import DocumentosAlumnosAsignadosCoordinacion from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteCoordinacion'
 
 function App() {
   return (
@@ -54,8 +61,12 @@ function App() {
         -- dashboard --
         <Route path="/dashboard" element={<Dashboard />} />
 
-        -- rutas REGISTRO--
+        --CRED
         <Route path="/" element={<LoginPage />} />
+        <Route path="/recuperar-contraseña" element={<RecuperarContraseña />} />
+
+        -- rutas REGISTRO--
+        
         <Route path="/registro" element={<RegistroSolicitud />} />
         <Route path="/alumnoSinAsignar/esperando_profesor" element={<EsperandoProfesor />} />
         <Route path="/profesor/solicitudes" element={<SolicitudesPendientes />} />
@@ -104,6 +115,10 @@ function App() {
         <Route path="/coordinacion/gestion-constancia-termino"    element={<GestionEstadoConstanciaTermino rol="coordinacion" />} />
         
         
+        --ADMIN--
+        <Route path="/cartacompromisofirmada" element={<CartaCompromisoFirmada />} />
+        <Route path="/alumnoasignado-documentacion" element={<DocumentosAlumnosAsignados />} />
+        <Route path="/coordinación-alumnoasignado-documentacion" element={<DocumentosAlumnosAsignadosCoordinacion />} />
 
 
       </Routes>

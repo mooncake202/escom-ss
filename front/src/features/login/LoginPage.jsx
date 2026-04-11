@@ -204,6 +204,15 @@ export default function LoginPage() {
                 showToggle
               />
             </Field>
+            <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
+            
+            <a
+              href="/recuperar-contrasena"
+              style={{ color: C.accentText, textDecoration: "none", fontWeight: 600 }}
+            >
+              ¿Olvidaste tu contraseña?{" "}
+            </a>
+          </p>
  
             {/* Error */}
             {error && (
@@ -236,7 +245,7 @@ export default function LoginPage() {
  
           {/* Enlace a registro */}
           <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
-            ¿No tienes cuenta?{" "}
+            ¿Aún no tienes cuenta?{" "}
             <a
               href="/registro"
               style={{ color: C.accentText, textDecoration: "none", fontWeight: 600 }}

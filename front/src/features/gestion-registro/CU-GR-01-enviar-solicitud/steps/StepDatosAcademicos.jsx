@@ -59,6 +59,142 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
 
         <ErrorMsg field="periodo" errors={errors} C={C} />
       </Field>
+
+      <Field label="Solicitud de dictamen" hint="Selecciona una opción para ver las instrucciones" C={C}>
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+
+    {[
+      {
+        value: "creditos",
+        label: "Dictamen por créditos menores a 70%",
+        desc: "Este dictamen es para poder realizar el servicio social aunque no hayas cubierto el 70% de créditos."
+      },
+      {
+        value: "estancia",
+        label: "Dictamen por estancia profesional",
+        desc: "Este dictamen es para poder realizar el servicio social cuando solo te falta tu estancia profesional."
+      },
+      {
+        value: "electiva",
+        label: "Dictamen por electiva",
+        desc: "Este dictamen es para poder realizar el servicio social cuando solo te falta una electiva."
+      }
+    ].map(opt => (
+      <div key={opt.value}>
+
+        {/* OPCIÓN */}
+        <label style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          borderRadius: RADIUS.md,
+          border: `1px solid ${form.tipoLiberacion === opt.value ? C.accent : C.borderSubtle}`,
+          background: form.tipoLiberacion === opt.value ? C.accentSoft : C.bgCard,
+          cursor: "pointer"
+        }}>
+          <input
+            type="radio"
+            name="tipoLiberacion"
+            value={opt.value}
+            checked={form.tipoLiberacion === opt.value}
+            onChange={handleChange}
+          />
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+              {opt.label}
+            </div>
+            <div style={{ fontSize: 12, color: C.textMuted }}>
+              {opt.desc}
+            </div>
+          </div>
+        </label>
+
+        {/* INSTRUCCIONES */}
+        {form.tipoLiberacion === opt.value && (
+          <div style={{
+            marginTop: 6,
+            padding: "12px 14px",
+            background: C.bgInput,
+            borderRadius: RADIUS.md,
+            border: `1px solid ${C.borderSubtle}`
+          }}>
+            {opt.value === "creditos" && (
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+                REQUISITOS PARA SOLICITAR DICTAMEN CUANDO NO TIENES EL 70% DE CREDITOS CUBIERTOS  <br />
+                1. ESTAR INSCRITO <br />
+                2. SER REGULAR (sin adeudos de materias) <br />
+                3. HABER CURSADO DESDE EL 1er AL 5to SEMESTRE COMPLETO<br />
+                4. TENER EL 60% O MAS DE CREDITOS CURSADOS.<br /><br />
+                Si cumples con los 4 requisitos anteriores podrás solicitar tu dictamen para iniciar el servicio social,
+                solo debes enviar al siguiente correo servicio_social_escom@ipn.mx la siguiente información para que
+                elaboren tu dictamen.<br /><br />
+                En un solo pdf debes incluir los siguientes documentos:<br />
+                • Escrito simple dirigido a la Comisión de Servicio Social, donde expongas el motivo del por qué
+                quieres iniciar tu servicio y solicitar que te permitan hacerlo; fírmalo y pon tu nombre completo<br />
+                • Constancia de créditos vigente para tramite de servicio social<br />
+                • Boleta global vigente<br />
+                • Constancia de servicio medico vigente<br /><br />
+                Te haremos un dictamen con el cual se te permitirá realizarlo, al final de tu servicio debes 
+                comprobar mediante una constancia de créditos para servicio social actual o carta pasante 
+                donde demuestres que ya cuentas con el 100% de créditos cursados, de lo contrario no se 
+                liberará.<br /><br />
+                Tiempo de respuesta aproximadamente entre 3 a 5 días hábiles <br />
+              </p>
+            )}
+
+            {opt.value === "estancia" && (
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+                REQUISITOS PARA SOLICITAR DICTAMEN POR ESTANCIA PROFESIONAL<br />
+                1. HABER CUBIERTO TODAS TUS MATERIAS ACADEMICAS<br />
+                2. QUE SOLO TE FALTE LA ESTANCIA PROFESIONAL
+                EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE DCITAMEN<br /><br />
+                Si cumples con los 2 requisitos anteriores podrás solicitar tu dictamen para iniciar el servicio social,
+                solo debes enviar al siguiente correo servicio_social_escom@ipn.mx la siguiente información para que
+                elaboren tu dictamen.<br /><br />
+                En un solo pdf debes incluir los siguientes documentos:<br />
+                • Escrito simple dirigido a la Comisión de Servicio Social, donde expongas el motivo del por qué
+                quieres iniciar tu servicio y solicitar que te permitan hacerlo; fírmalo y pon tu nombre completo<br />
+                • Constancia de créditos vigente para tramite de servicio social<br /><br />
+                Te haremos un dictamen con el cual se te permitirá realizarlo, al final de tu servicio debes 
+                comprobar mediante una constancia de créditos para servicio social actual o carta pasante 
+                donde demuestres que ya cuentas con el 100% de créditos cursados, de lo contrario no se 
+                liberará.<br /><br />
+                Tiempo de respuesta aproximadamente entre 3 a 5 días hábiles
+              </p>
+            )}
+
+            {opt.value === "electiva" && (
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+                REQUISITOS PARA SOLICITAR DICTAMEN POR ELECTIVA<br />
+                1. TENER EL 96.01% DE CREDITOS CURSADOS<br />
+                2. QUE SOLO TE FALTE LA ELECTIVA, EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE 
+                DCITAMEN<br /><br />
+                Si cumples con los 2 requisitos anteriores podrás solicitar tu dictamen para iniciar el servicio social,
+                solo debes enviar al siguiente correo servicio_social_escom@ipn.mx la siguiente información para que
+                elaboren tu dictamen<br /><br />
+                En un solo pdf debes incluir los siguientes documentos:<br />
+                • Escrito simple dirigido a la Comisión de Servicio Social, donde expongas el motivo del por qué
+                quieres iniciar tu servicio y solicitar que te permitan hacerlo; fírmalo y pon tu nombre completo<br />
+                • Constancia de créditos vigente para tramite de servicio social<br /><br />
+                Te haremos un dictamen con el cual se te permitirá realizarlo, al final de tu servicio debes 
+                comprobar mediante una constancia de créditos para servicio social actual o carta pasante 
+                donde demuestres que ya cuentas con el 100% de créditos cursados, de lo contrario no se 
+                liberará.<br /><br />
+                Tiempo de respuesta aproximadamente entre 3 a 5 días hábiles
+              </p>
+            )}
+          </div>
+        )}
+
+      </div>
+    ))}
+
+  </div>
+
+  <ErrorMsg field="tipoLiberacion" errors={errors} C={C} />
+</Field>
       
     </div>
   );
