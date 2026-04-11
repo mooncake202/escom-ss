@@ -95,7 +95,7 @@ function DocumentoUpload({ doc, archivo, error, onSubir, onQuitar, C }) {
           />
           <span style={{ fontSize: 20 }}>📎</span>
           <span style={{ fontSize: 13, color: C.textMuted }}>
-            Seleccionar archivo · PDF, JPG o PNG · máx. 5 MB
+            Seleccionar archivo · PDF máx. 5 MB
           </span>
         </label>
       )}

@@ -2,7 +2,7 @@ import { useState } from "react";
 
 export function useSeguimientoEvaluacionAlumno() {
   const [estado] = useState({
-    firmadoProfesor: false,
+    firmadoProfesor: true,
     firmadoCoordinacion: true,
   });
 

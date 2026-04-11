@@ -118,9 +118,32 @@ export function FirmaPanel({ tipo, estado, onFirmar }) {
           boxShadow: bloqueado ? "none" : SHADOWS.accent,
           opacity: bloqueado ? 0.5 : 1,
           transition: "opacity 0.2s",
+          marginBottom: "0.75rem",
         }}
       >
         Firmar evaluación →
+      </button>
+
+      <button
+        onClick={onFirmar}
+        
+        style={{
+          width: "100%",
+          padding: "12px",
+          borderRadius: RADIUS.md,
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: bloqueado ? "not-allowed" : "pointer",
+          background: bloqueado ? C.borderDefault : GRADIENTS.primary,
+          border: "none",
+          color: "#fff",
+          fontFamily: "inherit",
+          boxShadow: bloqueado ? "none" : SHADOWS.accent,
+          opacity: bloqueado ? 0.5 : 1,
+          transition: "opacity 0.2s",
+        }}
+      >
+        Rechazar solicitud de evaluación →
       </button>
     </div>
   );

@@ -7,7 +7,7 @@ import { useState } from "react";
 // ————————————————————————————————————————————————————
 
 export function useCartaTerminoAlumno() {
-  const [estado, setEstado] = useState("solicitada"); // 👈 CAMBIA AQUÍ PARA PROBAR
+  const [estado, setEstado] = useState("lista_para_recoger"); // 👈 CAMBIA AQUÍ PARA PROBAR
 
   const confirmarEntrega = () => {
     setEstado("recibida");
