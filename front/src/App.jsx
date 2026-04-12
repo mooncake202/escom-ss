@@ -15,6 +15,7 @@ import RegistroSolicitud from './features/gestion-registro/CU-GR-01-enviar-solic
 import SolicitudesPendientes from './features/gestion-registro/CU-GR-02-aceptar-rechazar-alumno/SolicitudesPendientes'
 import RegistroSISS from './features/gestion-registro/CU-GR-03-registro-siss/RegistroSISS'
 import AdjuntarDocumentacion from './features/gestion-registro/CU-GR-04-adjuntar-documentacion/AdjuntarDocumentacion'
+import EsperandoValidacionDocs from './features/gestion-registro/CU-GR-04-adjuntar-documentacion/EsperandoValidacionDocs'
 import RevisarDocumentacion from './features/gestion-registro/CU-GR-05-revisar-documentacion/RevisarDocumentacion'
 import CartaCompromiso from './features/gestion-registro/CU-GR-06-carta-compromiso/CartaCompromiso'
 import ValidarEntregaPresencial from './features/gestion-registro/CU-GR-07-validar-entrega-presencial/ValidarEntregaPresencial'
@@ -28,7 +29,7 @@ import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-ho
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
 
 import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solicitud/EsperandoProfesor'
-
+import EsperandoValidacionCarta from './features/gestion-registro/CU-GR-06-carta-compromiso/EsperaEntregaCartaCompromiso'
 
 
 //LSS
@@ -53,6 +54,9 @@ import GestionEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-11-e
 import CartaCompromisoFirmada from './features/gestion-admin/001- enviar-carta-firmada/CartaCompromisofirmada'
 import DocumentosAlumnosAsignados from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteAlumno'
 import DocumentosAlumnosAsignadosCoordinacion from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteCoordinacion'
+import GestionFaltas from './features/gestion-admin/003-gestion incidentes/GestionIncidencias'
+
+
 
 function App() {
   return (
@@ -72,8 +76,10 @@ function App() {
         <Route path="/profesor/solicitudes" element={<SolicitudesPendientes />} />
         <Route path="/alumnoSinAsignar/siss" element={<RegistroSISS />} />
         <Route path="/alumnoSinAsignar/documentacion" element={<AdjuntarDocumentacion />} />
+        <Route path="/alumnoSinAsignar/esperando_validacion_docs" element={<EsperandoValidacionDocs />} />
         <Route path="/coordinacion/documentacion" element={<RevisarDocumentacion />} />
         <Route path="/alumnoSinAsignar/carta-compromiso" element={<CartaCompromiso />} />
+        <Route path="/alumnoSinAsignar/esperando-validacion" element={<EsperandoValidacionCarta />} />
         <Route path="/coordinacion/carta-presencial" element={<ValidarEntregaPresencial />} />
         <Route path="/alumnoSinAsignar/expediente" element={<SubirExpediente />} />
         <Route path="/coordinacion/expedientes" element={<RevisarExpediente />} />
@@ -119,7 +125,7 @@ function App() {
         <Route path="/cartacompromisofirmada" element={<CartaCompromisoFirmada />} />
         <Route path="/alumnoasignado-documentacion" element={<DocumentosAlumnosAsignados />} />
         <Route path="/coordinación-alumnoasignado-documentacion" element={<DocumentosAlumnosAsignadosCoordinacion />} />
-
+        <Route path="/gestion-faltas" element={<GestionFaltas />} />
 
       </Routes>
     </BrowserRouter>

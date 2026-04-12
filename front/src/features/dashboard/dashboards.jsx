@@ -536,6 +536,8 @@ const DashboardCoordinacion = ({ C }) => {
           <ActionItem icon="flag"      {...T.danger}  label="Solicitudes de baja"         desc="Gestionar solicitudes de baja" C={C} />
           <AlertBanner type="warning" C={C}>Tienes solicitudes pendientes de baja.</AlertBanner>
           <ActionItem icon="users" {...T.blue}  label="Consultar información de alumnos por profesor"      desc="Datos y cantidad" C={C} />
+          <ActionItem icon="flag"      {...T.danger}  label="Gestión de faltas alumnos"         desc="5 pendientes" C={C} />
+          <AlertBanner type="warning" C={C}>Tienes pendientes revisiones en las faltas de los alumnos.</AlertBanner>
 
 
         </Section>
