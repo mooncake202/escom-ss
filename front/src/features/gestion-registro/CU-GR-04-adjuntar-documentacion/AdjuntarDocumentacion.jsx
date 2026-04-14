@@ -99,24 +99,7 @@ export default function AdjuntarDocumentacion() {
                   </p>
                 </div>
 
-          {/* Línea divisora */}
-          <div style={{ borderTop: `1px solid ${C.borderSubtle}`, margin: "1.25rem 0" }} />
-
-          <p style={{ margin: "0 0 1.25rem", fontSize: 12, fontWeight: 700, color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Documentos opcionales
-          </p>
-
-          {/* Dictamen — RN-GR-47 */}
-          <DocumentoUploader
-            label="Dictamen"
-            descripcion="Si cuentas con dictamen para realizar el servicio social, adjúntalo aquí."
-            obligatorio={false}
-            archivo={docs.dictamen}
-            error={errores.dictamen}
-            onAgregar={archivo => agregarDoc("dictamen", archivo)}
-            onQuitar={() => quitarDoc("dictamen")}
-            C={C}
-          />
+          
         </div>
 
         {/* Aviso */}
