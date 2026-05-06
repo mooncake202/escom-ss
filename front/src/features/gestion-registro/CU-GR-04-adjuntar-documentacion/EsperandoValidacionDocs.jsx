@@ -24,7 +24,7 @@ export default function EsperandoValidacionDocs() {
   // "docs_con_correccion" → Coordinación pidió correcciones
   // "docs_aprobados"    → Coordinación aprobó, puede continuar
 
-  const estatus = datos?.estatusDocumentacion ?? "docs_pendientes";
+  const estatus = datos?.estatusDocumentacion ?? "docs_aprobados";
 
   return (
     <ProcesoLayout pasoActual={2} usuario={nombre}>

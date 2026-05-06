@@ -149,6 +149,7 @@ function VistaRecibida({ C }) {
         <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textMuted }}>
           Ya puedes continuar con la creación de tu expediente.
         </p>
+        
       </div>
     </div>
   );

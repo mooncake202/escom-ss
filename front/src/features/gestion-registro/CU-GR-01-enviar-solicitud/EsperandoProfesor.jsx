@@ -6,6 +6,8 @@ export default function EsperandoProfesor() {
   const { C } = useTheme();
   const [datos, setDatos] = useState(null);
 
+const esAceptada = datos?.estatus === "Aprobada"; // 👈 agrega esto
+
   // 🔹 NUEVO
   const [mostrarOfertas, setMostrarOfertas] = useState(false);
   const [ofertaSeleccionada, setOfertaSeleccionada] = useState(null);
@@ -46,8 +48,31 @@ export default function EsperandoProfesor() {
   return (
     <ProcesoLayout pasoActual={1} usuario={nombre}>
       <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
+        {esAceptada ? (
+  <>
+    <div style={{ fontSize: 52, marginBottom: "1.5rem" }}>✅</div>
+    <h2 style={{ fontSize: 22, fontWeight: 700, color: C.success }}>
+      ¡Profesor aceptó tu solicitud!
+    </h2>
+    <p>Puedes continuar con el siguiente paso.</p>
+            <button
+              onClick={() => setMostrarOfertas(prev => !prev)}
+              style={{
+                marginTop: "1rem",
+                padding: "10px 16px",
+                borderRadius: RADIUS.md,
+                background: C.accent,
+                color: "#fff",
+                border: "none",
+                cursor: "pointer"
+              }}
+            >
+              Siguiente paso
+            </button>
 
-        {!esRechazada ? (
+          </>
+  
+) : !esRechazada ? (
           <>
             <div style={{ fontSize: 52, marginBottom: "1.5rem" }}>⏳</div>
 

@@ -1,22 +1,18 @@
+import { useState } from "react";
 import { useTheme, RADIUS, GRADIENTS, SHADOWS } from "@/themes/colors";
 
 export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
   const { C } = useTheme();
+  const [rechazando, setRechazando] = useState(false);
+  const [motivo, setMotivo] = useState("");
 
-  // CASO: Profesor aún no ha firmado
   if (!estado.firmadoProfesor) {
     return (
       <div style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: 280,
-        background: C.bgCard,
-        borderRadius: RADIUS.lg,
-        border: `1px dashed ${C.borderDefault}`,
-        padding: "3rem",
-        textAlign: "center",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", minHeight: 280, background: C.bgCard,
+        borderRadius: RADIUS.lg, border: `1px dashed ${C.borderDefault}`,
+        padding: "3rem", textAlign: "center",
       }}>
         <p style={{ fontSize: 32, marginBottom: "1rem" }}>⏳</p>
         <p style={{ fontSize: 14, fontWeight: 600, color: C.textPrimary, marginBottom: "0.35rem" }}>
@@ -32,17 +28,12 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
 
   return (
     <>
-      {/* Banner PDF disponible */}
+      {/* Banner PDF */}
       <div style={{
-        padding: "1rem 1.25rem",
-        borderRadius: RADIUS.lg,
-        background: "rgba(21,128,61,0.06)",
-        border: "1px solid rgba(21,128,61,0.25)",
-        marginBottom: "1.5rem",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "1rem",
+        padding: "1rem 1.25rem", borderRadius: RADIUS.lg,
+        background: "rgba(21,128,61,0.06)", border: "1px solid rgba(21,128,61,0.25)",
+        marginBottom: "1.5rem", display: "flex", alignItems: "center",
+        justifyContent: "space-between", gap: "1rem",
       }}>
         <div>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>
@@ -55,47 +46,30 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
         <button
           onClick={() => alert("Descargando PDF...")}
           style={{
-            padding: "8px 16px",
-            borderRadius: RADIUS.md,
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: "pointer",
-            background: "rgba(21,128,61,0.10)",
-            border: "1px solid rgba(21,128,61,0.3)",
-            color: "#15803d",
-            fontFamily: "inherit",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
+            padding: "8px 16px", borderRadius: RADIUS.md, fontSize: 13,
+            fontWeight: 600, cursor: "pointer", background: "rgba(21,128,61,0.10)",
+            border: "1px solid rgba(21,128,61,0.3)", color: "#15803d",
+            fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
           }}
         >
           Descargar PDF
         </button>
       </div>
 
-      
-
-      {/* CASO: Ya se tomó una decisión */}
+      {/* Decisión tomada */}
       {(estado.firmadoCoordinacion || estado.rechazado) && (
         <div style={{
-          padding: "1.25rem 1.5rem",
-          borderRadius: RADIUS.lg,
+          padding: "1.25rem 1.5rem", borderRadius: RADIUS.lg,
           border: `1px solid ${estado.rechazado ? "rgba(185,28,28,0.3)" : "rgba(21,128,61,0.3)"}`,
           background: estado.rechazado ? "rgba(185,28,28,0.06)" : "rgba(21,128,61,0.06)",
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
+          display: "flex", alignItems: "center", gap: "1rem",
         }}>
           <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
+            width: 36, height: 36, borderRadius: "50%",
             background: estado.rechazado ? "rgba(185,28,28,0.12)" : "rgba(21,128,61,0.12)",
             border: `1px solid ${estado.rechazado ? "rgba(185,28,28,0.3)" : "rgba(21,128,61,0.3)"}`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 16,
-            flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 16, flexShrink: 0,
           }}>
             {estado.rechazado ? "✖" : "✔"}
           </div>
@@ -106,28 +80,21 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
             <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textMuted }}>
               {estado.rechazado
                 ? "Esta evaluación fue rechazada por coordinación."
-                : "La firma de coordinación ha sido registrada correctamente."
-              }
+                : "La firma de coordinación ha sido registrada correctamente."}
             </p>
           </div>
         </div>
       )}
 
-      {/* CASO: Pendiente de decisión */}
+      {/* Pendiente de decisión */}
       {!estado.firmadoCoordinacion && !estado.rechazado && (
         <div style={{
-          padding: "1.5rem",
-          borderRadius: RADIUS.lg,
-          border: `1px solid ${C.borderSubtle}`,
-          background: C.bgCard,
+          padding: "1.5rem", borderRadius: RADIUS.lg,
+          border: `1px solid ${C.borderSubtle}`, background: C.bgCard,
         }}>
           <p style={{
-            margin: "0 0 0.35rem",
-            fontSize: 12,
-            fontWeight: 700,
-            color: C.accentText,
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
+            margin: "0 0 0.35rem", fontSize: 12, fontWeight: 700,
+            color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase",
           }}>
             Firma de coordinación
           </p>
@@ -137,18 +104,13 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button
-              onClick={onRechazar}
+              onClick={() => setRechazando(prev => !prev)}
               style={{
-                flex: 1,
-                padding: "12px",
-                borderRadius: RADIUS.md,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
+                flex: 1, padding: "12px", borderRadius: RADIUS.md,
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
                 background: "rgba(185,28,28,0.06)",
                 border: "1px solid rgba(185,28,28,0.3)",
-                color: "#b91c1c",
-                fontFamily: "inherit",
+                color: "#b91c1c", fontFamily: "inherit",
               }}
             >
               Rechazar
@@ -156,22 +118,57 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
             <button
               onClick={onFirmar}
               style={{
-                flex: 2,
-                padding: "12px",
-                borderRadius: RADIUS.md,
-                fontSize: 14,
-                fontWeight: 600,
-                cursor: "pointer",
-                background: GRADIENTS.primary,
-                border: "none",
-                color: "#fff",
-                fontFamily: "inherit",
-                boxShadow: SHADOWS.accent,
+                flex: 2, padding: "12px", borderRadius: RADIUS.md,
+                fontSize: 14, fontWeight: 600, cursor: "pointer",
+                background: GRADIENTS.primary, border: "none",
+                color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent,
               }}
             >
               Aprobar y firmar →
             </button>
           </div>
+
+          {/* Textbox de rechazo */}
+          {rechazando && (
+            <div style={{ marginTop: "1rem" }}>
+              <textarea
+                value={motivo}
+                onChange={e => setMotivo(e.target.value)}
+                placeholder="Escribe el motivo del rechazo..."
+                rows={4}
+                style={{
+                  width: "100%", padding: "10px", borderRadius: RADIUS.md,
+                  border: `1px solid ${C.borderDefault}`, background: C.bgInput,
+                  color: C.textPrimary, fontSize: 13, resize: "vertical",
+                  fontFamily: "inherit", boxSizing: "border-box",
+                }}
+              />
+              <div style={{ display: "flex", gap: 8, marginTop: "0.75rem" }}>
+                <button
+                  onClick={() => { setRechazando(false); setMotivo(""); }}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: RADIUS.md,
+                    border: `1px solid ${C.borderDefault}`, background: "transparent",
+                    color: C.textSecondary, cursor: "pointer",
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => onRechazar(motivo)}
+                  disabled={!motivo.trim()}
+                  style={{
+                    flex: 1, padding: "10px", borderRadius: RADIUS.md, border: "none",
+                    background: motivo.trim() ? "rgba(185,28,28,0.8)" : C.borderDefault,
+                    color: "#fff", cursor: motivo.trim() ? "pointer" : "not-allowed",
+                    fontWeight: 600,
+                  }}
+                >
+                  Confirmar rechazo
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>

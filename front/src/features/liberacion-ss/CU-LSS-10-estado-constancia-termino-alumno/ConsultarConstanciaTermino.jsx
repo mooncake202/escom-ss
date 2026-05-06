@@ -208,7 +208,7 @@ export default function ConsultarConstanciaTermino() {
     <ProcesoLSSLayout
       pasoActual={6}
       titulo="Constancia de término"
-      subtitulo="CU-LSS-09"
+      subtitulo="CU-LSS-10"
       rol="alumno"
       usuario={MOCK.usuario}
     >

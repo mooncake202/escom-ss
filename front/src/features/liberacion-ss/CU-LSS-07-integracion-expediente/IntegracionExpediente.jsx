@@ -132,8 +132,8 @@ export default function IntegracionExpediente() {
     return (
       <ProcesoLSSLayout
         pasoActual={4}
-        titulo="Integración de expediente"
-        subtitulo="CU-LSS-04"
+        titulo="Integración de expedienteeeee"
+        subtitulo="CU-LSS-07"
         rol={MOCK.rol}
         usuario={MOCK.usuario}
       >
@@ -173,7 +173,7 @@ export default function IntegracionExpediente() {
     <ProcesoLSSLayout
       pasoActual={4}
       titulo="Integración de expediente"
-      subtitulo="CU-LSS-04 - Alumno"
+      subtitulo="CU-LSS-07 - Alumno"
       rol={MOCK.rol}
       usuario={MOCK.usuario}
     >

@@ -54,7 +54,7 @@ function VistaAprobado({ C }) {
           boxShadow: SHADOWS.accent,
         }}
       >
-        Ir al inicio
+        Solicitar constancia de término
       </button>
     </div>
   );

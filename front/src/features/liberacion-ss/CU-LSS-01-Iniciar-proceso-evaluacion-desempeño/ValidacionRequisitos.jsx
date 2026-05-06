@@ -13,6 +13,11 @@ export default function ValidacionRequisitos() {
   const { confirmado, solicitarValidacion, error, loading, enviado, toggleConfirmado, toggleSolicitud, confirmar, completo } =
     useValidacionRequisitos();
 
+
+    // 🔧 PRUEBA — cambia a true/false para simular
+const tieneHoras = false;
+const tieneReportes = false;
+
   // ✅ MISMO patrón de éxito que tu ejemplo
   if (enviado) {
     return (
@@ -102,28 +107,28 @@ export default function ValidacionRequisitos() {
 
           {/* Auto validados */}
           <div style={{
-            padding: "12px",
-            borderRadius: 10,
-            border: `1px solid ${C.success}`,
-            background: C.successSoft,
-            marginBottom: "1rem",
-            fontSize: 13,
-            color: C.success
-          }}>
-            ✅ 480 horas completadas
-          </div>
+  padding: "12px",
+  borderRadius: 10,
+  border: `1px solid ${tieneHoras ? C.success : C.danger}`,
+  background: tieneHoras ? C.successSoft : C.dangerSoft,
+  marginBottom: "1rem",
+  fontSize: 13,
+  color: tieneHoras ? C.success : C.danger
+}}>
+  {tieneHoras ? "✅" : "❌"} 480 horas completadas
+</div>
 
-          <div style={{
-            padding: "12px",
-            borderRadius: 10,
-            border: `1px solid ${C.success}`,
-            background: C.successSoft,
-            marginBottom: "1.25rem",
-            fontSize: 13,
-            color: C.success
-          }}>
-            ✅ Reportes mensuales y global registrados y aprobados
-          </div>
+<div style={{
+  padding: "12px",
+  borderRadius: 10,
+  border: `1px solid ${tieneReportes ? C.success : C.danger}`,
+  background: tieneReportes ? C.successSoft : C.dangerSoft,
+  marginBottom: "1.25rem",
+  fontSize: 13,
+  color: tieneReportes ? C.success : C.danger
+}}>
+  {tieneReportes ? "✅" : "❌"} Reportes mensuales y global registrados y aprobados
+</div>
 
           {/* Confirmación */}
           <div style={{

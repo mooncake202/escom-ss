@@ -371,7 +371,7 @@ export default function EvaluacionExpedienteCoordinacion() {
   return (
     <DashboardLayout
       titulo="Evaluación de expediente"
-      subtitulo="CU-LSS-08"
+      subtitulo="CU-LSS-09"
       rol="coordinacion"
       usuario="Coordinación"
     >

@@ -4,7 +4,7 @@ import { useState } from "react";
 // Si rechazado → alumno puede corregir → regresa a CU-04
 
 export function useEstadoResolucionAlumno() {
-  const [estado, setEstado] = useState("aprobado");
+  const [estado, setEstado] = useState("aprobado"); // 👈 CAMBIA AQUÍ PARA PROBAR
   const [observacionesGuardadas, setObservacionesGuardadas] = useState("");
 
   // Simulación: en un caso real estos datos vendrían del backend

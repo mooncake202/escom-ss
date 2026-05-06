@@ -5,7 +5,7 @@ import { useState } from "react";
 // disponible:  constancia lista para descargar
 
 export function useConsultarConstanciaTermino() {
-  const [estado, setEstado] = useState("disponible");
+  const [estado, setEstado] = useState("pendiente");
   const [archivoConstancia, setArchivoConstancia] = useState(null);
 
   // En producción esto vendría del backend via polling o websocket
