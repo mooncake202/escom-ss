@@ -8,6 +8,7 @@ import Dashboard from './features/dashboard/dashboards'
 //CRED
 import LoginPage from "./features/login/LoginPage";
 import RecuperarContraseña from "./features/login/CU-CRED-02-cambiar-contraseña/RecuperarContrasena";
+import CrearUsuario from "./features/login/CU-CRED-03-crear-usuarios/RegistroProfesores";
 
 
 //GR
@@ -68,6 +69,7 @@ function App() {
         --CRED
         <Route path="/" element={<LoginPage />} />
         <Route path="/recuperar-contraseña" element={<RecuperarContraseña />} />
+        <Route path="/crear-usuario" element={<CrearUsuario />} />
 
         -- rutas REGISTRO--
         
