@@ -23,7 +23,7 @@ export default function EsperaRevisionExpediente() {
             Coordinación validó tu expediente. Ya eres Alumno Asignado y estás registrado formalmente en el programa de servicio social.
           </p>
           <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled, lineHeight: 1.6 }}>
-            Recibirás los formatos de reportes mensuales por correo. Mientras tanto puedes consultar el estado de tu proceso.
+            
           </p>
           <button
             onClick={() => navigate("/alumnoAsignado/estado")}
@@ -34,7 +34,7 @@ export default function EsperaRevisionExpediente() {
               color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent,
             }}
           >
-            Ver mi proceso →
+            Iniciar sesión →
           </button>
         </div>
       </ProcesoLayout>
@@ -78,7 +78,7 @@ export default function EsperaRevisionExpediente() {
               Observaciones de Coordinación
             </p>
             <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>
-              {observacion ?? "Sin observaciones registradas."}
+              {observacion ?? "La carta de creditos no es la vigente."}
             </p>
           </div>
 

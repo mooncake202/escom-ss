@@ -151,7 +151,7 @@ export default function ExpedienteCoordinacion() {
   return (
     <DashboardLayout
       titulo="Expedientes de alumnos"
-      subtitulo="CU-CO-05 · Coordinación"
+      subtitulo="CU-CO-13 · Coordinación"
       rol="coordinacion"
       usuario="Coord. María Esquivel"
     >

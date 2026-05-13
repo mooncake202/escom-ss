@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 const POLLING_INTERVAL_MS = 15000;
 
 export function useEsperaRevisionExpediente() {
-  const [estado,      setEstado]      = useState("Expediente enviado");
+  const [estado,      setEstado]      = useState("Expediente con correcciones");
   const [observacion, setObservacion] = useState(null);
   const [error,       setError]       = useState(null);
 

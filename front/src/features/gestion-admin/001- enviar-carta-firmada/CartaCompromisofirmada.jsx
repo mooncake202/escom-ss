@@ -445,7 +445,7 @@ export default function CartaCompromiso() {
   return (
     <DashboardLayout
       titulo="Carta Compromiso"
-      subtitulo="CU-CO-04 · Coordinación"
+      subtitulo="CU-CO-14 · Coordinación"
       rol="coordinacion"
       usuario="Coord. María Esquivel"
     >

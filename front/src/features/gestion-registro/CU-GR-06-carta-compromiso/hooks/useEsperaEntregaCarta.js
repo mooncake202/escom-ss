@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback } from "react";
 const POLLING_INTERVAL_MS = 15000; // consulta cada 15 segundos
 
 export function useEsperaEntregaCarta() {
-  const [entregaConfirmada, setEntregaConfirmada] = useState(false);
+  const [entregaConfirmada, setEntregaConfirmada] = useState(true);
   const [error, setError]                         = useState(null);
 
   const verificarEstado = useCallback(async () => {

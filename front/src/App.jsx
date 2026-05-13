@@ -22,6 +22,15 @@ import CartaCompromiso from './features/gestion-registro/CU-GR-06-carta-compromi
 import ValidarEntregaPresencial from './features/gestion-registro/CU-GR-07-validar-entrega-presencial/ValidarEntregaPresencial'
 import SubirExpediente from './features/gestion-registro/CU-GR-08-subir-expediente/SubirExpediente'
 import RevisarExpediente from './features/gestion-registro/CU-GR-09-revisar-expediente/RevisarExpediente'
+import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solicitud/EsperandoProfesor'
+import EsperandoValidacionCarta from './features/gestion-registro/CU-GR-06-carta-compromiso/EsperaEntregaCartaCompromiso'
+import EsperaRevisionExpediente from './features/gestion-registro/CU-GR-08-subir-expediente/EsperaRevisionExpediente'
+import ModificarSolicitud from './features/gestion-registro/CU-GR-13-MODIFICAR-SOLICITUD/ModificarSolicitud'
+
+
+
+
+//AH
 import AsignarActividades from './features/gestion-actividades/CU-AH-01-asignar-actividades/AsignarActividades'
 import ConsultarActividades from './features/gestion-actividades/CU-AH-02-consultar-actividades/ConsultarActividades'
 import RegistrarBitacora from './features/gestion-actividades/CU-AH-03-registrar-bitacora/RegistrarBitacora'
@@ -29,8 +38,6 @@ import RevisarAvances from './features/gestion-actividades/CU-AH-04-revisar-avan
 import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-horas/AcumuladoHoras'
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
 
-import EsperandoProfesor from './features/gestion-registro/CU-GR-01-enviar-solicitud/EsperandoProfesor'
-import EsperandoValidacionCarta from './features/gestion-registro/CU-GR-06-carta-compromiso/EsperaEntregaCartaCompromiso'
 
 
 //LSS
@@ -84,8 +91,11 @@ function App() {
         <Route path="/alumnoSinAsignar/esperando-validacion" element={<EsperandoValidacionCarta />} />
         <Route path="/coordinacion/carta-presencial" element={<ValidarEntregaPresencial />} />
         <Route path="/alumnoSinAsignar/expediente" element={<SubirExpediente />} />
+        <Route path="/alumnoSinAsignar/estado-expediente" element={<EsperaRevisionExpediente />} />
         <Route path="/coordinacion/expedientes" element={<RevisarExpediente />} />
-        
+        <Route path="/alumnoSinAsignar/modificar-solicitud" element={<ModificarSolicitud />} />
+
+
         -- rutas ACTIVIDADES--
         <Route path="/profesor/actividades" element={<AsignarActividades />} />
         <Route path="/alumno/actividades" element={<ConsultarActividades />} />

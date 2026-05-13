@@ -442,7 +442,7 @@ export default function GestionIncidencias() {
     <DashboardLayout
       titulo="Gestión de incidencias"
       subtitulo="CU-ADM-XX · Coordinación"
-      rol="coordinacion"
+      rol="profesor"
       usuario="Coord. María Esquivel"
     >
       {/* Métricas */}
