@@ -16,12 +16,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.use("/ofertas", ofertasRoutes);
-app.use("/registro", registroRoutes);
-app.use("/periodos", periodosRoutes);
-app.use("/login", loginRoute);
-app.use("/alumno", alumnoRoutes);
-app.use("/profesor", profesorRoutes);
+app.use("/api/ofertas", ofertasRoutes);
+app.use("/api/registro", registroRoutes);
+app.use("/api/periodos", periodosRoutes);
+app.use("/api/login", loginRoute);
+app.use("/api/alumno", alumnoRoutes);
+app.use("/api/profesor", profesorRoutes);
 
 
 

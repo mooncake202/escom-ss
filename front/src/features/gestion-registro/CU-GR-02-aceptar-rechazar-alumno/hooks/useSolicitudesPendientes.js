@@ -9,7 +9,7 @@ export function useSolicitudesPendientes() {
   useEffect(() => {
     const usuario = JSON.parse(localStorage.getItem("usuario"));
     if (!usuario) return;
-    fetch(`http://localhost:3000/profesor/${usuario.id}/solicitudes`)
+    fetch(`api/profesor/${usuario.id}/solicitudes`)
       .then(r => r.json())
       .then(data => setSolicitudes(data.map(s => ({ ...s, estado: "PendienteProfesor" }))))
       .catch(console.error);
@@ -28,7 +28,7 @@ export function useSolicitudesPendientes() {
   const decidir = async (id, decision) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/profesor/solicitudes/${id}/decidir`, {
+      const res = await fetch(`api/profesor/solicitudes/${id}/decidir`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ decision }),
