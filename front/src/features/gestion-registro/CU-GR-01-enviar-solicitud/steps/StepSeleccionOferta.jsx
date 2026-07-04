@@ -6,7 +6,7 @@ export function StepSeleccionOferta({ form, errors, ofertas, onSelect, handleCha
   const [perfilesFiltro, setPerfilesFiltro] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:3000/ofertas/perfiles")
+    fetch("/api/ofertas/perfiles")
       .then(r => r.json())
       .then(data => setPerfiles(data))
       .catch(() => {});

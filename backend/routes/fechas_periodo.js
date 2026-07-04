@@ -7,7 +7,7 @@ try {
     const [rows] = await db.query(`
     SELECT id, semestre, fechaInicio, fechaFin, fechaLimExpedi
     FROM periodo
-    /* WHERE fechaInicio >= CURDATE() */
+    WHERE fechaInicio >= CURDATE()
     ORDER BY fechaInicio
     `);
 
