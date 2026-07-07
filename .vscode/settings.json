@@ -13,6 +13,21 @@
             "name": "dddddddddddd",
             "database": "escom_ss",
             "username": "root"
+        },
+        {
+            "mysqlOptions": {
+                "authProtocol": "default",
+                "enableSsl": "Disabled"
+            },
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 3306,
+            "driver": "MariaDB",
+            "name": "escom_ss_DIAGR",
+            "username": "root",
+            "database": "escom_ss",
+            "askForPassword": true
         }
     ]
 }

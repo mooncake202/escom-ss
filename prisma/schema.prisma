@@ -1,500 +1,582 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
 }
+
+// ─────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────
+
+enum NombreCaracteristica {
+  Presidente_de_academia @map("Presidente de academia")
+  Coordinador
+  Jefe_de_departamento   @map("Jefe de departamento")
+  Investigador
+}
+
+enum TipoEventoCalendario {
+  Vacacional
+  Inhabil
+  Periodo
+}
+
+enum SemestrePeriodo {
+  s01 @map("01")
+  s02 @map("02")
+}
+
+enum TipoContacto {
+  correo
+  telefono
+  ubicacion
+  horario
+}
+
+enum OrigenAnuncio {
+  coordinador
+  profesor
+}
+
+enum TipoOfertaServicio {
+  individual
+  proyecto
+}
+
+enum TipoRevisor {
+  alumno
+  profesor
+  coordinador
+}
+
+enum EstadoRevision {
+  aprobado
+  rechazado
+}
+
+// ─────────────────────────────────────────
+// 1. Tablas independientes / base
+// ─────────────────────────────────────────
+
+model carrera {
+  id     Int    @id @default(autoincrement())
+  nombre String @db.VarChar(3)
+
+  deseo_de_carrera   deseo_de_carrera[]
+  solicitud_registro solicitud_registro[]
+}
+
+model caracteristica {
+  id                Int                  @id @default(autoincrement())
+  nombre            NombreCaracteristica
+  incremento_cupos  Int                  @db.UnsignedTinyInt
+
+  solicitud_caracteristica solicitud_caracteristica[]
+}
+
+// ─────────────────────────────────────────
+// 2. Entidad central de usuarios
+// ─────────────────────────────────────────
 
 model usuario {
-  id                           Int                         @id @default(autoincrement())
-  correoInst                   String                      @unique @db.VarChar(255)
-  password                     String                      @db.VarChar(255)
-  rol                          String                      @db.VarChar(50)
-  alumno                       alumno?
-  anuncios_autor               anuncio[]                   @relation("AnuncioAutor")
-  calendario_creado            calendario_institucional[]
-  coordinacion                 coordinacion?
-  documentos_subidos           documento[]
-  firma                        firma?
-  profesor                     profesor?
-  caracteristicas_asignadas    profesor_caracteristica[]   @relation("CaracteristicaAsignador")
-  recursos_actualizados        recurso[]
-  reporte_firmas               reporte_firmas[]
-  reporte_historial_como_actor reporte_historial_estados[]
-  revisiones_realizadas solicitud_revision[] @relation
-  @@index([id])
+  id                     Int       @id @default(autoincrement())
+  rol                    String    @db.VarChar(20)
+  correo_institucional   String    @unique @db.VarChar(35)
+  nombre                 String    @db.VarChar(50)
+  apellidos              String    @db.VarChar(50)
+  contrasena             String    @db.VarChar(255)
+  intentos_fallidos      Int?      @db.UnsignedTinyInt
+  cuenta_bloqueada       Boolean?
+  fecha_bloqueo          DateTime? @db.DateTime
+  fecha_creacion         DateTime  @db.DateTime
+  creado_por_id          Int?
+  rubrica_imagen         String?   @db.VarChar(500)
+  rubrica_ip             String?   @db.VarChar(45)
+  rubrica_fecha_registro DateTime  @db.DateTime
+
+  creado_por       usuario?  @relation("UsuarioCreador", fields: [creado_por_id], references: [id], onDelete: SetNull)
+  usuarios_creados usuario[] @relation("UsuarioCreador")
+
+  alumno       alumno?
+  profesor     profesor?
+  coordinador  coordinador?
+
+  inicio_sesion             inicio_sesion[]
+  token_contrasena          token_contrasena[]
+  anuncio                   anuncio[]
+  documento                 documento[]
+  revision_reporte_mensual  revision_reporte_mensual[]
+  revision_reporte_global   revision_reporte_global[]
+  revision_desempeno        revision_desempeno[]
+  solicitud_baja            solicitud_baja[]
 }
 
-model coordinacion {
-  id             Int     @id @default(autoincrement())
-  usuario_id     Int     @unique
-  nombreCompleto String  @unique @db.VarChar(255)
-  usuario        usuario @relation(fields: [usuario_id], references: [id])
-
-  @@index([usuario_id])
-}
+// ─────────────────────────────────────────
+// 3. Perfiles de rol
+// ─────────────────────────────────────────
 
 model alumno {
-  id             Int        @id @default(autoincrement())
-  usuario_id     Int        @unique
-  nombres        String     @db.VarChar(100)
-  apellidos      String     @db.VarChar(100)
-  boleta         String     @unique @db.VarChar(50)
-  carrera        String     @db.VarChar(255)
-  telefono       String     @unique @db.VarChar(20)
-  correoPersonal String     @unique @db.VarChar(255)
-  semestre Int 
+  boleta          String  @id @db.Char(10)
+  usuario_id      Int     @unique
+  celular         String  @db.VarChar(10)
+  carrera         String  @db.VarChar(3)
+  creditos        Int     @db.UnsignedTinyInt
+  semestre        Int     @db.UnsignedTinyInt
+  correo_personal String? @db.VarChar(50)
 
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 
-  creditos       Int
-  
-  usuario        usuario    @relation(fields: [usuario_id], references: [id])
-  horas          horas?
-  solicitud      solicitud?
-
-  anuncios_vistos anuncio_visto[]
-
-
-  @@index([usuario_id])
-  @@index([id])
+  registro_anuncio_visto registro_anuncio_visto[]
+  cumulo_horas_y_faltas  cumulo_horas_y_faltas?
+  solicitud_registro     solicitud_registro?
+  documento              documento[]
+  solicitud_baja         solicitud_baja[]
 }
 
 model profesor {
-  id                          Int                                 @id @default(autoincrement())
-  usuario_id                  Int                                 @unique
-  nombreCompleto              String                              @unique @db.VarChar(255)
-  telefono                    String?                             @unique @db.VarChar(20)
-  departamento                String                              @db.VarChar(255)
-  cubiculo String
-  anuncios                    anuncio[]                           @relation("AnuncioProfesor")
-  ofertas_servicio            oferta_servicio[]
-  usuario                     usuario                             @relation(fields: [usuario_id], references: [id])
-  caracteristicas             profesor_caracteristica[]
-  caracteristicas_solicitudes profesor_caracteristica_solicitud[]
+  id                Int    @id @default(autoincrement())
+  usuario_id        Int    @unique
+  departamento      String @db.VarChar(100)
+  telefono_personal String @db.VarChar(10)
+  horario_atencion  String @db.VarChar(100)
+  cubiculo          String @db.VarChar(100)
+  cupos_totales     Int    @db.UnsignedTinyInt
 
-  @@index([usuario_id])
-  @@index([id])
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  solicitud_caracteristica solicitud_caracteristica[]
+  oferta_servicio          oferta_servicio[]
+  bitacora                 bitacora[]
 }
 
-model profesor_caracteristica {
-  id              Int                        @id @default(autoincrement())
-  profesor_id     Int
-  tipo            tipoCaracteristicaProfesor
-  cuposExtra      Int
-  fechaAsignacion DateTime
-  asignadoPor     Int
-  asignador       usuario                    @relation("CaracteristicaAsignador", fields: [asignadoPor], references: [id])
-  profesor        profesor                   @relation(fields: [profesor_id], references: [id])
+model coordinador {
+  id         Int @id @default(autoincrement())
+  usuario_id Int @unique
 
-  @@unique([profesor_id, tipo])
-  @@index([profesor_id])
-  @@index([asignadoPor])
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  evento_calendario       evento_calendario[]
+  recurso                 recurso[]
+  contacto_institucional  contacto_institucional[]
+  oferta_servicio         oferta_servicio[]
+  documento               documento[] @relation("DocumentoAprobadoPor")
+  solicitud_baja          solicitud_baja[]
 }
 
-model profesor_caracteristica_solicitud {
-  id             Int                           @id @default(autoincrement())
-  profesor_id    Int
-  tipo           tipoCaracteristicaProfesor
-  estado         estadoSolicitudCaracteristica
-  motivacion     String                        @db.Text
-  comentario     String?                       @db.Text
-  fechaCreacion  DateTime
-  fechaRespuesta DateTime?
-  profesor       profesor                      @relation(fields: [profesor_id], references: [id])
+// ─────────────────────────────────────────
+// 4. Seguridad, logs y configuración institucional
+// ─────────────────────────────────────────
 
-  @@index([profesor_id])
-  @@index([estado])
-}
-
-model horas {
-  id               Int    @id @default(autoincrement())
-  alumno_id        Int    @unique
-  horasAcumuladas  Int    @default(0)
-  horasRechazadas  Int    @default(0)
-  faltasSeguidas   Int    @default(0)
-  faltasAcumuladas Int    @default(0)
-  alumno           alumno @relation(fields: [alumno_id], references: [id])
-
-  @@index([alumno_id])
-  @@index([id])
-}
-
-model oferta_servicio {
-  id                     Int                    @id @default(autoincrement())
-  profesor_id            Int
-  tipo                   tipoOferta
-  titulo                 String                 @db.VarChar(255)
-  tituloPlatSISS         String                 @db.VarChar(255)
-  descripcion            String                 @db.Text
-  actividades            String                 @db.Text
-  cuposTotales           Int
-  estado                 estadoOferta
-  cuposExtraInvestigador Int?
-  oferta_perfildeseado   oferta_perfildeseado[]
-  profesor               profesor               @relation(fields: [profesor_id], references: [id])
-  solicitudes            solicitud[]
-
-  @@index([id])
-  @@index([profesor_id])
-
-}
-
-model periodo {
-  id             Int         @id @default(autoincrement())
-  semestre       String      @db.VarChar(7)
-  fechaInicio    DateTime    @db.Date
-  fechaFin       DateTime    @db.Date
-  fechaLimExpedi DateTime    @db.Date
-  solicitudes    solicitud[]
-
-  @@index([id])
-}
-
-model solicitud {
-  id            Int                    @id @default(autoincrement())
-  alumno_id     Int                    @unique
-  oferta_id     Int
-  periodo_id    Int
-  estatus       pasosRegistroSolicitud
-  estatusAnterior pasosRegistroSolicitud?
-  motivacion    String                 @db.Text
-  motivoRechazo String?                @db.Text
-  tipoRechazo   tipoRechazo            @default(ninguno)
-  registroSISSConfirmado    Boolean @default(false)
-  cartaCompromisoConfirmada Boolean @default(false)
-  fechaCreacion         DateTime
-  fechaSISSConfirmado   DateTime?
-  fechaCartaConfirmada  DateTime?
-
-  revisiones solicitud_revision[]
-  actividades   actividad[]
-  bitacoras     bitacora[]
-  reportes      reporte[]
-  alumno        alumno                 @relation(fields: [alumno_id], references: [id])
-  oferta        oferta_servicio        @relation(fields: [oferta_id], references: [id])
-  periodo       periodo                @relation(fields: [periodo_id], references: [id])
-  documentos    solicitud_documentos[]
-
-  @@index([oferta_id])
-  @@index([periodo_id])
-  @@index([id])
-}
-
-model solicitud_revision {
-  id           Int            @id @default(autoincrement())
-  solicitud_id Int
-  etapa        etapaRevision
-  estado       estadoRevision @default(pendiente)
-  comentario   String?        @db.Text
-  revisadoPor  Int?
-  fechaRevision DateTime?
-  solicitud    solicitud      @relation(fields: [solicitud_id], references: [id])
-  revisor      usuario?       @relation(fields: [revisadoPor], references: [id])
-
-  @@index([solicitud_id])
-  @@index([etapa])
-}
-
-
-
-model actividad {
-  id                   Int                    @id @default(autoincrement())
-  solicitud_id         Int
-  titulo               String                 @db.VarChar(255)
-  descripcion          String?                @db.Text
-  entregableEsperado   String                 @db.Text
-  fecha_limite         DateTime?              @db.Date
-  fechaCreacion        DateTime
-  solicitud            solicitud              @relation(fields: [solicitud_id], references: [id])
-  bitacora_actividades bitacora_actividades[]
-
-  @@index([solicitud_id])
-}
-
-model bitacora {
-  id            Int                    @id @default(autoincrement())
-  solicitud_id  Int
-  fecha         DateTime               @db.Date
-  horaInicio    DateTime?              @db.Time(0)
-  horaFin       DateTime?              @db.Time(0)
-  estado        String                 @db.VarChar(30)
-  fechaCreacion DateTime
-  fechaRevision DateTime?
-  solicitud     solicitud              @relation(fields: [solicitud_id], references: [id])
-  actividades   bitacora_actividades[]
-
-  @@unique([solicitud_id, fecha])
-  @@index([solicitud_id])
-}
-
-model bitacora_actividades {
-  id           Int       @id @default(autoincrement())
-  bitacora_id  Int
-  actividad_id Int
-  descripcion  String    @db.Text
-  progreso     Int
-  evidencia    String    @db.Text
-  actividad    actividad @relation(fields: [actividad_id], references: [id])
-  bitacora     bitacora  @relation(fields: [bitacora_id], references: [id])
-
-  @@unique([bitacora_id, actividad_id])
-  @@index([bitacora_id])
-  @@index([actividad_id])
-}
-
-model reporte {
-  id                   Int                         @id @default(autoincrement())
-  solicitud_id         Int
-  tipo                 String                      @db.VarChar(20)
-  numero               Int?                        @db.SmallInt
-  fechaInicio          DateTime                    @db.Date
-  fechaFin             DateTime                    @db.Date
-  fechaLimite          DateTime                    @db.Date
-  diasLaborados        Int                         @default(0)
-  horasReportadas      Int                         @default(0)
-  observaciones        String?                     @db.Text
-  contenido            String?                     @db.Text
-  estado               String                      @db.VarChar(40)
-  fechaCreacion        DateTime
-  fechaModificacion    DateTime?
-  reporte_documento_id Int?
-  documento            documento?                  @relation(fields: [reporte_documento_id], references: [id])
-  solicitud            solicitud                   @relation(fields: [solicitud_id], references: [id])
-  dias                 reporte_dias[]
-  firmas               reporte_firmas[]
-  historial            reporte_historial_estados[]
-
-  @@unique([solicitud_id, fechaInicio])
-  @@index([solicitud_id])
-  @@index([reporte_documento_id], map: "reporte_reporte_documento_id_fkey")
-}
-
-model reporte_dias {
+model inicio_sesion {
   id         Int      @id @default(autoincrement())
-  reporte_id Int
-  fecha      DateTime @db.Date
-  reporte    reporte  @relation(fields: [reporte_id], references: [id])
-
-  @@unique([reporte_id, fecha])
-  @@index([reporte_id])
-}
-
-model reporte_historial_estados {
-  id             Int      @id @default(autoincrement())
-  reporte_id     Int
-  estadoAnterior String?  @db.VarChar(60)
-  estadoNuevo    String   @db.VarChar(60)
-  actor_id       Int?
-  comentario     String?  @db.Text
-  fechaCreacion  DateTime
-  actor          usuario? @relation(fields: [actor_id], references: [id])
-  reporte        reporte  @relation(fields: [reporte_id], references: [id])
-
-  @@index([reporte_id])
-  @@index([actor_id])
-}
-
-model reporte_firmas {
-  id         Int      @id @default(autoincrement())
-  reporte_id Int
-  tipo       String   @db.VarChar(20)
   usuario_id Int
-  fechaFirma DateTime
-  reporte    reporte  @relation(fields: [reporte_id], references: [id])
-  usuario    usuario  @relation(fields: [usuario_id], references: [id])
+  fecha_hora DateTime @db.DateTime
+  ip_acceso  String   @db.VarChar(45)
+  resultado  Boolean
 
-  @@unique([reporte_id, tipo])
-  @@index([usuario_id], map: "reporte_firmas_usuario_id_fkey")
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 }
 
-model firma {
-  id            Int      @id @default(autoincrement())
-  usuario_id    Int      @unique
-  hash          String   @db.VarChar(512)
-  fechaCreacion DateTime
-  rutaImagen    String   @db.VarChar(500)
-  usuario       usuario  @relation(fields: [usuario_id], references: [id])
+model token_contrasena {
+  id               Int      @id @default(autoincrement())
+  usuario_id       Int
+  token            String   @db.VarChar(255)
+  fecha_expiracion DateTime @db.DateTime
+  usado            Boolean
 
-  @@index([usuario_id])
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 }
 
-model documento {
-  id            Int                    @id @default(autoincrement())
-  tipo          String                 @db.VarChar(50)
-  nombre        String                 @db.VarChar(255)
-  ruta          String                 @db.VarChar(500)
-  mimeType      String                 @db.VarChar(100)
-  tamanio       Int
-  subidoPor     Int
-  fechaCreacion DateTime
-  usuario       usuario                @relation(fields: [subidoPor], references: [id])
-  reportes      reporte[]
-  solicitudes   solicitud_documentos[]
+model solicitud_caracteristica {
+  id                Int       @id @default(autoincrement())
+  profesor_id       Int
+  caracteristica_id Int
+  justificacion     String    @db.Text
+  estado            String    @db.VarChar(30)
+  fecha             DateTime  @db.DateTime
+  comentario        String?   @db.Text
+  fecha_respuesta   DateTime? @db.DateTime
 
-  @@index([subidoPor])
-  @@index([tipo])
+  profesor       profesor       @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
+  caracteristica caracteristica @relation(fields: [caracteristica_id], references: [id], onDelete: Cascade)
 }
 
-model solicitud_documentos {
-  id           Int       @id @default(autoincrement())
-  solicitud_id Int
-  documento_id Int
-  tipo         String    @db.VarChar(50)
-  documento    documento @relation(fields: [documento_id], references: [id])
-  solicitud    solicitud @relation(fields: [solicitud_id], references: [id])
+model evento_calendario {
+  id             Int                  @id @default(autoincrement())
+  coordinador_id Int
+  nombre         String               @db.VarChar(150)
+  tipo           TipoEventoCalendario
+  fecha_inicio   DateTime             @db.Date
+  fecha_fin      DateTime?            @db.Date
+  hora           DateTime?            @db.Time
 
-  @@unique([solicitud_id, documento_id])
-  @@index([solicitud_id])
-  @@index([documento_id])
+  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
+
+  periodo_registro periodo_registro?
 }
 
-model calendario_institucional {
-  id            Int                    @id @default(autoincrement())
-  titulo        String                 @db.VarChar(255)
-  semestre      String                 @db.VarChar(6)
-  tipo          String                 @db.VarChar(20)
-  creadoPor     Int
-  fechaCreacion DateTime
-  inhabil       calendario_inhabil?
-  usuario       usuario                @relation(fields: [creadoPor], references: [id])
-  vacacional    calendario_vacacional?
+model periodo_registro {
+  id                   Int             @id @default(autoincrement())
+  evento_calendario_id Int             @unique
+  anio                 String          @db.Char(4)
+  semestre             SemestrePeriodo
+  fecha_max_expediente DateTime        @db.Date
 
-  @@index([creadoPor])
-  @@index([tipo])
-  @@index([semestre])
-}
+  evento_calendario evento_calendario @relation(fields: [evento_calendario_id], references: [id], onDelete: Cascade)
 
-model calendario_vacacional {
-  id            Int                      @id @default(autoincrement())
-  calendario_id Int                      @unique
-  fechaInicio   DateTime                 @db.Date
-  fechaFin      DateTime                 @db.Date
-  calendario    calendario_institucional @relation(fields: [calendario_id], references: [id])
-
-  @@index([calendario_id])
-}
-
-model calendario_inhabil {
-  id            Int                      @id @default(autoincrement())
-  calendario_id Int                      @unique
-  fechaInhabil  DateTime                 @unique @db.Date
-  horaDesde     DateTime                 @db.Time(0)
-  calendario    calendario_institucional @relation(fields: [calendario_id], references: [id])
-
-  @@index([calendario_id])
-  @@index([fechaInhabil])
-}
-
-model anuncio {
-  id            Int       @id @default(autoincrement())
-  autor_id      Int
-  profesor_id   Int?
-  titulo        String    @db.VarChar(255)
-  contenido     String    @db.Text
-  fechaCreacion DateTime
-  autor         usuario   @relation("AnuncioAutor", fields: [autor_id], references: [id])
-  profesor      profesor? @relation("AnuncioProfesor", fields: [profesor_id], references: [id])
-
-
-  visto_por anuncio_visto[]
-
-
-  @@index([autor_id])
-  @@index([profesor_id])
-}
-
-
-model anuncio_visto {
-  alumno_id  Int
-  anuncio_id Int
-  visto_en   DateTime
-
-  alumno  alumno  @relation(fields: [alumno_id], references: [id])
-  anuncio anuncio @relation(fields: [anuncio_id], references: [id])
-
-  @@id([alumno_id, anuncio_id])
+  solicitud_registro solicitud_registro[]
 }
 
 model recurso {
-  id                 Int      @id @default(autoincrement())
-  titulo             String   @db.VarChar(255)
-  url                String   @db.VarChar(500)
-  fechaActualizacion DateTime
-  actualizadoPor     Int
-  usuario            usuario  @relation(fields: [actualizadoPor], references: [id])
+  id                  Int       @id @default(autoincrement())
+  coordinador_id      Int
+  nombre              String    @db.VarChar(150)
+  url                 String    @db.VarChar(500)
+  fecha_registro      DateTime  @db.DateTime
+  fecha_actualizacion DateTime? @db.DateTime
 
-  @@index([actualizadoPor])
+  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
 }
 
-model oferta_perfildeseado {
-  oferta_id       Int
-  perfil_id       Int
-  oferta_servicio oferta_servicio @relation(fields: [oferta_id], references: [id], map: "oferta_perfilDeseado_oferta_id_fkey")
-  perfildeseado   perfildeseado   @relation(fields: [perfil_id], references: [id], map: "oferta_perfilDeseado_perfil_id_fkey")
+model contacto_institucional {
+  id                  Int          @id @default(autoincrement())
+  coordinador_id      Int
+  tipo                TipoContacto
+  valor               String       @db.VarChar(255)
+  fecha_actualizacion DateTime     @db.DateTime
 
-  @@id([oferta_id, perfil_id])
-  @@index([perfil_id], map: "oferta_perfilDeseado_perfil_id_idx")
+  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
 }
 
-model perfildeseado {
-  id                   Int                    @id @default(autoincrement())
-  nombre               String                 @unique(map: "perfilDeseado_nombre_key") @db.VarChar(50)
-  oferta_perfildeseado oferta_perfildeseado[]
+model anuncio {
+  id                Int           @id @default(autoincrement())
+  usuario_id        Int
+  titulo            String        @db.VarChar(150)
+  contenido         String        @db.Text
+  fecha_publicacion DateTime      @db.DateTime
+  origen            OrigenAnuncio
+
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  registro_anuncio_visto registro_anuncio_visto[]
 }
 
-enum tipoCaracteristicaProfesor {
-  presidente_academia
-  coordinador
-  jefe_departamento
-  funcionario
-  coordinador_club
-  proyecto_investigacion
+model registro_anuncio_visto {
+  id         Int    @id @default(autoincrement())
+  alumno_id  String @db.Char(10)
+  anuncio_id Int
+
+  alumno  alumno  @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
+  anuncio anuncio @relation(fields: [anuncio_id], references: [id], onDelete: Cascade)
+
+  @@unique([alumno_id, anuncio_id])
 }
 
-enum estadoSolicitudCaracteristica {
-  pendiente
-  aprobada
-  rechazada
+model cumulo_horas_y_faltas {
+  id                  Int    @id @default(autoincrement())
+  alumno_id           String @unique @db.Char(10)
+  horas_acumuladas    Int    @default(0) @db.UnsignedSmallInt
+  horas_rechazadas    Int    @default(0) @db.UnsignedSmallInt
+  faltas_acumuladas   Int    @default(0) @db.UnsignedTinyInt
+  faltas_consecutivas Int    @default(0) @db.UnsignedTinyInt
+
+  alumno alumno @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
 }
 
-enum estadoOferta {
-  activa
-  pendiente
-  finalizado
+// ─────────────────────────────────────────
+// 5. Ofertas de proyectos y gestión de carrera
+// ─────────────────────────────────────────
+
+model oferta_servicio {
+  id                      Int                @id @default(autoincrement())
+  profesor_id             Int
+  coordinador_id          Int
+  nombre_SISS             String             @db.VarChar(100)
+  nombre_proyecto         String             @db.VarChar(150)
+  tipo_oferta             TipoOfertaServicio
+  descripcion_actividades String             @db.Text
+  cupos_ofertados         Int?               @db.UnsignedTinyInt
+  cupos_investigador      Int?               @db.UnsignedTinyInt
+  cupos_disponibles       Int                @db.UnsignedTinyInt
+  estado_oferta           String             @db.VarChar(20)
+  fecha_registro          DateTime           @db.DateTime
+  motivo_rechazo          String?            @db.Text
+
+  profesor    profesor    @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
+  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
+
+  deseo_de_carrera   deseo_de_carrera[]
+  solicitud_registro solicitud_registro[]
 }
 
-enum tipoOferta {
-  proyecto
-  individual
+model deseo_de_carrera {
+  id         Int @id @default(autoincrement())
+  oferta_id  Int
+  carrera_id Int
+
+  oferta  oferta_servicio @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  carrera carrera         @relation(fields: [carrera_id], references: [id], onDelete: Cascade)
+
+  @@unique([oferta_id, carrera_id])
 }
 
-enum pasosRegistroSolicitud {
-  espera_respuesta_de_profesor
-  espera_validacion_documentacion_y_registroSISS
-  espera_validacion_carta_compromiso
-  espera_validacion_expediente
-  Aprobada
-  rechazada_corregible
-  rechazada_definitiva
+// ─────────────────────────────────────────
+// 6. Flujo de solicitud y vinculación activa
+// ─────────────────────────────────────────
+
+model solicitud_registro {
+  id                   Int       @id @default(autoincrement())
+  alumno_id            String    @unique @db.Char(10)
+  carrera_id           Int
+  dictamen             Int?      @db.UnsignedTinyInt
+  periodo_registro_id  Int
+  oferta_id            Int
+  motivacion_oferta    String    @db.Text
+  estado_solicitud     String    @db.VarChar(50)
+  estado_anterior      String    @db.VarChar(50)
+  fecha_aplicacion     DateTime  @db.DateTime
+  tipo_rechazo         String?   @db.VarChar(50)
+  motivo_rechazo       String?   @db.Text
+  registro_siss        Boolean   @default(false)
+  docs_iniciales       Boolean   @default(false)
+  carta_compromiso     Boolean   @default(false)
+  expediente           Boolean   @default(false)
+
+  alumno           alumno           @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
+  carrera          carrera          @relation(fields: [carrera_id], references: [id], onDelete: Cascade)
+  periodo_registro periodo_registro @relation(fields: [periodo_registro_id], references: [id], onDelete: Cascade)
+  oferta           oferta_servicio  @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+
+  actividad          actividad[]
+  bitacora           bitacora[]
+  reporte_mensual    reporte_mensual[]
+  reporte_global     reporte_global[]
+  liberacion_proceso liberacion_proceso?
 }
 
-enum tipoRechazo {
-  ninguno
-  definitivo
-  corregible
+// ─────────────────────────────────────────
+// 7. Documentación general
+// ─────────────────────────────────────────
+
+model documento {
+  id                Int     @id @default(autoincrement())
+  alumno_id         String  @db.Char(10)
+  creador_id        Int
+  tipo_documento    String  @db.VarChar(50)
+  fecha_creacion    DateTime @db.DateTime
+  estado_documento  String  @db.VarChar(20)
+  ruta_archivo      String  @db.VarChar(255)
+  aprobado_por_id   Int?
+  nombre_expediente String? @db.VarChar(100)
+
+  alumno       alumno       @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
+  creador      usuario      @relation(fields: [creador_id], references: [id], onDelete: Cascade)
+  aprobado_por coordinador? @relation("DocumentoAprobadoPor", fields: [aprobado_por_id], references: [id], onDelete: SetNull)
+
+  reporte_mensual      reporte_mensual?
+  reporte_global       reporte_global?
+  evaluacion_desempeno evaluacion_desempeno?
+  solicitud_baja       solicitud_baja[]
 }
 
-enum etapaRevision {
-  documentacion_y_registroSISS
-  carta_compromiso
-  expediente
+// ─────────────────────────────────────────
+// 8. Bitácoras y seguimiento de tareas diarias
+// ─────────────────────────────────────────
+
+model actividad {
+  id                     Int       @id @default(autoincrement())
+  solicitud_registro_id  Int
+  titulo                 String    @db.VarChar(150)
+  descripcion            String    @db.Text
+  entregable_esperado    String    @db.Text
+  fecha_limite           DateTime  @db.Date
+  estado                 String    @db.VarChar(20)
+  fecha_asignacion       DateTime  @db.DateTime
+  porcentaje_progreso    Int       @default(0) @db.UnsignedTinyInt
+  fecha_completada       DateTime? @db.DateTime
+  fecha_limite_original  DateTime? @db.Date
+
+  solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
+
+  registro_bitacora_actividades registro_bitacora_actividades[]
 }
 
-enum estadoRevision {
-  pendiente
-  aprobada
-  rechazada_corregible
-  rechazada_definitiva
+model bitacora {
+  id                     Int       @id @default(autoincrement())
+  solicitud_registro_id  Int
+  hora_inicio            DateTime  @db.DateTime
+  hora_fin               DateTime  @db.DateTime
+  horas_contabilizadas   Int       @db.UnsignedTinyInt
+  estado                 String    @db.VarChar(30)
+  fecha_registro         DateTime  @db.Date
+  motivo_rechazo         String?   @db.Text
+  fecha_revision         DateTime? @db.DateTime
+  revisado_por_id        Int?
+
+  solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
+  revisado_por       profesor?           @relation(fields: [revisado_por_id], references: [id], onDelete: SetNull)
+
+  registro_bitacora_actividades registro_bitacora_actividades[]
+}
+
+model registro_bitacora_actividades {
+  id                            Int    @id @default(autoincrement())
+  bitacora_id                   Int
+  actividad_id                  Int
+  descripcion                   String @db.Text
+  porcentaje_avance_registrado  Int    @db.UnsignedTinyInt
+  evidencia                     String @db.Text
+
+  bitacora  bitacora  @relation(fields: [bitacora_id], references: [id], onDelete: Cascade)
+  actividad actividad @relation(fields: [actividad_id], references: [id], onDelete: Cascade)
+
+  @@unique([bitacora_id, actividad_id])
+}
+
+// ─────────────────────────────────────────
+// 9. Reportes mensuales y globales con firmas digitales
+// ─────────────────────────────────────────
+
+model reporte_mensual {
+  id                     Int    @id @default(autoincrement())
+  solicitud_registro_id  Int
+  documento_id           Int    @unique
+  num_reporte            Int    @db.UnsignedTinyInt
+  actividades_mes        String @db.Text
+  estado_reporte         String @db.VarChar(35)
+
+  solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
+  documento          documento          @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+
+  revision_reporte_mensual revision_reporte_mensual[]
+}
+
+model reporte_global {
+  id                     Int    @id @default(autoincrement())
+  solicitud_registro_id  Int
+  documento_id           Int    @unique
+  actividades_resumen    String @db.Text
+  estado_reporte         String @db.VarChar(35)
+
+  solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
+  documento          documento          @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+
+  revision_reporte_global revision_reporte_global[]
+}
+
+model revision_reporte_mensual {
+  id                  Int            @id @default(autoincrement())
+  reporte_mensual_id  Int
+  usuario_id          Int
+  tipo_revisor        TipoRevisor
+  estado              EstadoRevision
+  comentario          String?        @db.Text
+  hash_documento      String?        @db.VarChar(64)
+  ip_firma            String?        @db.VarChar(45)
+  token_tsa           String?        @db.Text
+  fecha               DateTime       @db.DateTime
+
+  reporte_mensual reporte_mensual @relation(fields: [reporte_mensual_id], references: [id], onDelete: Cascade)
+  usuario         usuario         @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+}
+
+model revision_reporte_global {
+  id                 Int            @id @default(autoincrement())
+  reporte_global_id  Int
+  usuario_id         Int
+  tipo_revisor       TipoRevisor
+  estado             EstadoRevision
+  comentario         String?        @db.Text
+  hash_documento     String?        @db.VarChar(64)
+  ip_firma           String?        @db.VarChar(45)
+  token_tsa          String?        @db.Text
+  fecha              DateTime       @db.DateTime
+
+  reporte_global reporte_global @relation(fields: [reporte_global_id], references: [id], onDelete: Cascade)
+  usuario        usuario        @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// 10. Procesos de cierre y liberación de servicio social (LSS)
+// ─────────────────────────────────────────
+
+model liberacion_proceso {
+  id                       Int       @id @default(autoincrement())
+  solicitud_registro_id    Int       @unique
+  estado                   String    @db.VarChar(50)
+  fecha_inicio             DateTime  @db.DateTime
+  reportes_validados_siss  Boolean
+  evaluacion_subida_siss   Boolean?
+  evaluacion_descargada    Boolean?
+  carta_termino_recogida   Boolean?
+  expediente_enviado       Boolean?
+  observaciones_rechazo    String?   @db.Text
+
+  solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
+
+  evaluacion_desempeno evaluacion_desempeno?
+  carta_termino        carta_termino?
+}
+
+model evaluacion_desempeno {
+  id                           Int       @id @default(autoincrement())
+  documento_id                 Int       @unique
+  liberacion_proceso_id        Int       @unique
+  estado                       String    @db.VarChar(50)
+  observaciones_profesor       String?   @db.Text
+  reportes_siss_confirmados    Boolean
+  fecha_evaluacion              DateTime? @db.DateTime
+  motivo_rechazo_coordinacion  String?   @db.Text
+
+  documento          documento          @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  liberacion_proceso liberacion_proceso @relation(fields: [liberacion_proceso_id], references: [id], onDelete: Cascade)
+
+  revision_desempeno revision_desempeno[]
+}
+
+model revision_desempeno {
+  id                       Int      @id @default(autoincrement())
+  evaluacion_desempeno_id  Int
+  usuario_id               Int
+  tipo_revisor             String   @db.VarChar(20)
+  estado                   String   @db.VarChar(20)
+  comentario               String?  @db.Text
+  hash_documento           String?  @db.VarChar(64)
+  ip_firma                 String?  @db.VarChar(45)
+  token_tsa                String?  @db.Text
+  fecha                    DateTime @db.DateTime
+
+  evaluacion_desempeno evaluacion_desempeno @relation(fields: [evaluacion_desempeno_id], references: [id], onDelete: Cascade)
+  usuario              usuario              @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+}
+
+model carta_termino {
+  id                     Int       @id @default(autoincrement())
+  liberacion_proceso_id  Int       @unique
+  estado                 String    @db.VarChar(50)
+  carta_recogida         Boolean
+  fecha_disponible       DateTime? @db.DateTime
+  fecha_recogida         DateTime? @db.DateTime
+  fecha_solicitud        DateTime  @db.DateTime
+
+  liberacion_proceso liberacion_proceso @relation(fields: [liberacion_proceso_id], references: [id], onDelete: Cascade)
+}
+
+model solicitud_baja {
+  id             Int      @id @default(autoincrement())
+  alumno_id      String   @db.Char(10)
+  solicitante_id Int
+  coordinador_id Int
+  documento_id   Int?
+  estado         String   @db.VarChar(12)
+  motivo         String   @db.Text
+  fecha          DateTime @db.DateTime
+
+  alumno      alumno      @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
+  solicitante usuario     @relation(fields: [solicitante_id], references: [id], onDelete: Cascade)
+  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
+  documento   documento?  @relation(fields: [documento_id], references: [id], onDelete: SetNull)
 }
