@@ -1,1 +1,1 @@
-Mi CV disponible en una página web:)
+TT2 EN DESARROLLO
