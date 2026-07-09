@@ -20,7 +20,7 @@ const MOCK_ALUMNO = { nombre: "García López Ana", matricula: "2022630001", id:
 
 // true  → alumno en proyecto (muestra sección de equipo)
 // false → alumno individual (no muestra sección de equipo)
-const MOCK_EN_PROYECTO = false;
+const MOCK_EN_PROYECTO = true;
 
 const MOCK_PROYECTO = {
   nombre: "Sistema de gestión de inventarios",
@@ -35,7 +35,7 @@ const MOCK_INTEGRANTES = [
     carrera:        "ISC",
     correoInst:     "agarcia0001@alumno.ipn.mx",
     correoPersonal: "ana.garcia@gmail.com",
-    telefono:       "55 1234 5678",
+    
   },
   {
     id: 2,
@@ -44,7 +44,7 @@ const MOCK_INTEGRANTES = [
     carrera:        "IA",
     correoInst:     "chernandez0042@alumno.ipn.mx",
     correoPersonal: "carlos.hdz@outlook.com",
-    telefono:       "55 8765 4321",
+    
   },
   {
     id: 3,
@@ -53,7 +53,7 @@ const MOCK_INTEGRANTES = [
     carrera:        "LCD",
     correoInst:     "dmartinez0078@alumno.ipn.mx",
     correoPersonal: null,
-    telefono:       "55 9999 0000",
+   
   },
 ];
 

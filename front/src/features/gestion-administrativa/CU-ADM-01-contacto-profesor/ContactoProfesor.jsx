@@ -13,7 +13,7 @@ export default function ContactoProfesor() {
   if (!profesor) {
     return (
       <DashboardLayout
-        titulo="Información de contacto del profesor"
+        titulo="Información de contacto"
         subtitulo="CU-ADM-01 · Alumno"
         rol="alumno"
         usuario={alumno.nombre}
@@ -43,7 +43,7 @@ export default function ContactoProfesor() {
   if (profesor.contactos.length === 0) {
     return (
       <DashboardLayout
-        titulo="Información de contacto del profesor"
+        titulo="Información de contacto"
         subtitulo="CU-ADM-01 · Alumno"
         rol="alumno"
         usuario={alumno.nombre}
@@ -71,7 +71,7 @@ export default function ContactoProfesor() {
   // — Flujo principal —
   return (
     <DashboardLayout
-      titulo="Información de contacto del profesor"
+      titulo="Información de contacto"
       subtitulo="CU-ADM-01 · Alumno"
       rol="alumno"
       usuario={alumno.nombre}
