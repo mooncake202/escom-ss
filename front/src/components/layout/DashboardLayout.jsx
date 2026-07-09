@@ -8,7 +8,7 @@ import { Header }  from "./Header";
  *   <TuPagina />
  * </DashboardLayout>
  */
-export function DashboardLayout({ titulo, subtitulo, rol = "profesor", usuario = "Usuario", children }) {
+export function DashboardLayout({ titulo, subtitulo, rol = "profesor", usuario = "Usuario", enProyecto = false, children }) {
   const { C } = useTheme();
 
   return (
@@ -20,7 +20,7 @@ export function DashboardLayout({ titulo, subtitulo, rol = "profesor", usuario =
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Sidebar izquierdo */}
-      <Sidebar rol={rol} />
+      <Sidebar rol={rol} enProyecto={enProyecto} />
 
       {/* Columna derecha: header + contenido */}
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
