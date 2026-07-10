@@ -18,12 +18,12 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/ofertas", ofertasRoutes);
-app.use("/api/registro", registroRoutes);
+//app.use("/api/ofertas", ofertasRoutes);
+//app.use("/api/registro", registroRoutes);
 app.use("/api/periodos", periodosRoutes);
-app.use("/api/login", loginRoute);
-app.use("/api/alumno", alumnoRoutes);
-app.use("/api/profesor", profesorRoutes);
+//app.use("/api/login", loginRoute);
+//app.use("/api/alumno", alumnoRoutes);
+//app.use("/api/profesor", profesorRoutes);
 
 
 
