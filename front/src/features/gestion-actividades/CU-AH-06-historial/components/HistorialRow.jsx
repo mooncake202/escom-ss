@@ -75,8 +75,10 @@ export function HistorialRow({ registro, expandido, onToggle, C }) {
             {/* BITÁCORA */}
             {esBitacora && (
               <>
+                
                 {/* Avances */}
                 <div>
+                  
                   <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                     Actividades trabajadas
                   </p>
@@ -106,11 +108,63 @@ export function HistorialRow({ registro, expandido, onToggle, C }) {
 
                 {/* Comentario rechazo — RN-AH-55 */}
                 {registro.estado === "Rechazada" && registro.comentarioProfesor && (
-                  <div style={{ padding: "10px 14px", borderRadius: RADIUS.md, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)" }}>
-                    <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: "#EF4444", textTransform: "uppercase", letterSpacing: "0.06em" }}>Motivo del rechazo</p>
-                    <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>{registro.comentarioProfesor}</p>
-                  </div>
-                )}
+  <div style={{
+    padding: "10px 14px",
+    borderRadius: RADIUS.md,
+    background: "rgba(239,68,68,0.08)",
+    border: "1px solid rgba(239,68,68,0.3)"
+  }}>
+    
+    <p style={{
+      margin: "0 0 4px",
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#EF4444",
+      textTransform: "uppercase",
+      letterSpacing: "0.06em"
+    }}>
+      Motivo del rechazo
+    </p>
+
+    <p style={{
+      margin: 0,
+      fontSize: 13,
+      color: C.textSecondary,
+      lineHeight: 1.5
+    }}>
+      {registro.comentarioProfesor}
+    </p>
+
+    {/* 🔹 BOTÓN NUEVO */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation(); // evita colapsar el row
+
+        // 👉 aquí cambias el estado (ajústalo a tu lógica real)
+        registro.estado = "Aprobada";
+            }}
+            style={{
+              marginTop: "10px",
+              width: "100%",
+              padding: "9px",
+              borderRadius: RADIUS.md,
+              background: "linear-gradient(135deg, #22C55E, #16A34A)",
+              color: "#fff",
+              border: "none",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              boxShadow: "0 4px 12px rgba(34,197,94,0.3)",
+              transition: "all 0.2s ease"
+            }}
+            onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+            onMouseLeave={e => e.currentTarget.style.opacity = 1}
+          >
+            Aprobar bitácora
+          </button>
+
+        </div>
+      )}
               </>
             )}
 
@@ -118,6 +172,7 @@ export function HistorialRow({ registro, expandido, onToggle, C }) {
             {!esBitacora && (
               <>
                 <div>
+                  <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em"  }}>Fecha límite de entrega: {registro.fechaLimite}</p>
                   <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>Descripción</p>
                   <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>{registro.descripcion}</p>
                 </div>

@@ -78,7 +78,60 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await postLogin(form);
-      navigate("/dashboard");
+      const { rol, estatus, tipoRechazo, estatusAnterior, registroSISSConfirmado, cartaCompromisoConfirmada, numDocumentos } = res.usuario;
+
+      localStorage.setItem("usuario", JSON.stringify(res.usuario));
+      
+      if (rol === "profesor") {
+        navigate("/profesor/solicitudes");
+      } 
+      
+      else if (rol === "coordinacion") {
+      navigate("/coordinacion/dashboard");
+      } 
+      
+      else if (rol === "alumno_asignado") {
+        navigate("/alumno/dashboard");
+      }
+
+
+      else if (rol === "alumno_sin_asignar") {
+        const estatusEfectivo =
+        tipoRechazo && tipoRechazo !== "ninguno"
+          ? estatusAnterior
+          : estatus;
+
+      if (estatusEfectivo === "espera_respuesta_de_profesor") {
+        navigate("/alumnoSinAsignar/esperando_profesor");
+      }
+      
+      
+      else {
+        console.log("estatus no manejado:", estatusEfectivo);
+      }
+
+
+
+
+
+
+
+
+
+      } 
+
+
+
+
+
+
+      
+
+
+
+
+
+
     } catch (err) {
       setError(err.message || "Correo o contraseña incorrectos");
     } finally {
@@ -151,6 +204,15 @@ export default function LoginPage() {
                 showToggle
               />
             </Field>
+            <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
+            
+            <a
+              href="/recuperar-contrasena"
+              style={{ color: C.accentText, textDecoration: "none", fontWeight: 600 }}
+            >
+              ¿Olvidaste tu contraseña?{" "}
+            </a>
+          </p>
  
             {/* Error */}
             {error && (
@@ -183,7 +245,7 @@ export default function LoginPage() {
  
           {/* Enlace a registro */}
           <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
-            ¿No tienes cuenta?{" "}
+            ¿Aún no tienes cuenta?{" "}
             <a
               href="/registro"
               style={{ color: C.accentText, textDecoration: "none", fontWeight: 600 }}

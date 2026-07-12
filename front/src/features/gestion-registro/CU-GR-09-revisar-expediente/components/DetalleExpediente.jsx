@@ -102,7 +102,7 @@ export function DetalleExpediente({ item, loading, comentario, setComentario, mo
           <DocCheck label="Carta compromiso (ambos lados)" incluido={item.expediente.cartaCompromiso}    C={C} />
           <DocCheck label="CURP vigente"                   incluido={item.expediente.curp}               C={C} />
           <DocCheck label="Constancia de créditos"         incluido={item.expediente.constanciaCreditos} C={C} />
-          <DocCheck label="Dictamen (si aplica)"           incluido={item.expediente.dictamen}           C={C} />
+          <DocCheck label="Dictamen (no aplica)"           incluido={item.expediente.dictamen}           C={C} />
 
           {/* Aviso aprobación — RN-GR-53 y RN-GR-54 */}
           <div style={{ marginTop: "1.25rem", padding: "12px 14px", borderRadius: RADIUS.md, background: C.accentSoft, border: `1px solid ${C.accent}` }}>

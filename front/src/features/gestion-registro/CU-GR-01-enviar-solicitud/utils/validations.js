@@ -51,6 +51,8 @@ export function validateStep(step, form, aceptaCreditos) {
       errors.creditos="Necesitas mínimo el 70% para realizar tu servicio";
 
     if (!form.periodo)  errors.periodo  = "Selecciona un periodo";
+
+    if (!form.semestre)  errors.semestre  = "Campo requerido";
   }//listo
 
   if (step === 2) {

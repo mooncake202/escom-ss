@@ -28,7 +28,11 @@ export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
           </div>
           <div style={{ minWidth: 0 }}>
             <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alumno.nombre}</p>
-            <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{CARRERA_LABEL[alumno.carrera]} · {alumno.boleta}</p>
+            <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{CARRERA_LABEL[alumno.carrera]} · {alumno.boleta}
+            <br />
+            <span style={{ fontSize: 10, color: C.textDisabled }}>
+              {alumno.proyecto}
+            </span></p>
           </div>
         </div>
         {/* Contadores */}

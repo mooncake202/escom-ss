@@ -5,7 +5,7 @@ host: "localhost",
 user: "root",
 password: "1234",
 database: "escom_ss",
-port: 3307,
+port: 3306,
 charset: "utf8mb4",
 waitForConnections:true,
 connectionLimit:10

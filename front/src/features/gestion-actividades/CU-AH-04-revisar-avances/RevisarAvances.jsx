@@ -3,15 +3,20 @@ import { DashboardLayout }    from "@/components/layout/DashboardLayout";
 import { BitacoraCard }       from "./components/BitacoraCard";
 import { DetalleBitacora }    from "./components/DetalleBitacora";
 import { useRevisarAvances }  from "./hooks/useRevisarAvances";
+import { CARRERA_LABEL } from "../CU-AH-06-historial/HistorialActividades";
+import { useState } from "react";
 
 export default function RevisarAvances() {
   const { C } = useTheme();
   const {
     pendientes, alumnos, seleccionada, loading, resultado,
-    comentario, setComentario, modoRechazo, setModoRechazo,
-    filtroAlumno, setFiltroAlumno,
+    comentario, setComentario, modoRechazo, setModoRechazo, 
     verDetalle, cerrar, decidir,
   } = useRevisarAvances();
+  const [filtroNombre, setFiltroNombre] = useState("");
+  const pendientesFiltradas = pendientes.filter(b =>
+  b.alumno.nombre.toLowerCase().includes(filtroNombre.toLowerCase())
+);
 
   
 
@@ -52,20 +57,27 @@ export default function RevisarAvances() {
           </p>
         </div>
 
-        {/* Filtro por alumno */}
-        <select
-          value={filtroAlumno}
-          onChange={e => setFiltroAlumno(e.target.value)}
-          style={{ padding: "8px 14px", borderRadius: RADIUS.md, background: C.bgInput, border: `1px solid ${C.borderDefault}`, color: C.textPrimary, fontSize: 13, fontFamily: "inherit", cursor: "pointer", outline: "none" }}
-        >
-          <option value="todos">Todos los alumnos</option>
-          {alumnos.map(a => (
-            <option key={a.boleta} value={a.boleta}>{a.nombre.split(" ").slice(0, 2).join(" ")}</option>
-          ))}
-        </select>
+        
       </div>
 
       {/* Lista */}
+      {/* Filtro por alumno */}
+        
+
+        <div style={{ maxWidth: 420 }}>
+              <input
+                placeholder="Buscar alumno..."
+                value={filtroNombre}
+                onChange={e => setFiltroNombre(e.target.value)}
+                style={{ width: "100%", padding: "8px 12px", marginBottom: "0.625rem",
+                  borderRadius: RADIUS.md, background: C.bgInput,
+                  border: `1px solid ${C.borderDefault}`, color: C.textPrimary,
+                  fontSize: 12, outline: "none" }}
+              />
+              
+              
+            </div>
+        
       {pendientes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
           <p style={{ fontSize: 32, margin: "0 0 0.75rem" }}>📭</p>
@@ -78,7 +90,7 @@ export default function RevisarAvances() {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", maxWidth: 760 }}>
-          {pendientes.map(b => (
+          {pendientesFiltradas.map(b => (
             <BitacoraCard key={b.id} bitacora={b} onVer={verDetalle} C={C} />
           ))}
         </div>

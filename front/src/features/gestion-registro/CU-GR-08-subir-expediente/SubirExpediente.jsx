@@ -177,11 +177,11 @@ export default function SubirExpediente() {
             onClick={() => navigator.clipboard.writeText(NOMBRE_ARCHIVO_SUGERIDO)}
             style={{ background: "none", border: "none", cursor: "pointer", color: C.textDisabled, fontSize: 12, fontFamily: "inherit", flexShrink: 0, padding: "2px 6px" }}
           >
-            Copiar
+            
           </button>
         </div>
         <p style={{ margin: "8px 0 0", fontSize: 12, color: C.textDisabled }}>
-          Este es el nombre que debe tener tu archivo. Usa el botón para copiarlo.
+          
         </p>
  
         {/* Botón enviar */}

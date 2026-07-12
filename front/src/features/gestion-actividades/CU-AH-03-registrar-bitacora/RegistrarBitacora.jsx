@@ -23,31 +23,9 @@ export default function RegistrarBitacora() {
     >
       <div style={{ maxWidth: 680, margin: "0 auto" }}>
 
-        {/* Resumen de horas — RN-AH-47 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
-          {[
-            { label: "Horas realizadas",  valor: alumno.horasAcumuladas, total: alumno.horasTotales, color: C.accentText,  bg: C.accentSoft },
-            { label: "Horas deuda",       valor: alumno.horasDeuda,      total: null,                color: alumno.horasDeuda > 0 ? "#F59E0B" : C.success, bg: alumno.horasDeuda > 0 ? "rgba(245,158,11,0.1)" : C.successSoft },
-            { label: "Horas restantes",   valor: alumno.horasTotales - alumno.horasAcumuladas, total: null, color: C.textPrimary, bg: C.bgCard },
-          ].map(({ label, valor, total, color, bg }) => (
-            <div key={label} style={{ padding: "0.875rem 1rem", borderRadius: RADIUS.lg, background: bg, border: `1px solid ${C.borderSubtle}` }}>
-              <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
-              <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color }}>
-                {valor}h {total && <span style={{ fontSize: 12, fontWeight: 400, color: C.textDisabled }}>/ {total}h</span>}
-              </p>
-            </div>
-          ))}
-        </div>
+        
 
-        {/* Aviso deuda — RN-AH-15 y RN-AH-16 */}
-        {alumno.horasDeuda > 0 && (
-          <div style={{ padding: "12px 16px", borderRadius: RADIUS.md, background: "rgba(245,158,11,0.08)", border: `1px solid ${C.warning ?? "#F59E0B"}`, marginBottom: "1.5rem", display: "flex", gap: 10 }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>⚠️</span>
-            <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>
-              Tienes <strong style={{ color: C.warning ?? "#F59E0B" }}>{alumno.horasDeuda} horas de deuda</strong>. Hoy puedes registrar hasta <strong>{limiteHoras} horas</strong> — las horas extra se descontarán de tu deuda.
-            </p>
-          </div>
-        )}
+        
 
         {/* ── FASE: inicio ── */}
         {fase === "inicio" && (
@@ -57,7 +35,7 @@ export default function RegistrarBitacora() {
               ¿Listo para iniciar tu jornada?
             </h2>
             <p style={{ margin: "0 0 0.5rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
-              Límite de hoy: <strong style={{ color: C.textPrimary }}>{limiteHoras} horas</strong>
+              Límite por día: <strong style={{ color: C.textPrimary }}>{limiteHoras} horas</strong>
             </p>
             <p style={{ margin: "0 0 2rem", fontSize: 12, color: C.textDisabled }}>
               Al iniciar se registrará automáticamente la hora de inicio de tu jornada.
