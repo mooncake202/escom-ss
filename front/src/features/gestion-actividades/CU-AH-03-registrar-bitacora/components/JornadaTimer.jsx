@@ -42,7 +42,7 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
       {/* Info tiempo restante */}
       <div style={{ textAlign: "center" }}>
         <p style={{ margin: "0 0 4px", fontSize: 13, color: C.textMuted }}>
-          Límite de hoy: <strong style={{ color: C.textPrimary }}>{limiteHoras} horas</strong>
+          Límite por día: <strong style={{ color: C.textPrimary }}>{limiteHoras} horas</strong>
         </p>
         <p style={{ margin: 0, fontSize: 13, color: restante < 1800 ? "#EF4444" : C.textMuted }}>
           Tiempo restante: <strong style={{ color: restante < 1800 ? "#EF4444" : C.textPrimary }}>

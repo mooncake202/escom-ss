@@ -3,14 +3,39 @@ import { DashboardLayout }       from "@/components/layout/DashboardLayout";
 import { AlumnoCard }            from "./components/AlumnoCard";
 import { ActividadRow }          from "./components/ActividadRow";
 import { useAsignarActividades } from "./hooks/useAsignarActividades";
+import { useState } from "react";
 
 export default function AsignarActividades() {
   const { C } = useTheme();
+  const [filtroProyecto, setFiltroProyecto] = useState([]);
+  const [filtroCarrera, setFiltroCarrera] = useState([]);
   const {
     alumnos, alumnoSeleccionado, form, errores, loading, exitoso,
     modoFormulario, setModoForm,
     seleccionarAlumno, handleChange, registrarActividad,
   } = useAsignarActividades();
+
+  const proyectos = [...new Set(alumnos.map(a => a.proyecto))];
+  const carreras = ["ISC", "IA", "LCD"];
+  const toggleProyecto = (p) => {
+    setFiltroProyecto(prev =>
+      prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
+    );
+  };
+
+  const toggleCarrera = (c) => {
+    setFiltroCarrera(prev =>
+      prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]
+    );
+  };
+
+  const alumnosFiltrados = alumnos.filter(a => {
+  const matchProyecto =  filtroProyecto.length === 0 || filtroProyecto.includes(a.proyecto);
+
+  const matchCarrera =  filtroCarrera.length === 0 || filtroCarrera.includes(a.carrera);
+  return matchProyecto && matchCarrera;
+
+});
 
   return (
     <DashboardLayout
@@ -19,15 +44,71 @@ export default function AsignarActividades() {
       rol="profesor"
       usuario="Dr. Torres Vega"
     >
+
+
+
+
+
+
       <div style={{ display: "grid", gridTemplateColumns: "500px 1fr", gap: "1.5rem", height: "calc(100vh - 56px - 3.5rem)", minHeight: 0 }}>
+
+        
 
         {/* ── Columna izquierda: lista de alumnos ── */}
         <div style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+          
+          {/* FILTROS */}
+          <div style={{ marginBottom: "1rem" }}>
+
+            {/* PROYECTOS */}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
+              {proyectos.map(p => (
+                <button
+                  key={p}
+                  onClick={() => toggleProyecto(p)}
+                  style={{
+                    padding: "4px 14px",
+                    borderRadius: "999px",
+                    border: `1px solid ${filtroProyecto.includes(p) ? C.accent : C.borderDefault}`,
+                    background: filtroProyecto.includes(p) ? C.accent : "transparent",
+                    color: filtroProyecto.includes(p) ? "#fff" : C.textMuted,
+                    fontSize: 12,
+                    cursor: "pointer"
+                  }}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+
+            {/* CARRERAS */}
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {carreras.map(c => (
+                <button
+                  key={c}
+                  onClick={() => toggleCarrera(c)}
+                  style={{
+                    padding: "4px 14px",
+                    borderRadius: "999px",
+                    border: `1px solid ${filtroCarrera.includes(c) ? C.accent : C.borderDefault}`,
+                    background: filtroCarrera.includes(c) ? C.accent : "transparent",
+                    color: filtroCarrera.includes(c) ? "#fff" : C.textMuted,
+                    fontSize: 12,
+                    cursor: "pointer"
+                  }}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+          </div>
+          
           <p style={{ margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700, color: C.textDisabled, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Mis alumnos ({alumnos.length})
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", overflowY: "auto" }}>
-            {alumnos.map(a => (
+            {alumnosFiltrados.map(a => (
               <AlumnoCard
                 key={a.id} alumno={a} C={C}
                 seleccionado={alumnoSeleccionado?.id === a.id}
@@ -51,7 +132,11 @@ export default function AsignarActividades() {
                 <div>
                   <h2 style={{ margin: "0 0 3px", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>{alumnoSeleccionado.nombre}</h2>
                   <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>{alumnoSeleccionado.correoInst}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
+                    Proyecto: {alumnoSeleccionado.proyecto}
+                  </p>
                 </div>
+                
                 <button
                   onClick={() => { setModoForm(true); }}
                   style={{ padding: "9px 18px", borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600, cursor: "pointer", background: GRADIENTS.primary, border: "none", color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent }}
@@ -106,6 +191,29 @@ export default function AsignarActividades() {
                       style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.descripcion ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }}
                     />
                     {errores.descripcion && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.descripcion}</p>}
+                  </div>
+
+                  <div style={{ marginBottom: "1rem" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em"}}>
+                      Fecha límite *
+                    </label>
+                    <input
+                      type="date"
+                      name="fechaLimite"
+                      value={form.fechaLimite}
+                      onChange={handleChange}
+                      style={{
+                        background: C.bgInput, border: `1px solid ${errores.fechaLimite ? C.danger : C.borderDefault}`, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: RADIUS.md
+                      }}
+                    />
+                    {errores.fechaLimite && (
+                      <p style={{ fontSize: 12, color: C.danger }}>
+                        {errores.fechaLimite}
+                      </p>
+                    )}
                   </div>
 
                   {/* Entregable — RN-AH-03 opcional */}

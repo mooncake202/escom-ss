@@ -4,7 +4,7 @@ const MOCK_BITACORAS = [
   {
     id: 1,
     estado: "PendienteRevision",
-    alumno: { nombre: "García López Juan Carlos", boleta: "2021630412", carrera: "ISC" },
+    alumno: { nombre: "García López Juan Carlos", boleta: "2021630412", carrera: "ISC", oferta: "Sistema Web" },
     fecha:           "2026-03-20",
     horaInicio:      "09:00",
     horaFin:         "13:00",
@@ -20,7 +20,7 @@ const MOCK_BITACORAS = [
   {
     id: 2,
     estado: "PendienteRevision",
-    alumno: { nombre: "Ramírez Torres Ana Sofía", boleta: "2022630187", carrera: "IA" },
+    alumno: { nombre: "Ramírez Torres Ana Sofía", boleta: "2022630187", carrera: "IA", oferta: "Base de datos para IA" },
     fecha:           "2026-03-20",
     horaInicio:      "10:00",
     horaFin:         "14:00",
@@ -34,7 +34,7 @@ const MOCK_BITACORAS = [
   {
     id: 3,
     estado: "PendienteRevision",
-    alumno: { nombre: "García López Juan Carlos", boleta: "2021630412", carrera: "ISC" },
+    alumno: { nombre: "García López Juan Carlos", boleta: "2021630412", carrera: "ISC", oferta: "Sistema Web" },
     fecha:           "2026-03-19",
     horaInicio:      "09:00",
     horaFin:         "13:00",

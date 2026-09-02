@@ -36,6 +36,9 @@ export function ProgresoCircular({ porcentaje, horasRealizadas, horasTotales, C 
 
 // ── Tarjetas de métricas ─────────────────────────────────────
 export function MetricaCards({ datos, C }) {
+  const faltasSeguidasAlerta = datos.faltasSeguidas >= 4;   // aviso desde 4/5
+  const faltasTotalAlerta    = datos.faltasTotal    >= 15;  // aviso desde 15/18
+
   const tarjetas = [
     {
       label:  "Horas realizadas",
@@ -54,20 +57,28 @@ export function MetricaCards({ datos, C }) {
       desc:   "para completar el servicio",
     },
     {
-      label:  "Horas deuda",
-      valor:  datos.horasDeuda,
-      unidad: "h",
-      color:  datos.horasDeuda > 0 ? "#F59E0B" : "#22C55E",
-      bg:     datos.horasDeuda > 0 ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)",
-      desc:   datos.horasDeuda > 0 ? "pendientes de recuperar" : "sin deuda acumulada",
-    },
-    {
       label:  "Horas rechazadas",
       valor:  datos.horasRechazadas,
       unidad: "h",
       color:  datos.horasRechazadas > 0 ? "#EF4444" : C.textDisabled,
       bg:     datos.horasRechazadas > 0 ? "rgba(239,68,68,0.1)" : C.bgInput,
       desc:   "no acreditadas",
+    },
+    {
+      label:  "Faltas seguidas",
+      valor:  datos.faltasSeguidas,
+      unidad: `/ 5`,
+      color:  faltasSeguidasAlerta ? "#EF4444" : datos.faltasSeguidas > 0 ? "#F59E0B" : "#22C55E",
+      bg:     faltasSeguidasAlerta ? "rgba(239,68,68,0.1)" : datos.faltasSeguidas > 0 ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)",
+      desc:   faltasSeguidasAlerta ? "⚠️ cerca del límite" : "consecutivas registradas",
+    },
+    {
+      label:  "Faltas totales",
+      valor:  datos.faltasTotal,
+      unidad: `/ 18`,
+      color:  faltasTotalAlerta ? "#EF4444" : datos.faltasTotal > 0 ? "#F59E0B" : "#22C55E",
+      bg:     faltasTotalAlerta ? "rgba(239,68,68,0.1)" : datos.faltasTotal > 0 ? "rgba(245,158,11,0.1)" : "rgba(34,197,94,0.1)",
+      desc:   faltasTotalAlerta ? "⚠️ cerca del límite" : "acumuladas en total",
     },
   ];
 
@@ -99,17 +110,13 @@ export function BarraProgreso({ datos, C }) {
       </div>
       <div style={{ height: 10, background: C.borderSubtle, borderRadius: 5, overflow: "hidden", display: "flex" }}>
         <div style={{ width: `${pctRealizado}%`, background: "#2E86DE", transition: "width 0.5s" }} />
-        <div style={{ width: `${Math.min(pctRechazado, 100 - pctRealizado)}%`, background: "rgba(239,68,68,0.4)", transition: "width 0.5s" }} />
       </div>
       <div style={{ display: "flex", gap: "1rem", marginTop: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <div style={{ width: 10, height: 10, borderRadius: 2, background: "#2E86DE" }} />
           <span style={{ fontSize: 11, color: C.textDisabled }}>Realizadas</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <div style={{ width: 10, height: 10, borderRadius: 2, background: "rgba(239,68,68,0.4)" }} />
-          <span style={{ fontSize: 11, color: C.textDisabled }}>Rechazadas</span>
-        </div>
+        
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <div style={{ width: 10, height: 10, borderRadius: 2, background: C.borderSubtle }} />
           <span style={{ fontSize: 11, color: C.textDisabled }}>Restantes</span>

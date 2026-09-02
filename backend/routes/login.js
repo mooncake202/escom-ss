@@ -16,9 +16,15 @@ router.post("/", async (req, res) => {
     }
 
     const [[usuario]] = await db.query(
-      `SELECT id, correoInst, password, rol
-       FROM usuarios
-       WHERE correoInst = ?`,
+      `SELECT u.id, u.correoInst, u.password, u.rol,
+              s.estatus, s.tipoRechazo, s.estatusAnterior, s.motivoRechazo,
+              
+              s.registroSISSConfirmado, s.cartaCompromisoConfirmada,
+              (SELECT COUNT(*) FROM solicitud_documentos sd WHERE sd.solicitud_id = s.id) AS numDocumentos
+      FROM usuario u
+      LEFT JOIN alumno a ON a.usuario_id = u.id
+      LEFT JOIN solicitud s ON s.alumno_id = a.id
+      WHERE u.correoInst = ?`,
       [correoInst.trim()]
     );
 
@@ -41,7 +47,14 @@ router.post("/", async (req, res) => {
       usuario: {
         id: usuario.id,
         correo: usuario.correoInst,
-        rol: usuario.rol
+        rol: usuario.rol,
+        estatus: usuario.estatus || null,
+        tipoRechazo: usuario.tipoRechazo || "ninguno",
+        estatusAnterior: usuario.estatusAnterior || null,
+        motivoRechazo: usuario.motivoRechazo || null,
+        registroSISSConfirmado: usuario.registroSISSConfirmado || false,
+        cartaCompromisoConfirmada: usuario.cartaCompromisoConfirmada || false,
+        numDocumentos: usuario.numDocumentos || 0
       }
     });
 

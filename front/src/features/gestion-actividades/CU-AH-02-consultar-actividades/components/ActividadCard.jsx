@@ -44,7 +44,7 @@ export function ActividadCard({ actividad, expandida, onToggle, C }) {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: "0 0 3px", fontSize: 14, fontWeight: 600, color: C.textPrimary }}>{actividad.titulo}</p>
-          <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>Asignada el {fecha}</p>
+          <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>Fecha límite de entrega: {fecha}</p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -62,6 +62,9 @@ export function ActividadCard({ actividad, expandida, onToggle, C }) {
       {expandida && (
         <div style={{ padding: "0 1.25rem 1.25rem", borderTop: `1px solid ${C.borderSubtle}` }}>
           <div style={{ paddingTop: "1rem", display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+
+          <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>Asignada el {fecha}</p>
+
 
             <div>
               <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>Descripción</p>

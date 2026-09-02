@@ -18,7 +18,7 @@ export default function ConsultarActividades() {
   return (
     <DashboardLayout
       titulo="Mis actividades"
-      subtitulo="CU-AH-02 · Alumno"
+      subtitulo="CU-AH-02-consultar-actividades"
       rol="alumno"
       usuario="García López Juan Carlos"
     >

@@ -4,8 +4,8 @@ import { RADIUS } from "../../../../themes/colors";
 export function StepCredenciales({ form, errors, handleChange, aceptaCreditos, setAcepta, ofertas, periodos, C }) {
   const ofertaSeleccionada =  ofertas?.find(o => String(o.id) === String(form.oferta))?.titulo;
 
-  const inicioSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fecha_inicio;
-  const finSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fecha_fin;
+  const inicioSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fechaInicio;
+  const finSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fechaFin;
 
   const inicioFormateado = inicioSeleccionado
   ? new Date(inicioSeleccionado).toLocaleDateString("es-MX")
@@ -67,6 +67,7 @@ const finFormateado = finSeleccionado
             ["Inicio seleccionado", inicioFormateado],
             ["Oferta", ofertaSeleccionada],
             ["Fin seleccionado", finFormateado],
+            ["Semestre", form.semestre]
             
 
             
