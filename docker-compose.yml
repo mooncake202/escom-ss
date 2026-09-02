@@ -1,0 +1,48 @@
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: escom_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: [SECRETO_ELIMINADO]
+      MYSQL_DATABASE: escom_ss
+      MYSQL_USER: escomuser
+      MYSQL_PASSWORD: [SECRETO_ELIMINADO]
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p[SECRETO_ELIMINADO]"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: node:20
+    container_name: escom_backend
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/backend/node_modules
+    command: sh -c "npm install && npx prisma generate && cd backend && npm install && npx nodemon server.js"
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "mysql://escomuser:[SECRETO_ELIMINADO]@mariadb:3306/escom_ss"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: escom_nginx
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./front/dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mariadb_data:
