@@ -7,6 +7,7 @@ import Dashboard from './features/dashboard/dashboards'
 import { RutaProtegida } from './components/RutaProtegida'
 
 //CRED
+import { AvisoSesionExpirada } from './components/AvisoSesionExpirada';
 import LoginPage from "./features/login/LoginPage";
 import RecuperarContraseña from "./features/login/CU-CRED-02-cambiar-contraseña/RecuperarContrasena";
 import EstablecerContrasena from "./features/login/CU-CRED-02-cambiar-contraseña/EstablecerContrasena";
@@ -103,6 +104,7 @@ const COORDINADOR = ["coordinador"];
 function App() {
   return (
     <BrowserRouter>
+      <AvisoSesionExpirada />
       <Routes>
         
         <Route path="/dashboard" element={
@@ -117,11 +119,11 @@ function App() {
           <RutaProtegida roles={COORDINADOR}><CrearUsuario /></RutaProtegida>
         } />
 
-        {/* -- rutas REGISTRO-- */}
+        {/* --GR */}
 
         {/* SIN proteger a propósito: LoginPage la enlaza como "Regístrate
-            aquí" para alguien que TODAVÍA no tiene cuenta. Si la proteges,
-            nadie nuevo podría registrarse. Confírmame si esto es correcto. */}
+            aquí" para alguien que TODAVÍA no tiene cuenta. Si se protege,
+            nadie nuevo podría registrarse.  */}
         <Route path="/registro" element={<RegistroSolicitud />} />
 
         <Route path="/alumnoSinAsignar/esperando_profesor" element={
@@ -165,7 +167,7 @@ function App() {
         } />
 
 
-        {/* -- rutas ACTIVIDADES-- */}
+        {/* --  AH-- */}
         <Route path="/profesor/actividades" element={
           <RutaProtegida roles={PROFESOR}><AsignarActividades /></RutaProtegida>
         } />

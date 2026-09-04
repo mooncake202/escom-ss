@@ -179,11 +179,11 @@ model coordinador {
 // ─────────────────────────────────────────
 
 model inicio_sesion {
-  id         Int      @id @default(autoincrement())
-  usuario_id Int
-  fecha_hora DateTime @db.DateTime(0)
-  ip_acceso  String   @db.VarChar(45)
-  resultado  Boolean
+  id                Int      @id @default(autoincrement())
+  usuario_id        Int
+  fecha_hora_acceso DateTime @db.DateTime(0)
+  ip_acceso         String   @db.VarChar(45)
+  resultado         Boolean
 
   usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 }

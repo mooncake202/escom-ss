@@ -23,6 +23,7 @@ export async function apiFetch(path, options = {}) {
     if (res.status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("usuario");
+      window.dispatchEvent(new CustomEvent("sesion-expirada"));
     }
     throw new Error(json.message || "Ocurrió un error.");
   }

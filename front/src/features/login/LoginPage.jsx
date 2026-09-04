@@ -86,7 +86,7 @@ export default function LoginPage() {
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
       
       if (rol === "profesor") {
-        navigate("/profesor/solicitudes");
+        navigate("/profesor/dashboard");
       } 
       
       else if (rol === "coordinador") {
