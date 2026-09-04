@@ -26,14 +26,16 @@ app.use("/api/periodos", periodosRoutes);
 //app.use("/api/profesor", profesorRoutes);
 
 
-//login
+//login CRED 01
 app.use('/auth', require('./src/modules/auth/auth.routes'));
 
-//crear usuario
+//crear usuario CRED 03
 app.use('/usuarios', require('./src/modules/usuarios/usuarios.routes'));
 app.use('/caracteristicas', require('./src/modules/caracteristicas/caracteristicas.routes'));
 app.use('/perfil', require('./src/modules/perfil/perfil.routes'));
 
+//cambiar contraseña CRED 02
+app.use('/password', require('./src/modules/password/password.routes'));
 
 app.listen(3000,()=>{
 console.log("Servidor corriendo en http://localhost:3000");

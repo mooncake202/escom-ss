@@ -59,4 +59,27 @@ async function enviarCorreoBienvenida({ to, nombre, token }) {
   });
 }
 
-module.exports = { enviarCorreoBienvenida };
+/**
+ * CU-CRED-02 — recuperación/cambio de contraseña. Reutiliza la misma
+ * pantalla de "establecer contraseña" que el correo de bienvenida, porque
+ * ambos casos son funcionalmente lo mismo: token -> formulario de nueva
+ * contraseña.
+ */
+async function enviarCorreoRecuperacion({ to, nombre, token }) {
+  const link = `${FRONTEND_URL}/establecer-contrasena/${token}`;
+ 
+  await getTransporter().sendMail({
+    from: SMTP_FROM,
+    to,
+    subject: 'Recuperación de contraseña — Sistema de Servicio Social ESCOM',
+    text:
+      `Hola ${nombre},\n\n` +
+      `Recibimos una solicitud para restablecer tu contraseña en el Sistema de Servicio Social.\n` +
+      `Si fuiste tú, ingresa aquí para crear una nueva:\n\n${link}\n\n` +
+      `Este enlace es válido por 30 minutos y de un solo uso.\n\n` +
+      `Si no solicitaste esto, puedes ignorar este correo.`,
+  });
+}
+ 
+module.exports = { enviarCorreoBienvenida, enviarCorreoRecuperacion };
+ 

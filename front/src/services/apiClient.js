@@ -20,6 +20,10 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("usuario");
+    }
     throw new Error(json.message || "Ocurrió un error.");
   }
 

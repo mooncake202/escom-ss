@@ -179,7 +179,7 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
       {/* Logout */}
       <div style={{ padding: "8px 6px", borderTop: `1px solid ${C.navBorder}`, flexShrink: 0 }}>
         <button
-          onClick={() => navigate("/login")}
+          onClick={() => navigate("/")}
           title={!expanded ? "Cerrar sesión" : undefined}
           style={{
             width: "100%", height: 40,

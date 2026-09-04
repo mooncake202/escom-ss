@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTheme, GRADIENTS, RADIUS, BRAND } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 
-// ── Iconos SVG inline ─────────────────────────────────────────────
+// ── Iconos SVG inline ───────────────────────────────────────────── DENTRO DE CARPETA FEATURE
 const Icon = ({ name, size = 18, color = "currentColor" }) => {
   const icons = {
     clock:    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>,

@@ -18,32 +18,13 @@ function validarNombreOApellidos(valor, etiquetaCampo) {
   }
 }
 
-
-
-const DOMINIOS_PERMITIDOS = (process.env.CORREO_DOMINIOS_EXTRA || '')
-  .split(',')
-  .map((d) => d.trim().toLowerCase())
-  .filter(Boolean)
-  .concat(['ipn.mx']);
-
 function validarCorreoInstitucional(correo) {
-  if (!correo) {
-    const error = new Error('El correo institucional es obligatorio.');
-    error.status = 400;
-    throw error;
-  }
-
-  const correoLimpio = correo.trim().toLowerCase();
-  const formatoValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correoLimpio);
-  const dominio = correoLimpio.split('@')[1];
-
-  if (!formatoValido || !dominio || !DOMINIOS_PERMITIDOS.includes(dominio)) {
+  if (!correo || !CORREO_IPN_REGEX.test(correo.trim())) {
     const error = new Error('El correo institucional debe tener un formato válido y terminar en @ipn.mx.');
     error.status = 400;
     throw error;
   }
-
-  if (correoLimpio.length > 35) {
+  if (correo.trim().length > 35) {
     const error = new Error('El correo institucional no puede superar 35 caracteres.');
     error.status = 400;
     throw error;
@@ -79,10 +60,24 @@ function validarDepartamento(departamento) {
   }
 }
 
+// RN-CRED-04: mínimo 8 caracteres, mayúscula, minúscula, número y carácter especial.
+const CONTRASENA_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+
+function validarContrasena(contrasena) {
+  if (!contrasena || !CONTRASENA_REGEX.test(contrasena)) {
+    const error = new Error(
+      'La contraseña debe tener mínimo 8 caracteres, incluyendo una mayúscula, una minúscula, un número y un carácter especial.'
+    );
+    error.status = 400;
+    throw error;
+  }
+}
+
 module.exports = {
   validarNombreOApellidos,
   validarCorreoInstitucional,
   validarTelefono,
   validarDepartamento,
+  validarContrasena,
   DEPARTAMENTOS_VALIDOS,
 };

@@ -4,10 +4,12 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from './features/dashboard/dashboards'
+import { RutaProtegida } from './components/RutaProtegida'
 
 //CRED
 import LoginPage from "./features/login/LoginPage";
 import RecuperarContraseña from "./features/login/CU-CRED-02-cambiar-contraseña/RecuperarContrasena";
+import EstablecerContrasena from "./features/login/CU-CRED-02-cambiar-contraseña/EstablecerContrasena";
 import CrearUsuario from "./features/login/CU-CRED-03-crear-usuarios/RegistroProfesores";
 
 
@@ -62,7 +64,7 @@ import HistorialOfertas        from './features/gestion-ofertas/CU-PRO-05-histor
 import SolicitarRegistroOferta from './features/gestion-ofertas/CU-PRO-01-solicitar-registro-oferta/SolicitarRegistroOferta'
 import SolicitarOfertaIndividual from './features/gestion-ofertas/CU-PRO-01-solicitar-registro-oferta/SolicitarOfertaIndividual'
 import ConsultarOfertas        from './features/gestion-ofertas/CU-PRO-03-consultar-ofertas/ConsultarOfertas'
-import Dashboards from './features/dashboards'
+
 
 //import ContactoEquipo from './features/gestion-administrativa/CU-ADM-03-contacto-equipo/ContactoEquipo'
 
@@ -92,113 +94,264 @@ import DocumentosAlumnosAsignadosCoordinacion from './features/gestion-admin/002
 import GestionFaltas from './features/gestion-admin/003-gestion incidentes/GestionIncidencias'
 
 
+// Roles usados en RutaProtegida — coinciden con el enum RolUsuario del backend.
+const ALUMNO_ASIGNADO = ["alumno_asignado"];
+const ALUMNO_SIN_ASIGNAR = ["alumno_sin_asignar"];
+const PROFESOR = ["profesor"];
+const COORDINADOR = ["coordinador"];
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        -- dashboard --
-        <Route path="/dashboard" element={<Dashboard />} />
+        
+        <Route path="/dashboard" element={
+          <RutaProtegida><Dashboard /></RutaProtegida>
+        } />
 
-        --CRED
+        {/* --CRED */}
         <Route path="/" element={<LoginPage />} />
-        <Route path="/recuperar-contraseña" element={<RecuperarContraseña />} />
-        <Route path="/crear-usuario" element={<CrearUsuario />} />
+        <Route path="/recuperar-contrasena" element={<RecuperarContraseña />} />
+        <Route path="/establecer-contrasena/:token" element={<EstablecerContrasena />} />
+        <Route path="/crear-usuario" element={
+          <RutaProtegida roles={COORDINADOR}><CrearUsuario /></RutaProtegida>
+        } />
 
-        -- rutas REGISTRO--
-        
+        {/* -- rutas REGISTRO-- */}
+
+        {/* SIN proteger a propósito: LoginPage la enlaza como "Regístrate
+            aquí" para alguien que TODAVÍA no tiene cuenta. Si la proteges,
+            nadie nuevo podría registrarse. Confírmame si esto es correcto. */}
         <Route path="/registro" element={<RegistroSolicitud />} />
-        <Route path="/alumnoSinAsignar/esperando_profesor" element={<EsperandoProfesor />} />
-        <Route path="/profesor/solicitudes" element={<SolicitudesPendientes />} />
-        <Route path="/alumnoSinAsignar/siss" element={<RegistroSISS />} />
-        <Route path="/alumnoSinAsignar/documentacion" element={<AdjuntarDocumentacion />} />
-        <Route path="/alumnoSinAsignar/esperando_validacion_docs" element={<EsperandoValidacionDocs />} />
-        <Route path="/coordinacion/documentacion" element={<RevisarDocumentacion />} />
-        <Route path="/alumnoSinAsignar/carta-compromiso" element={<CartaCompromiso />} />
-        <Route path="/alumnoSinAsignar/esperando-validacion" element={<EsperandoValidacionCarta />} />
-        <Route path="/coordinacion/carta-presencial" element={<ValidarEntregaPresencial />} />
-        <Route path="/alumnoSinAsignar/expediente" element={<SubirExpediente />} />
-        <Route path="/alumnoSinAsignar/estado-expediente" element={<EsperaRevisionExpediente />} />
-        <Route path="/coordinacion/expedientes" element={<RevisarExpediente />} />
-        <Route path="/alumnoSinAsignar/modificar-solicitud" element={<ModificarSolicitud />} />
+
+        <Route path="/alumnoSinAsignar/esperando_profesor" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><EsperandoProfesor /></RutaProtegida>
+        } />
+        <Route path="/profesor/solicitudes" element={
+          <RutaProtegida roles={PROFESOR}><SolicitudesPendientes /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/siss" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><RegistroSISS /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/documentacion" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><AdjuntarDocumentacion /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/esperando_validacion_docs" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><EsperandoValidacionDocs /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/documentacion" element={
+          <RutaProtegida roles={COORDINADOR}><RevisarDocumentacion /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/carta-compromiso" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><CartaCompromiso /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/esperando-validacion" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><EsperandoValidacionCarta /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/carta-presencial" element={
+          <RutaProtegida roles={COORDINADOR}><ValidarEntregaPresencial /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/expediente" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><SubirExpediente /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/estado-expediente" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><EsperaRevisionExpediente /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/expedientes" element={
+          <RutaProtegida roles={COORDINADOR}><RevisarExpediente /></RutaProtegida>
+        } />
+        <Route path="/alumnoSinAsignar/modificar-solicitud" element={
+          <RutaProtegida roles={ALUMNO_SIN_ASIGNAR}><ModificarSolicitud /></RutaProtegida>
+        } />
 
 
-        -- rutas ACTIVIDADES--
-        <Route path="/profesor/actividades" element={<AsignarActividades />} />
-        <Route path="/alumno/actividades" element={<ConsultarActividades />} />
+        {/* -- rutas ACTIVIDADES-- */}
+        <Route path="/profesor/actividades" element={
+          <RutaProtegida roles={PROFESOR}><AsignarActividades /></RutaProtegida>
+        } />
+        <Route path="/alumno/actividades" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ConsultarActividades /></RutaProtegida>
+        } />
 
-        <Route path="/alumno/bitacora" element={<RegistrarBitacora />} />
-        <Route path="/profesor/bitacoras" element={<RevisarAvances />} />
+        <Route path="/alumno/bitacora" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><RegistrarBitacora /></RutaProtegida>
+        } />
+        <Route path="/profesor/bitacoras" element={
+          <RutaProtegida roles={PROFESOR}><RevisarAvances /></RutaProtegida>
+        } />
 
-        <Route path="/alumno/horas"          element={<AcumuladoHoras rol="alumno" />} />
-        <Route path="/profesor/horas"        element={<AcumuladoHoras rol="profesor" />} />
-        <Route path="/coordinacion/horas"    element={<AcumuladoHoras rol="coordinacion" />} />
+        <Route path="/alumno/horas" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><AcumuladoHoras rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/profesor/horas" element={
+          <RutaProtegida roles={PROFESOR}><AcumuladoHoras rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/horas" element={
+          <RutaProtegida roles={COORDINADOR}><AcumuladoHoras rol="coordinacion" /></RutaProtegida>
+        } />
 
-        <Route path="/alumno/historial"          element={<HistorialActividades rol="alumno" />} />
-        <Route path="/profesor/historial"        element={<HistorialActividades rol="profesor" />} />
-        <Route path="/coordinacion/historial"    element={<HistorialActividades rol="coordinacion" />} />
-        <Route path="/alumno/contacto-profesor" element={<ContactoProfesor />} />
-        <Route path="/coordinacion/admin/recursos" element={<GestionarRecursos />} />
-        <Route path="/coordinacion/admin/anuncios" element={<PublicarAnuncios rol="coordinacion" />} />
-        <Route path="/profesor/anuncios" element={<PublicarAnuncios rol="profesor" />} />
-        <Route path="/alumno/anuncios" element={<AnunciosSistema />} />
-        <Route path="/alumno/datos" element={<ActualizarDatos />} />
-        <Route path="/coordinacion/calendario" element={<CalendarioInstitucional />} />
-        <Route path="/profesor/solicitar-baja-alumno" element={<SolicitarBajaAlumno />} />
-        <Route path="/alumno/solicitar-baja" element={<BajaServicioSocial />} />
-        <Route path="/profesor/datos-personales" element={<ActualizarDatosProfesor />} />
-        <Route path="/profesor/reportes" element={<RevisarReportes />} />
-        <Route path="/alumno/contacto-institucional"       element={<ContactoInstitucional rol="alumno" />} />
-        <Route path="/profesor/contacto-institucional"     element={<ContactoInstitucional rol="profesor" />} />
-        <Route path="/coordinacion/gestionar-bajas"          element={<GestionarBajas />} />
-        <Route path="/profesor/solicitar-modificacion"          element={<SolicitarModificacionCaracteristicas />} />
-        <Route path="/coordinacion/solicitudes-caracteristicas" element={<RevisarSolicitudesCaracteristicas />} />
-        <Route path="/profesor/mis-alumnos"                    element={<ConsultarUsuariosAsignados rol="profesor" />} />
-        <Route path="/coordinacion/usuarios-asignados"         element={<ConsultarUsuariosAsignados rol="coordinacion" />} />
+        <Route path="/alumno/historial" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><HistorialActividades rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/profesor/historial" element={
+          <RutaProtegida roles={PROFESOR}><HistorialActividades rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/historial" element={
+          <RutaProtegida roles={COORDINADOR}><HistorialActividades rol="coordinacion" /></RutaProtegida>
+        } />
+        <Route path="/alumno/contacto-profesor" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoProfesor /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/admin/recursos" element={
+          <RutaProtegida roles={COORDINADOR}><GestionarRecursos /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/admin/anuncios" element={
+          <RutaProtegida roles={COORDINADOR}><PublicarAnuncios rol="coordinacion" /></RutaProtegida>
+        } />
+        <Route path="/profesor/anuncios" element={
+          <RutaProtegida roles={PROFESOR}><PublicarAnuncios rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/alumno/anuncios" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><AnunciosSistema /></RutaProtegida>
+        } />
+        <Route path="/alumno/datos" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ActualizarDatos /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/calendario" element={
+          <RutaProtegida roles={COORDINADOR}><CalendarioInstitucional /></RutaProtegida>
+        } />
+        <Route path="/profesor/solicitar-baja-alumno" element={
+          <RutaProtegida roles={PROFESOR}><SolicitarBajaAlumno /></RutaProtegida>
+        } />
+        <Route path="/alumno/solicitar-baja" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><BajaServicioSocial /></RutaProtegida>
+        } />
+        <Route path="/profesor/datos-personales" element={
+          <RutaProtegida roles={PROFESOR}><ActualizarDatosProfesor /></RutaProtegida>
+        } />
+        <Route path="/profesor/reportes" element={
+          <RutaProtegida roles={PROFESOR}><RevisarReportes /></RutaProtegida>
+        } />
+        <Route path="/alumno/contacto-institucional" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoInstitucional rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/profesor/contacto-institucional" element={
+          <RutaProtegida roles={PROFESOR}><ContactoInstitucional rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/gestionar-bajas" element={
+          <RutaProtegida roles={COORDINADOR}><GestionarBajas /></RutaProtegida>
+        } />
+        <Route path="/profesor/solicitar-modificacion" element={
+          <RutaProtegida roles={PROFESOR}><SolicitarModificacionCaracteristicas /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/solicitudes-caracteristicas" element={
+          <RutaProtegida roles={COORDINADOR}><RevisarSolicitudesCaracteristicas /></RutaProtegida>
+        } />
+        <Route path="/profesor/mis-alumnos" element={
+          <RutaProtegida roles={PROFESOR}><ConsultarUsuariosAsignados rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/usuarios-asignados" element={
+          <RutaProtegida roles={COORDINADOR}><ConsultarUsuariosAsignados rol="coordinacion" /></RutaProtegida>
+        } />
         
-        <Route path="/dashboard" element={<Dashboards />} />
-        <Route path="/alumno/reportes" element={<HistorialReportes />} />
-        <Route path="/alumno/reportes/generar"  element={<GenerarReporte />} />
-        <Route path="/alumno/reportes/estatus"  element={<ConsultarEstatusReporte />} />
-        <Route path="/alumno/reportes/modificar" element={<ModificarReenviarReporte />} />
-        <Route path="/alumno/reportes/global"   element={<GenerarReporteGlobal />} />
-        <Route path="/coordinacion/reportes"    element={<ValidarReportes />} />
-        
-        
-        
-        <Route path="/coordinacion/contacto-institucional" element={<ContactoInstitucional rol="coordinacion" />} />
-        <Route path="/profesor/proyectos" element={<HistorialOfertas />} />
-        <Route path="/profesor/proyectos/registrar" element={<SolicitarRegistroOferta />} />
-        <Route path="/profesor/proyectos/individual" element={<SolicitarOfertaIndividual />} />
-        <Route path="/coordinacion/ofertas" element={<ConsultarOfertas />} />
-
-        
-        
-        --LSS--
-        <Route path="/alumno/iniciar-proceso-evaluacion"    element={<IniciarProcesoEvaluacion rol="alumno" />} />
-
-        <Route path="/alumno/seguimiento-evaluacion"    element={<SeguimientoEvaluacionAlumno rol="alumno" />} />
-        <Route path="/profesor/evaluar-alumno"    element={<EvaluarAlumnoProfesor rol="profesor" />} />
-        <Route path="/coordinacion/revisar-evaluacion-alumno"    element={<RevisarEvaluacionAlumnoCoordinacion rol="coordinacion" />} />
-
-        <Route path="/alumno/seguimiento-carta-termino"    element={<SeguimientoCartaTerminoAlumno rol="alumno" />} />
-        <Route path="/coordinacion/estado-carta-termino"    element={<EstadoCartaTerminoCoordinacion rol="coordinacion" />} />
-        
-        <Route path="/alumno/integracion-expediente"    element={<IntegracionExpediente rol="alumno" />} />
+        <Route path="/alumno/reportes" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><HistorialReportes /></RutaProtegida>
+        } />
+        <Route path="/alumno/reportes/generar" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><GenerarReporte /></RutaProtegida>
+        } />
+        <Route path="/alumno/reportes/estatus" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ConsultarEstatusReporte /></RutaProtegida>
+        } />
+        <Route path="/alumno/reportes/modificar" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ModificarReenviarReporte /></RutaProtegida>
+        } />
+        <Route path="/alumno/reportes/global" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><GenerarReporteGlobal /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/reportes" element={
+          <RutaProtegida roles={COORDINADOR}><ValidarReportes /></RutaProtegida>
+        } />
 
 
-        <Route path="/alumno/estado-resolucion"    element={<EstadoResolucion rol="alumno" />} />
-        <Route path="/coordinacion/evaluacion-expediente"    element={<EvaluacionExpediente rol="coordinacion" />} />
 
-        <Route path="/alumno/consultar-constancia-termino"    element={<ConsultarEstadoConstanciaTermino rol="alumno" />} />
-        <Route path="/coordinacion/gestion-constancia-termino"    element={<GestionEstadoConstanciaTermino rol="coordinacion" />} />
-        
-        
-        --ADMIN--
-        <Route path="/cartacompromisofirmada" element={<CartaCompromisoFirmada />} />
-        <Route path="/alumnoasignado-documentacion" element={<DocumentosAlumnosAsignados />} />
-        <Route path="/coordinación-alumnoasignado-documentacion" element={<DocumentosAlumnosAsignadosCoordinacion />} />
-        <Route path="/gestion-faltas" element={<GestionFaltas />} />
+        <Route path="/coordinacion/contacto-institucional" element={
+          <RutaProtegida roles={COORDINADOR}><ContactoInstitucional rol="coordinacion" /></RutaProtegida>
+        } />
+        <Route path="/profesor/proyectos" element={
+          <RutaProtegida roles={PROFESOR}><HistorialOfertas /></RutaProtegida>
+        } />
+        <Route path="/profesor/proyectos/registrar" element={
+          <RutaProtegida roles={PROFESOR}><SolicitarRegistroOferta /></RutaProtegida>
+        } />
+        <Route path="/profesor/proyectos/individual" element={
+          <RutaProtegida roles={PROFESOR}><SolicitarOfertaIndividual /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/ofertas" element={
+          <RutaProtegida roles={COORDINADOR}><ConsultarOfertas /></RutaProtegida>
+        } />
+
+
+
+        {/* --LSS-- */}
+        <Route path="/alumno/iniciar-proceso-evaluacion" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><IniciarProcesoEvaluacion rol="alumno" /></RutaProtegida>
+        } />
+
+        <Route path="/alumno/seguimiento-evaluacion" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><SeguimientoEvaluacionAlumno rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/profesor/evaluar-alumno" element={
+          <RutaProtegida roles={PROFESOR}><EvaluarAlumnoProfesor rol="profesor" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/revisar-evaluacion-alumno" element={
+          <RutaProtegida roles={COORDINADOR}><RevisarEvaluacionAlumnoCoordinacion rol="coordinacion" /></RutaProtegida>
+        } />
+
+        <Route path="/alumno/seguimiento-carta-termino" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><SeguimientoCartaTerminoAlumno rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/estado-carta-termino" element={
+          <RutaProtegida roles={COORDINADOR}><EstadoCartaTerminoCoordinacion rol="coordinacion" /></RutaProtegida>
+        } />
+
+        <Route path="/alumno/integracion-expediente" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><IntegracionExpediente rol="alumno" /></RutaProtegida>
+        } />
+
+
+        <Route path="/alumno/estado-resolucion" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><EstadoResolucion rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/evaluacion-expediente" element={
+          <RutaProtegida roles={COORDINADOR}><EvaluacionExpediente rol="coordinacion" /></RutaProtegida>
+        } />
+
+        <Route path="/alumno/consultar-constancia-termino" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ConsultarEstadoConstanciaTermino rol="alumno" /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/gestion-constancia-termino" element={
+          <RutaProtegida roles={COORDINADOR}><GestionEstadoConstanciaTermino rol="coordinacion" /></RutaProtegida>
+        } />
+
+
+        {/* --ADMIN-- */}
+        {/* Estas 4 no tienen prefijo /alumno /profesor /coordinacion en la
+            URL, así que no pude inferir el rol con certeza — las dejé solo
+            con "requiere sesión" (sin restricción de rol). Ajusta roles={...}
+            si sabes a quién le toca cada una. */}
+        <Route path="/cartacompromisofirmada" element={
+          <RutaProtegida><CartaCompromisoFirmada /></RutaProtegida>
+        } />
+        <Route path="/alumnoasignado-documentacion" element={
+          <RutaProtegida><DocumentosAlumnosAsignados /></RutaProtegida>
+        } />
+        <Route path="/coordinación-alumnoasignado-documentacion" element={
+          <RutaProtegida><DocumentosAlumnosAsignadosCoordinacion /></RutaProtegida>
+        } />
+        <Route path="/gestion-faltas" element={
+          <RutaProtegida><GestionFaltas /></RutaProtegida>
+        } />
 
       </Routes>
     </BrowserRouter>
