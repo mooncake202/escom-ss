@@ -192,6 +192,10 @@ function App() {
           <RutaProtegida roles={COORDINADOR}><AcumuladoHoras rol="coordinacion" /></RutaProtegida>
         } />
 
+
+
+      
+
         <Route path="/alumno/historial" element={
           <RutaProtegida roles={ALUMNO_ASIGNADO}><HistorialActividades rol="alumno" /></RutaProtegida>
         } />
@@ -201,6 +205,8 @@ function App() {
         <Route path="/coordinacion/historial" element={
           <RutaProtegida roles={COORDINADOR}><HistorialActividades rol="coordinacion" /></RutaProtegida>
         } />
+
+  {/* --  ADM-- */}
         <Route path="/alumno/contacto-profesor" element={
           <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoProfesor /></RutaProtegida>
         } />
@@ -280,6 +286,9 @@ function App() {
         <Route path="/coordinacion/contacto-institucional" element={
           <RutaProtegida roles={COORDINADOR}><ContactoInstitucional rol="coordinacion" /></RutaProtegida>
         } />
+
+
+        {/* --PRO-- */}
         <Route path="/profesor/proyectos" element={
           <RutaProtegida roles={PROFESOR}><HistorialOfertas /></RutaProtegida>
         } />

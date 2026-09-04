@@ -120,6 +120,7 @@ model usuario {
   revision_reporte_global  revision_reporte_global[]
   revision_desempeno       revision_desempeno[]
   solicitud_baja           solicitud_baja[]
+  notificacion             notificacion[]
 }
 
 // ─────────────────────────────────────────
@@ -194,6 +195,19 @@ model token_contrasena {
   token            String   @db.VarChar(255)
   fecha_expiracion DateTime @db.DateTime(0)
   usado            Boolean
+
+  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+}
+
+model notificacion {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int
+  tipo             String    @db.VarChar(20) // info | warning | urgente | success
+  mensaje          String    @db.Text
+  ruta_relacionada String?   @db.VarChar(255)
+  leida            Boolean   @default(false)
+  fecha_creacion   DateTime  @db.DateTime(0)
+  fecha_leida      DateTime? @db.DateTime(0)
 
   usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 }

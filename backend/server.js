@@ -41,3 +41,7 @@ app.use('/password', require('./src/modules/password/password.routes'));
 app.listen(3000,()=>{
 console.log("Servidor corriendo en http://localhost:3000");
 });
+
+//dashboard
+app.use('/notificaciones', require('./src/modules/notificaciones/notificaciones.routes'));
+app.use('/dashboard', require('./src/modules/dashboard/dashboard.routes'));

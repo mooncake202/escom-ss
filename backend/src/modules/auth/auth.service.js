@@ -17,7 +17,7 @@ async function registrarInicioSesion(usuarioId, ip, resultado) {
   await prisma.inicio_sesion.create({
     data: {
       usuario_id: usuarioId,
-      fecha_hora: new Date(),
+      fecha_hora_acceso: new Date(),
       ip_acceso: ip || 'desconocida',
       resultado,
     },

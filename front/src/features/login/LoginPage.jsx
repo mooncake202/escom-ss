@@ -86,15 +86,15 @@ export default function LoginPage() {
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
       
       if (rol === "profesor") {
-        navigate("/profesor/dashboard");
+        navigate("/dashboard");
       } 
       
       else if (rol === "coordinador") {
-      navigate("/coordinacion/dashboard");
+      navigate("/dashboard");
       } 
       
       else if (rol === "alumno_asignado") {
-        navigate("/alumno/dashboard");
+        navigate("/dashboard");
       }
 
 

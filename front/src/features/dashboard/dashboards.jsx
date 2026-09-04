@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, RADIUS, BRAND } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useSesion, nombreCompletoSesion } from "../login/CU-CRED-03-crear-usuarios/hooks/useSesion"; // ajusta si tu useSesion vive en otro lado
+import { obtenerResumenDashboard } from "@/services/dashboardService";
+import {
+  listarNotificacionesPendientes,
+  marcarNotificacionLeida,
+} from "@/services/notificacionesService";
 
-// ── Iconos SVG inline ───────────────────────────────────────────── DENTRO DE CARPETA FEATURE
+// ── Iconos SVG inline ──────────────────────────────────────────────
 const Icon = ({ name, size = 18, color = "currentColor" }) => {
   const icons = {
     clock:    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>,
@@ -69,12 +76,14 @@ const StatCard = ({ icon, label, value, sub, color, bg, C }) => (
 const ActionItem = ({ icon, label, desc, color, bg, onClick, C }) => (
   <button
     onClick={onClick}
+    disabled={!onClick}
     style={{
       display: "flex", alignItems: "center", gap: 12, width: "100%",
       background: "none", border: "none", padding: "9px 10px", borderRadius: RADIUS.md,
-      cursor: "pointer", textAlign: "left", transition: "background 0.15s", fontFamily: "inherit",
+      cursor: onClick ? "pointer" : "default", opacity: onClick ? 1 : 0.5,
+      textAlign: "left", transition: "background 0.15s", fontFamily: "inherit",
     }}
-    onMouseEnter={e => e.currentTarget.style.background = C.navItemHover}
+    onMouseEnter={e => onClick && (e.currentTarget.style.background = C.navItemHover)}
     onMouseLeave={e => e.currentTarget.style.background = "none"}
   >
     <div style={{
@@ -87,7 +96,7 @@ const ActionItem = ({ icon, label, desc, color, bg, onClick, C }) => (
       <div style={{ fontSize: 13, fontWeight: 600, color: C.textPrimary }}>{label}</div>
       {desc && <div style={{ fontSize: 12, color: C.textDisabled, marginTop: 1 }}>{desc}</div>}
     </div>
-    <Icon name="arrow" size={14} color={C.textDisabled} />
+    {onClick && <Icon name="arrow" size={14} color={C.textDisabled} />}
   </button>
 );
 
@@ -109,22 +118,21 @@ const Section = ({ title, icon, color, bg, children, badge, C }) => (
         </div>
         <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary, letterSpacing: "-0.01em" }}>{title}</span>
       </div>
-      {badge && <Badge color={color} bg={bg}>{badge}</Badge>}
+      {/* El badge solo se pinta si hay valor > 0 — nunca se muestra "0 pendientes" */}
+      {!!badge && <Badge color={color} bg={bg}>{badge}</Badge>}
     </div>
     <div style={{ padding: "6px 8px 8px" }}>{children}</div>
   </div>
 );
 
-const AlertBanner = ({ type = "info", children, C }) => {
+const AlertBanner = ({ tipo = "info", children, onClick, C }) => {
   const map = {
     info:    { bg: C.accentSoft,   border: C.accent,   color: C.accentText, icon: "bell"  },
     warning: { bg: C.warningSoft,  border: C.warning,  color: C.warning,    icon: "bell"  },
     success: { bg: C.successSoft,  border: C.success,  color: C.success,    icon: "check" },
-    urgente:   { bg: C.dangerSoft,   border: C.danger,   color: C.danger,     icon: "flag"  },
-    error:   { bg: C.dangerSoft,   border: C.danger,   color: C.danger,     icon: "flag"  },
-
+    urgente: { bg: C.dangerSoft,   border: C.danger,   color: C.danger,     icon: "flag"  },
   };
-  const s = map[type];
+  const s = map[tipo] || map.info;
   return (
     <div style={{
       display: "flex", alignItems: "flex-start", gap: 10, padding: "11px 14px",
@@ -132,7 +140,12 @@ const AlertBanner = ({ type = "info", children, C }) => {
       borderRadius: RADIUS.md, marginBottom: 8,
     }}>
       <Icon name={s.icon} size={15} color={s.color} />
-      <span style={{ fontSize: 13, color: s.color, lineHeight: 1.5 }}>{children}</span>
+      <span
+        onClick={onClick}
+        style={{ fontSize: 13, color: s.color, lineHeight: 1.5, flex: 1, cursor: onClick ? "pointer" : "default" }}
+      >
+        {children}
+      </span>
     </div>
   );
 };
@@ -140,119 +153,142 @@ const AlertBanner = ({ type = "info", children, C }) => {
 const ProgressBar = ({ value, max, color, C }) => (
   <div style={{ height: 6, background: C.borderSubtle, borderRadius: RADIUS.full, overflow: "hidden", marginTop: 6 }}>
     <div style={{
-      width: `${Math.min(100, (value / max) * 100)}%`, height: "100%",
+      width: `${max > 0 ? Math.min(100, (value / max) * 100) : 0}%`, height: "100%",
       background: color, borderRadius: RADIUS.full, transition: "width 0.4s ease",
     }} />
   </div>
 );
 
-// ── Tokens de color semánticos para cada rol ──────────────────────
-// Usamos exclusivamente los tokens del sistema ESCOM
+// ── Tokens de color semánticos ──────────────────────────────────
 const T = {
-  blue:       { color: BRAND.blue400,  bg: "rgba(10,102,194,0.12)"  },
-  teal:       { color: "#2DD4BF",      bg: "rgba(45,212,191,0.12)"  },
-  green:      { color: BRAND.success,  bg: BRAND.successSoft         },
-  warning:    { color: BRAND.warning,  bg: BRAND.warningSoft         },
-  danger:     { color: BRAND.danger,   bg: BRAND.dangerSoft          },
-  purple:     { color: "#A78BFA",      bg: "rgba(167,139,250,0.12)" },
-  slate:      { color: BRAND.gray400,  bg: "rgba(154,154,154,0.10)" },
-  accent:     { color: BRAND.blue300,  bg: "rgba(0,58,143,0.20)"    },
+  blue:    { color: BRAND.blue400, bg: "rgba(10,102,194,0.12)" },
+  teal:    { color: "#2DD4BF",     bg: "rgba(45,212,191,0.12)" },
+  green:   { color: BRAND.success, bg: BRAND.successSoft },
+  warning: { color: BRAND.warning, bg: BRAND.warningSoft },
+  danger:  { color: BRAND.danger,  bg: BRAND.dangerSoft },
+  purple:  { color: "#A78BFA",     bg: "rgba(167,139,250,0.12)" },
+  slate:   { color: BRAND.gray400, bg: "rgba(154,154,154,0.10)" },
+  accent:  { color: BRAND.blue300, bg: "rgba(0,58,143,0.20)" },
 };
+
+// ── Notificaciones posicionadas por ruta ──────────────────────────
+// Cada notificación real trae (o no) una `ruta_relacionada`. Si la trae,
+// aparece EXACTAMENTE en el slot de esa ruta (por eso no hay que adivinar
+// dónde ponerla — el dato mismo lo dice). Si no trae ruta (null), es una
+// notificación general y aparece en el bloque de arriba del dashboard.
+function notificacionPorRuta(notificaciones, ruta) {
+  return notificaciones.find((n) => n.ruta_relacionada === ruta) || null;
+}
+
+function SlotNotificacion({ ruta, notificaciones, onLeer, navigate, C }) {
+  const n = notificacionPorRuta(notificaciones, ruta);
+  if (!n) return null;
+  return (
+    <AlertBanner
+      tipo={n.tipo}
+      C={C}
+      onClick={() => {
+        onLeer(n.id);
+        if (n.ruta_relacionada) navigate(n.ruta_relacionada);
+      }}
+    >
+      {n.mensaje}
+    </AlertBanner>
+  );
+}
+
+function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C }) {
+  const generales = notificaciones.filter((n) => !n.ruta_relacionada);
+  if (generales.length === 0) return null;
+  return (
+    <div style={{ marginBottom: "1.25rem" }}>
+      {generales.map((n) => (
+        <AlertBanner
+          key={n.id}
+          tipo={n.tipo}
+          C={C}
+          onClick={() => onLeer(n.id)}
+        >
+          {n.mensaje}
+        </AlertBanner>
+      ))}
+    </div>
+  );
+}
 
 // ══════════════════════════════════════════════════════════════════
 // DASHBOARD ALUMNO
 // ══════════════════════════════════════════════════════════════════
-const DashboardAlumno = ({ C }) => {
+const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   const stats = [
-    { icon: "clock",    label: "Horas acumuladas",    value: "312", sub: "",      ...T.blue    },
-    { icon: "document", label: "Reportes enviados",   value: "4",   sub: "",        ...T.teal    },
-    { icon: "check",    label: "Actividades activas", value: "6",   sub: "1 con entrega hoy",   ...T.green   },
-    { icon: "flag",     label: "Faltas totales", value: "5",   sub: "Max. 18",          ...T.slate   },
+    { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasAcumuladas ?? 0,       ...T.blue  },
+    { icon: "document", label: "Reportes enviados",   value: resumen.reportesEnviados ?? 0,      ...T.teal  },
+    { icon: "check",    label: "Actividades activas", value: resumen.actividadesAsignadas ?? 0,  ...T.green },
+    { icon: "flag",     label: "Faltas totales",      value: resumen.faltasAcumuladas ?? 0,      ...T.slate },
   ];
 
   return (
     <>
-      {/* Encabezado */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
-          Bienvenido, <span style={{ color: C.accentText }}>María González</span> 
+          Bienvenido, <span style={{ color: C.accentText }}>{nombreCompletoSesion(sesion)}</span>
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Inicio de servicio social: <strong style={{ color: C.textSecondary }}>2025-2</strong> · Oferta: <em>Desarrollo de software para biblioteca ESCOM</em>
+          Inicio de servicio social: <strong style={{ color: C.textSecondary }}>{resumen.periodoLabel || "—"}</strong>
+          {" · "}Oferta: <em>{resumen.ofertaNombre || "Sin asignar"}</em>
         </p>
       </div>
 
-      {/* Alertas */}
-      <div style={{ marginBottom: "1.25rem" }}>
-        <AlertBanner type="urgente" C={C}>Se te bloqueó el registro de bitácoras hasta que generes y envíes tu reporte del mes de <strong>abril</strong>. Creálo ahora para poder realizar bitácora del día.</AlertBanner>
-        <AlertBanner type="warning" C={C}>Tienes un reporte mensual con fecha límite el <strong>15 de abril</strong>. Genera y firma antes de la fecha.</AlertBanner>
+      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
 
-        <AlertBanner type="urgente" C={C}>Falta tu bitácora del día.</AlertBanner>
-
-        <AlertBanner type="info" C={C}>Hay un anuncio nuevo.</AlertBanner>
-
-
-
-
-
-
-      </div>
-
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
         {stats.map(s => <StatCard key={s.label} {...s} C={C} />)}
       </div>
 
-      {/* Progreso de faltas */}
       <div style={{
         background: C.bgCard, borderRadius: RADIUS.lg, padding: "1rem 1.25rem",
         border: `1px solid ${C.borderSubtle}`, marginBottom: "1.5rem",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Faltas seguidas</span>
-          <span style={{ fontSize: 13, color: C.accentText, fontWeight: 700 }}>3 / 5 días</span>
+          <span style={{ fontSize: 13, color: C.accentText, fontWeight: 700 }}>{resumen.faltasConsecutivas ?? 0} / 5 días</span>
         </div>
-        <ProgressBar value={3} max={5} color={GRADIENTS.progress} C={C} />
+        <ProgressBar value={resumen.faltasConsecutivas ?? 0} max={5} color={GRADIENTS.progress} C={C} />
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
           <span style={{ fontSize: 11, color: C.textDisabled }}>Si llegas a 5 días seguidos de falta, te darán de baja el servicio.</span>
-          
         </div>
       </div>
 
-      {/* Grid de secciones */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
 
+        {/* CU-AH */}
         <Section title="Actividades y Horas" icon="clock" {...T.blue} C={C}>
-          <ActionItem icon="plus"   {...T.blue}    label="Registrar bitácora del día"       desc="Sin completar" C={C} />
-          <ActionItem icon="book"   {...T.teal}    label="Consultar actividades asignadas"  desc="6 actividades activas" C={C} />
-        <AlertBanner type="info" C={C}>Te asignaron una nueva actividad.</AlertBanner>
-
-          <ActionItem icon="folder" {...T.slate}   label="Historial de actividades y bitácoras"         desc="Ver todas las actividades completadas" C={C} />
-        <AlertBanner type="info" C={C}>Te revisaron una bitácora.</AlertBanner>
-
-
-          <ActionItem icon="chart"  {...T.green}   label="Horas acumuladas"                 desc="Detalle de horas en el servicio social" C={C} />
+          <ActionItem icon="plus"   {...T.blue}  label="Registrar bitácora del día"      desc="Sin completar"          onClick={() => navigate("/alumno/bitacora")} C={C} />
+          <ActionItem icon="book"   {...T.teal}  label="Consultar actividades asignadas" desc="Actividades activas"    onClick={() => navigate("/alumno/actividades")} C={C} />
+          <SlotNotificacion ruta="/alumno/actividades" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="folder" {...T.slate} label="Historial de actividades y bitácoras" desc="Ver todas las actividades completadas" onClick={() => navigate("/alumno/historial")} C={C} />
+          <SlotNotificacion ruta="/alumno/historial" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="chart"  {...T.green} label="Horas acumuladas"                desc="Detalle de horas en el servicio social" onClick={() => navigate("/alumno/horas")} C={C} />
         </Section>
 
+        {/* CU-REP */}
         <Section title="Reportes" icon="document" {...T.teal} C={C}>
-          <ActionItem icon="plus"   {...T.teal}    label="Generar reporte "          desc="Reporte #5 disponible para generar" C={C} />
-          <ActionItem icon="check"  {...T.blue}    label="Consultar estado de reportes"     desc="Ver el estado de tus reportes activos" C={C} />
-        <AlertBanner type="info" C={C}>Tienes una actualización en el estado de tu reporte.</AlertBanner>
-
-          <ActionItem icon="folder" {...T.slate}   label="Historial de reportes"            desc="Todos los reportes enviados" C={C} />
+          <ActionItem icon="plus"   {...T.teal} label="Generar reporte"              desc="Reporte disponible para generar" onClick={() => navigate("/alumno/reportes/generar")} C={C} />
+          <ActionItem icon="check"  {...T.blue} label="Consultar estado de reportes" desc="Ver el estado de tus reportes activos" onClick={() => navigate("/alumno/reportes/estatus")} C={C} />
+          <SlotNotificacion ruta="/alumno/reportes/estatus" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="folder" {...T.slate} label="Historial de reportes"       desc="Todos los reportes enviados" onClick={() => navigate("/alumno/reportes")} C={C} />
         </Section>
 
+        {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.purple} C={C}>
-          <ActionItem icon="bell"   {...T.warning} label="Anuncios del sistema"             desc="3 anuncios nuevos sin leer" C={C} />
-          <ActionItem icon="user"   {...T.purple}  label="Contacto del profesor"            desc="Dr. Alejandro Méndez · ext. 52340" C={C} />
-          <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"      desc="Teléfono, correo personal" C={C} />
-          <ActionItem icon="logout" {...T.danger}  label="Baja del servicio"      desc="Proceso irreversible, requiere justificación" C={C} />
-        <AlertBanner type="info" C={C}>Tienes una actualización en el estado de la solicitud de baja del servicio social.</AlertBanner>
-        
-
-
+          <ActionItem icon="bell"   {...T.warning} label="Anuncios del sistema"        desc="Anuncios nuevos"          onClick={() => navigate("/alumno/anuncios")} C={C} />
+          <ActionItem icon="user"   {...T.purple}  label="Contacto del profesor"       desc="Datos de contacto de tu profesor" onClick={() => navigate("/alumno/contacto-profesor")} C={C} />
+          <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales" desc="Teléfono, correo personal" onClick={() => navigate("/alumno/datos")} C={C} />
+          <ActionItem icon="logout" {...T.danger}  label="Baja del servicio"           desc="Proceso irreversible, requiere justificación" onClick={() => navigate("/alumno/solicitar-baja")} C={C} />
+          <SlotNotificacion ruta="/alumno/solicitar-baja" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
+        {/* CU-LSS */}
         <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C}>
           <div style={{ padding: "10px 10px 4px" }}>
             <div style={{
@@ -273,59 +309,17 @@ const DashboardAlumno = ({ C }) => {
             </div>
             <div style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
-                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>312/480</span>
+                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasAcumuladas ?? 0}/480</span>
               </div>
-              <ProgressBar value={312} max={480} color={C.textDisabled} C={C} />
-            </div>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
-                <span>Reportes aprobados</span><span style={{ color: C.accentText, fontWeight: 700 }}>4/6</span>
-              </div>
-              <ProgressBar value={4} max={6} color={C.textDisabled} C={C} />
+              <ProgressBar value={resumen.horasAcumuladas ?? 0} max={480} color={C.textDisabled} C={C} />
             </div>
           </div>
-          <ActionItem icon="arrow" {...T.slate} label="Ver proceso de liberación" desc="Disponible al cumplir los requisitos" C={C} />
-        <AlertBanner type="info" C={C}>Hay una actualización en tu proceso de liberación del servicio social.</AlertBanner>
-          <ActionItem icon="folder" {...T.slate}  label="Documentos del servicio"      desc="Ve los documentos históricos del servicio" C={C} />
-        <AlertBanner type="info" C={C}>Te enviaron tu carta compromiso firmada.</AlertBanner>
-
-
+          <ActionItem icon="arrow"  {...T.slate} label="Ver proceso de liberación" desc="Disponible al cumplir los requisitos" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
+          <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="folder" {...T.slate} label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/alumnoasignado-documentacion")} C={C} />
+          <SlotNotificacion ruta="/alumnoasignado-documentacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
-      </div>
-
-      {/* Anuncios recientes */}
-      <div style={{
-        background: C.bgCard, borderRadius: RADIUS.lg,
-        border: `1px solid ${C.borderSubtle}`, padding: "1rem 1.25rem", marginTop: "0.875rem",
-      }}>
-        <p style={{ margin: "0 0 0.875rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Anuncios recientes</p>
-        {[
-          { from: "Dr. Alejandro Méndez", text: "Recuerden que la sesión de seguimiento es el viernes a las 10:00 AM en el cubículo B-203.", time: "Hace 2 horas", isNew: true },
-          { from: "Coordinación SS",      text: "El periodo de entrega de reportes mensuales cierra el 15 de abril. No olviden firmar sus documentos.", time: "Ayer", isNew: true },
-          { from: "Dr. Alejandro Méndez", text: "Actividades del mes de abril han sido actualizadas. Revisen las fechas límite.", time: "Hace 3 días", isNew: false },
-        ].map((a, i, arr) => (
-          <div key={i} style={{
-            display: "flex", gap: 12, padding: "10px 0",
-            borderBottom: i < arr.length - 1 ? `1px solid ${C.borderSubtle}` : "none",
-          }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-              background: GRADIENTS.primary,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <Icon name="user" size={15} color="#fff" />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{a.from}</span>
-                {a.isNew && <Badge {...T.blue}>Nuevo</Badge>}
-                <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>{a.time}</span>
-              </div>
-              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.55 }}>{a.text}</p>
-            </div>
-          </div>
-        ))}
       </div>
     </>
   );
@@ -334,97 +328,76 @@ const DashboardAlumno = ({ C }) => {
 // ══════════════════════════════════════════════════════════════════
 // DASHBOARD PROFESOR
 // ══════════════════════════════════════════════════════════════════
-const DashboardProfesor = ({ C }) => {
-  
-
+const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   return (
     <>
       <div style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ margin: "0 0 4px", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
-          Bienvenido, <span style={{ color: T.teal.color }}>Dr. Alejandro Méndez</span>
+          Bienvenido, <span style={{ color: T.teal.color }}>{nombreCompletoSesion(sesion)}</span>
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Departamento de Computación · Cubículo B-203 · Periodo <strong style={{ color: C.textSecondary }}>2025-2</strong>
+          Departamento de {resumen.departamento || "—"} · Cubículo {resumen.cubiculo || "—"}
         </p>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Características: Investigador, jefe de club 
+          Características: {resumen.caracteristicas?.length ? resumen.caracteristicas.join(", ") : "Ninguna"}
         </p>
       </div>
 
-      <div style={{ marginBottom: "1.25rem" }}>
-        <AlertBanner type="urgente" C={C}>Actividades de alumnos proximas a caducar. Asignales más.</AlertBanner>
-        <AlertBanner type="urgente" C={C}>Un alumno acabó sus asignaciones. Asingale más</AlertBanner>
+      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
 
-        
-        
-
-
-
-
-
-      </div>
-
-      {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
-        <StatCard icon="users"    label="Alumnos asignados"      value="5"  sub="de 6"           {...T.teal}    C={C} />
-        <StatCard icon="folder"   label="Ofertas activas"         value="2"  sub="1 proyecto, 1 individual" {...T.blue}    C={C} />
-        <StatCard icon="document" label="Reportes por revisar"    value="2"  sub="Con fecha límite hoy"     {...T.danger}  C={C} />
-
-        <StatCard icon="inbox"    label="Revisar bitácoras"  value="3"  sub="Sin responder"            {...T.warning} C={C} />
+        <StatCard icon="users"    label="Alumnos asignados"    value={resumen.alumnosAsignados ?? 0} sub={`de ${resumen.cuposTotales ?? 0} cupos`} {...T.teal} C={C} />
+        <StatCard icon="folder"   label="Ofertas activas"      value={resumen.ofertasActivas ?? 0} {...T.blue} C={C} />
+        {/* Dan 0 hasta que existan CU-REP / CU-AH-04 con su convención de estado */}
+        <StatCard icon="document" label="Reportes por revisar"  value={resumen.reportesPorRevisar ?? 0} {...T.danger} C={C} />
+        <StatCard icon="inbox"    label="Revisar bitácoras"     value={resumen.bitacorasPorRevisar ?? 0} {...T.warning} C={C} />
       </div>
 
-      {/* Tabla alumnos */}
-      
-      {/* Grid secciones */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
 
-        <Section title="Actividades y Horas" icon="clock" {...T.teal} C={C} badge={"2 pendientes"}>
-          <ActionItem icon="chart"  {...T.teal}    label="Acumulado de horas por alumno"  desc="Ver el progreso detallado de cada alumno" C={C} />
-          <ActionItem icon="plus"   {...T.blue}    label="Asignar actividades por alumno"  desc="Crear y asignar nuevas actividades" C={C} />
-          <ActionItem icon="book"   {...T.green}   label="Revisar bitácoras por alumno"   desc="2 bitácoras pendientes de revisión" C={C} />
-        <AlertBanner type="urgente" C={C}>Hay bitácoras pendientes de tu revisión.</AlertBanner>
-
+        {/* CU-AH */}
+        <Section title="Actividades y Horas" icon="clock" {...T.teal} C={C} badge={resumen.bitacorasPorRevisar}>
+          <ActionItem icon="chart" {...T.teal}  label="Acumulado de horas por alumno"  desc="Ver el progreso detallado de cada alumno" onClick={() => navigate("/profesor/horas")} C={C} />
+          <ActionItem icon="chart" {...T.teal}  label="Historial de actividades y bitácoras"  desc="Ver el progreso detallado de cada alumno" onClick={() => navigate("/profesor/historial")} C={C} />  
+          <ActionItem icon="plus"  {...T.blue}  label="Asignar actividades por alumno" desc="Crear y asignar nuevas actividades" onClick={() => navigate("/profesor/actividades")} C={C} />
+          <ActionItem icon="book"  {...T.green} label="Revisar bitácoras por alumno"   desc="Bitácoras pendientes de revisión" onClick={() => navigate("/profesor/bitacoras")} C={C} />
+          <SlotNotificacion ruta="/profesor/bitacoras" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
-        <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge="3 pendientes">
-          
-          <ActionItem icon="check"  {...T.blue}    label="Aceptar o rechazar solicitudes"  desc="3 solicitudes pendientes" C={C} />
-        <AlertBanner type="urgente" C={C}>Hay solicitudes de ingreso pendiente de respuesta.</AlertBanner>
-          <ActionItem icon="users" {...T.blue}  label="Consultar información de alumnos"      desc="Datos y cantidad" C={C} />
-
-
+        {/* CU-GR */}
+        <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge={resumen.solicitudesPendientes}>
+          <ActionItem icon="check" {...T.blue} label="Aceptar o rechazar solicitudes" desc="Solicitudes pendientes" onClick={() => navigate("/profesor/solicitudes")} C={C} />
+          <SlotNotificacion ruta="/profesor/solicitudes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="users" {...T.blue} label="Consultar información de alumnos" desc="Datos y cantidad" onClick={() => navigate("/profesor/mis-alumnos")} C={C} />
         </Section>
 
-        <Section title="Reportes" icon="document" {...T.danger} C={C} badge="2 por revisar">
-          <ActionItem icon="pencil" {...T.danger}  label="Revisar y firmar reporte"       desc="2 reportes esperan tu revisión y firma" C={C} />
-        <AlertBanner type="urgente" C={C}>Hay reportes que pendientes de revisión y firma.</AlertBanner>
-
+        {/* CU-REP */}
+        <Section title="Reportes" icon="document" {...T.danger} C={C} badge={resumen.reportesPorRevisar}>
+          <ActionItem icon="pencil" {...T.danger} label="Revisar y firmar reporte" desc="Reportes esperan tu revisión y firma" onClick={() => navigate("/profesor/reportes")} C={C} />
+          <SlotNotificacion ruta="/profesor/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
+        {/* CU-PRO */}
         <Section title="Gestión de Ofertas" icon="folder" {...T.purple} C={C}>
-          <ActionItem icon="plus"   {...T.purple}  label="Solicitar apertura de oferta"   desc="Nueva oferta de proyecto o individual" C={C} />
-        <AlertBanner type="info" C={C}>Tienes actualizaciones en tu soliciud de ofertas.</AlertBanner>
-
-          <ActionItem icon="folder" {...T.slate}   label="Historial de ofertas"           desc="Consultar ofertas anteriores y activas" C={C} />
+          <ActionItem icon="plus"   {...T.purple} label="Solicitar apertura de oferta" desc="Nueva oferta de proyecto o individual" onClick={() => navigate("/profesor/proyectos/registrar")} C={C} />
+          <SlotNotificacion ruta="/profesor/proyectos/registrar" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="folder" {...T.slate}  label="Historial de ofertas"         desc="Consultar ofertas anteriores y activas" onClick={() => navigate("/profesor/proyectos")} C={C} />
         </Section>
 
+        {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.slate} C={C}>
-          <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"    desc="Teléfono, cubículo, departamento" C={C} />
-          <ActionItem icon="bell"   {...T.warning} label="Publicar anuncio a mis alumnos" desc="Notificar a todos o a un alumno específico" C={C} />
-          <ActionItem icon="logout" {...T.danger}  label="Solicitar baja de alumno"       desc="Requiere justificación documentada" C={C} />
-        <AlertBanner type="info" C={C}>Tienes actualizaciones en tu solicitud de dar de baja a alumno.</AlertBanner>
-
-          <ActionItem icon="pencil" {...T.blue}  label="Solicitar modificación en características de profesor"       desc="Requiere justificación" C={C} />
-        <AlertBanner type="info" C={C}>Tienes actualizaciones en tu solicitud de modificacion de rol de profesor.</AlertBanner>
-
-
+          <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"    desc="Teléfono, cubículo, departamento" onClick={() => navigate("/profesor/datos-personales")} C={C} />
+          <ActionItem icon="bell"   {...T.warning} label="Publicar anuncio a mis alumnos" desc="Notificar a todos o a un alumno específico" onClick={() => navigate("/profesor/anuncios")} C={C} />
+          <ActionItem icon="logout" {...T.danger}  label="Solicitar baja de alumno"       desc="Requiere justificación documentada" onClick={() => navigate("/profesor/solicitar-baja-alumno")} C={C} />
+          <SlotNotificacion ruta="/profesor/solicitar-baja-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="pencil" {...T.blue}  label="Solicitar modificación en características de profesor" desc="Requiere justificación" onClick={() => navigate("/profesor/solicitar-modificacion")} C={C} />
+          <SlotNotificacion ruta="/profesor/solicitar-modificacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
-        <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C} badge="1 pendiente">
-          
-          <ActionItem icon="star"   {...T.warning} label="Evaluar desempeño de alumno"   desc="1 evaluación pendiente de completar" C={C} />
-        <AlertBanner type="urgente" C={C}>Hay evaluaciones de desempeño pendientes.</AlertBanner>
-
+        {/* CU-LSS */}
+        <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C} badge={resumen.evaluacionesPendientes}>
+          <ActionItem icon="star" {...T.warning} label="Evaluar desempeño de alumno" desc="Evaluación pendiente de completar" onClick={() => navigate("/profesor/evaluar-alumno")} C={C} />
+          <SlotNotificacion ruta="/profesor/evaluar-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
       </div>
@@ -435,21 +408,7 @@ const DashboardProfesor = ({ C }) => {
 // ══════════════════════════════════════════════════════════════════
 // DASHBOARD COORDINACIÓN
 // ══════════════════════════════════════════════════════════════════
-const DashboardCoordinacion = ({ C }) => {
-  const pendientes = [
-    { label: "Solicitudes de registro", value: 8,  icon: "inbox",    ...T.blue    },
-    { label: "Expedientes LSS",         value: 3,  icon: "folder",   ...T.purple  },
-    { label: "Reportes por revisar",    value: 11, icon: "document", ...T.teal    },
-    { label: "Ofertas por validar",     value: 2,  icon: "star",     ...T.warning },
-  ];
-
-  const lssItems = [
-    { alumno: "Luis Hernández",  etapa: "Evaluación de desempeño", estado: "Pendiente dictamen",  ...T.warning },
-    { alumno: "Andrea Martínez", etapa: "Carta de término",        estado: "Lista para entregar", ...T.green   },
-    { alumno: "Pedro Sánchez",   etapa: "Expediente",              estado: "En revisión",         ...T.blue    },
-    { alumno: "Diana López",     etapa: "Constancia de término",   estado: "Pendiente emisión",   ...T.purple  },
-  ];
-
+const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   return (
     <>
       <div style={{ marginBottom: "1.5rem" }}>
@@ -457,23 +416,20 @@ const DashboardCoordinacion = ({ C }) => {
           Panel de <span style={{ color: T.purple.color }}>Coordinación</span>
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Lic. Carmen Torres · Periodo activo: <strong style={{ color: C.textSecondary }}>2025-2</strong> · 47 alumnos registrados
+          {nombreCompletoSesion(sesion)} · Periodo activo: <strong style={{ color: C.textSecondary }}>{resumen.periodoLabel || "—"}</strong>
+          {" · "}{resumen.alumnosRegistrados ?? 0} alumnos registrados
         </p>
       </div>
 
-      <div style={{ marginBottom: "1.25rem" }}>
-        <AlertBanner type="error" C={C}>8 solicitudes de alumnos llevan más de 3 días sin respuesta.</AlertBanner>
-        <AlertBanner type="warning" C={C}>El periodo de registro cierra en <strong>10 días</strong>. Hay documentación de registro pendiente de validar.</AlertBanner>
-      </div>
+      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
 
-      
-
-      {/* Métricas */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem", marginBottom: "1.25rem" }}>
         {[
-          { label: "Alumnos con horas completas",        value: "12", total: 47, ...T.green  },
-          { label: "Alumnos en proceso de liberación",   value: "4",  total: 47, ...T.purple },
-          { label: "Reportes aprobados este mes",        value: "23", total: 30, ...T.teal   },
+          { label: "Alumnos con horas completas",      value: resumen.alumnosConHorasCompletas ?? 0,   total: resumen.alumnosRegistrados ?? 0, ...T.green },
+          { label: "Alumnos en proceso de liberación",  value: resumen.alumnosEnProcesoLiberacion ?? 0, total: resumen.alumnosRegistrados ?? 0, ...T.purple },
+          // Sin convención de estado_reporte todavía (CU-REP) — el total
+          // aquí es una referencia aproximada, no un objetivo real.
+          { label: "Reportes aprobados este mes",       value: resumen.reportesAprobadosMes ?? 0,       total: resumen.alumnosRegistrados ?? 0, ...T.teal },
         ].map(m => (
           <div key={m.label} style={{
             background: C.bgCard, borderRadius: RADIUS.lg, padding: "14px 16px",
@@ -483,76 +439,70 @@ const DashboardCoordinacion = ({ C }) => {
               <span style={{ fontSize: 13, color: C.textMuted, maxWidth: 140, lineHeight: 1.4 }}>{m.label}</span>
               <span style={{ fontSize: 22, fontWeight: 700, color: m.color }}>{m.value}</span>
             </div>
-            <ProgressBar value={parseInt(m.value)} max={m.total} color={m.color} C={C} />
+            <ProgressBar value={m.value} max={m.total || 1} color={m.color} C={C} />
             <div style={{ fontSize: 11, color: C.textDisabled, marginTop: 4 }}>de {m.total} alumnos</div>
           </div>
         ))}
       </div>
 
-     
-
-      {/* Grid secciones */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.875rem" }}>
 
+        {/* CU-AH */}
         <Section title="Actividades y Horas" icon="clock" {...T.teal} C={C}>
-          <ActionItem icon="chart"    {...T.teal}    label="Acumulado de horas por alumno"     desc="Ver progreso general del grupo" C={C} />
-          <ActionItem icon="book"     {...T.blue}    label="Consultar actividades por alumno"  desc="Revisar actividades asignadas" C={C} />
+          <ActionItem icon="chart" {...T.teal} label="Acumulado de horas por alumno"    desc="Ver progreso general del grupo" onClick={() => navigate("/coordinacion/horas")} C={C} />
+          {/* RUTA_PENDIENTE */}
+          <ActionItem icon="book" {...T.blue} label="Consultar actividades por alumno" desc="Revisar actividades asignadas" onClick={() => navigate("/coordinacion/historial")} C={C} />
         </Section>
 
-        <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} >
-          <ActionItem icon="document" {...T.blue}    label="Revisar documentación inicial"     desc="8 solicitudes" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes revisiones pendientes de documentacion inicial.</AlertBanner>
-          <ActionItem icon="check"    {...T.green}   label="Validar carta compromiso"          desc="Confirma  cuando el alumno la entregue" C={C} />
-          <ActionItem icon="folder"   {...T.purple}  label="Revisar expediente de registro"    desc="5 solicitudes" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes revisiones pendientes de expediente de registro.</AlertBanner>
-
-          <ActionItem icon="folder"   {...T.purple}  label="Envío de carta compromiso firmada"    desc="3 solicitudes" C={C} />
-
+        {/* CU-GR */}
+        <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C}>
+          <ActionItem icon="document" {...T.blue}   label="Revisar documentación inicial"  desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/documentacion")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/documentacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="check"    {...T.green}  label="Validar carta compromiso"       desc="Confirma cuando el alumno la entregue" onClick={() => navigate("/coordinacion/carta-presencial")} C={C} />
+          <ActionItem icon="folder"   {...T.purple} label="Revisar expediente de registro" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/expedientes")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/expedientes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="folder"   {...T.purple} label="Envío de carta compromiso firmada" desc="Solicitudes pendientes" onClick={() => navigate("/cartacompromisofirmada")} C={C} />
         </Section>
 
-        <Section title="Reportes" icon="document" {...T.teal} C={C} badge="11 pendientes">
-          <ActionItem icon="chart"    {...T.teal}    label="Estado de reportes"                desc="Vista general por alumno y periodo" C={C} />
-          <ActionItem icon="folder"   {...T.slate}   label="Historial de reportes enviados"    desc="Todos los reportes del periodo" C={C} />
-          <ActionItem icon="pencil"   {...T.danger}  label="Revisar y dictaminar reporte"      desc="11 reportes esperan dictamen" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes revisiones pendientes de reportes.</AlertBanner>
-
+        {/* CU-REP */} {/* RUTA_PENDIENTE_SOL */}
+        <Section title="Reportes" icon="document" {...T.teal} C={C} badge={resumen.reportesPorRevisar}>
+          <ActionItem icon="pencil"   {...T.danger} label="Dictaminar reportes e historial"   desc="Reportes esperan dictamen" onClick={() => navigate("/coordinacion/reportes")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
-        <Section title="Gestión de Ofertas" icon="star" {...T.warning} C={C} badge="2 solicitudes">
-          <ActionItem icon="check"    {...T.warning} label="Revisar solicitudes de apertura"   desc="2 solicitudes de profesores" C={C} />
-          <AlertBanner type="warning" C={C}>Tienes solicitudes pendientes de apertura.</AlertBanner>
-
-          <ActionItem icon="cog"      {...T.purple}  label="Modificar características de profesor" desc="3 solicitudes" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes solicitudes de modificación de roles pendientes.</AlertBanner>
-
-          <ActionItem icon="folder"   {...T.blue}    label="Consultar proyectos registrados"   desc="Catálogo completo de ofertas" C={C} />
+        {/* CU-PRO */}
+        <Section title="Gestión de Ofertas" icon="star" {...T.warning} C={C} badge={resumen.ofertasPorValidar}>
+          <ActionItem icon="check"  {...T.warning} label="Solicitudes de ofertas e historial"        desc="Solicitudes de profesores" onClick={() => navigate("/coordinacion/ofertas")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/ofertas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="cog"    {...T.purple}  label="Modificar características de profesor" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/solicitudes-caracteristicas")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/solicitudes-caracteristicas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          
         </Section>
 
-        <Section title="Administrativa" icon="cog" {...T.slate} C={C} badge={"1 solicitud"}>
-          <ActionItem icon="calendar" {...T.blue}    label="Gestionar calendario escolar"      desc="Periodos, días inhábiles, vacaciones" C={C} />
-          <ActionItem icon="bell"     {...T.warning} label="Publicar anuncio"                  desc="Para todos los alumnos o por profesor" C={C} />
-          <ActionItem icon="link"     {...T.teal}    label="Gestionar medios de contacto"      desc="Información institucional visible" C={C} />
-          <ActionItem icon="key"      {...T.purple}  label="Gestionar recursos del SS"         desc="Documentos y guías del servicio" C={C} />
-          <ActionItem icon="flag"      {...T.danger}  label="Solicitudes de baja"         desc="Gestionar solicitudes de baja" C={C} />
-          <AlertBanner type="warning" C={C}>Tienes solicitudes pendientes de baja.</AlertBanner>
-          <ActionItem icon="users" {...T.blue}  label="Consultar información de alumnos por profesor"      desc="Datos y cantidad" C={C} />
-          <ActionItem icon="flag"      {...T.danger}  label="Gestión de faltas alumnos"         desc="5 pendientes" C={C} />
-          <AlertBanner type="warning" C={C}>Tienes pendientes revisiones en las faltas de los alumnos.</AlertBanner>
-
-
+        {/* CU-ADM */}
+        <Section title="Administrativa" icon="cog" {...T.slate} C={C}>
+          <ActionItem icon="calendar" {...T.blue}    label="Gestionar calendario escolar" desc="Periodos, días inhábiles, vacaciones" onClick={() => navigate("/coordinacion/calendario")} C={C} />
+          <ActionItem icon="bell"     {...T.warning} label="Publicar anuncio"             desc="Para todos los alumnos o por profesor" onClick={() => navigate("/coordinacion/admin/anuncios")} C={C} />
+          <ActionItem icon="link"     {...T.teal}    label="Gestionar medios de contacto" desc="Información institucional visible" onClick={() => navigate("/coordinacion/contacto-institucional")} C={C} />
+          <ActionItem icon="key"      {...T.purple}  label="Gestionar recursos del SS"    desc="Documentos y guías del servicio" onClick={() => navigate("/coordinacion/admin/recursos")} C={C} />
+          <ActionItem icon="flag"     {...T.danger}  label="Solicitudes de baja"          desc="Gestionar solicitudes de baja" onClick={() => navigate("/coordinacion/gestionar-bajas")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/gestionar-bajas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="users" {...T.blue} label="Consultar información de alumnos por profesor" desc="Datos y cantidad" onClick={() => navigate("/coordinacion/usuarios-asignados")} C={C} />
+          {/* RUTA_PENDIENTE Ruta suelta, sin prefijo /coordinacion/ — confirmar */}
+          <ActionItem icon="flag" {...T.danger} label="Gestión de faltas alumnos" desc="Pendientes" onClick={() => navigate("/gestion-faltas")} C={C} />
+          <SlotNotificacion ruta="/gestion-faltas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="users" {...T.blue} label="Crear o editar usuarios" desc="Profesor o Coordinador" onClick={() => navigate("/crear-usuario")} C={C} />
         </Section>
 
-        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C} >
-          <ActionItem icon="star"     {...T.warning} label="Dictaminar evaluación de desempeño" desc="1 evaluación pendiente de dictamen" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes revisiones pendientes de evaluación de desempeño.</AlertBanner>
-
-          <ActionItem icon="document" {...T.blue}    label="Gestionar carta de término"         desc="1 carta lista para entregar" C={C} />
-          <ActionItem icon="folder"   {...T.teal}    label="Dictaminar expediente"              desc="1 expediente en revisión" C={C} />
-          <AlertBanner type="urgente" C={C}>Tienes revisiones pendientes de expediente de término.</AlertBanner>
-
-          <ActionItem icon="check"    {...T.green}   label="Gestionar constancia de término"    desc="1 constancia pendiente de emisión" C={C} />
-          <ActionItem icon="folder" {...T.slate}  label="Documentos del servicio"      desc="Ve los documentos históricos del servicio" C={C} />
-
+        {/* CU-LSS */}
+        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C}>
+          <ActionItem icon="star"     {...T.warning} label="Dictaminar evaluación de desempeño" desc="Evaluación pendiente de dictamen" onClick={() => navigate("/coordinacion/revisar-evaluacion-alumno")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/revisar-evaluacion-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="document" {...T.blue}    label="Gestionar carta de término"         desc="Carta lista para entregar" onClick={() => navigate("/coordinacion/estado-carta-termino")} C={C} />
+          <ActionItem icon="folder"   {...T.teal}    label="Dictaminar expediente"              desc="Expediente en revisión" onClick={() => navigate("/coordinacion/evaluacion-expediente")} C={C} />
+          <SlotNotificacion ruta="/coordinacion/evaluacion-expediente" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="check"    {...T.green}   label="Gestionar constancia de término"    desc="Constancia pendiente de emisión" onClick={() => navigate("/coordinacion/gestion-constancia-termino")} C={C} />
+          <ActionItem icon="folder" {...T.slate}  label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/coordinación-alumnoasignado-documentacion")} C={C} />
         </Section>
 
       </div>
@@ -561,70 +511,101 @@ const DashboardCoordinacion = ({ C }) => {
 };
 
 // ══════════════════════════════════════════════════════════════════
-// COMPONENTE RAÍZ — selecciona rol y envuelve en DashboardLayout
+// COMPONENTE RAÍZ — sin selector: renderiza SOLO el dashboard del rol
+// real de la sesión.
 // ══════════════════════════════════════════════════════════════════
 
 const ROL_CONFIG = {
-  alumno:       { titulo: "Mi Dashboard",              subtitulo: "Inicio",             usuario: "García López Juan Carlos" },
-  profesor:     { titulo: "Panel del Profesor",         subtitulo: "Inicio",             usuario: "Dr. Alejandro Méndez"     },
-  coordinacion: { titulo: "Panel de Coordinación",      subtitulo: "Inicio",             usuario: "Lic. Carmen Torres"       },
+  alumno_asignado: { titulo: "Mi Dashboard",           subtitulo: "Inicio" },
+  profesor:        { titulo: "Panel del Profesor",     subtitulo: "Inicio" },
+  coordinador:      { titulo: "Panel de Coordinación",  subtitulo: "Inicio" },
 };
 
 export default function Dashboards() {
   const { C } = useTheme();
-  const [rol, setRol] = useState("alumno");
+  const navigate = useNavigate();
+  const { usuario: sesion } = useSesion();
+
+  const [resumen, setResumen] = useState({});
+  const [notificaciones, setNotificaciones] = useState([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    async function cargar() {
+      setCargando(true);
+      try {
+        const [resumenData, notiData] = await Promise.all([
+          obtenerResumenDashboard(),
+          listarNotificacionesPendientes(),
+        ]);
+        setResumen(resumenData);
+        setNotificaciones(notiData);
+      } catch (err) {
+        console.error('Error al cargar el dashboard:', err);
+      } finally {
+        setCargando(false);
+      }
+    }
+    cargar();
+  }, []); // una sola vez al montar — ver nota sobre el loop de useSesion()
+
+  async function handleLeerNotificacion(id) {
+    setNotificaciones((prev) => prev.filter((n) => n.id !== id));
+    try {
+      await marcarNotificacionLeida(id);
+    } catch (err) {
+      console.error('No se pudo marcar la notificación como leída:', err);
+    }
+  }
+
+  if (!sesion) return null;
+
+  const rol = sesion.rol;
+
+  if (rol === "alumno_sin_asignar") {
+    return (
+      <DashboardLayout titulo="Tu proceso de inscripción" subtitulo="Servicio Social" rol={rol} usuario={nombreCompletoSesion(sesion)}>
+        <div style={{
+          background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`,
+          padding: "2rem", textAlign: "center",
+        }}>
+          <p style={{ color: C.textMuted, fontSize: 14 }}>
+            Tu proceso de inscripción al servicio social todavía está en curso.
+            Esta pantalla se completará junto con el módulo de registro (CU-GR).
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   const cfg = ROL_CONFIG[rol];
+  if (!cfg) {
+    return (
+      <DashboardLayout titulo="Dashboard" subtitulo="" rol={rol} usuario={nombreCompletoSesion(sesion)}>
+        <p style={{ color: C.textMuted }}>Rol no reconocido: {rol}</p>
+      </DashboardLayout>
+    );
+  }
 
   return (
-    <DashboardLayout titulo={cfg.titulo} subtitulo={cfg.subtitulo} rol={rol} usuario={cfg.usuario}>
-
-      <div style={{
-        maxWidth: "800px",   // ← controla el ancho máximo
-        margin: "0 auto",     // ← centra horizontalmente
-        width: "100%",
-      }}>
-
-        {/* Selector de rol */}
-        <div style={{
-          display: "flex", gap: "0.5rem", marginBottom: "1.5rem",
-          padding: "10px 14px", background: C.bgCard,
-          borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`,
-          alignItems: "center",
-        }}></div>
-
-      {/* Selector de rol — solo para demo / desarrollo */}
-      <div style={{
-        display: "flex", gap: "0.5rem", marginBottom: "1.5rem",
-        padding: "10px 14px", background: C.bgCard,
-        borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`,
-        alignItems: "center",
-      }}>
-        <span style={{ fontSize: 12, color: C.textDisabled, fontWeight: 600, marginRight: 4, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-          Vista:
-        </span>
-        {["alumno", "profesor", "coordinacion"].map(r => (
-          <button
-            key={r}
-            onClick={() => setRol(r)}
-            style={{
-              padding: "5px 14px", borderRadius: RADIUS.full, fontSize: 12, fontWeight: 600,
-              cursor: "pointer", fontFamily: "inherit", transition: "all 0.15s",
-              background: rol === r ? C.accent : C.bgInput,
-              border: `1px solid ${rol === r ? C.accent : C.borderDefault}`,
-              color: rol === r ? "#fff" : C.textMuted,
-              textTransform: "capitalize",
-            }}
-          >
-            {r}
-          </button>
-        ))}
+    <DashboardLayout titulo={cfg.titulo} subtitulo={cfg.subtitulo} rol={rol} usuario={nombreCompletoSesion(sesion)}>
+      <div style={{ maxWidth: "800px", margin: "0 auto", width: "100%" }}>
+        {cargando ? (
+          <p style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "2rem" }}>Cargando…</p>
+        ) : (
+          <>
+            {rol === "alumno_asignado" && (
+              <DashboardAlumno C={C} sesion={sesion} resumen={resumen} notificaciones={notificaciones} onLeerNotificacion={handleLeerNotificacion} navigate={navigate} />
+            )}
+            {rol === "profesor" && (
+              <DashboardProfesor C={C} sesion={sesion} resumen={resumen} notificaciones={notificaciones} onLeerNotificacion={handleLeerNotificacion} navigate={navigate} />
+            )}
+            {rol === "coordinador" && (
+              <DashboardCoordinacion C={C} sesion={sesion} resumen={resumen} notificaciones={notificaciones} onLeerNotificacion={handleLeerNotificacion} navigate={navigate} />
+            )}
+          </>
+        )}
       </div>
-
-      {rol === "alumno"       && <DashboardAlumno       C={C} />}
-      {rol === "profesor"     && <DashboardProfesor      C={C} />}
-      {rol === "coordinacion" && <DashboardCoordinacion  C={C} />}
-
-        </div>
     </DashboardLayout>
   );
 }
