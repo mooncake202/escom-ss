@@ -1,14 +1,28 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useTheme, GRADIENTS, RADIUS, SHADOWS } from "@/themes/colors";
+import { DEPARTAMENTOS, ROLES, CUPOS_BASE } from "./hooks/profesoresData";
+import { useSesion, nombreCompletoSesion } from "./hooks/useSesion";
 import {
-  PROFESORES,
-  CARACTERISTICAS,
-  DEPARTAMENTOS,
-  ROLES,
-  CORREOS_REGISTRADOS,
-  CUPOS_BASE
-} from "./hooks/profesoresData";
+  listarUsuarios,
+  crearUsuario,
+  actualizarUsuario,
+  reenviarCorreoBienvenida,
+  listarCaracteristicas,
+} from "@/services/usuariosService";
+
+// ── Mapeos frontend (etiqueta) <-> backend (enum) ────────────
+// La BD usa minúsculas ("profesor"/"coordinador") y identificadores de
+// característica con guión bajo ("Presidente_de_academia"). El resto de este
+// archivo sigue usando las etiquetas bonitas ("Profesor", "Presidente de
+// academia") para no tener que reescribir todo el render — la conversión
+// pasa solo por estas funciones.
+const ROL_DB_A_ETIQUETA = { profesor: "Profesor", coordinador: "Coordinador" };
+const ROL_ETIQUETA_A_DB = { Profesor: "profesor", Coordinador: "coordinador" };
+
+function formatearCaracteristica(identificador) {
+  return identificador.replace(/_/g, " ");
+}
 
 // ── Helpers ──────────────────────────────────────────────────
 function iniciales(nombre, apellidos) {
@@ -23,10 +37,16 @@ function iniciales(nombre, apellidos) {
 function nombreCompleto(usuario) {
   return `${usuario.nombre} ${usuario.apellidos}`.trim();
 }
-function calcularCupos(caracteristicas = []) {
+
+// Preview de cupos mientras se llena el formulario (antes de guardar).
+// `catalogo` es el array crudo que regresa GET /caracteristicas.
+function calcularCuposPreview(seleccionadas = [], catalogo = []) {
   return (
     CUPOS_BASE +
-    caracteristicas.reduce((sum, c) => sum + (CARACTERISTICAS[c] ?? 0), 0)
+    seleccionadas.reduce((sum, nombre) => {
+      const c = catalogo.find((x) => x.nombre === nombre);
+      return sum + (c ? c.incremento_cupos : 0);
+    }, 0)
   );
 }
 
@@ -177,7 +197,6 @@ function UsuarioItem({ usuario, activo, onClick, C }) {
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}
     >
-      {/* Avatar */}
       <div style={{
         width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
         background: activo ? GRADIENTS.primary : C.bgInput,
@@ -221,9 +240,9 @@ function PanelDetalle({ usuario, onEditar, C }) {
       { icon: ICONS.phone,   label: "Teléfono",             value: usuario.telefono_personal },
       { icon: ICONS.clock,   label: "Horario de atención",  value: usuario.horario_atencion },
       { icon: ICONS.door,    label: "Cubículo",             value: usuario.cubiculo },
-      { icon: ICONS.users, label: "Cupos totales", value: calcularCupos(usuario.caracteristicas) },
+      { icon: ICONS.users,   label: "Cupos totales",        value: usuario.cupos_totales },
     ] : []),
-    { icon: ICONS.user,      label: "Usuario ID",           value: usuario.usuario_id },
+    
   ];
 
   return (
@@ -231,7 +250,6 @@ function PanelDetalle({ usuario, onEditar, C }) {
       background: C.bgCard, borderRadius: RADIUS.lg,
       border: `1px solid ${C.borderDefault}`, padding: "1.25rem",
     }}>
-      {/* Encabezado */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: "1rem" }}>
         <div style={{
           width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
@@ -254,7 +272,9 @@ function PanelDetalle({ usuario, onEditar, C }) {
           </p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <RolBadge value={usuario.rol} />
-            {esProfesor && (usuario.caracteristicas ?? []).map((c) => (  <CaracteristicaBadge key={c} value={c} />))}
+            {esProfesor && (usuario.caracteristicas ?? []).map((c) => (
+              <CaracteristicaBadge key={c} value={formatearCaracteristica(c)} />
+            ))}
           </div>
         </div>
 
@@ -274,7 +294,6 @@ function PanelDetalle({ usuario, onEditar, C }) {
         </button>
       </div>
 
-      {/* Grid de datos */}
       <div style={{
         display: "grid", gridTemplateColumns: "1fr 1fr",
         gap: "0.75rem 1.5rem",
@@ -340,7 +359,6 @@ function PantallaConfirmacion({ correo, falloCorreo, onReenviar, onCerrar, C }) 
         </h3>
 
         {falloCorreo ? (
-          /* Excepción E1 */
           <p style={{
             margin: 0, fontSize: 13, color: C.textMuted,
             fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 380,
@@ -349,7 +367,6 @@ function PantallaConfirmacion({ correo, falloCorreo, onReenviar, onCerrar, C }) 
             <strong>{correo}</strong>.
           </p>
         ) : (
-          /* Flujo principal paso 6 */
           <p style={{
             margin: 0, fontSize: 13, color: C.textMuted,
             fontFamily: "'DM Sans', system-ui, sans-serif", maxWidth: 380,
@@ -360,7 +377,6 @@ function PantallaConfirmacion({ correo, falloCorreo, onReenviar, onCerrar, C }) 
       </div>
 
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-        {/* Botón "Reenviar correo" habilitado solo en excepción E1 (RF-CRED-04) */}
         {falloCorreo && (
           <button
             onClick={onReenviar}
@@ -396,10 +412,12 @@ function PantallaConfirmacion({ correo, falloCorreo, onReenviar, onCerrar, C }) 
 
 // ── Formulario de alta / edición ─────────────────────────────
 // Alta (nuevo): nombre, apellidos, correo_institucional, rol, departamento (si Profesor)
-// Edición: todos los campos existentes del profesor
+// Edición: NOTA — todavía no hay endpoint de edición en el backend (fuera del
+// alcance de CU-CRED-03). Por ahora la edición solo actualiza el estado local
+// y NO persiste — ver aviso en el toast al guardar.
 function FormularioUsuario({
   usuarioInicial,
-  correosRegistrados,
+  catalogoCaracteristicas,
   onGuardar,
   onCancelar,
   C,
@@ -412,15 +430,14 @@ function FormularioUsuario({
     correo_institucional: usuarioInicial?.correo_institucional ?? "",
     rol:                  usuarioInicial?.rol                  ?? "",
     departamento:         usuarioInicial?.departamento         ?? "",
-    // Campos extra solo visibles en edición
     telefono_personal:    usuarioInicial?.telefono_personal    ?? "",
     horario_atencion:     usuarioInicial?.horario_atencion     ?? "",
     cubiculo:             usuarioInicial?.cubiculo             ?? "",
-    caracteristicas:  usuarioInicial?.caracteristicas  ?? [],
+    caracteristicas:      usuarioInicial?.caracteristicas      ?? [],
   });
 
-  // Errores por campo (flujo alterno 2.1)
   const [errores, setErrores] = useState({});
+  const [enviando, setEnviando] = useState(false);
 
   function set(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -432,54 +449,67 @@ function FormularioUsuario({
   function validar() {
     const e = {};
 
-    // ── Campos obligatorios comunes ──
+    const NOMBRE_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿÑñ' -]{2,50}$/;
+    const TELEFONO_REGEX = /^\d{10}$/;
+    const CORREO_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
     if (!form.nombre.trim())
       e.nombre = "El nombre es obligatorio.";
+    else if (!NOMBRE_REGEX.test(form.nombre.trim()))
+      e.nombre = "Solo letras y espacios.";
+
     if (!form.apellidos.trim())
       e.apellidos = "Los apellidos son obligatorios.";
+    else if (!NOMBRE_REGEX.test(form.apellidos.trim()))
+      e.apellidos = "Solo letras y espacios.";
+
     if (!form.correo_institucional.trim())
       e.correo_institucional = "El correo institucional es obligatorio.";
+    else if (!CORREO_REGEX.test(form.correo_institucional.trim()))
+    e.correo_institucional = "El correo no tiene un formato válido.";
+
     if (!form.rol)
       e.rol = "Debes seleccionar un rol.";
 
-    // ── Formato de correo institucional ──
-    if (form.correo_institucional.trim() &&
-        !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.correo_institucional.trim())) {
-      e.correo_institucional = "El correo no tiene un formato válido.";
-    }
-
-    // ── Correo duplicado (RN-CRED-01, flujo alterno 3.1) ──
-    if (
-      !e.correo_institucional &&
-      !esEditar &&
-      correosRegistrados.has(form.correo_institucional.trim().toLowerCase())
-    ) {
-      e.correo_institucional = "El correo institucional ya está registrado en el sistema.";
-    }
-
-    // ── Departamento obligatorio solo para Profesor ──
     if (form.rol === "Profesor" && !form.departamento) {
       e.departamento = "El departamento es obligatorio para profesores.";
+    }
+
+    if (form.telefono_personal && !TELEFONO_REGEX.test(form.telefono_personal)) {
+      e.telefono_personal = "Debe tener exactamente 10 dígitos.";
     }
 
     return e;
   }
 
-  function handleGuardar() {
+  async function handleGuardar() {
     const e = validar();
     if (Object.keys(e).length > 0) {
       setErrores(e);
       return;
     }
-    onGuardar({ ...form, cupos_totales: parseInt(form.cupos_totales) || 0 });
+
+    setEnviando(true);
+    try {
+      await onGuardar(form);
+    } catch (err) {
+      if (err.message && err.message.toLowerCase().includes("correo")) {
+        setErrores((prev) => ({ ...prev, correo_institucional: err.message }));
+      } else {
+        setErrores((prev) => ({ ...prev, _general: err.message }));
+      }
+    } finally {
+      setEnviando(false);
+    }
   }
+
+  const cuposPreview = calcularCuposPreview(form.caracteristicas, catalogoCaracteristicas);
 
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
       border: `1px solid ${C.borderDefault}`, padding: "1.25rem",
     }}>
-      {/* Encabezado formulario */}
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         marginBottom: "1.25rem", paddingBottom: "1rem",
@@ -510,10 +540,19 @@ function FormularioUsuario({
         </div>
       </div>
 
-      {/* ── Campos del formulario ── */}
+      {errores._general && (
+        <div style={{
+          padding: "10px 14px", borderRadius: RADIUS.md,
+          background: "rgba(226,75,74,0.10)", border: "1px solid #E24B4A",
+          color: "#A32D2D", fontSize: 12, marginBottom: "1rem",
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+        }}>
+          {errores._general}
+        </div>
+      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 20px" }}>
 
-        {/* Nombre */}
         <Campo label="Nombre(s)" required error={errores.nombre}>
           <input
             value={form.nombre}
@@ -523,7 +562,6 @@ function FormularioUsuario({
           />
         </Campo>
 
-        {/* Apellidos */}
         <Campo label="Apellidos" required error={errores.apellidos}>
           <input
             value={form.apellidos}
@@ -533,7 +571,6 @@ function FormularioUsuario({
           />
         </Campo>
 
-        {/* Correo institucional */}
         <div style={{ gridColumn: "span 2" }}>
           <Campo label="Correo institucional" required error={errores.correo_institucional}>
             <input
@@ -546,7 +583,6 @@ function FormularioUsuario({
           </Campo>
         </div>
 
-        {/* Rol (Profesor / Coordinador — RF-CRED-05: nunca Alumno) */}
         <Campo label="Rol" required error={errores.rol}>
           <select
             value={form.rol}
@@ -560,7 +596,6 @@ function FormularioUsuario({
           </select>
         </Campo>
 
-        {/* Departamento — solo si rol = Profesor */}
         {esProfesor && (
           <Campo label="Departamento" required error={errores.departamento}>
             <select
@@ -573,14 +608,9 @@ function FormularioUsuario({
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
-
           </Campo>
-
         )}
 
-        
-
-        {/* ── Campos extendidos solo visibles en edición ── */}
         {esProfesor && (
           <>
             <Campo label="Teléfono personal">
@@ -589,6 +619,7 @@ function FormularioUsuario({
                 onChange={(e) => set("telefono_personal", e.target.value)}
                 placeholder="10 dígitos"
                 maxLength={10}
+                disabled={esEditar}
                 style={inputStyle(C, false)}
               />
             </Campo>
@@ -608,139 +639,133 @@ function FormularioUsuario({
                   value={form.horario_atencion}
                   onChange={(e) => set("horario_atencion", e.target.value)}
                   placeholder="Ej. Lunes a viernes 10:00–12:00"
+                  disabled={esEditar}
                   style={inputStyle(C, false)}
                 />
               </Campo>
             </div>
 
-            
+            <div style={{ gridColumn: "span 2" }}>
+              <Campo label="Característica">
+                <div style={{
+                  border: `1px solid ${C.borderDefault}`,
+                  borderRadius: RADIUS.md,
+                  overflow: "hidden",
+                }}>
+                  <div style={{
+                    padding: "8px 12px",
+                    background: "rgba(10,77,181,0.07)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    borderBottom: `1px solid ${C.borderSubtle}`,
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        width: 16, height: 16, borderRadius: 4,
+                        background: "#0A4DB5",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <Icon d={ICONS.check} size={10} stroke="#fff" strokeWidth={3} />
+                      </span>
+                      <span style={{ fontSize: 13, color: C.textPrimary, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+                        Profesor de base
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "#0A4DB5", fontWeight: 700 }}>
+                      +{CUPOS_BASE} cupos base
+                    </span>
+                  </div>
 
-            <Campo label="Característica">
-              {/* Multiselección de características */}
-<div style={{ gridColumn: "span 2" }}>
-  <Campo >
-    <div style={{
-      border: `1px solid ${C.borderDefault}`,
-      borderRadius: RADIUS.md,
-      overflow: "hidden",
-    }}>
-      {/* Fila fija: Profesor de base (siempre activa) */}
-      <div style={{
-        padding: "8px 12px",
-        background: "rgba(10,77,181,0.07)",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        borderBottom: `1px solid ${C.borderSubtle}`,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{
-            width: 16, height: 16, borderRadius: 4,
-            background: "#0A4DB5",
-            display: "inline-flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Icon d={ICONS.check} size={10} stroke="#fff" strokeWidth={3} />
-          </span>
-          <span style={{ fontSize: 13, color: C.textPrimary, fontFamily: "'DM Sans', system-ui, sans-serif" }}>
-            Profesor de base
-          </span>
-        </div>
-        <span style={{ fontSize: 12, color: "#0A4DB5", fontWeight: 700 }}>
-          +{CUPOS_BASE} cupos base
-        </span>
-      </div>
-
-      {/* Filas seleccionables */}
-      {Object.entries(CARACTERISTICAS).map(([nombre, cupos]) => {
-        const activa = form.caracteristicas.includes(nombre);
-        return (
-          <div
-            key={nombre}
-            onClick={() => {
-              const nuevas = activa
-                ? form.caracteristicas.filter((c) => c !== nombre)
-                : [...form.caracteristicas, nombre];
-              set("caracteristicas", nuevas);
-            }}
-            style={{
-              padding: "8px 12px", cursor: "pointer",
-              background: activa ? "rgba(10,77,181,0.05)" : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              borderBottom: `1px solid ${C.borderSubtle}`,
-              transition: "background 0.12s",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{
-                width: 16, height: 16, borderRadius: 4, flexShrink: 0,
-                border: `2px solid ${activa ? "#0A4DB5" : C.borderDefault}`,
-                background: activa ? "#0A4DB5" : "transparent",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.12s",
-              }}>
-                {activa && <Icon d={ICONS.check} size={10} stroke="#fff" strokeWidth={3} />}
-              </span>
-              <span style={{
-                fontSize: 13,
-                color: activa ? C.textPrimary : C.textMuted,
-                fontFamily: "'DM Sans', system-ui, sans-serif",
-              }}>
-                {nombre}
-              </span>
+                  {catalogoCaracteristicas.map(({ nombre, incremento_cupos }) => {
+                    const activa = form.caracteristicas.includes(nombre);
+                    const label = formatearCaracteristica(nombre);
+                    return (
+                      <div
+                        key={nombre}
+                        onClick={() => {
+                          const nuevas = activa
+                            ? form.caracteristicas.filter((c) => c !== nombre)
+                            : [...form.caracteristicas, nombre];
+                          set("caracteristicas", nuevas);
+                        }}
+                        style={{
+                          padding: "8px 12px", cursor: "pointer",
+                          background: activa ? "rgba(10,77,181,0.05)" : "transparent",
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          borderBottom: `1px solid ${C.borderSubtle}`,
+                          transition: "background 0.12s",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{
+                            width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                            border: `2px solid ${activa ? "#0A4DB5" : C.borderDefault}`,
+                            background: activa ? "#0A4DB5" : "transparent",
+                            display: "inline-flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.12s",
+                          }}>
+                            {activa && <Icon d={ICONS.check} size={10} stroke="#fff" strokeWidth={3} />}
+                          </span>
+                          <span style={{
+                            fontSize: 13,
+                            color: activa ? C.textPrimary : C.textMuted,
+                            fontFamily: "'DM Sans', system-ui, sans-serif",
+                          }}>
+                            {label}
+                          </span>
+                        </div>
+                        <span style={{
+                          fontSize: 12, fontWeight: 600,
+                          color: incremento_cupos > 0 ? "#16A34A" : C.textDisabled,
+                        }}>
+                          {incremento_cupos > 0 ? `+${incremento_cupos} cupos` : "Sin cupos extra"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Campo>
             </div>
-            <span style={{
-              fontSize: 12, fontWeight: 600,
-              color: cupos > 0 ? "#16A34A" : C.textDisabled,
-            }}>
-              {cupos > 0 ? `+${cupos} cupos` : "Sin cupos extra"}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  </Campo>
-</div>
 
-{/* Cupos calculados — solo lectura */}
-<div style={{ gridColumn: "span 2" }}>
-  <p style={{
-    margin: 0, fontSize: 10, fontWeight: 700, color: "#888",
-    textTransform: "uppercase", letterSpacing: "0.06em",
-    fontFamily: "'DM Sans', system-ui, sans-serif", marginBottom: 4,
-  }}>
-    Cupos totales (calculado)
-  </p>
-  <div style={{
-    padding: "8px 12px", borderRadius: RADIUS.md,
-    background: "rgba(34,197,94,0.08)",
-    border: `1px solid rgba(34,197,94,0.25)`,
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-  }}>
-    <span style={{
-      fontSize: 13, color: C.textMuted,
-      fontFamily: "'DM Sans', system-ui, sans-serif",
-    }}>
-      Base ({CUPOS_BASE}) + características seleccionadas
-    </span>
-    <span style={{ fontSize: 20, fontWeight: 800, color: "#16A34A" }}>
-      {calcularCupos(form.caracteristicas)}
-    </span>
-  </div>
-</div>
-            </Campo>
+            <div style={{ gridColumn: "span 2" }}>
+              <p style={{
+                margin: 0, fontSize: 10, fontWeight: 700, color: "#888",
+                textTransform: "uppercase", letterSpacing: "0.06em",
+                fontFamily: "'DM Sans', system-ui, sans-serif", marginBottom: 4,
+              }}>
+                Cupos totales (calculado)
+              </p>
+              <div style={{
+                padding: "8px 12px", borderRadius: RADIUS.md,
+                background: "rgba(34,197,94,0.08)",
+                border: `1px solid rgba(34,197,94,0.25)`,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{
+                  fontSize: 13, color: C.textMuted,
+                  fontFamily: "'DM Sans', system-ui, sans-serif",
+                }}>
+                  Base ({CUPOS_BASE}) + características seleccionadas
+                </span>
+                <span style={{ fontSize: 20, fontWeight: 800, color: "#16A34A" }}>
+                  {cuposPreview}
+                </span>
+              </div>
+            </div>
           </>
         )}
       </div>
 
-      {/* Acciones */}
       <div style={{
         display: "flex", gap: 10, marginTop: "1.25rem",
         paddingTop: "1rem", borderTop: `1px solid ${C.borderSubtle}`,
       }}>
         <button
           onClick={onCancelar}
+          disabled={enviando}
           style={{
             padding: "8px 18px", borderRadius: RADIUS.md,
             border: `1px solid ${C.borderDefault}`,
-            background: "transparent", cursor: "pointer",
+            background: "transparent", cursor: enviando ? "wait" : "pointer",
             fontSize: 13, fontWeight: 600, color: C.textSecondary,
             fontFamily: "'DM Sans', system-ui, sans-serif",
           }}
@@ -750,17 +775,19 @@ function FormularioUsuario({
 
         <button
           onClick={handleGuardar}
+          disabled={enviando}
           style={{
             marginLeft: "auto",
             padding: "8px 20px", borderRadius: RADIUS.md,
             border: "none", background: GRADIENTS.primary,
-            cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#fff",
+            cursor: enviando ? "wait" : "pointer", fontSize: 13, fontWeight: 600, color: "#fff",
             fontFamily: "'DM Sans', system-ui, sans-serif",
             display: "flex", alignItems: "center", gap: 6,
+            opacity: enviando ? 0.7 : 1,
           }}
         >
           <Icon d={ICONS.save} size={14} stroke="#fff" />
-          {esEditar ? "Guardar cambios" : "Crear usuario"}
+          {enviando ? "Guardando…" : esEditar ? "Guardar cambios" : "Crear usuario"}
         </button>
       </div>
     </div>
@@ -770,40 +797,54 @@ function FormularioUsuario({
 // ── Vista principal ──────────────────────────────────────────
 export default function RegistroProfesores() {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
 
-  // Estado de usuarios registrados en el sistema
-  const [usuarios, setUsuarios] = useState(PROFESORES);
-
-  // Set de correos para validación de duplicados (RN-CRED-01)
-  const [correosRegistrados, setCorreosRegistrados] = useState(
-    new Set(CORREOS_REGISTRADOS)
-  );
+  const [usuarios, setUsuarios] = useState([]);
+  const [catalogoCaracteristicas, setCatalogoCaracteristicas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [errorCarga, setErrorCarga] = useState("");
 
   const [seleccionado, setSeleccionado] = useState(null);
   const [modoFormulario, setModoFormulario] = useState(false); // "nuevo" | "editar" | false
-
-  // Pantalla de confirmación (paso 6 del flujo principal y excepción E1)
-  const [confirmacion, setConfirmacion] = useState(null); // { correo, falloCorreo }
+  const [confirmacion, setConfirmacion] = useState(null); // { usuarioId, correo, falloCorreo }
 
   const [busqueda, setBusqueda] = useState("");
   const [toastMsg, setToastMsg] = useState(null);
-  const nextId = useRef(PROFESORES.length + 1);
 
-  // ── Búsqueda ─────────────────────────────────────────────
+  useEffect(() => {
+    async function cargar() {
+      setCargando(true);
+      setErrorCarga("");
+      try {
+        const [usuariosData, caracteristicasData] = await Promise.all([
+          listarUsuarios(),
+          listarCaracteristicas(),
+        ]);
+        setUsuarios(
+          usuariosData.map((u) => ({ ...u, rol: ROL_DB_A_ETIQUETA[u.rol] ?? u.rol }))
+        );
+        setCatalogoCaracteristicas(caracteristicasData);
+      } catch (err) {
+        setErrorCarga(err.message || "No se pudieron cargar los usuarios.");
+      } finally {
+        setCargando(false);
+      }
+    }
+    cargar();
+  }, []);
+
   const usuariosFiltrados = useMemo(() =>
     usuarios.filter((u) =>
       nombreCompleto(u).toLowerCase().includes(busqueda.toLowerCase()) ||
       u.correo_institucional.toLowerCase().includes(busqueda.toLowerCase())
     ), [usuarios, busqueda]);
 
-  // ── Métricas ─────────────────────────────────────────────
   const stats = useMemo(() => ({
     total:        usuarios.length,
     profesores:   usuarios.filter((u) => u.rol === "Profesor").length,
     coordinadores: usuarios.filter((u) => u.rol === "Coordinador").length,
   }), [usuarios]);
 
-  // ── Helpers ──────────────────────────────────────────────
   function mostrarToast(msg) {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 3000);
@@ -830,67 +871,106 @@ export default function RegistroProfesores() {
     setModoFormulario(false);
   }
 
-  function handleGuardar(formData) {
+  async function handleGuardar(formData) {
     if (modoFormulario === "editar" && seleccionado) {
-      // Edición: actualiza registro existente
-      const actualizado = { ...seleccionado, ...formData };
-      setUsuarios((prev) =>
-        prev.map((u) => (u.id === seleccionado.id ? actualizado : u))
-      );
-      setSeleccionado(actualizado);
+      const payload = {
+        nombre: formData.nombre,
+        apellidos: formData.apellidos,
+        correo_institucional: formData.correo_institucional,
+        ...(formData.rol === "Profesor"
+          ? {
+              departamento: formData.departamento,
+              telefono_personal: formData.telefono_personal,
+              horario_atencion: formData.horario_atencion,
+              cubiculo: formData.cubiculo,
+              caracteristicas: formData.caracteristicas,
+            }
+          : {}),
+      };
+
+      await actualizarUsuario(seleccionado.id, payload); // si truena, lo atrapa el formulario
+
+      const usuariosActualizados = await listarUsuarios();
+      const mapeados = usuariosActualizados.map((u) => ({
+        ...u,
+        rol: ROL_DB_A_ETIQUETA[u.rol] ?? u.rol,
+      }));
+      setUsuarios(mapeados);
+      setSeleccionado(mapeados.find((u) => u.id === seleccionado.id) ?? null);
       mostrarToast("Usuario actualizado correctamente");
       setModoFormulario(false);
-    } else {
-      // Alta: crea nuevo usuario (CU-CRED-03)
-      const nuevoId = nextId.current++;
-      const nuevo = {
-  id: nuevoId,
-  usuario_id: 100 + nuevoId,
-  fecha_creacion: new Date().toISOString(),
-  creado_por_id: 1,
-  ...formData,
-  cupos_totales: calcularCupos(formData.caracteristicas),
-};
-      setUsuarios((prev) => [...prev, nuevo]);
-
-      // Registrar correo para futuras validaciones (RN-CRED-01)
-      setCorreosRegistrados((prev) =>
-        new Set([...prev, formData.correo_institucional.trim().toLowerCase()])
-      );
-
-      // Simular envío de correo (pasos 5 y 6 del flujo principal)
-      // En producción, esto sería una llamada al servicio de correo.
-      // Se simula 20% de fallo para demostrar la excepción E1.
-      const falloSimulado = Math.random() < 0.2;
-
-      setSeleccionado(nuevo);
-      setModoFormulario(false);
-      setConfirmacion({
-        correo: formData.correo_institucional,
-        falloCorreo: falloSimulado,
-      });
+      return;
     }
+
+    const payload = {
+      nombre: formData.nombre,
+      apellidos: formData.apellidos,
+      correo_institucional: formData.correo_institucional,
+      rol: ROL_ETIQUETA_A_DB[formData.rol],
+      ...(formData.rol === "Profesor"
+        ? {
+            departamento: formData.departamento,
+            telefono_personal: formData.telefono_personal,
+            horario_atencion: formData.horario_atencion,
+            cubiculo: formData.cubiculo,
+            caracteristicas: formData.caracteristicas,
+          }
+        : {}),
+    };
+
+    const resultado = await crearUsuario(payload);
+
+    // La respuesta de creación solo trae los campos básicos (id, nombre,
+    // apellidos, correo, rol) — no departamento/cupos/características.
+    // Se refresca la lista completa para que el panel de detalle muestre
+    // todo sin necesitar un reload manual de la página.
+    const usuariosActualizados = await listarUsuarios();
+    const mapeados = usuariosActualizados.map((u) => ({
+      ...u,
+      rol: ROL_DB_A_ETIQUETA[u.rol] ?? u.rol,
+    }));
+    setUsuarios(mapeados);
+    setSeleccionado(mapeados.find((u) => u.id === resultado.usuario.id) ?? null);
+    setModoFormulario(false);
+    setConfirmacion({
+      usuarioId: resultado.usuario.id,
+      correo: resultado.usuario.correo_institucional,
+      falloCorreo: !resultado.correoEnviado,
+    });
   }
 
-  function handleReenviarCorreo() {
-    // Simula el reenvío manual (excepción E1, RF-CRED-04)
-    mostrarToast(`Correo reenviado a ${confirmacion.correo}`);
-    setConfirmacion((prev) => ({ ...prev, falloCorreo: false }));
+  async function handleReenviarCorreo() {
+    try {
+      await reenviarCorreoBienvenida(confirmacion.usuarioId);
+      mostrarToast(`Correo reenviado a ${confirmacion.correo}`);
+      setConfirmacion((prev) => ({ ...prev, falloCorreo: false }));
+    } catch (err) {
+      mostrarToast(err.message || "No se pudo reenviar el correo.");
+    }
   }
 
   function handleCerrarConfirmacion() {
     setConfirmacion(null);
   }
 
-  // ── Render ───────────────────────────────────────────────
   return (
     <DashboardLayout
       titulo="Gestión de Usuarios"
-      subtitulo="CU-CRED-03 · Crear usuario · Solo Coordinadores"
-      rol="coordinacion"
-      usuario="Coord. María Esquivel"
+      subtitulo="CU-CRED-03 · FINALIZADO"
+      rol={sesion?.rol || "coordinador"}
+      usuario={nombreCompletoSesion(sesion)}
     >
-      {/* Métricas resumen */}
+      {errorCarga && (
+        <div style={{
+          padding: "10px 14px", borderRadius: RADIUS.md,
+          background: "rgba(226,75,74,0.10)", border: "1px solid #E24B4A",
+          color: "#A32D2D", fontSize: 13, marginBottom: "1rem",
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+        }}>
+          {errorCarga}
+        </div>
+      )}
+
       <div style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem" }}>
         {[
           {
@@ -933,17 +1013,14 @@ export default function RegistroProfesores() {
         ))}
       </div>
 
-      {/* Layout 2 columnas */}
       <div style={{ display: "flex", gap: "1rem", height: "calc(100vh - 220px)", minHeight: 0 }}>
 
-        {/* ── Columna izquierda: lista ── */}
         <div style={{
           width: 310, flexShrink: 0,
           background: C.bgCard, borderRadius: RADIUS.lg,
           border: `1px solid ${C.borderDefault}`,
           display: "flex", flexDirection: "column", overflow: "hidden",
         }}>
-          {/* Buscador */}
           <div style={{ padding: "12px", borderBottom: `1px solid ${C.borderSubtle}` }}>
             <div style={{
               display: "flex", alignItems: "center", gap: 8,
@@ -964,9 +1041,12 @@ export default function RegistroProfesores() {
             </div>
           </div>
 
-          {/* Lista scrolleable */}
           <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-            {usuariosFiltrados.length === 0 ? (
+            {cargando ? (
+              <div style={{ padding: "2rem 1rem", textAlign: "center" }}>
+                <p style={{ fontSize: 13, color: C.textDisabled, margin: 0 }}>Cargando…</p>
+              </div>
+            ) : usuariosFiltrados.length === 0 ? (
               <div style={{ padding: "2rem 1rem", textAlign: "center" }}>
                 <p style={{ fontSize: 13, color: C.textDisabled, margin: 0 }}>Sin resultados</p>
               </div>
@@ -978,13 +1058,11 @@ export default function RegistroProfesores() {
                   activo={seleccionado?.id === usuario.id && !modoFormulario && !confirmacion}
                   onClick={() => handleSeleccionar(usuario)}
                   C={C}
-                  
                 />
               ))
             )}
           </div>
 
-          {/* Botón crear usuario */}
           <div style={{ padding: "10px", borderTop: `1px solid ${C.borderSubtle}` }}>
             <button
               onClick={handleNuevo}
@@ -1004,10 +1082,8 @@ export default function RegistroProfesores() {
           </div>
         </div>
 
-        {/* ── Columna derecha: detalle / formulario / confirmación ── */}
         <div style={{ flex: 1, overflowY: "auto", minWidth: 0 }}>
           {confirmacion ? (
-            /* Pantalla de confirmación (paso 6 y excepción E1) */
             <PantallaConfirmacion
               correo={confirmacion.correo}
               falloCorreo={confirmacion.falloCorreo}
@@ -1017,8 +1093,9 @@ export default function RegistroProfesores() {
             />
           ) : modoFormulario ? (
             <FormularioUsuario
+              key={modoFormulario === "editar" ? `editar-${seleccionado?.id}` : "nuevo"}
               usuarioInicial={modoFormulario === "editar" ? seleccionado : null}
-              correosRegistrados={correosRegistrados}
+              catalogoCaracteristicas={catalogoCaracteristicas}
               onGuardar={handleGuardar}
               onCancelar={handleCancelar}
               C={C}
@@ -1062,7 +1139,6 @@ export default function RegistroProfesores() {
         </div>
       </div>
 
-      {/* Toast de confirmación */}
       {toastMsg && (
         <div style={{
           position: "fixed", bottom: 24, right: 24,

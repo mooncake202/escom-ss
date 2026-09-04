@@ -1,17 +1,23 @@
-export async function postLogin(data) {
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  const res = await fetch("http://localhost:3000/login", {
+export async function postLogin(data) {
+  const res = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(data)
+    body: JSON.stringify(data),
   });
 
-  const json = await res.json();
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error("El servidor no respondió correctamente. Intenta de nuevo.");
+  }
 
   if (!res.ok) {
-    throw new Error(json.mensaje);
+    throw new Error(json.message || "Ocurrió un error al iniciar sesión.");
   }
 
   return json;

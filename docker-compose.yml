@@ -29,6 +29,13 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: "mysql://escomuser:[SECRETO_ELIMINADO]@mariadb:3306/escom_ss"
+      JWT_SECRET: "[SECRETO_ELIMINADO]"
+      SMTP_HOST: "smtp.gmail.com"
+      SMTP_PORT: "587"
+      SMTP_USER: "karenlagarza02@gmail.com"
+      SMTP_PASS: "[SECRETO_ELIMINADO]"
+      SMTP_FROM: "Servicio Social IPN <karenlagarza02@gmail.com>"
+      CORREO_DOMINIOS_EXTRA: "gmail.com"
     depends_on:
       mariadb:
         condition: service_healthy

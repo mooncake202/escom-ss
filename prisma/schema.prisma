@@ -18,10 +18,12 @@ enum RolUsuario {
 }
 
 enum NombreCaracteristica {
-  Presidente_de_academia @map("Presidente de academia")
+  Presidente_de_academia         @map("Presidente de academia")
   Coordinador
-  Jefe_de_departamento   @map("Jefe de departamento")
+  Jefe_de_departamento           @map("Jefe de departamento")
   Investigador
+  Funcionario
+  Profesor_coordinador_de_clubes @map("Profesor coordinador de clubes")
 }
 
 enum TipoEventoCalendario {
@@ -77,7 +79,7 @@ model carrera {
 
 model caracteristica {
   id               Int                  @id @default(autoincrement())
-  nombre           NombreCaracteristica
+  nombre           NombreCaracteristica @unique
   incremento_cupos Int                  @db.UnsignedTinyInt
 
   solicitud_caracteristica solicitud_caracteristica[]
@@ -208,6 +210,8 @@ model solicitud_caracteristica {
 
   profesor       profesor       @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
   caracteristica caracteristica @relation(fields: [caracteristica_id], references: [id], onDelete: Cascade)
+
+  @@unique([profesor_id, caracteristica_id])
 }
 
 model evento_calendario {

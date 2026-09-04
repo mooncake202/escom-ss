@@ -4,12 +4,14 @@ const ROL_LABEL = {
   alumno:       "Alumno",
   profesor:     "Profesor",
   coordinacion: "Coordinación",
+  coordinador:  "Coordinación", // alias: el backend usa "coordinador"
 };
 
 const ROL_COLOR = {
   alumno:       { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
   profesor:     { bg: "rgba(34,197,94,0.12)",  color: "#22C55E" },
   coordinacion: { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
+  coordinador:  { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" }, // alias
 };
 
 export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario" }) {
@@ -53,7 +55,7 @@ export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario
         fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
         flexShrink: 0,
       }}>
-        {ROL_LABEL[rol]}
+        {ROL_LABEL[rol] ?? rol}
       </div>
 
       {/* Avatar usuario */}

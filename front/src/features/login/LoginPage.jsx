@@ -80,13 +80,16 @@ export default function LoginPage() {
       const res = await postLogin(form);
       const { rol, estatus, tipoRechazo, estatusAnterior, registroSISSConfirmado, cartaCompromisoConfirmada, numDocumentos } = res.usuario;
 
+      // Antes solo se guardaba "usuario" — el token nunca se persistía,
+      // así que ninguna petición futura podía autenticarse.
+      localStorage.setItem("token", res.token);
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
       
       if (rol === "profesor") {
         navigate("/profesor/solicitudes");
       } 
       
-      else if (rol === "coordinacion") {
+      else if (rol === "coordinador") {
       navigate("/coordinacion/dashboard");
       } 
       

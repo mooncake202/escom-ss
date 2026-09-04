@@ -29,44 +29,54 @@ const ICONS = {
   alumnos:      "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
 };
 
-// Menú por rol
+const NAV_ITEMS_ALUMNO = [
+  { key: "dashboard",   label: "Inicio",        path: "/dashboard",                     icon: "dashboard" },
+  { key: "solicitudes", label: "Mi solicitud",  path: "/registro",                      icon: "solicitudes" },
+  { key: "actividades", label: "Actividades",   path: "/alumno/actividades",            icon: "actividades" },
+  { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
+  { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
+  { key: "contacto",    label: "Mi profesor",   path: "/alumno/contacto-profesor",      icon: "contacto" },
+  { key: "bajaSS",      label: "Baja SS",       path: "/alumno/solicitar-baja",         icon: "userMinus" },
+  { key: "institucion", label: "Coordinación",  path: "/alumno/contacto-institucional", icon: "institucion" },
+  { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
+];
+
+const NAV_ITEMS_PROFESOR = [
+  { key: "dashboard",     label: "Inicio",             path: "/dashboard",                       icon: "dashboard" },
+  { key: "solicitudes",   label: "Solicitudes",        path: "/profesor/solicitudes",            icon: "solicitudes" },
+  { key: "actividades",   label: "Actividades",        path: "/profesor/actividades",            icon: "actividades" },
+  { key: "mis-alumnos",   label: "Mis alumnos",        path: "/profesor/mis-alumnos",            icon: "alumnos" },
+  { key: "ofertas",       label: "Mis ofertas",        path: "/profesor/proyectos",              icon: "oferta" },
+  { key: "reportes",      label: "Reportes",           path: "/profesor/reportes",               icon: "reportes" },
+  { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
+  { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
+  { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
+  { key: "institucion",   label: "Coordinación",       path: "/profesor/contacto-institucional", icon: "institucion" },
+  { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
+];
+
+const NAV_ITEMS_COORDINACION = [
+  { key: "dashboard",       label: "Inicio",               path: "/dashboard",                              icon: "dashboard" },
+  { key: "reportes",        label: "Reportes",             path: "/coordinacion/reportes",                  icon: "reportes" },
+  { key: "ofertas",         label: "Ofertas SS",           path: "/coordinacion/ofertas",                   icon: "oferta" },
+  { key: "calendario",      label: "Calendario",           path: "/coordinacion/calendario",                icon: "calendario" },
+  { key: "bajas",           label: "Gestionar bajas",      path: "/coordinacion/gestionar-bajas",           icon: "baja" },
+  { key: "caracteristicas", label: "Características",      path: "/coordinacion/solicitudes-caracteristicas", icon: "actividades" },
+  { key: "usuarios",        label: "Usuarios asignados",   path: "/coordinacion/usuarios-asignados",        icon: "alumnos" },
+  { key: "recursos",        label: "Recursos",             path: "/coordinacion/admin/recursos",            icon: "recursos" },
+  { key: "anuncios",        label: "Anuncios",             path: "/coordinacion/admin/anuncios",            icon: "anuncios" },
+  { key: "institucion",     label: "Contacto inst.",       path: "/coordinacion/contacto-institucional",    icon: "institucion" },
+];
+
+// Menú por rol. "coordinador" es alias de "coordinacion" (mismo array) porque
+// el backend usa el enum "coordinador" pero esta pantalla ya existía usando
+// "coordinacion" — se mantienen ambas claves para no romper otras pantallas
+// que aún pasen rol="coordinacion".
 const NAV_ITEMS = {
-  alumno: [
-    { key: "dashboard",   label: "Inicio",        path: "/dashboard",                     icon: "dashboard" },
-    { key: "solicitudes", label: "Mi solicitud",  path: "/registro",                      icon: "solicitudes" },
-    { key: "actividades", label: "Actividades",   path: "/alumno/actividades",            icon: "actividades" },
-    { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
-    { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
-    { key: "contacto",    label: "Mi profesor",   path: "/alumno/contacto-profesor",      icon: "contacto" },
-    { key: "bajaSS",      label: "Baja SS",       path: "/alumno/solicitar-baja",         icon: "userMinus" },
-    { key: "institucion", label: "Coordinación",  path: "/alumno/contacto-institucional", icon: "institucion" },
-    { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
-  ],
-  profesor: [
-    { key: "dashboard",     label: "Inicio",             path: "/dashboard",                       icon: "dashboard" },
-    { key: "solicitudes",   label: "Solicitudes",        path: "/profesor/solicitudes",            icon: "solicitudes" },
-    { key: "actividades",   label: "Actividades",        path: "/profesor/actividades",            icon: "actividades" },
-    { key: "mis-alumnos",   label: "Mis alumnos",        path: "/profesor/mis-alumnos",            icon: "alumnos" },
-    { key: "ofertas",       label: "Mis ofertas",        path: "/profesor/proyectos",              icon: "oferta" },
-    { key: "reportes",      label: "Reportes",           path: "/profesor/reportes",               icon: "reportes" },
-    { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
-    { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
-    { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
-    { key: "institucion",   label: "Coordinación",       path: "/profesor/contacto-institucional", icon: "institucion" },
-    { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
-  ],
-  coordinacion: [
-    { key: "dashboard",       label: "Inicio",               path: "/dashboard",                              icon: "dashboard" },
-    { key: "reportes",        label: "Reportes",             path: "/coordinacion/reportes",                  icon: "reportes" },
-    { key: "ofertas",         label: "Ofertas SS",           path: "/coordinacion/ofertas",                   icon: "oferta" },
-    { key: "calendario",      label: "Calendario",           path: "/coordinacion/calendario",                icon: "calendario" },
-    { key: "bajas",           label: "Gestionar bajas",      path: "/coordinacion/gestionar-bajas",           icon: "baja" },
-    { key: "caracteristicas", label: "Características",      path: "/coordinacion/solicitudes-caracteristicas", icon: "actividades" },
-    { key: "usuarios",        label: "Usuarios asignados",   path: "/coordinacion/usuarios-asignados",        icon: "alumnos" },
-    { key: "recursos",        label: "Recursos",             path: "/coordinacion/admin/recursos",            icon: "recursos" },
-    { key: "anuncios",        label: "Anuncios",             path: "/coordinacion/admin/anuncios",            icon: "anuncios" },
-    { key: "institucion",     label: "Contacto inst.",       path: "/coordinacion/contacto-institucional",    icon: "institucion" },
-  ],
+  alumno: NAV_ITEMS_ALUMNO,
+  profesor: NAV_ITEMS_PROFESOR,
+  coordinacion: NAV_ITEMS_COORDINACION,
+  coordinador: NAV_ITEMS_COORDINACION,
 };
 
 export function Sidebar({ rol = "profesor", enProyecto = false }) {
@@ -154,7 +164,6 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
               onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.navItemHover; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
             >
-              {/* Indicador activo */}
               {active && (
                 <div style={{ position: "absolute", left: 0, width: 3, height: 24, borderRadius: "0 3px 3px 0", background: GRADIENTS.primary }} />
               )}

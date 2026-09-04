@@ -26,6 +26,14 @@ app.use("/api/periodos", periodosRoutes);
 //app.use("/api/profesor", profesorRoutes);
 
 
+//login
+app.use('/auth', require('./src/modules/auth/auth.routes'));
+
+//crear usuario
+app.use('/usuarios', require('./src/modules/usuarios/usuarios.routes'));
+app.use('/caracteristicas', require('./src/modules/caracteristicas/caracteristicas.routes'));
+app.use('/perfil', require('./src/modules/perfil/perfil.routes'));
+
 
 app.listen(3000,()=>{
 console.log("Servidor corriendo en http://localhost:3000");
