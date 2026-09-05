@@ -10,6 +10,5 @@ export const CARRERAS = [
 export const FORM_INITIAL = {
   correoInst: "", correoPersonal: "", telefono: "", nombres: "", apellidos:"", boleta: "",
   carrera: "", creditos: "", semestre: "", periodo: "", password: "", confirmarPassword: "", oferta: "",
-  motivacion:""
+  motivacion:"", tipoLiberacion: ""
 };
-

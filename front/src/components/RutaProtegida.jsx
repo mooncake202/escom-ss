@@ -1,4 +1,5 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { rutaCorrectaParaAlumnoSinAsignar } from "@/features/gestion-registro/utils/estadoRutas";
 
 /**
  * Envuelve una ruta para exigir sesión activa (y opcionalmente un rol
@@ -10,6 +11,12 @@ import { Navigate } from "react-router-dom";
  * evita que alguien vea una pantalla rota al navegar directo a una URL sin
  * sesión.
  *
+ * Regla extra para alumno_sin_asignar: a diferencia de profesor/coordinador/
+ * alumno_asignado (que sí pueden navegar libremente entre TODAS las rutas
+ * de su rol), un alumno_sin_asignar SOLO puede estar en la única ruta que
+ * corresponde exactamente a su estado_solicitud actual — cualquier otra
+ * (incluyendo /dashboard) lo regresa ahí automáticamente.
+ *
  * Uso:
  * <Route path="/coordinacion/usuarios-asignados" element={
  *   <RutaProtegida roles={["coordinador"]}>
@@ -18,6 +25,7 @@ import { Navigate } from "react-router-dom";
  * } />
  */
 export function RutaProtegida({ roles, children }) {
+  const location = useLocation();
   const token = localStorage.getItem("token");
   let usuario = null;
   try {
@@ -32,6 +40,13 @@ export function RutaProtegida({ roles, children }) {
 
   if (roles && !roles.includes(usuario.rol)) {
     return <Navigate to="/" replace />;
+  }
+
+  if (usuario.rol === "alumno_sin_asignar") {
+    const rutaCorrecta = rutaCorrectaParaAlumnoSinAsignar(usuario);
+    if (location.pathname !== rutaCorrecta) {
+      return <Navigate to={rutaCorrecta} replace />;
+    }
   }
 
   return children;

@@ -81,7 +81,7 @@ async function crearUsuario(datos, creadoPorId) {
         contrasena: contrasenaHash,
         fecha_creacion: ahora,
         creado_por_id: creadoPorId,
-        rubrica_fecha_registro: ahora,
+        
       },
     });
 

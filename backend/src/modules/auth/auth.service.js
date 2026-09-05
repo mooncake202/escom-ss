@@ -1,6 +1,8 @@
 const bcrypt = require('bcrypt');
 const prisma = require('../../lib/prisma');
 const { generarToken } = require('../../lib/jwt');
+const { verificarYAplicarVencimiento } = require('../gr/gr.service');
+
 
 // RN-CRED-02
 const MAX_INTENTOS = 5;
@@ -106,7 +108,32 @@ async function login({ correo_institucional, contrasena, ip }) {
 
   await registrarInicioSesion(usuario.id, ip, true);
 
+
+
   const token = generarToken({ sub: usuario.id, rol: usuario.rol });
+
+  // RN-GR-04: si es alumno sin asignar, se revisa (y aplica si aplica) el
+  // vencimiento del plazo de expediente ANTES de decidir a qué pantalla lo
+  // va a mandar el frontend. Se manda también estado_anterior: cuando el
+  // resultado es rechazada_definitivamente, el frontend lo usa para saber
+  // desde qué pantalla venía y mostrar el rechazo AHÍ MISMO, en vez de una
+  // pantalla genérica aparte.
+  let infoSolicitud = {};
+  if (usuario.rol === 'alumno_sin_asignar') {
+    const alumno = await prisma.alumno.findUnique({
+      where: { usuario_id: usuario.id },
+      include: { solicitud_registro: true },
+    });
+
+    if (alumno && alumno.solicitud_registro) {
+      const solicitudActualizada = await verificarYAplicarVencimiento(alumno.solicitud_registro.id);
+      infoSolicitud = {
+        estado_solicitud: solicitudActualizada.estado_solicitud,
+        estado_anterior: solicitudActualizada.estado_anterior,
+        motivo_rechazo: solicitudActualizada.motivo_rechazo,
+      };
+    }
+  }
 
   return {
     token,
@@ -116,8 +143,11 @@ async function login({ correo_institucional, contrasena, ip }) {
       apellidos: usuario.apellidos,
       correo_institucional: usuario.correo_institucional,
       rol: usuario.rol,
+      ...infoSolicitud,
     },
   };
 }
+
+
 
 module.exports = { login };

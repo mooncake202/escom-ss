@@ -2,11 +2,12 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { postLogin } from "../../services/loginService";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "../../themes/colors";
- 
+import { rutaCorrectaParaAlumnoSinAsignar } from "@/features/gestion-registro/utils/estadoRutas";
+
 function InputField({ C, showToggle, ...props }) {
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
- 
+
   return (
     <div style={{ position: "relative" }}>
       <input
@@ -40,7 +41,7 @@ function InputField({ C, showToggle, ...props }) {
     </div>
   );
 }
- 
+
 function Field({ label, children, C }) {
   return (
     <div style={{ marginBottom: "1.25rem" }}>
@@ -55,93 +56,49 @@ function Field({ label, children, C }) {
     </div>
   );
 }
- 
+
 export default function LoginPage() {
   const { C } = useTheme();
   const navigate = useNavigate();
- 
+
   const [form, setForm] = useState({ correoInst: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
- 
+
   const handleChange = e => {
     const { name, value } = e.target;
     setForm(p => ({ ...p, [name]: value }));
     setError("");
   };
- 
+
   const handleSubmit = async e => {
     e.preventDefault();
     if (!form.correoInst) return setError("Ingresa tu correo institucional");
     if (!form.password)   return setError("Ingresa tu contraseña");
- 
+
     setLoading(true);
     try {
       const res = await postLogin(form);
-      const { rol, estatus, tipoRechazo, estatusAnterior, registroSISSConfirmado, cartaCompromisoConfirmada, numDocumentos } = res.usuario;
+      const { rol } = res.usuario;
 
-      // Antes solo se guardaba "usuario" — el token nunca se persistía,
-      // así que ninguna petición futura podía autenticarse.
       localStorage.setItem("token", res.token);
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
-      
-      if (rol === "profesor") {
+
+      if (rol === "profesor" || rol === "coordinador" || rol === "alumno_asignado") {
         navigate("/dashboard");
-      } 
-      
-      else if (rol === "coordinador") {
-      navigate("/dashboard");
-      } 
-      
-      else if (rol === "alumno_asignado") {
-        navigate("/dashboard");
+        return;
       }
 
-
-      else if (rol === "alumno_sin_asignar") {
-        const estatusEfectivo =
-        tipoRechazo && tipoRechazo !== "ninguno"
-          ? estatusAnterior
-          : estatus;
-
-      if (estatusEfectivo === "espera_respuesta_de_profesor") {
-        navigate("/alumnoSinAsignar/esperando_profesor");
+      if (rol === "alumno_sin_asignar") {
+        navigate(rutaCorrectaParaAlumnoSinAsignar(res.usuario));
       }
-      
-      
-      else {
-        console.log("estatus no manejado:", estatusEfectivo);
-      }
-
-
-
-
-
-
-
-
-
-      } 
-
-
-
-
-
-
-      
-
-
-
-
-
-
     } catch (err) {
       setError(err.message || "Correo o contraseña incorrectos");
     } finally {
       setLoading(false);
     }
   };
- 
+
   return (
     <div style={{
       minHeight: "100vh", background: C.bgPage,
@@ -149,9 +106,9 @@ export default function LoginPage() {
       padding: "2rem 1rem", fontFamily: "'DM Sans', system-ui, sans-serif",
     }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
- 
+
       <div style={{ width: "100%", maxWidth: 420 }}>
- 
+
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "2rem" }}>
           <div style={{
@@ -159,7 +116,7 @@ export default function LoginPage() {
             background: GRADIENTS.primary,
             display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>
-            
+
           </div>
           <div>
             <p style={{ margin: 0, fontSize: 11, color: C.textDisabled, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600 }}>
@@ -170,7 +127,7 @@ export default function LoginPage() {
             </h1>
           </div>
         </div>
- 
+
         {/* Card */}
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.xl,
@@ -183,7 +140,7 @@ export default function LoginPage() {
           <p style={{ margin: "0 0 1.75rem", color: C.textMuted, fontSize: 13 }}>
             Ingresa con tu correo institucional del IPN
           </p>
- 
+
           <form onSubmit={handleSubmit}>
             <Field label="Correo institucional" C={C}>
               <InputField
@@ -195,7 +152,7 @@ export default function LoginPage() {
                 onChange={handleChange}
               />
             </Field>
- 
+
             <Field label="Contraseña" C={C}>
               <InputField
                 C={C}
@@ -208,7 +165,7 @@ export default function LoginPage() {
               />
             </Field>
             <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
-            
+
             <a
               href="/recuperar-contrasena"
               style={{ color: C.accentText, textDecoration: "none", fontWeight: 600 }}
@@ -216,7 +173,7 @@ export default function LoginPage() {
               ¿Olvidaste tu contraseña?{" "}
             </a>
           </p>
- 
+
             {/* Error */}
             {error && (
               <div style={{
@@ -227,7 +184,7 @@ export default function LoginPage() {
                 {error}
               </div>
             )}
- 
+
             {/* Botón */}
             <button
               type="submit"
@@ -245,7 +202,7 @@ export default function LoginPage() {
               {loading ? "Verificando..." : "Entrar →"}
             </button>
           </form>
- 
+
           {/* Enlace a registro */}
           <p style={{ margin: "1.25rem 0 0", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
             ¿Aún no tienes cuenta?{" "}
@@ -257,7 +214,7 @@ export default function LoginPage() {
             </a>
           </p>
         </div>
- 
+
         <p style={{ textAlign: "center", marginTop: "1.5rem", fontSize: 12, color: C.textDisabled }}>
           ESCOM — Sistema de Servicio Social Interno · IPN
         </p>

@@ -21,7 +21,7 @@ app.use(express.json());
 
 //app.use("/api/ofertas", ofertasRoutes);
 //app.use("/api/registro", registroRoutes);
-app.use("/api/periodos", periodosRoutes);
+//app.use("/api/periodos", periodosRoutes);
 //app.use("/api/login", loginRoute);
 //app.use("/api/alumno", alumnoRoutes);
 //app.use("/api/profesor", profesorRoutes);
@@ -45,3 +45,13 @@ console.log("Servidor corriendo en http://localhost:3000");
 //dashboard
 app.use('/notificaciones', require('./src/modules/notificaciones/notificaciones.routes'));
 app.use('/dashboard', require('./src/modules/dashboard/dashboard.routes'));
+
+
+//GR01
+app.use('/registro', require('./src/modules/gr/gr.routes'));
+app.use('/ofertas', require('./src/modules/ofertas/ofertas.routes'));
+app.use('/periodos', require('./src/modules/periodos/periodos.routes'));
+
+
+//GR02
+app.use('/profesor', require('./src/modules/gr/gr-profesor.routes'));

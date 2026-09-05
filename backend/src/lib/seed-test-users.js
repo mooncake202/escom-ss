@@ -67,7 +67,7 @@ async function main() {
         apellidos: DATOS_COORDINADOR.apellidos,
         rol: 'coordinador',
         fecha_creacion: ahora,
-        rubrica_fecha_registro: ahora, // requerido por el schema; valor dummy
+        
         intentos_fallidos: 0,
         cuenta_bloqueada: false,
       },
@@ -83,7 +83,7 @@ async function main() {
         apellidos: DATOS_PROFESOR.apellidos,
         rol: 'profesor',
         fecha_creacion: ahora,
-        rubrica_fecha_registro: ahora,
+        
         intentos_fallidos: 0,
         cuenta_bloqueada: false,
       },

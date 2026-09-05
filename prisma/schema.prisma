@@ -103,7 +103,7 @@ model usuario {
   creado_por_id          Int?
   rubrica_imagen         String?    @db.VarChar(500)
   rubrica_ip             String?    @db.VarChar(45)
-  rubrica_fecha_registro DateTime   @db.DateTime(0)
+  rubrica_fecha_registro DateTime?   @db.DateTime(0)
 
   creado_por       usuario?  @relation("UsuarioCreador", fields: [creado_por_id], references: [id], onDelete: SetNull)
   usuarios_creados usuario[] @relation("UsuarioCreador")
@@ -132,7 +132,7 @@ model alumno {
   usuario_id      Int     @unique
   celular         String  @db.VarChar(10)
   carrera         String  @db.VarChar(3)
-  creditos        Int     @db.UnsignedTinyInt
+  creditos        Decimal @db.Decimal(5, 2)
   semestre        Int     @db.UnsignedTinyInt
   correo_personal String? @db.VarChar(50)
 
@@ -356,11 +356,11 @@ model solicitud_registro {
   alumno_id           String   @unique @db.Char(10)
   carrera_id          Int
   dictamen            Int?     @db.UnsignedTinyInt
-  periodo_registro_id Int
-  oferta_id           Int
-  motivacion_oferta   String   @db.Text
+  periodo_registro_id Int?
+  oferta_id           Int?
+  motivacion_oferta   String?   @db.Text
   estado_solicitud    String   @db.VarChar(50)
-  estado_anterior     String   @db.VarChar(50)
+  estado_anterior     String?   @db.VarChar(50)
   fecha_aplicacion    DateTime @db.DateTime(0)
   tipo_rechazo        String?  @db.VarChar(50)
   motivo_rechazo      String?  @db.Text
@@ -371,8 +371,8 @@ model solicitud_registro {
 
   alumno           alumno           @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
   carrera          carrera          @relation(fields: [carrera_id], references: [id], onDelete: Cascade)
-  periodo_registro periodo_registro @relation(fields: [periodo_registro_id], references: [id], onDelete: Cascade)
-  oferta           oferta_servicio  @relation(fields: [oferta_id], references: [id], onDelete: Cascade)
+  periodo_registro periodo_registro? @relation(fields: [periodo_registro_id], references: [id], onDelete: SetNull)
+  oferta           oferta_servicio?  @relation(fields: [oferta_id], references: [id], onDelete: SetNull)
 
   actividad          actividad[]
   bitacora           bitacora[]

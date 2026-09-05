@@ -73,11 +73,44 @@ function validarContrasena(contrasena) {
   }
 }
 
+// ── NUEVO (CU-GR-01) ──────────────────────────────────────────────────────
+// Función SEPARADA de validarCorreoInstitucional a propósito: los alumnos
+// usan @alumno.ipn.mx, no @ipn.mx (ese dominio es exclusivo de profesor y
+// coordinador en CU-CRED-03). No se toca la función existente para no
+// arriesgar ese flujo ya probado.
+const CORREO_ALUMNO_IPN_REGEX = /^[^\s@]+@alumno\.ipn\.mx$/i;
+
+function validarCorreoInstitucionalAlumno(correo) {
+  if (!correo || !CORREO_ALUMNO_IPN_REGEX.test(correo.trim())) {
+    const error = new Error('El correo institucional debe ser válido y terminar en @alumno.ipn.mx.');
+    error.status = 400;
+    throw error;
+  }
+  if (correo.trim().length > 35) {
+    const error = new Error('El correo institucional no puede superar 35 caracteres.');
+    error.status = 400;
+    throw error;
+  }
+}
+
+// Formato de boleta ESCOM: año de ingreso (19|20 + 2 dígitos) + 63 (carrera) + 4 dígitos.
+const BOLETA_REGEX = /^(19|20)\d{2}63\d{4}$/;
+
+function validarBoleta(boleta) {
+  if (!boleta || !BOLETA_REGEX.test(boleta)) {
+    const error = new Error('La boleta no tiene un formato válido para ESCOM.');
+    error.status = 400;
+    throw error;
+  }
+}
+
 module.exports = {
   validarNombreOApellidos,
   validarCorreoInstitucional,
   validarTelefono,
   validarDepartamento,
   validarContrasena,
+  validarCorreoInstitucionalAlumno,
+  validarBoleta,
   DEPARTAMENTOS_VALIDOS,
 };

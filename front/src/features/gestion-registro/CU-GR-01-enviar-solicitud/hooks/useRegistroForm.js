@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { FORM_INITIAL, STEPS } from "../utils/constants";
 import { validateStep } from "../utils/validations";
-import { getOfertas, postRegistro } from "@/services/registroService";
+import { getOfertas, postRegistro, verificarCorreoDisponible } from "@/services/registroService";
 import { getPeriodos } from "@/services/registroService";
 
 export function useRegistroForm() {
@@ -9,6 +9,9 @@ export function useRegistroForm() {
   const [form, setForm]               = useState(FORM_INITIAL);
   const [errors, setErrors]           = useState({});
   const [ofertas, setOfertas]         = useState([]);
+  // Distingue "todavía no llega la respuesta" de "ya llegó y viene vacía" —
+  // sin esto no se puede mostrar el mensaje de 7.1 (Flujo Alterno) correcto.
+  const [ofertasCargando, setOfertasCargando] = useState(true);
   const [aceptaCreditos, setAcepta]   = useState(false);
   const [submitted, setSubmitted]     = useState(false);
   const [loading, setLoading]         = useState(false);
@@ -17,8 +20,9 @@ export function useRegistroForm() {
   // Carga de ofertas desde el backend
   useEffect(() => {
     getOfertas()
-      .then(setOfertas)
-      .catch(() => setErrors({oferta: "Error al cargar ofertas. Recargue la página"}));
+      .then((data) => setOfertas(data))
+      .catch(() => setErrors({oferta: "Error al cargar ofertas. Recargue la página"}))
+      .finally(() => setOfertasCargando(false));
   }, []);
 
   //carga periodos
@@ -38,12 +42,26 @@ export function useRegistroForm() {
   setErrors(prev => ({ ...prev, [name]: "" }));
   };
 
-
-
-
-  const seleccionarOferta = (id) => {
-    setForm(prev => ({ ...prev, oferta: Number(id) }));
+  // Punto 2: al seleccionar una oferta se revalida que siga teniendo cupo en
+  // ESE momento (no solo hasta el envío final del paso 4). Si ya no lo
+  // tiene, se refresca el listado de ofertas quitando la que se llenó, SIN
+  // tocar ningún otro dato que el alumno ya haya llenado en el formulario.
+  const seleccionarOferta = async (id) => {
     setErrors(prev => ({ ...prev, oferta: "" }));
+    try {
+      const ofertasFrescas = await getOfertas();
+      const sigueDisponible = ofertasFrescas.some(o => o.id === Number(id));
+      setOfertas(ofertasFrescas);
+
+      if (!sigueDisponible) {
+        setErrors(prev => ({ ...prev, oferta: "Esa oferta ya no tiene cupo disponible, selecciona otra." }));
+        return;
+      }
+
+      setForm(prev => ({ ...prev, oferta: Number(id) }));
+    } catch (err) {
+      setErrors(prev => ({ ...prev, oferta: err.message }));
+    }
   };
 
   const validate = () => {
@@ -52,7 +70,30 @@ export function useRegistroForm() {
     return Object.keys(errs).length === 0;
   };
 
-  const next = () => { if (validate()) setStep(s => s + 1); };
+  // Punto 1: al terminar el paso 1 (datos personales) se valida que el
+  // correo no esté registrado, en vez de enterarse hasta el envío final.
+  const next = async () => {
+    if (!validate()) return;
+
+    if (step === 0) {
+      setLoading(true);
+      try {
+        const disponible = await verificarCorreoDisponible(form.correoInst);
+        if (!disponible) {
+          setErrors(prev => ({ ...prev, correoInst: "Este correo ya está registrado." }));
+          return;
+        }
+      } catch (err) {
+        setErrors(prev => ({ ...prev, correoInst: err.message }));
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    setStep(s => s + 1);
+  };
+
   const back = () => setStep(s => s - 1);
 
   const submit = async () => {
@@ -62,8 +103,10 @@ export function useRegistroForm() {
       await postRegistro(form);
       setSubmitted(true);
     } catch (err) {
-      //el error es de cupos?
-      if(err.message==="Lo sentimos, el cupo se acaba de llenar"){
+      // Flujo Alterno 10.1: el cupo se llenó entre la selección y el envío.
+      // Se compara por código, no por texto — el mensaje puede cambiar sin
+      // romper este flujo.
+      if (err.code === "OFERTA_SIN_CUPOS") {
         setStep(2);
         setForm(prev => ({...prev, oferta: ""}));
         getOfertas()
@@ -86,7 +129,7 @@ export function useRegistroForm() {
 
   return {
     // estado
-    step, form, errors, ofertas, aceptaCreditos, periodos, submitted, loading,
+    step, form, errors, ofertas, ofertasCargando, aceptaCreditos, periodos, submitted, loading,
     totalSteps: STEPS.length,
     // acciones
     handleChange, seleccionarOferta,

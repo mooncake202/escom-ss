@@ -42,6 +42,7 @@ services:
       JWT_SECRET: "[SECRETO_ELIMINADO]"
       JWT_EXPIRES_IN: "4h"
       REDIS_URL: "redis://redis:6379"
+      FRONTEND_URL: "https://ttservicio.com"
       SMTP_HOST: "smtp.gmail.com"
       SMTP_PORT: "587"
       SMTP_USER: "karenlagarza02@gmail.com"
