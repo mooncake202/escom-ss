@@ -4,14 +4,14 @@ services:
     container_name: escom_mariadb
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: [SECRETO_ELIMINADO]
-      MYSQL_DATABASE: escom_ss
-      MYSQL_USER: escomuser
-      MYSQL_PASSWORD: [SECRETO_ELIMINADO]
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p[SECRETO_ELIMINADO]"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -38,16 +38,16 @@ services:
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: "mysql://escomuser:[SECRETO_ELIMINADO]@mariadb:3306/escom_ss"
-      JWT_SECRET: "[SECRETO_ELIMINADO]"
-      JWT_EXPIRES_IN: "4h"
+      DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       REDIS_URL: "redis://redis:6379"
       FRONTEND_URL: "https://ttservicio.com"
-      SMTP_HOST: "smtp.gmail.com"
-      SMTP_PORT: "587"
-      SMTP_USER: "karenlagarza02@gmail.com"
-      SMTP_PASS: "[SECRETO_ELIMINADO]"
-      SMTP_FROM: "Servicio Social IPN <karenlagarza02@gmail.com>"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
       CORREO_DOMINIOS_EXTRA: "gmail.com"
     depends_on:
       mariadb:
