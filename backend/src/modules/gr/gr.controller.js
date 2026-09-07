@@ -157,6 +157,9 @@ const postContinuarCartaCompromiso = crearHandlerAccion(grService.continuarACart
 const postCorregirDocumentacion = crearHandlerAccion(grService.corregirDocumentacion, 'Error al corregir documentación:');
 const postCorregirSISS = crearHandlerAccion(grService.corregirRegistroSISS, 'Error al corregir SISS:');
 const postModificarSolicitud = crearHandlerAccion(grService.iniciarModificarSolicitud, 'Error al iniciar modificación de solicitud:');
+const postConfirmarCartaCompromiso = crearHandlerAccion(grService.confirmarCartaCompromiso, 'Error al confirmar carta compromiso:');
+const postContinuarExpediente = crearHandlerAccion(grService.continuarAExpediente, 'Error al continuar a expediente:');
+
 
 async function getMisDocumentos(req, res) {
   try {
@@ -185,6 +188,8 @@ module.exports = {
   postCorregirSISS,
   postModificarSolicitud,
   getMisDocumentos,
+  postConfirmarCartaCompromiso,
+  postContinuarExpediente,
 };
 
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme, GRADIENTS, BRAND } from "@/themes/colors";
+import { apiFetch } from "@/services/apiClient";
 
 // ── Iconos SVG inline ────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
@@ -178,13 +179,22 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
 
       {/* Logout */}
       <div style={{ padding: "8px 6px", borderTop: `1px solid ${C.navBorder}`, flexShrink: 0 }}>
-        <button
-          onClick={() => {
+          <button
+          onClick={async () => {
+            try {
+              await apiFetch("/auth/logout", { method: "POST" });
+            } catch (err) {
+              // Si falla el aviso al backend, no importa — igual cerramos localmente.
+              console.error("No se pudo notificar el logout al backend:", err);
+            }
             localStorage.removeItem("token");
             localStorage.removeItem("usuario");
             navigate("/");
           }}
           title={!expanded ? "Cerrar sesión" : undefined}
+
+
+
           style={{
             width: "100%", height: 40,
             display: "flex", alignItems: "center",

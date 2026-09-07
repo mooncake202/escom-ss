@@ -705,6 +705,39 @@ async function obtenerMisDocumentos(usuarioId) {
 }
 
 
+async function confirmarCartaCompromiso(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'descargar_carta_compromiso') {
+    throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'espera_confirmacion_carta_compromiso', estado_anterior: 'descargar_carta_compromiso' },
+  });
+  return { mensaje: 'Quedas en espera de que Coordinación confirme la recepción de tu carta.', estado_solicitud: 'espera_confirmacion_carta_compromiso' };
+}
+
+async function continuarAExpediente(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'carta_compromiso_confirmada') {
+    throw crearError('Tu solicitud no está en el paso correcto para continuar.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'adjuntar_expediente', estado_anterior: 'carta_compromiso_confirmada' },
+  });
+  return { mensaje: 'Avanzaste al paso de expediente.', estado_solicitud: 'adjuntar_expediente' };
+}
+
+
 module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
@@ -723,6 +756,8 @@ module.exports = {
   iniciarModificarSolicitud,
   obtenerMisDocumentos,
   RUTA_BASE_DOCUMENTOS,
+  confirmarCartaCompromiso,
+  continuarAExpediente,
 
 };
 

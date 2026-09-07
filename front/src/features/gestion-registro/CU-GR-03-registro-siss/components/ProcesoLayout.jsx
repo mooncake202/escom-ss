@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS } from "@/themes/colors";
 import { ProcesoSidebar } from "./ProcesoSidebar";
+import { apiFetch } from "@/services/apiClient";
 
 export function ProcesoLayout({ pasoActual = 2, usuario = "Alumno", children }) {
   const { C } = useTheme();
@@ -8,7 +9,13 @@ export function ProcesoLayout({ pasoActual = 2, usuario = "Alumno", children }) 
 
   const iniciales = usuario.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 
-  const cerrarSesion = () => {
+    const cerrarSesion = async () => {
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch (err) {
+      // Si falla el aviso al backend, no importa — igual cerramos localmente.
+      console.error("No se pudo notificar el logout al backend:", err);
+    }
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
     navigate("/");

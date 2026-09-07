@@ -150,4 +150,21 @@ async function login({ correo_institucional, contrasena, ip }) {
 
 
 
-module.exports = { login };
+const redis = require('../../lib/redis');
+
+/**
+ * CU-CRED-04 (logout) — revoca el token actual escribiéndolo en la
+ * blacklist de Redis, con expiración igual al tiempo que le quedaba de
+ * vida al JWT (no tiene sentido guardarlo más tiempo que eso).
+ */
+async function logout(usuarioDecodificado) {
+  const ahora = Math.floor(Date.now() / 1000);
+  const ttlRestante = usuarioDecodificado.exp - ahora;
+  if (ttlRestante > 0) {
+    await redis.set(`blacklist:${usuarioDecodificado.jti}`, '1', 'EX', ttlRestante);
+  }
+}
+
+
+
+module.exports = { login, logout };

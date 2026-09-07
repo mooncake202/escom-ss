@@ -1,48 +1,69 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
-import { ProcesoLayout }       from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
-import { useCartaCompromiso }  from "./hooks/useCartaCompromiso";
+import { ProcesoLayout } from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
+import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoSolicitud";
+import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
+import { confirmarCartaCompromiso } from "@/services/estadoSolicitudService";
 
-const URL_SISS    = "https://serviciosocial.ipn.mx/";
-const MOCK_ALUMNO = { nombre: "García López Juan Carlos" };
+const URL_SISS = "https://serviciosocial.ipn.mx/";
+
+function actualizarUsuarioLocal(cambios) {
+  const actual = JSON.parse(localStorage.getItem("usuario") || "null");
+  if (!actual) return;
+  localStorage.setItem("usuario", JSON.stringify({ ...actual, ...cambios }));
+}
 
 export default function CartaCompromiso() {
-  const { C }    = useTheme();
+  const { C } = useTheme();
   const navigate = useNavigate();
-  const { accedioSISS, setAccedioSISS, loading, completado, confirmar } = useCartaCompromiso();
+  const { estado, cargando, error } = useEstadoSolicitud();
 
-  if (completado) {
+  const [accedioSISS, setAccedioSISS] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [errorAccion, setErrorAccion] = useState("");
+
+  const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
+  const nombre = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "";
+
+  if (cargando) return null;
+
+  if (error) {
     return (
-      <ProcesoLayout pasoActual={5} usuario={MOCK_ALUMNO.nombre}>
-        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
-          <div style={{ fontSize: 52, marginBottom: "1rem" }}>📄</div>
-          <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.success }}>
-            ¡Listo! Entrega tu carta presencialmente
-          </h2>
-          <p style={{ margin: "0 0 0.5rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-            Coordinación registrará la recepción de tu carta compromiso cuando la entregues en ventanilla. Una vez validada, podrás continuar con la carga de tu expediente.
-          </p>
-          <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled, lineHeight: 1.6 }}>
-            Mientras tanto puedes consultar el estado de tu proceso.
-          </p>
-          <button
-            onClick={() => navigate("/alumnoSinAsignar/estado")}
-            style={{
-              padding: "12px 32px", borderRadius: RADIUS.md,
-              fontSize: 14, fontWeight: 600, cursor: "pointer",
-              background: GRADIENTS.primary, border: "none",
-              color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent,
-            }}
-          >
-            Ver estado de mi proceso
-          </button>
+      <ProcesoLayout pasoActual={4} usuario={nombre}>
+        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem", color: C.danger }}>
+          {error}
         </div>
       </ProcesoLayout>
     );
   }
 
+  // Por si el plazo de expediente venció mientras el alumno seguía en este paso.
+  if (estado?.estado_solicitud === "rechazada_definitivamente") {
+    return (
+      <ProcesoLayout pasoActual={4} usuario={nombre}>
+        <SolicitudRechazadaDefinitivamente motivoRechazo={estado.motivo_rechazo} />
+      </ProcesoLayout>
+    );
+  }
+
+  const handleConfirmar = async () => {
+    if (!accedioSISS) return;
+    setEnviando(true);
+    setErrorAccion("");
+    try {
+      const resultado = await confirmarCartaCompromiso();
+      // Sin esto, RutaProtegida rebota de vuelta aquí mismo.
+      actualizarUsuarioLocal({ estado_solicitud: resultado.estado_solicitud, estado_anterior: "descargar_carta_compromiso" });
+      navigate("/alumnoSinAsignar/esperando-validacion");
+    } catch (err) {
+      setErrorAccion(err.message);
+      setEnviando(false);
+    }
+  };
+
   return (
-    <ProcesoLayout pasoActual={4} usuario={MOCK_ALUMNO.nombre}>
+    <ProcesoLayout pasoActual={4} usuario={nombre}>
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
 
         {/* Notificación validación */}
@@ -71,9 +92,7 @@ export default function CartaCompromiso() {
           Tu documentación inicial fue validada por Coordinación. Ahora debes obtener tu carta compromiso desde la plataforma SISS, imprimirla, firmarla y entregarla presencialmente.
         </p>
 
-        
-
-        {/* Instrucciones — RN-GR-34 */}
+        {/* Instrucciones — RN-GR-44 */}
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.lg,
           border: `1px solid ${C.borderSubtle}`,
@@ -88,8 +107,7 @@ export default function CartaCompromiso() {
             { n: "2", texto: 'Busca la sección "Carta compromiso" dentro de tu trámite de servicio social.' },
             { n: "3", texto: 'Descarga el documento en formato PDF.' },
             { n: "4", texto: 'Imprímelo a color y fírmalo con tinta azul en las áreas de PRESTADOR.' },
-            { n: "5", texto: 'Llevalo a firmar con tu profesor en AVAL DE ACEPTACIÓN E INICIO.' },
-
+            { n: "5", texto: 'Llévalo a firmar con tu profesor en AVAL DE ACEPTACIÓN E INICIO.' },
             { n: "6", texto: 'Entrega la carta firmada presencialmente en las oficinas de Coordinación de ESCOM.' },
           ].map(({ n, texto }) => (
             <div key={n} style={{ display: "flex", gap: 12, marginBottom: "0.875rem", alignItems: "flex-start" }}>
@@ -117,16 +135,14 @@ export default function CartaCompromiso() {
               <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>No modifiques el documento descargado del SISS.</li>
               <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>El horario de atención de Coordinación es de lunes a viernes de 10:00 a 18:00 hrs.</li>
               <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>También debes firmar en el costado de la hoja que dice NOTAS IMPORTANTES.</li>
-
             </ul>
           </div>
 
-          {/* Botón SISS — RN-GR-35 */}
+          {/* Botón SISS — RN-GR-44 / RF-GR-76 */}
           <a
             href={URL_SISS}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={() => setAccedioSISS(true)}
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               marginTop: "0.5rem", padding: "10px 20px",
@@ -142,7 +158,7 @@ export default function CartaCompromiso() {
           </a>
         </div>
 
-        {/* Checkbox confirmación — RN-GR-36 y RN-GR-37 */}
+        {/* Checkbox confirmación — RN-GR-45, texto exacto de la ficha */}
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.lg,
           border: `1px solid ${accedioSISS ? C.accent : C.borderSubtle}`,
@@ -157,7 +173,7 @@ export default function CartaCompromiso() {
               style={{ marginTop: 2, accentColor: C.accent, width: 16, height: 16, flexShrink: 0, cursor: "pointer" }}
             />
             <span style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>
-              Confirmo que descargué mi carta compromiso desde la plataforma SISS, la imprimí y la firmé. Estoy listo para entregarla presencialmente a Coordinación.
+              Confirmo que descargué mi carta compromiso desde SISS, la imprimí y la firmé. Estoy listo para entregarla presencialmente a coordinación de extensión de apoyos educativos.
             </span>
           </label>
         </div>
@@ -168,22 +184,26 @@ export default function CartaCompromiso() {
           </p>
         )}
 
-        {/* Botón continuar */}
+        {errorAccion && (
+          <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.danger }}>{errorAccion}</p>
+        )}
+
+        {/* Botón continuar — RN-GR-45/46/47 */}
         <button
-          onClick={confirmar}
-          disabled={!accedioSISS || loading}
+          onClick={handleConfirmar}
+          disabled={!accedioSISS || enviando}
           style={{
             width: "100%", padding: "12px",
             borderRadius: RADIUS.md, fontSize: 14, fontWeight: 600,
-            cursor: !accedioSISS || loading ? "not-allowed" : "pointer",
-            background: !accedioSISS || loading ? C.borderDefault : GRADIENTS.primary,
+            cursor: !accedioSISS || enviando ? "not-allowed" : "pointer",
+            background: !accedioSISS || enviando ? C.borderDefault : GRADIENTS.primary,
             border: "none", color: "#fff", fontFamily: "inherit",
-            boxShadow: !accedioSISS || loading ? "none" : SHADOWS.accent,
+            boxShadow: !accedioSISS || enviando ? "none" : SHADOWS.accent,
             opacity: !accedioSISS ? 0.5 : 1,
             transition: "background 0.2s",
           }}
         >
-          {loading ? "Guardando..." : "Confirmar y continuar →"}
+          {enviando ? "Guardando..." : "Confirmar y continuar →"}
         </button>
 
       </div>

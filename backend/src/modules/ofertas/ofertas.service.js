@@ -1,12 +1,24 @@
 const prisma = require('../../lib/prisma');
+const redis = require('../../lib/redis');
+
+const CACHE_KEY_OFERTAS = 'cache:ofertas';
+const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
 
 /**
  * RF-GR-06: solo ofertas activas y con cupos disponibles al momento de la consulta.
  */
 async function listarOfertasDisponibles() {
+  try {
+    const cacheado = await redis.get(CACHE_KEY_OFERTAS);
+    if (cacheado) return JSON.parse(cacheado);
+  } catch (err) {
+    // Si Redis falla, seguimos sin caché en vez de tumbar el endpoint.
+    console.error('Error al leer caché de ofertas (se continúa sin caché):', err.message);
+  }
+
   const ofertas = await prisma.oferta_servicio.findMany({
     where: {
-      estado_oferta: 'Aprobada', 
+      estado_oferta: 'Aprobada',
       cupos_disponibles: { gt: 0 },
     },
     include: {
@@ -16,7 +28,7 @@ async function listarOfertasDisponibles() {
     orderBy: { fecha_registro: 'desc' },
   });
 
-  return ofertas.map((o) => ({
+  const resultado = ofertas.map((o) => ({
     id: o.id,
     titulo: o.nombre_proyecto,
     profesor: `${o.profesor.usuario.nombre} ${o.profesor.usuario.apellidos}`,
@@ -29,11 +41,20 @@ async function listarOfertasDisponibles() {
     cuposDisponibles: o.cupos_disponibles,
     perfiles: o.deseo_de_carrera.map((d) => d.carrera.nombre).join(','),
   }));
+
+  try {
+    await redis.set(CACHE_KEY_OFERTAS, JSON.stringify(resultado), 'EX', CACHE_TTL_OFERTAS);
+  } catch (err) {
+    console.error('Error al guardar caché de ofertas (no crítico):', err.message);
+  }
+
+  return resultado;
 }
 
 /**
  * Catálogo de "perfiles" (carrera deseada) para el filtro de StepSeleccionOferta.
  * Reusa la tabla `carrera` que ya existe — NO se crean tablas perfilDeseado.
+ * Sin caché: es una tabla catálogo diminuta, no vale la pena.
  */
 async function listarPerfilesDisponibles() {
   const carreras = await prisma.carrera.findMany({ orderBy: { nombre: 'asc' } });

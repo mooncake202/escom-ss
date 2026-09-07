@@ -27,4 +27,15 @@ async function postLogin(req, res) {
   }
 }
 
-module.exports = { postLogin };
+
+async function postLogout(req, res) {
+  try {
+    await authService.logout(req.usuario);
+    return res.status(200).json({ message: 'Sesión cerrada correctamente.' });
+  } catch (err) {
+    console.error('Error al cerrar sesión:', err);
+    return res.status(500).json({ message: 'Ocurrió un error. Intenta de nuevo más tarde.' });
+  }
+}
+
+module.exports = { postLogin, postLogout };

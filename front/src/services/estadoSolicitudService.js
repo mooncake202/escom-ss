@@ -94,3 +94,18 @@ export async function iniciarModificarSolicitud() {
 export async function getMisDocumentos() {
   return apiFetch("/registro/mis-documentos");
 }
+
+/**
+ * CU-GR-08, RN-GR-45/47 — el alumno confirma que descargó, imprimió y
+ * firmó su carta compromiso.
+ */
+export async function confirmarCartaCompromiso() {
+  return apiFetch("/registro/confirmar-carta-compromiso", { method: "POST" });
+}
+
+/**
+ * CU-GR-08, Flujo A — botón "Continuar" cuando carta_compromiso_confirmada.
+ */
+export async function continuarAExpediente() {
+  return apiFetch("/registro/continuar-expediente", { method: "POST" });
+}
