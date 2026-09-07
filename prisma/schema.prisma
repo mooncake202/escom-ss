@@ -368,6 +368,7 @@ model solicitud_registro {
   registro_siss       Boolean  @default(false)
   docs_iniciales      Boolean  @default(false)
   carta_compromiso    Boolean  @default(false)
+  fecha_carta_compromiso  DateTime? @db.DateTime(0)
   expediente          Boolean  @default(false)
 
   alumno           alumno           @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)

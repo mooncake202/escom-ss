@@ -7,18 +7,21 @@ import { useValidarEntregaPresencial }  from "./hooks/useValidarEntregaPresencia
 export default function ValidarEntregaPresencial() {
   const { C } = useTheme();
   const {
-    pendientes, seleccionado, loading, resultado,
+    pendientes, cargandoLista, seleccionado, loading, resultado, error,
     verDetalle, cerrar, registrarRecepcion,
   } = useValidarEntregaPresencial();
+
+  const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
+  const nombreCoordinador = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "Coordinación";
 
   return (
     <DashboardLayout
       titulo="Validar entrega presencial"
-      subtitulo="CU-GR-07 · Coordinación"
-      rol="coordinacion"
-      usuario="Coordinación ESCOM"
+      subtitulo="CU-GR-09 · Coordinación"
+      rol="coordinador"
+      usuario={nombreCoordinador}
     >
-      {/* Toast resultado — RN-GR-41 */}
+      {/* Toast resultado */}
       {resultado && (
         <div style={{
           marginBottom: "1.25rem", padding: "12px 16px", borderRadius: RADIUS.md,
@@ -40,7 +43,9 @@ export default function ValidarEntregaPresencial() {
       </div>
 
       {/* Lista */}
-      {pendientes.length === 0 ? (
+      {cargandoLista ? (
+        <p style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "2rem" }}>Cargando...</p>
+      ) : pendientes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
           <p style={{ fontSize: 32, margin: "0 0 0.75rem" }}>📭</p>
           <p style={{ fontSize: 15, color: C.textMuted, margin: 0 }}>No hay cartas pendientes de recepción</p>
@@ -60,6 +65,7 @@ export default function ValidarEntregaPresencial() {
       <DetalleEntregaPresencial
         item={seleccionado}
         loading={loading}
+        error={error}
         onRegistrar={registrarRecepcion}
         onCerrar={cerrar}
         C={C}

@@ -185,4 +185,64 @@ async function descargarDocumento(documentoId, usuarioSolicitante) {
   return descifrarBuffer(bufferCifrado);
 }
 
-module.exports = { listarSolicitudesDocumentacionPendiente, decidirDocumentacion, descargarDocumento };
+
+
+/**
+ * RF-GR-85: alumnos con la carta compromiso lista para entregar presencialmente.
+ */
+async function listarSolicitudesEsperandoCarta() {
+  const solicitudes = await prisma.solicitud_registro.findMany({
+    where: { estado_solicitud: 'espera_confirmacion_carta_compromiso' },
+    include: {
+      alumno: { include: { usuario: true } },
+      oferta: { include: { profesor: { include: { usuario: true } } } },
+      periodo_registro: { include: { evento_calendario: true } },
+    },
+    orderBy: { fecha_aplicacion: 'asc' },
+  });
+
+  return solicitudes.map((s) => ({
+    id: s.id,
+    alumno: {
+      nombre: `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`,
+      boleta: s.alumno.boleta,
+      carrera: s.alumno.carrera,
+      correoInst: s.alumno.usuario.correo_institucional,
+    },
+    profesor: s.oferta?.profesor ? `${s.oferta.profesor.usuario.nombre} ${s.oferta.profesor.usuario.apellidos}` : null,
+    periodoInicio: s.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
+    periodoFin: s.periodo_registro?.evento_calendario?.fecha_fin ?? null,
+  }));
+}
+
+/**
+ * CU-GR-09 — RN-GR-50 a RN-GR-53.
+ */
+async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
+  const coordinador = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
+  if (!coordinador) throw crearError('No se encontró tu perfil de coordinador.', 404);
+
+  const solicitud = await prisma.solicitud_registro.findUnique({ where: { id: Number(solicitudId) } });
+  if (!solicitud) throw crearError('Solicitud no encontrada.', 404);
+  if (solicitud.estado_solicitud !== 'espera_confirmacion_carta_compromiso') {
+    throw crearError('Esta solicitud ya fue procesada.', 409);
+  }
+
+  await prisma.solicitud_registro.update({
+    where: { id: solicitud.id },
+    data: {
+      estado_solicitud: 'carta_compromiso_confirmada',
+      estado_anterior: 'espera_confirmacion_carta_compromiso',
+      carta_compromiso: true,
+      fecha_carta_compromiso: new Date(),
+    },
+  });
+
+  return { mensaje: 'Recepción registrada correctamente.' };
+}
+
+
+module.exports = { listarSolicitudesDocumentacionPendiente, 
+  decidirDocumentacion, descargarDocumento,
+  listarSolicitudesEsperandoCarta, registrarRecepcionCarta,
+};

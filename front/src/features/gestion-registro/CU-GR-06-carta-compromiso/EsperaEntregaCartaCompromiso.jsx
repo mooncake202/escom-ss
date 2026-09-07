@@ -6,6 +6,8 @@ import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoS
 import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
 import { continuarAExpediente } from "@/services/estadoSolicitudService";
 
+const URL_SISS = "https://serviciosocial.ipn.mx/";
+
 function actualizarUsuarioLocal(cambios) {
   const actual = JSON.parse(localStorage.getItem("usuario") || "null");
   if (!actual) return;
@@ -95,7 +97,7 @@ export default function EsperaEntregaCartaCompromiso() {
   // ── RN-GR-47/48 — espera_confirmacion_carta_compromiso ──
   return (
     <ProcesoLayout pasoActual={4} usuario={nombre}>
-      <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
+      <div style={{ maxWidth: 620, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
 
         <div style={{ fontSize: 52, marginBottom: "1rem" }}>🕐</div>
 
@@ -164,6 +166,74 @@ export default function EsperaEntregaCartaCompromiso() {
               El horario de atención de Coordinación es de lunes a viernes de 10:00 a 18:00 hrs.
             </p>
           </div>
+        </div>
+
+        {/* ── Instrucciones — repetidas aquí para que el alumno pueda
+             repasarlas mientras espera, tal como estaban en CartaCompromiso.jsx.
+             Solo se muestran en este estado de espera, no una vez confirmada
+             la recepción (ya no le sirven de nada en ese punto). ── */}
+        <div style={{
+          background: C.bgCard, borderRadius: RADIUS.lg,
+          border: `1px solid ${C.borderSubtle}`,
+          padding: "1.5rem", marginBottom: "1.5rem",
+          textAlign: "left",
+        }}>
+          <p style={{ margin: "0 0 1.25rem", fontSize: 12, fontWeight: 700, color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Pasos a seguir
+          </p>
+
+          {[
+            { n: "1", texto: 'Accede a la plataforma SISS con el botón de abajo.' },
+            { n: "2", texto: 'Busca la sección "Carta compromiso" dentro de tu trámite de servicio social.' },
+            { n: "3", texto: 'Descarga el documento en formato PDF.' },
+            { n: "4", texto: 'Imprímelo a color y fírmalo con tinta azul en las áreas de PRESTADOR.' },
+            { n: "5", texto: 'Llévalo a firmar con tu profesor en AVAL DE ACEPTACIÓN E INICIO.' },
+            { n: "6", texto: 'Entrega la carta firmada presencialmente en las oficinas de Coordinación de ESCOM.' },
+          ].map(({ n, texto }) => (
+            <div key={n} style={{ display: "flex", gap: 12, marginBottom: "0.875rem", alignItems: "flex-start" }}>
+              <div style={{
+                width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
+                background: C.accentSoft, border: `1px solid ${C.accent}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, color: C.accentText,
+              }}>
+                {n}
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.6, paddingTop: 2 }}>
+                {texto}
+              </p>
+            </div>
+          ))}
+
+          <div style={{ margin: "1rem 0", padding: "12px 14px", background: C.bgPage, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}` }}>
+            <p style={{ margin: "0 0 8px", fontSize: 12, fontWeight: 700, color: C.warning ?? "#F59E0B", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              Consideraciones importantes
+            </p>
+            <ul style={{ margin: 0, paddingLeft: "1.25rem", display: "flex", flexDirection: "column", gap: 6 }}>
+              <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>La carta debe estar firmada antes de entregarla, sin firma no será aceptada.</li>
+              <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>No modifiques el documento descargado del SISS.</li>
+              <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>El horario de atención de Coordinación es de lunes a viernes de 10:00 a 18:00 hrs.</li>
+              <li style={{ fontSize: 13, color: C.textSecondary, lineHeight: 1.5 }}>También debes firmar en el costado de la hoja que dice NOTAS IMPORTANTES.</li>
+            </ul>
+          </div>
+
+          <a
+            href={URL_SISS}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              marginTop: "0.5rem", padding: "10px 20px",
+              borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+              background: GRADIENTS.primary, color: "#fff",
+              textDecoration: "none", boxShadow: SHADOWS.accent,
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+            </svg>
+            Ir a la plataforma SISS
+          </a>
         </div>
 
       </div>

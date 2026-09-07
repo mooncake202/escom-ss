@@ -15,10 +15,10 @@ function InfoRow({ label, value, C }) {
   );
 }
 
-export function DetalleEntregaPresencial({ item, loading, onRegistrar, onCerrar, C }) {
+export function DetalleEntregaPresencial({ item, loading, error, onRegistrar, onCerrar, C }) {
   if (!item) return null;
 
-  const fmtFecha = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
+  const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
 
   return (
     <>
@@ -36,7 +36,7 @@ export function DetalleEntregaPresencial({ item, loading, onRegistrar, onCerrar,
         <div style={{ padding: "1.25rem 1.5rem", borderBottom: `1px solid ${C.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
             <p style={{ margin: 0, fontSize: 11, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
-              CU-GR-07 · Validación presencial
+              CU-GR-09 · Validación presencial
             </p>
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.textPrimary, fontWeight: 700 }}>
               Registrar recepción de carta
@@ -52,14 +52,14 @@ export function DetalleEntregaPresencial({ item, loading, onRegistrar, onCerrar,
           <p style={{ margin: "0 0 10px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Datos del alumno
           </p>
-          <InfoRow label="Nombre"   value={item.alumno.nombre}                         C={C} />
-          <InfoRow label="Boleta"   value={item.alumno.boleta}                         C={C} />
-          <InfoRow label="Carrera"  value={CARRERA_LABEL[item.alumno.carrera]}         C={C} />
-          <InfoRow label="Correo"   value={item.alumno.correoInst}                     C={C} />
-          <InfoRow label="Profesor" value={item.profesor}                              C={C} />
+          <InfoRow label="Nombre"   value={item.alumno.nombre}                                          C={C} />
+          <InfoRow label="Boleta"   value={item.alumno.boleta}                                          C={C} />
+          <InfoRow label="Carrera"  value={CARRERA_LABEL[item.alumno.carrera] || item.alumno.carrera}   C={C} />
+          <InfoRow label="Correo"   value={item.alumno.correoInst}                                      C={C} />
+          <InfoRow label="Profesor" value={item.profesor || "—"}                                        C={C} />
           <InfoRow label="Periodo"  value={`${fmtFecha(item.periodoInicio)} — ${fmtFecha(item.periodoFin)}`} C={C} />
 
-          {/* Aviso verificación — RN-GR-38 */}
+          {/* Aviso verificación — RN-GR-50 */}
           <div style={{
             marginTop: "1.5rem", padding: "14px 16px", borderRadius: RADIUS.md,
             background: "rgba(245,158,11,0.08)", border: `1px solid ${C.warning ?? "#F59E0B"}`,
@@ -86,13 +86,17 @@ export function DetalleEntregaPresencial({ item, loading, onRegistrar, onCerrar,
             </ul>
           </div>
 
-          {/* Info fecha registro — RN-GR-39 */}
+          {/* Info fecha registro — RN-GR-51 */}
           <p style={{ margin: "1.25rem 0 0", fontSize: 12, color: C.textDisabled, lineHeight: 1.5 }}>
             Al confirmar, el sistema registrará automáticamente la fecha y hora de recepción y notificará al alumno para que proceda con la carga de su expediente.
           </p>
+
+          {error && (
+            <p style={{ margin: "1rem 0 0", fontSize: 13, color: C.danger }}>{error}</p>
+          )}
         </div>
 
-        {/* Botones — RN-GR-40 */}
+        {/* Botones */}
         <div style={{ padding: "1.25rem 1.5rem", borderTop: `1px solid ${C.borderSubtle}`, display: "flex", gap: "0.75rem", flexShrink: 0 }}>
           <button
             onClick={onCerrar}

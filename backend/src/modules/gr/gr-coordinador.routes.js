@@ -4,6 +4,8 @@ const {
   getSolicitudesDocumentacion,
   postDecidirDocumentacion,
   getDescargarDocumento,
+  getSolicitudesCartaCompromiso,
+  postRegistrarRecepcionCarta,
 } = require('./gr-coordinador.controller');
 
 const router = express.Router();
@@ -18,5 +20,10 @@ router.post('/documentacion/:id/decidir', requireAuth, requireRole('coordinador'
 // cualquiera, alumno solo el suyo) se valida dentro del service, por eso
 // aquí solo exigimos sesión, no un rol específico.
 router.get('/documentos/:id/descargar', requireAuth, getDescargarDocumento);
+
+
+//gr09
+router.get('/cartas-compromiso', requireAuth, requireRole('coordinador'), getSolicitudesCartaCompromiso);
+router.post('/cartas-compromiso/:id/registrar-recepcion', requireAuth, requireRole('coordinador'), postRegistrarRecepcionCarta);
 
 module.exports = router;
