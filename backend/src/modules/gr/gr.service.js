@@ -8,6 +8,18 @@ const {
   validarContrasena,
 } = require('../../lib/validators');
 
+const fs = require('fs');
+const path = require('path');
+const { cifrarBuffer, generarNombreSeguro } = require('../../lib/fileEncryption');
+
+// backend/src/modules/gr -> subimos 3 niveles hasta backend/, ahí vive uploads/
+const RUTA_BASE_DOCUMENTOS = path.join(__dirname, '../../../uploads/documentos');
+
+function esPdfValido(buffer) {
+  // Magic bytes reales de un PDF — nunca confiar solo en la extensión del nombre.
+  return !!buffer && buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+}
+
 
 const CREDITOS_MIN_DEFAULT = 70;
 const CREDITOS_MIN_DICTAMEN_CREDITOS = 60;
@@ -457,7 +469,155 @@ async function continuarARegistroSISS(usuarioId) {
     return { mensaje: 'Avanzaste al registro en SISS.', estado_solicitud: 'registro_SISS' };
 }
 
+/**
+ * CU-GR-04 — RN-GR-25: datos personalizados para las instrucciones de SISS.
+ */
+async function obtenerInfoSISS(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: {
+      solicitud_registro: {
+        include: {
+          oferta: true,
+          periodo_registro: { include: { evento_calendario: true } },
+        },
+      },
+    },
+  });
 
+  if (!alumno || !alumno.solicitud_registro) {
+    throw crearError('No se encontró tu solicitud de registro.', 404);
+  }
+
+  const solicitud = alumno.solicitud_registro;
+
+  if (solicitud.estado_solicitud !== 'registro_SISS') {
+    throw crearError('Tu solicitud no está en el paso de registro en SISS.', 409);
+  }
+
+  return {
+    programa: solicitud.oferta?.programa_SISS ?? null,
+    actividad: solicitud.oferta?.nombre_SISS ?? null,
+    fechaInicio: solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
+  };
+}
+
+/**
+ * CU-GR-04 — RN-GR-24 / RN-GR-27: confirma el registro en SISS y avanza.
+ */
+async function confirmarRegistroSISS(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+
+  if (!alumno || !alumno.solicitud_registro) {
+    throw crearError('No se encontró tu solicitud de registro.', 404);
+  }
+
+  if (alumno.solicitud_registro.estado_solicitud !== 'registro_SISS') {
+    throw crearError('Tu solicitud no está en el paso correcto para confirmar esto.', 409);
+  }
+
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: {
+      estado_solicitud: 'adjuntar_documentacion_inicial',
+      estado_anterior: 'registro_SISS',
+      registro_siss: true,
+    },
+  });
+
+  return {
+    mensaje: 'Tu registro en SISS ha sido confirmado. Ahora debes adjuntar tu documentación.',
+    estado_solicitud: 'adjuntar_documentacion_inicial',
+  };
+}
+
+/**
+ * CU-GR-05 — Adjuntar documentación inicial
+ */
+async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSocial }) {
+  if (!cartaCreditos || !seguroSocial) {
+    throw crearError('Debes adjuntar ambos documentos obligatorios.');
+  }
+
+  if (!esPdfValido(cartaCreditos.buffer) || !esPdfValido(seguroSocial.buffer)) {
+    throw crearError('Alguno de los archivos no es un PDF válido.');
+  }
+
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+
+  if (!alumno || !alumno.solicitud_registro) {
+    throw crearError('No se encontró tu solicitud de registro.', 404);
+  }
+
+  if (alumno.solicitud_registro.estado_solicitud !== 'adjuntar_documentacion_inicial') {
+    throw crearError('Tu solicitud no está en el paso de adjuntar documentación.', 409);
+  }
+
+  // RN-GR-32 / RF-GR-56: se guardan cifrados (ver fileEncryption.js), con
+  // nombre aleatorio — nunca el nombre original que subió el alumno.
+  const carpetaAlumno = path.join(RUTA_BASE_DOCUMENTOS, alumno.boleta);
+  fs.mkdirSync(carpetaAlumno, { recursive: true });
+
+  const nombreCarta = generarNombreSeguro();
+  const nombreSeguro = generarNombreSeguro();
+  const rutaRelativaCarta = path.join(alumno.boleta, nombreCarta);
+  const rutaRelativaSeguro = path.join(alumno.boleta, nombreSeguro);
+
+  fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativaCarta), cifrarBuffer(cartaCreditos.buffer));
+  fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativaSeguro), cifrarBuffer(seguroSocial.buffer));
+
+  const ahora = new Date();
+
+  try {
+    await prisma.$transaction([
+      prisma.documento.create({
+        data: {
+          alumno_id: alumno.boleta,
+          creador_id: usuarioId,
+          tipo_documento: 'carta_creditos',
+          fecha_creacion: ahora,
+          estado_documento: 'en_revision',
+          ruta_archivo: rutaRelativaCarta,
+        },
+      }),
+      prisma.documento.create({
+        data: {
+          alumno_id: alumno.boleta,
+          creador_id: usuarioId,
+          tipo_documento: 'constancia_seguro_social',
+          fecha_creacion: ahora,
+          estado_documento: 'en_revision',
+          ruta_archivo: rutaRelativaSeguro,
+        },
+      }),
+      prisma.solicitud_registro.update({
+        where: { id: alumno.solicitud_registro.id },
+        data: {
+          estado_solicitud: 'SISS_y_documentacion_pendiente',
+          estado_anterior: 'adjuntar_documentacion_inicial',
+          docs_iniciales: true,
+        },
+      }),
+    ]);
+  } catch (err) {
+    // Excepción E2: si la BD falla, no dejamos archivos huérfanos en disco.
+    [rutaRelativaCarta, rutaRelativaSeguro].forEach((ruta) => {
+      try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, ruta)); } catch {}
+    });
+    throw crearError('Ocurrió un error al procesar la solicitud.', 500);
+  }
+
+  return {
+    mensaje: 'Tu documentación fue enviada correctamente y será revisada por Coordinación.',
+    estado_solicitud: 'SISS_y_documentacion_pendiente',
+  };
+}
 
 
 
@@ -470,6 +630,9 @@ module.exports = {
   dictamenLabel,
   cambiarOferta,
   continuarARegistroSISS,
+  obtenerInfoSISS,
+  confirmarRegistroSISS,
+  adjuntarDocumentacionInicial,
 };
 
 

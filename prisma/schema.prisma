@@ -319,6 +319,7 @@ model oferta_servicio {
   profesor_id             Int
   coordinador_id          Int
   nombre_SISS             String             @db.VarChar(100)
+  programa_SISS           String            @db.VarChar(150)
   nombre_proyecto         String             @db.VarChar(150)
   tipo_oferta             TipoOfertaServicio
   descripcion_actividades String             @db.Text

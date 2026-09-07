@@ -8,7 +8,11 @@ export async function apiFetch(path, options = {}) {
     res = await fetch(`${API_URL}${path}`, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        // Si el body es FormData (subida de archivos), NO se fuerza
+        // Content-Type: application/json — el navegador debe poner su
+        // propio "multipart/form-data; boundary=..." automáticamente. Si
+        // lo sobrescribiéramos, el backend no podría parsear los archivos.
+        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {}),
       },
@@ -25,9 +29,7 @@ export async function apiFetch(path, options = {}) {
   } catch {
     // Excepción E3, caso 2: SÍ hubo respuesta, pero no es JSON — típico de
     // nginx/Cloudflare devolviendo su propia página de error (502/503/504)
-    // porque el backend real está caído detrás de ellos. Mismo mensaje que
-    // el caso 1: para el usuario es la misma situación ("no puedo usar el
-    // sistema ahorita"), sin importar en qué capa exacta falló.
+    // porque el backend real está caído detrás de ellos.
     throw new Error("El servicio no está disponible temporalmente. Intenta de nuevo más tarde.");
   }
 

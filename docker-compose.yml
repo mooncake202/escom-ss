@@ -51,6 +51,7 @@ services:
       SMTP_FROM: ${SMTP_FROM}
       CORREO_DOMINIOS_EXTRA: "gmail.com"
       TZ: "America/Mexico_City"
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
     depends_on:
       mariadb:
         condition: service_healthy

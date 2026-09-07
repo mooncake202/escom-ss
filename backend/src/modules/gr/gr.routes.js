@@ -4,6 +4,7 @@ const express = require('express');
 const { requireAuth, requireRole } = require('../../middleware/auth.middleware');
 const { postEnviarSolicitud, getVerificarCorreo, getEstadoSolicitud } = require('./gr.controller');
 const { postCambiarOferta, postContinuarSISS } = require('./gr.controller'); 
+const { getInfoSISS, postConfirmarSISS, postAdjuntarDocumentacion } = require('./gr.controller'); 
 
 const router = express.Router();
 
@@ -22,6 +23,12 @@ router.get('/estado', requireAuth, requireRole('alumno_sin_asignar'), getEstadoS
 router.post('/cambiar-oferta', requireAuth, requireRole('alumno_sin_asignar'), postCambiarOferta);
 router.post('/continuar-siss', requireAuth, requireRole('alumno_sin_asignar'), postContinuarSISS);
 
+//gr04
+router.get('/info-siss', requireAuth, requireRole('alumno_sin_asignar'), getInfoSISS);
+router.post('/confirmar-siss', requireAuth, requireRole('alumno_sin_asignar'), postConfirmarSISS);
+
+//gr-05
+router.post('/adjuntar-documentacion', requireAuth, requireRole('alumno_sin_asignar'), postAdjuntarDocumentacion);
 
 
 module.exports = router;

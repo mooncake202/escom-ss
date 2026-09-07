@@ -27,3 +27,32 @@ export async function cambiarOferta(ofertaId, motivacion) {
 export async function continuarARegistroSISS() {
   return apiFetch("/registro/continuar-siss", { method: "POST" });
 }
+
+/**
+ * CU-GR-04 — RN-GR-25: datos personalizados (programa, actividad, fecha
+ * de inicio) para mostrar en las instrucciones de SISS.
+ */
+export async function getInfoSISS() {
+  return apiFetch("/registro/info-siss");
+}
+
+/**
+ * CU-GR-04 — RN-GR-24/27: confirma el registro en SISS y avanza a CU-GR-05.
+ */
+export async function confirmarRegistroSISS() {
+  return apiFetch("/registro/confirmar-siss", { method: "POST" });
+}
+
+/**
+ * CU-GR-05 — sube la carta de créditos y la constancia de seguro social
+ * juntas, en una sola petición multipart/form-data.
+ */
+export async function adjuntarDocumentacionInicial(cartaCreditos, seguroSocial) {
+  const formData = new FormData();
+  formData.append("cartaCreditos", cartaCreditos);
+  formData.append("seguroSocial", seguroSocial);
+  return apiFetch("/registro/adjuntar-documentacion", {
+    method: "POST",
+    body: formData,
+  });
+}

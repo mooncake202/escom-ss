@@ -87,3 +87,6 @@ Desktop.ini
 coverage/
 .nyc_output/
 *.tsbuildinfo
+
+
+backend/uploads/
