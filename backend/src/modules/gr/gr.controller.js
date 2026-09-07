@@ -43,6 +43,38 @@ async function getEstadoSolicitud(req, res) {
   }
 }
 
-module.exports = { postEnviarSolicitud, getVerificarCorreo, getEstadoSolicitud };
+async function postCambiarOferta(req, res) {
+  try {
+    const resultado = await grService.cambiarOferta(req.usuario.sub, req.body);
+    return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al cambiar de oferta:', err);
+    const body = { message };
+    if (err.code) body.code = err.code;
+    return res.status(status).json(body);
+  }
+}
+
+async function postContinuarSISS(req, res) {
+  try {
+    const resultado = await grService.continuarARegistroSISS(req.usuario.sub);
+    return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al continuar a SISS:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+module.exports = { 
+  postEnviarSolicitud, 
+  getVerificarCorreo, 
+  getEstadoSolicitud,
+  postCambiarOferta,
+  postContinuarSISS,
+};
 
 

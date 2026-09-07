@@ -66,24 +66,37 @@ async function resumenProfesor(usuarioId) {
     };
   }
 
-  const [alumnosAsignados, ofertasActivas] = await Promise.all([
-    prisma.solicitud_registro.count({ where: { oferta: { profesor_id: profesor.id } } }),
+const [alumnosAsignados, ofertasActivas, solicitudesPendientes] = await Promise.all([
+    // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
+    // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
+    // final del proceso GR.
+    prisma.solicitud_registro.count({
+      where: { oferta: { profesor_id: profesor.id }, estado_solicitud: 'alumno_asignado' },
+    }),
     prisma.oferta_servicio.count({ where: { profesor_id: profesor.id, cupos_disponibles: { gt: 0 } } }),
+    // Ya resuelto por CU-GR-02: coincide con RN-GR-06 (mismo criterio que usa
+    // el propio profesor para ver su lista de solicitudes pendientes).
+    prisma.solicitud_registro.count({
+      where: { oferta: { profesor_id: profesor.id }, estado_solicitud: 'espera_respuesta_de_profesor' },
+    }),
   ]);
 
   return {
     alumnosAsignados,
     cuposTotales: profesor.cupos_totales,
     ofertasActivas,
-    // TODO: requieren convención de estado de CU-REP / CU-AH-04 / CU-GR-02.
+    solicitudesPendientes,
+    // TODO: requieren convención de estado de CU-REP / CU-AH-04 — todavía no construidos.
     reportesPorRevisar: 0,
     bitacorasPorRevisar: 0,
-    solicitudesPendientes: 0,
     departamento: profesor.departamento,
     cubiculo: profesor.cubiculo,
     caracteristicas: profesor.solicitud_caracteristica.map((sc) => sc.caracteristica.nombre.replace(/_/g, ' ')),
   };
+
 }
+
+
 
 async function resumenCoordinacion() {
   const [

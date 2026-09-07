@@ -8,6 +8,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: "America/Mexico_City"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
@@ -49,6 +50,7 @@ services:
       SMTP_PASS: ${SMTP_PASS}
       SMTP_FROM: ${SMTP_FROM}
       CORREO_DOMINIOS_EXTRA: "gmail.com"
+      TZ: "America/Mexico_City"
     depends_on:
       mariadb:
         condition: service_healthy

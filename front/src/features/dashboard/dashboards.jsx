@@ -197,6 +197,21 @@ function SlotNotificacion({ ruta, notificaciones, onLeer, navigate, C }) {
   );
 }
 
+// Slot CALCULADO — no lee la tabla `notificacion`, no tiene "leído": aparece
+// solo mientras la condición sea verdadera (ej. resumen.algoPendiente > 0) y
+// desaparece sola cuando deja de serlo. Úsalo para cualquier mensaje que sea
+// una CONSULTA en vivo, no un evento histórico que haya que recordar.
+function SlotNotificacionCalculada({ mostrar, mensaje, ruta, tipo = "info", navigate, C }) {
+  if (!mostrar) return null;
+  return (
+    <AlertBanner tipo={tipo} C={C} onClick={() => navigate(ruta)}>
+      {mensaje}
+    </AlertBanner>
+  );
+}
+
+
+
 function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C }) {
   const generales = notificaciones.filter((n) => !n.ruta_relacionada);
   if (generales.length === 0) return null;
@@ -338,9 +353,13 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
           Departamento de {resumen.departamento || "—"} · Cubículo {resumen.cubiculo || "—"}
         </p>
-        <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Características: {resumen.caracteristicas?.length ? resumen.caracteristicas.join(", ") : "Ninguna"}
-        </p>
+
+        {resumen.caracteristicas?.length > 0 && (
+  <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+    Características: {resumen.caracteristicas.join(", ")}
+  </p>
+)}
+
       </div>
 
       <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
@@ -367,7 +386,13 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         {/* CU-GR */}
         <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge={resumen.solicitudesPendientes}>
           <ActionItem icon="check" {...T.blue} label="Aceptar o rechazar solicitudes" desc="Solicitudes pendientes" onClick={() => navigate("/profesor/solicitudes")} C={C} />
-          <SlotNotificacion ruta="/profesor/solicitudes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.solicitudesPendientes ?? 0) > 0}
+            mensaje="Hay solicitudes de ingreso pendientes de respuesta."
+            ruta="/profesor/solicitudes"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="users" {...T.blue} label="Consultar información de alumnos" desc="Datos y cantidad" onClick={() => navigate("/profesor/mis-alumnos")} C={C} />
         </Section>
 

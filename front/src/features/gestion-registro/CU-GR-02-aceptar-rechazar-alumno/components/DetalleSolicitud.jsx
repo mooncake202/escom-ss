@@ -14,7 +14,7 @@ function InfoRow({ label, value, C }) {
 export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C }) {
   if (!solicitud) return null;
 
-  const fmtFecha = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
+  const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
 
   return (
     <>
@@ -62,7 +62,7 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
           <InfoRow label="Nombre"           value={solicitud.nombre}         C={C} />
           <InfoRow label="Boleta"           value={solicitud.boleta}         C={C} />
           <InfoRow label="Correo inst."     value={solicitud.correoInst}     C={C} />
-          <InfoRow label="Correo personal"  value={solicitud.correoPersonal} C={C} />
+          <InfoRow label="Correo personal"  value={solicitud.correoPersonal || "—"} C={C} />
           <InfoRow label="Teléfono"         value={solicitud.telefono}       C={C} />
 
           {/* Sección datos académicos */}
@@ -71,12 +71,14 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
           </p>
           <InfoRow label="Carrera"          value={CARRERA_LABEL[solicitud.carrera] ?? solicitud.carrera} C={C} />
           <InfoRow label="Créditos declarados" value={`${solicitud.creditos}%`} C={C} />
+          {/* RF-GR-17: dictamen activo (si aplica) */}
+          <InfoRow label="Dictamen"         value={solicitud.dictamen || "Sin dictamen"} C={C} />
           <InfoRow label="Periodo inicio"   value={fmtFecha(solicitud.periodoInicio)} C={C} />
           <InfoRow label="Periodo término"  value={fmtFecha(solicitud.periodoFin)}    C={C} />
           <InfoRow label="Fecha de envío"   value={fmtFecha(solicitud.fechaCreacion)}    C={C} />
           <InfoRow label="Vacante" value={solicitud.tituloOferta} C={C} />
           <InfoRow label="Habilidades y motivación" value={solicitud.motivacion} C={C} />
-          
+
 
           {/* Aviso RN-GR-04 */}
           <div style={{ marginTop: "1.25rem", padding: "10px 14px", background: C.warningSoft ?? "rgba(245,158,11,0.1)", borderRadius: RADIUS.md, border: `1px solid ${C.warning ?? "#F59E0B"}` }}>
@@ -86,7 +88,7 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
           </div>
         </div>
 
-        {/* Botones de acción — RN-GR-12 */}
+        {/* Botones de acción — RN-GR-07: solo aceptar o rechazar, sin comentarios */}
         <div style={{ padding: "1.25rem 1.5rem", borderTop: `1px solid ${C.borderSubtle}`, display: "flex", gap: "0.75rem" }}>
           <button
             onClick={() => onDecidir(solicitud.id, "rechazar")}

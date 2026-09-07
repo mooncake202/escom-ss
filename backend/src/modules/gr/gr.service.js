@@ -7,7 +7,7 @@ const {
   validarBoleta,
   validarContrasena,
 } = require('../../lib/validators');
-const { crearNotificacion } = require('../notificaciones/notificaciones.service');
+
 
 const CREDITOS_MIN_DEFAULT = 70;
 const CREDITOS_MIN_DICTAMEN_CREDITOS = 60;
@@ -220,18 +220,12 @@ async function enviarSolicitudRegistro(datos) {
     throw err;
   }
 
-  // ── 5. Notificar al profesor (fuera de la transacción a propósito) ──────
-  // Si esto falla, la solicitud YA quedó guardada — no debe tumbar el registro.
-  try {
-    await crearNotificacion({
-      usuarioId: ofertaEncontrada.profesor.usuario_id,
-      tipo: 'info',
-      mensaje: `Nueva postulación de ${nombreNormalizado} ${apellidosNormalizados} para tu oferta "${ofertaEncontrada.nombre_proyecto}".`,
-      rutaRelacionada: '/profesor/solicitudes',
-    });
-  } catch (err) {
-    console.error('No se pudo notificar al profesor de la nueva postulación:', err);
-  }
+  
+
+
+
+
+
 
   return { mensaje: 'Tu solicitud fue enviada correctamente. Ya puedes iniciar sesión para ver el estado de tu proceso.' };
 }
@@ -305,8 +299,22 @@ async function verificarYAplicarVencimiento(solicitudId) {
   if (ESTADOS_EXCLUIDOS_DE_VENCIMIENTO.includes(solicitud.estado_solicitud)) return solicitud;
   if (!solicitud.periodo_registro) return solicitud;
 
-  const limite = new Date(solicitud.periodo_registro.fecha_max_expediente);
-  limite.setHours(14, 0, 0, 0); // RN-GR-04: antes de las 2:00 pm de ese día
+  const fechaLimite = new Date(solicitud.periodo_registro.fecha_max_expediente);
+  // RN-GR-04: antes de las 2:00 pm HORA DE MÉXICO de ese día.
+  // fecha_max_expediente es @db.Date — Prisma la representa como medianoche
+  // UTC, que ya "es" las 6pm del día ANTERIOR en México. Por eso NO se usa
+  // setHours() (trabaja en hora local del proceso y movería el límite un
+  // día completo antes sin avisar) — se construye directo en UTC:
+  // 2:00 pm México (UTC-6, sin horario de verano desde 2022) = 20:00 UTC.
+  const limite = new Date(Date.UTC(
+    fechaLimite.getUTCFullYear(),
+    fechaLimite.getUTCMonth(),
+    fechaLimite.getUTCDate(),
+    20, 0, 0, 0
+  ));
+
+
+
 
   if (new Date() < limite) return solicitud;
 
@@ -365,6 +373,94 @@ async function obtenerEstadoActualPorUsuarioId(usuarioId) {
   };
 }
 
+// Estados desde los que se permite cambiar de oferta — RN-GR-17: "en los
+// tres escenarios" (pendiente, rechazada por perfil, rechazada por cupos).
+const ESTADOS_PERMITEN_CAMBIO_OFERTA = ['espera_respuesta_de_profesor', 'rechazada_por_profesor', 'rechazada_por_cupos'];
+
+/**
+ * CU-GR-03 — Cambiar de oferta (RN-GR-17 a RN-GR-20, RF-GR-32 a RF-GR-37)
+ */
+async function cambiarOferta(usuarioId, { ofertaId, motivacion }) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+
+  if (!alumno || !alumno.solicitud_registro) {
+    throw crearError('No se encontró tu solicitud de registro.', 404);
+  }
+
+  const solicitud = alumno.solicitud_registro;
+
+  if (!ESTADOS_PERMITEN_CAMBIO_OFERTA.includes(solicitud.estado_solicitud)) {
+    throw crearError('No puedes cambiar de oferta en el estado actual de tu solicitud.', 409);
+  }
+
+  if (!motivacion || motivacion.trim().length < 20) {
+    throw crearError('Describe tu motivo de postulación (mínimo 20 caracteres).');
+  }
+
+  const ofertaEncontrada = await prisma.oferta_servicio.findUnique({
+    where: { id: Number(ofertaId) },
+  });
+
+  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'Aprobada') {
+    throw crearError('La oferta seleccionada ya no está disponible.');
+  }
+
+  // RF-GR-37 / Excepción E2: mismo patrón de revalidación que en CU-GR-01.
+  if (ofertaEncontrada.cupos_disponibles <= 0) {
+    throw crearError('Lo sentimos, esa oferta ya no tiene cupo disponible. Selecciona otra.', 409, 'OFERTA_SIN_CUPOS');
+  }
+
+  await prisma.solicitud_registro.update({
+    where: { id: solicitud.id },
+    data: {
+      oferta_id: ofertaEncontrada.id,
+      motivacion_oferta: motivacion,
+      estado_solicitud: 'espera_respuesta_de_profesor',
+      estado_anterior: null, // confirmado: se pierde el rastro a propósito, tal como dice la ficha
+      tipo_rechazo: null,
+      motivo_rechazo: null,
+      fecha_aplicacion: new Date(),
+    },
+  });
+
+    return { mensaje: 'Tu selección de oferta fue actualizada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
+}
+
+/**
+ * CU-GR-03, Flujo D / Salida #5 — botón "Siguiente paso" cuando ya fue aceptado.
+ */
+async function continuarARegistroSISS(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+
+  if (!alumno || !alumno.solicitud_registro) {
+    throw crearError('No se encontró tu solicitud de registro.', 404);
+  }
+
+  if (alumno.solicitud_registro.estado_solicitud !== 'aceptada_por_profesor') {
+    throw crearError('Tu solicitud no está en el estado correcto para continuar.', 409);
+  }
+
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: {
+      estado_solicitud: 'registro_SISS',
+      estado_anterior: 'aceptada_por_profesor',
+    },
+  });
+
+    return { mensaje: 'Avanzaste al registro en SISS.', estado_solicitud: 'registro_SISS' };
+}
+
+
+
+
+
 module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
@@ -372,6 +468,8 @@ module.exports = {
   obtenerEstadoActualPorUsuarioId,
   DICTAMEN_MAP, 
   dictamenLabel,
+  cambiarOferta,
+  continuarARegistroSISS,
 };
 
 

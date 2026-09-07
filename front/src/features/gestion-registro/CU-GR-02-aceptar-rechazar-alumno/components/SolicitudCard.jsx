@@ -3,8 +3,6 @@ import { RADIUS } from "../../../../themes/colors";
 const CARRERA_LABEL = { ISC: "Ing. Sistemas Computacionales", IA: "Inteligencia Artificial", LCD: "Lic. Ciencia de Datos" };
 
 export function SolicitudCard({ solicitud, onVer, C }) {
-  console.log(solicitud.tituloOferta) 
-
   const fecha = new Date(solicitud.fechaCreacion).toLocaleDateString("es-MX", {
     day: "2-digit", month: "short", year: "numeric",
   });
@@ -22,9 +20,9 @@ export function SolicitudCard({ solicitud, onVer, C }) {
           {solicitud.nombre}
         </p>
         <p style={{ margin: "0 0 3px", fontSize: 12, color: C.textMuted }}>
-          {CARRERA_LABEL[solicitud.carrera] ?? solicitud.carrera} 
+          {CARRERA_LABEL[solicitud.carrera] ?? solicitud.carrera}
         </p>
-        
+
         <p style={{ margin: "0 0 3px", fontSize: 12, color: C.textMuted }}>
           Vacante: { solicitud.tituloOferta }
         </p>

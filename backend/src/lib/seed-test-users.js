@@ -30,7 +30,7 @@ const DATOS_PROFESOR = {
   telefono_personal: '5512345678',
   horario_atencion: 'Lunes a viernes 10:00-12:00',
   cubiculo: 'ESCOM-101',
-  cupos_totales: 5,
+  cupos_totales: 3,
 };
 
 async function main() {

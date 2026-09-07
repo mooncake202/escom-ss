@@ -3,22 +3,25 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useSolicitudesPendientes } from "./hooks/useSolicitudesPendientes";
 import { SolicitudCard }    from "./components/SolicitudCard";
 import { DetalleSolicitud } from "./components/DetalleSolicitud";
- 
+
 export default function SolicitudesPendientes() {
   const { C } = useTheme();
   const {
-    pendientes, seleccionada, loading, resultado,
+    pendientes, cargandoLista, seleccionada, loading, resultado,
     verDetalle, cerrarDetalle, decidir,
   } = useSolicitudesPendientes();
- 
+
+  const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
+  const nombreProfesor = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "Profesor";
+
   return (
     <DashboardLayout
       titulo="Solicitudes pendientes"
       subtitulo="Alumnos que han solicitado realizar su servicio social con usted"
       rol="profesor"
-      usuario="Dr. Torres Vega"
+      usuario={nombreProfesor}
     >
- 
+
       {/* Toast de resultado */}
       {resultado && (
         <div style={{
@@ -30,22 +33,25 @@ export default function SolicitudesPendientes() {
           fontSize: 13, fontWeight: 500,
         }}>
           {resultado.tipo === "aceptar"
-            ? `✓ Solicitud de ${resultado.nombre} aceptada. El alumno fue notificado.`
-            : `✕ Solicitud de ${resultado.nombre} rechazada. El alumno fue notificado.`
+            ? `✓ Solicitud de ${resultado.nombre} aceptada. El alumno lo verá reflejado en su proceso.`
+            : `✕ Solicitud de ${resultado.nombre} rechazada. El alumno lo verá reflejado en su proceso.`
           }
         </div>
       )}
- 
+
       {/* Encabezado de sección */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ margin: "0 0 0.25rem", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
-          Solicitudes pendientes
+          
         </h2>
-        
       </div>
- 
+
       {/* Lista */}
-      {pendientes.length === 0 ? (
+      {cargandoLista ? (
+        <div style={{ textAlign: "center", padding: "4rem 1rem", color: C.textDisabled }}>
+          Cargando solicitudes...
+        </div>
+      ) : pendientes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
           <p style={{ fontSize: 32, margin: "0 0 0.75rem" }}>📭</p>
           <p style={{ fontSize: 15, color: C.textMuted, margin: 0 }}>No tienes solicitudes pendientes</p>
@@ -63,7 +69,7 @@ export default function SolicitudesPendientes() {
           </p>
         </div>
       )}
- 
+
       {/* Panel de detalle */}
       <DetalleSolicitud
         solicitud={seleccionada}
