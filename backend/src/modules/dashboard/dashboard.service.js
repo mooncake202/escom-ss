@@ -122,8 +122,8 @@ async function resumenCoordinacion() {
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoLabel: formatearPeriodo(periodoMasReciente),
-    // TODO: requieren convención de estado de CU-GR-02 / CU-REP / CU-PRO.
-    solicitudesRegistroPendientes: 0,
+        // Ya resuelto por CU-GR-07.
+    solicitudesRegistroPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'SISS_y_documentacion_pendiente' } }),
     reportesPorRevisar: 0,
     reportesAprobadosMes: 0,
     ofertasPorValidar: 0,

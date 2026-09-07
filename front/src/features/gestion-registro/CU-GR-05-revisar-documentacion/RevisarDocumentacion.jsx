@@ -4,34 +4,43 @@ import { SolicitudDocCard }         from "./components/SolicitudDocCard";
 import { DetalleDocumentacion }     from "./components/DetalleDocumentacion";
 import { useRevisarDocumentacion }  from "./hooks/useRevisarDocumentacion";
 
+const MENSAJE_RESULTADO = {
+  aceptar: (nombre) => `✓ Documentación de ${nombre} validada. El alumno fue notificado.`,
+  corregir_siss: (nombre) => `⚠ Se pidió corregir el registro SISS de ${nombre}.`,
+  corregir_documentos: (nombre) => `⚠ Se pidió corregir los documentos de ${nombre}.`,
+  rechazar_definitivo: (nombre) => `✕ Solicitud de ${nombre} rechazada definitivamente.`,
+};
+
 export default function RevisarDocumentacion() {
   const { C } = useTheme();
   const {
-    pendientes, seleccionada, loading, resultado,
+    pendientes, cargandoLista, seleccionada, loading, resultado,
     comentario, setComentario, modoRechazo, setModoRechazo,
-    verDetalle, cerrar, decidir,
+    verDetalle, cerrar, decidir, verPdf, errorDescarga,
   } = useRevisarDocumentacion();
+
+  const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
+  const nombreCoordinador = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "Coordinación";
+
+  const esResultadoExito = resultado?.tipo === "aceptar";
 
   return (
     <DashboardLayout
       titulo="Revisión de documentación inicial"
-      subtitulo="CU-GR-05 · Coordinación"
-      rol="coordinacion"
-      usuario="Coordinación ESCOM"
+      subtitulo="CU-GR-07 · Coordinación"
+      rol="coordinador"
+      usuario={nombreCoordinador}
     >
-      {/* Toast resultado — RN-GR-31 */}
+      {/* Toast resultado */}
       {resultado && (
         <div style={{
           marginBottom: "1.25rem", padding: "12px 16px", borderRadius: RADIUS.md,
-          background: resultado.tipo === "aceptar" ? C.successSoft : C.dangerSoft,
-          border: `1px solid ${resultado.tipo === "aceptar" ? C.success : C.danger}`,
-          color: resultado.tipo === "aceptar" ? C.success : C.danger,
+          background: esResultadoExito ? C.successSoft : C.dangerSoft,
+          border: `1px solid ${esResultadoExito ? C.success : C.danger}`,
+          color: esResultadoExito ? C.success : C.danger,
           fontSize: 13, fontWeight: 500,
         }}>
-          {resultado.tipo === "aceptar"
-            ? `✓ Documentación de ${resultado.nombre} validada. El alumno fue notificado.`
-            : `✕ Documentación de ${resultado.nombre} rechazada. El alumno fue notificado con el motivo.`
-          }
+          {MENSAJE_RESULTADO[resultado.tipo]?.(resultado.nombre)}
         </div>
       )}
 
@@ -46,7 +55,9 @@ export default function RevisarDocumentacion() {
       </div>
 
       {/* Lista */}
-      {pendientes.length === 0 ? (
+      {cargandoLista ? (
+        <p style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "2rem" }}>Cargando...</p>
+      ) : pendientes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
           <p style={{ fontSize: 32, margin: "0 0 0.75rem" }}>📭</p>
           <p style={{ fontSize: 15, color: C.textMuted, margin: 0 }}>No hay documentación pendiente de revisión</p>
@@ -71,6 +82,8 @@ export default function RevisarDocumentacion() {
         modoRechazo={modoRechazo}
         setModoRechazo={setModoRechazo}
         onDecidir={decidir}
+        onVerPdf={verPdf}
+        errorDescarga={errorDescarga}
         onCerrar={cerrar}
         C={C}
       />

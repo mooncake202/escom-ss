@@ -541,7 +541,6 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
   if (!cartaCreditos || !seguroSocial) {
     throw crearError('Debes adjuntar ambos documentos obligatorios.');
   }
-
   if (!esPdfValido(cartaCreditos.buffer) || !esPdfValido(seguroSocial.buffer)) {
     throw crearError('Alguno de los archivos no es un PDF válido.');
   }
@@ -550,73 +549,58 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
     where: { usuario_id: usuarioId },
     include: { solicitud_registro: true },
   });
-
-  if (!alumno || !alumno.solicitud_registro) {
-    throw crearError('No se encontró tu solicitud de registro.', 404);
-  }
-
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
   if (alumno.solicitud_registro.estado_solicitud !== 'adjuntar_documentacion_inicial') {
     throw crearError('Tu solicitud no está en el paso de adjuntar documentación.', 409);
   }
 
-  // RN-GR-32 / RF-GR-56: se guardan cifrados (ver fileEncryption.js), con
-  // nombre aleatorio — nunca el nombre original que subió el alumno.
   const carpetaAlumno = path.join(RUTA_BASE_DOCUMENTOS, alumno.boleta);
   fs.mkdirSync(carpetaAlumno, { recursive: true });
 
-  const nombreCarta = generarNombreSeguro();
-  const nombreSeguro = generarNombreSeguro();
-  const rutaRelativaCarta = path.join(alumno.boleta, nombreCarta);
-  const rutaRelativaSeguro = path.join(alumno.boleta, nombreSeguro);
+  const rutaRelativaCarta = path.join(alumno.boleta, generarNombreSeguro());
+  const rutaRelativaSeguro = path.join(alumno.boleta, generarNombreSeguro());
 
   fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativaCarta), cifrarBuffer(cartaCreditos.buffer));
   fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativaSeguro), cifrarBuffer(seguroSocial.buffer));
 
   const ahora = new Date();
+  const rutasViejasABorrar = [];
 
   try {
-    await prisma.$transaction([
-      prisma.documento.create({
-        data: {
-          alumno_id: alumno.boleta,
-          creador_id: usuarioId,
-          tipo_documento: 'carta_creditos',
-          fecha_creacion: ahora,
-          estado_documento: 'en_revision',
-          ruta_archivo: rutaRelativaCarta,
-        },
-      }),
-      prisma.documento.create({
-        data: {
-          alumno_id: alumno.boleta,
-          creador_id: usuarioId,
-          tipo_documento: 'constancia_seguro_social',
-          fecha_creacion: ahora,
-          estado_documento: 'en_revision',
-          ruta_archivo: rutaRelativaSeguro,
-        },
-      }),
-      prisma.solicitud_registro.update({
+    await prisma.$transaction(async (tx) => {
+      // Reutiliza la fila si ya existe (ej. Coordinador pidió corrección);
+      // solo crea una nueva si es la primera vez que este alumno sube este tipo.
+      for (const [tipoDocumento, rutaNueva] of [
+        ['carta_creditos', rutaRelativaCarta],
+        ['constancia_seguro_social', rutaRelativaSeguro],
+      ]) {
+        const existente = await tx.documento.findFirst({ where: { alumno_id: alumno.boleta, tipo_documento: tipoDocumento } });
+        if (existente) {
+          rutasViejasABorrar.push(existente.ruta_archivo);
+          await tx.documento.update({
+            where: { id: existente.id },
+            data: { ruta_archivo: rutaNueva, estado_documento: 'en_revision', creador_id: usuarioId, fecha_creacion: ahora, aprobado_por_id: null },
+          });
+        } else {
+          await tx.documento.create({
+            data: { alumno_id: alumno.boleta, creador_id: usuarioId, tipo_documento: tipoDocumento, fecha_creacion: ahora, estado_documento: 'en_revision', ruta_archivo: rutaNueva },
+          });
+        }
+      }
+
+      await tx.solicitud_registro.update({
         where: { id: alumno.solicitud_registro.id },
-        data: {
-          estado_solicitud: 'SISS_y_documentacion_pendiente',
-          estado_anterior: 'adjuntar_documentacion_inicial',
-          docs_iniciales: true,
-        },
-      }),
-    ]);
-  } catch (err) {
-    // Excepción E2: si la BD falla, no dejamos archivos huérfanos en disco.
-    [rutaRelativaCarta, rutaRelativaSeguro].forEach((ruta) => {
-      try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, ruta)); } catch {}
+        data: { estado_solicitud: 'SISS_y_documentacion_pendiente', estado_anterior: 'adjuntar_documentacion_inicial', docs_iniciales: true },
+      });
     });
+  } catch (err) {
+    [rutaRelativaCarta, rutaRelativaSeguro].forEach((ruta) => { try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, ruta)); } catch {} });
     throw crearError('Ocurrió un error al procesar la solicitud.', 500);
   }
 
-  return {
-    mensaje: 'Tu documentación fue enviada correctamente y será revisada por Coordinación.',
-    estado_solicitud: 'SISS_y_documentacion_pendiente',
-  };
+  rutasViejasABorrar.forEach((ruta) => { try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, ruta)); } catch {} });
+
+  return { mensaje: 'Tu documentación fue enviada correctamente y será revisada por Coordinación.', estado_solicitud: 'SISS_y_documentacion_pendiente' };
 }
 
 
@@ -738,6 +722,7 @@ module.exports = {
   corregirRegistroSISS,
   iniciarModificarSolicitud,
   obtenerMisDocumentos,
+  RUTA_BASE_DOCUMENTOS,
 
 };
 

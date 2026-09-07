@@ -8,10 +8,8 @@ const CARRERA_LABEL = {
 
 export function SolicitudDocCard({ solicitud, onVer, C }) {
   const fecha = new Date(solicitud.fechaEnvio).toLocaleDateString("es-MX", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit", month: "short", year: "numeric", timeZone: "UTC",
   });
-
-  const numDocs = Object.values(solicitud.documentos).filter(Boolean).length;
 
   return (
     <div style={{
@@ -25,21 +23,20 @@ export function SolicitudDocCard({ solicitud, onVer, C }) {
           {solicitud.alumno.nombre}
         </p>
         <p style={{ margin: "0 0 3px", fontSize: 12, color: C.textMuted }}>
-          {CARRERA_LABEL[solicitud.alumno.carrera]} · Boleta {solicitud.alumno.boleta}
+          {CARRERA_LABEL[solicitud.alumno.carrera] || solicitud.alumno.carrera} · Boleta {solicitud.alumno.boleta}
         </p>
         <p style={{ margin: "0 0 3px", fontSize: 12, color: C.textMuted }}>
-          Profesor: {solicitud.profesor}
+          Profesor: {solicitud.profesor || "—"}
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.successSoft, color: C.success, fontWeight: 600 }}>
-            SISS ✓
+          <span style={{
+            fontSize: 11, padding: "2px 8px", borderRadius: 20,
+            background: solicitud.registroSISS ? C.successSoft : C.dangerSoft,
+            color: solicitud.registroSISS ? C.success : C.danger, fontWeight: 600,
+          }}>
+            SISS {solicitud.registroSISS ? "✓" : "✕"}
           </span>
-          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.accentSoft, color: C.accentText, fontWeight: 600 }}>
-            {numDocs} documento{numDocs !== 1 ? "s" : ""}
-          </span>
-          <span style={{ fontSize: 12, color: C.textDisabled }}>
-            Enviada el {fecha}
-          </span>
+          <span style={{ fontSize: 12, color: C.textDisabled }}>Enviada el {fecha}</span>
         </div>
       </div>
 

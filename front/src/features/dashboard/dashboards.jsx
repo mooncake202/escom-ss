@@ -480,9 +480,15 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </Section>
 
         {/* CU-GR */}
-        <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C}>
+          <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge={resumen.solicitudesRegistroPendientes}>
           <ActionItem icon="document" {...T.blue}   label="Revisar documentación inicial"  desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/documentacion")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/documentacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.solicitudesRegistroPendientes ?? 0) > 0}
+            mensaje="Tienes revisiones pendientes de documentación inicial."
+            ruta="/coordinacion/documentacion"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="check"    {...T.green}  label="Validar carta compromiso"       desc="Confirma cuando el alumno la entregue" onClick={() => navigate("/coordinacion/carta-presencial")} C={C} />
           <ActionItem icon="folder"   {...T.purple} label="Revisar expediente de registro" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/expedientes")} C={C} />
           <SlotNotificacion ruta="/coordinacion/expedientes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
