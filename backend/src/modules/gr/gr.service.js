@@ -620,6 +620,106 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
 }
 
 
+async function continuarACartaCompromiso(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'SISS_docs_aprobados') {
+    throw crearError('Tu solicitud no está en el paso correcto para continuar.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'descargar_carta_compromiso', estado_anterior: 'SISS_docs_aprobados' },
+  });
+  return { mensaje: 'Avanzaste al paso de carta compromiso.', estado_solicitud: 'descargar_carta_compromiso' };
+}
+
+async function corregirDocumentacion(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'corregir_docsini') {
+    throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'adjuntar_documentacion_inicial', estado_anterior: 'corregir_docsini' },
+  });
+  return { mensaje: 'Vuelve a adjuntar tu documentación.', estado_solicitud: 'adjuntar_documentacion_inicial' };
+}
+
+async function corregirRegistroSISS(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'corregir_SISS') {
+    throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'registro_SISS', estado_anterior: 'corregir_SISS' },
+  });
+  return { mensaje: 'Vuelve a completar tu registro en SISS.', estado_solicitud: 'registro_SISS' };
+}
+
+/**
+ * Botón "Modificar solicitud y reenviar" — el componente compartido
+ * SolicitudRechazadaDefinitivamente lo usa desde CUALQUIER pantalla donde
+ * pueda aparecer rechazada_definitivamente (GR-01, GR-03, GR-04, GR-05, GR-06...).
+ */
+async function iniciarModificarSolicitud(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'rechazada_definitivamente') {
+    throw crearError('Tu solicitud no está en estado de rechazo definitivo.', 409);
+  }
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: {
+      estado_solicitud: 'modificar_reenviar',
+      estado_anterior: 'rechazada_definitivamente',
+      oferta_id: null,
+      motivacion_oferta: null,
+      tipo_rechazo: null,
+      motivo_rechazo: null,
+      registro_siss: false,
+      docs_iniciales: false,
+      periodo_registro_id: null,
+    },
+  });
+  return { mensaje: 'Ya puedes modificar y reenviar tu solicitud.', estado_solicitud: 'modificar_reenviar' };
+}
+
+/**
+ * RF-GR-61/62: lista de documentos del alumno — de propósito general,
+ * reutilizable en futuras pantallas (GR-08, GR-10...), no exclusiva de este CU.
+ */
+async function obtenerMisDocumentos(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({ where: { usuario_id: usuarioId } });
+  if (!alumno) throw crearError('No se encontró tu perfil de alumno.', 404);
+
+  const documentos = await prisma.documento.findMany({
+    where: { alumno_id: alumno.boleta },
+    orderBy: { fecha_creacion: 'desc' },
+  });
+
+  return documentos.map((d) => ({
+    id: d.id,
+    tipoDocumento: d.tipo_documento,
+    estadoDocumento: d.estado_documento,
+    fechaCreacion: d.fecha_creacion,
+  }));
+}
+
 
 module.exports = {
   enviarSolicitudRegistro,
@@ -633,6 +733,12 @@ module.exports = {
   obtenerInfoSISS,
   confirmarRegistroSISS,
   adjuntarDocumentacionInicial,
+  continuarACartaCompromiso,
+  corregirDocumentacion,
+  corregirRegistroSISS,
+  iniciarModificarSolicitud,
+  obtenerMisDocumentos,
+
 };
 
 

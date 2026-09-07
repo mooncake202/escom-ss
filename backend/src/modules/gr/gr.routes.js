@@ -4,7 +4,9 @@ const express = require('express');
 const { requireAuth, requireRole } = require('../../middleware/auth.middleware');
 const { postEnviarSolicitud, getVerificarCorreo, getEstadoSolicitud } = require('./gr.controller');
 const { postCambiarOferta, postContinuarSISS } = require('./gr.controller'); 
-const { getInfoSISS, postConfirmarSISS, postAdjuntarDocumentacion } = require('./gr.controller'); 
+const { getInfoSISS, postConfirmarSISS, postAdjuntarDocumentacion, postContinuarCartaCompromiso,
+    postCorregirDocumentacion, postCorregirSISS, postModificarSolicitud, getMisDocumentos,
+} = require('./gr.controller'); 
 
 const router = express.Router();
 
@@ -30,5 +32,11 @@ router.post('/confirmar-siss', requireAuth, requireRole('alumno_sin_asignar'), p
 //gr-05
 router.post('/adjuntar-documentacion', requireAuth, requireRole('alumno_sin_asignar'), postAdjuntarDocumentacion);
 
+//gr06
+router.post('/continuar-carta-compromiso', requireAuth, requireRole('alumno_sin_asignar'), postContinuarCartaCompromiso);
+router.post('/corregir-documentacion', requireAuth, requireRole('alumno_sin_asignar'), postCorregirDocumentacion);
+router.post('/corregir-siss', requireAuth, requireRole('alumno_sin_asignar'), postCorregirSISS);
+router.post('/modificar-solicitud', requireAuth, requireRole('alumno_sin_asignar'), postModificarSolicitud);
+router.get('/mis-documentos', requireAuth, requireRole('alumno_sin_asignar'), getMisDocumentos);
 
 module.exports = router;

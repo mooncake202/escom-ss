@@ -56,3 +56,41 @@ export async function adjuntarDocumentacionInicial(cartaCreditos, seguroSocial) 
     body: formData,
   });
 }
+
+/**
+ * CU-GR-06, Flujo A — botón "Continuar" cuando SISS_docs_aprobados.
+ */
+export async function continuarACartaCompromiso() {
+  return apiFetch("/registro/continuar-carta-compromiso", { method: "POST" });
+}
+
+/**
+ * CU-GR-06, Flujo B — botón "Corregir y reenviar" cuando corregir_docsini.
+ */
+export async function corregirDocumentacion() {
+  return apiFetch("/registro/corregir-documentacion", { method: "POST" });
+}
+
+/**
+ * CU-GR-06, Flujo C — botón "Corregir registro en SISS" cuando corregir_SISS.
+ */
+export async function corregirRegistroSISS() {
+  return apiFetch("/registro/corregir-siss", { method: "POST" });
+}
+
+/**
+ * CU-GR-06, Flujo D / RN-GR-36 — botón "Modificar solicitud y reenviar".
+ * Usado por el componente compartido SolicitudRechazadaDefinitivamente,
+ * sin importar desde qué pantalla se dispare.
+ */
+export async function iniciarModificarSolicitud() {
+  return apiFetch("/registro/modificar-solicitud", { method: "POST" });
+}
+
+/**
+ * Lista de documentos del alumno — de propósito general, no exclusiva de
+ * ningún CU en particular.
+ */
+export async function getMisDocumentos() {
+  return apiFetch("/registro/mis-documentos");
+}

@@ -139,6 +139,38 @@ function postAdjuntarDocumentacion(req, res) {
 }
 
 
+function crearHandlerAccion(fn, mensajeInterno) {
+  return async (req, res) => {
+    try {
+      const resultado = await fn(req.usuario.sub);
+      return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud });
+    } catch (err) {
+      const status = err.status || 500;
+      const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+      if (status === 500) console.error(mensajeInterno, err);
+      return res.status(status).json({ message });
+    }
+  };
+}
+
+const postContinuarCartaCompromiso = crearHandlerAccion(grService.continuarACartaCompromiso, 'Error al continuar a carta compromiso:');
+const postCorregirDocumentacion = crearHandlerAccion(grService.corregirDocumentacion, 'Error al corregir documentación:');
+const postCorregirSISS = crearHandlerAccion(grService.corregirRegistroSISS, 'Error al corregir SISS:');
+const postModificarSolicitud = crearHandlerAccion(grService.iniciarModificarSolicitud, 'Error al iniciar modificación de solicitud:');
+
+async function getMisDocumentos(req, res) {
+  try {
+    const documentos = await grService.obtenerMisDocumentos(req.usuario.sub);
+    return res.status(200).json(documentos);
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al obtener documentos:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+
 module.exports = { 
   postEnviarSolicitud, 
   getVerificarCorreo, 
@@ -148,6 +180,11 @@ module.exports = {
   getInfoSISS,
   postConfirmarSISS,
   postAdjuntarDocumentacion,
+  postContinuarCartaCompromiso,
+  postCorregirDocumentacion, 
+  postCorregirSISS,
+  postModificarSolicitud,
+  getMisDocumentos,
 };
 
 
