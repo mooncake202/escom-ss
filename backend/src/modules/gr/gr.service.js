@@ -8,6 +8,8 @@ const {
   validarContrasena,
 } = require('../../lib/validators');
 
+const { generarToken } = require('../../lib/jwt');
+
 const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 
 const fs = require('fs');
@@ -898,6 +900,66 @@ async function subirExpediente(usuarioId, archivos) {
   return { mensaje: 'Tu expediente fue enviado correctamente y será revisado por Coordinación.', estado_solicitud: 'expediente_pendiente_revision' };
 }
 
+/**
+ * CU-GR-11, Flujo A / Salida #2 — botón "Corregir y reenviar expediente".
+ */
+async function corregirExpediente(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'expediente_con_correcciones') {
+    throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
+  }
+
+  await prisma.$transaction([
+    prisma.solicitud_registro.update({
+      where: { id: alumno.solicitud_registro.id },
+      data: { estado_solicitud: 'adjuntar_expediente', estado_anterior: 'expediente_con_correcciones' },
+    }),
+    prisma.documento.updateMany({
+      where: { alumno_id: alumno.boleta, tipo_documento: 'expediente' },
+      data: { estado_documento: 'en_revision' },
+    }),
+  ]);
+
+  return { mensaje: 'Vuelve a integrar y enviar tu expediente.', estado_solicitud: 'adjuntar_expediente' };
+}
+
+/**
+ * CU-GR-11, Flujo B / Salida #4 — RN-GR-67/RF-GR-103: el alumno pasa a
+ * Alumno Asignado de verdad. Como requireRole() valida contra el rol
+ * FIRMADO dentro del JWT (no una consulta fresca a la BD), hay que emitir
+ * un token nuevo — si no, el alumno seguiría siendo tratado como
+ * alumno_sin_asignar en cualquier endpoint futuro que exija el rol nuevo.
+ */
+async function continuarAlumnoAsignado(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'expediente_aprobado') {
+    throw crearError('Tu solicitud no está en el paso correcto para continuar.', 409);
+  }
+
+  await prisma.$transaction([
+    prisma.solicitud_registro.update({
+      where: { id: alumno.solicitud_registro.id },
+      data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_aprobado' },
+    }),
+    prisma.usuario.update({ where: { id: usuarioId }, data: { rol: 'alumno_asignado' } }),
+  ]);
+
+  const nuevoToken = generarToken({ sub: usuarioId, rol: 'alumno_asignado' });
+
+  return { mensaje: '¡Felicidades! Ya eres Alumno Asignado.', estado_solicitud: 'alumno_asignado', token: nuevoToken };
+}
+
+
+
+
 module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
@@ -920,4 +982,6 @@ module.exports = {
   continuarAExpediente,
   obtenerInfoExpediente,
   subirExpediente,
+  corregirExpediente,
+  continuarAlumnoAsignado,
 };

@@ -42,18 +42,9 @@ export async function confirmarCartaCompromiso() {
 export async function continuarAExpediente() {
   return apiFetch("/registro/continuar-expediente", { method: "POST" });
 }
-
-/**
- * CU-GR-10 — datos previos (si necesita dictamen, nombre sugerido del PDF).
- */
 export async function getInfoExpediente() {
   return apiFetch("/registro/info-expediente");
 }
-
-/**
- * CU-GR-10 — sube los 3-4 documentos del expediente; el backend los une,
- * comprime si hace falta, y guarda el PDF final.
- */
 export async function subirExpediente({ cartaCompromiso, curp, constanciaCreditos, dictamen }) {
   const formData = new FormData();
   formData.append("cartaCompromiso", cartaCompromiso);
@@ -61,4 +52,19 @@ export async function subirExpediente({ cartaCompromiso, curp, constanciaCredito
   formData.append("constanciaCreditos", constanciaCreditos);
   if (dictamen) formData.append("dictamen", dictamen);
   return apiFetch("/registro/subir-expediente", { method: "POST", body: formData });
+}
+
+/**
+ * CU-GR-11, Flujo A — botón "Corregir y reenviar expediente".
+ */
+export async function corregirExpediente() {
+  return apiFetch("/registro/corregir-expediente", { method: "POST" });
+}
+
+/**
+ * CU-GR-11, Flujo B — botón "Continuar" cuando expediente_aprobado.
+ * Regresa también un JWT nuevo, porque el rol del usuario cambió de verdad.
+ */
+export async function continuarAlumnoAsignado() {
+  return apiFetch("/registro/continuar-alumno-asignado", { method: "POST" });
 }

@@ -235,6 +235,20 @@ function postSubirExpediente(req, res) {
   });
 }
 
+const postCorregirExpediente = crearHandlerAccion(grService.corregirExpediente, 'Error al corregir expediente:');
+
+async function postContinuarAlumnoAsignado(req, res) {
+  try {
+    const resultado = await grService.continuarAlumnoAsignado(req.usuario.sub);
+    return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud, token: resultado.token });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al continuar como alumno asignado:', err);
+    return res.status(status).json({ message });
+  }
+}
+
 
 module.exports = { 
   postEnviarSolicitud, 
@@ -254,6 +268,8 @@ module.exports = {
   postContinuarExpediente,
   getInfoExpediente,
   postSubirExpediente,
+  postCorregirExpediente,
+  postContinuarAlumnoAsignado,
 };
 
 

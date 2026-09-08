@@ -74,7 +74,7 @@ const NAV_ITEMS_COORDINACION = [
 // "coordinacion" — se mantienen ambas claves para no romper otras pantallas
 // que aún pasen rol="coordinacion".
 const NAV_ITEMS = {
-  alumno: NAV_ITEMS_ALUMNO,
+  alumno_asignado: NAV_ITEMS_ALUMNO,
   profesor: NAV_ITEMS_PROFESOR,
   coordinacion: NAV_ITEMS_COORDINACION,
   coordinador: NAV_ITEMS_COORDINACION,

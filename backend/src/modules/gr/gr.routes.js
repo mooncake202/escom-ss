@@ -6,7 +6,7 @@ const { postEnviarSolicitud, getVerificarCorreo, getEstadoSolicitud } = require(
 const { postCambiarOferta, postContinuarSISS } = require('./gr.controller'); 
 const { getInfoSISS, postConfirmarSISS, postAdjuntarDocumentacion, postContinuarCartaCompromiso,
     postCorregirDocumentacion, postCorregirSISS, postModificarSolicitud, getMisDocumentos,
-    postConfirmarCartaCompromiso, postContinuarExpediente
+    postConfirmarCartaCompromiso, postContinuarExpediente, postCorregirExpediente, postContinuarAlumnoAsignado,
 } = require('./gr.controller'); 
 
 const router = express.Router();
@@ -53,6 +53,8 @@ const { getInfoExpediente, postSubirExpediente } = require('./gr.controller');
 router.get('/info-expediente', requireAuth, requireRole('alumno_sin_asignar'), getInfoExpediente);
 router.post('/subir-expediente', requireAuth, requireRole('alumno_sin_asignar'), postSubirExpediente);
 
-
+//gr-11
+router.post('/corregir-expediente', requireAuth, requireRole('alumno_sin_asignar'), postCorregirExpediente);
+router.post('/continuar-alumno-asignado', requireAuth, requireRole('alumno_sin_asignar'), postContinuarAlumnoAsignado);
 
 module.exports = router;
