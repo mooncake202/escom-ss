@@ -175,11 +175,13 @@ export default function RecuperarContrasena() {
   const [loading, setLoading] = useState(false);
   const [enviado, setEnviado] = useState(false);
 
+  const CORREO_INSTITUCIONAL_REGEX = /^([^\s@]+@ipn\.mx|[a-zA-Z]+[0-9]{4}@alumno\.ipn\.mx)$/i;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!correo.trim()) return setError("Ingresa tu correo institucional.");
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo.trim()))
-      return setError("Ingresa un correo con formato válido.");
+    if (!CORREO_INSTITUCIONAL_REGEX.test(correo.trim()))
+      return setError("Ingresa un correo institucional válido (@ipn.mx o @alumno.ipn.mx).");
 
     setLoading(true);
     setError("");

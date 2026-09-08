@@ -71,9 +71,13 @@ export default function LoginPage() {
     setError("");
   };
 
+  const CORREO_INSTITUCIONAL_REGEX = /^([^\s@]+@ipn\.mx|[a-zA-Z]+[0-9]{4}@alumno\.ipn\.mx)$/i;
+
   const handleSubmit = async e => {
     e.preventDefault();
     if (!form.correoInst) return setError("Ingresa tu correo institucional");
+    if (!CORREO_INSTITUCIONAL_REGEX.test(form.correoInst.trim()))
+      return setError("Ingresa un correo institucional válido (@ipn.mx o @alumno.ipn.mx).");
     if (!form.password)   return setError("Ingresa tu contraseña");
 
     setLoading(true);

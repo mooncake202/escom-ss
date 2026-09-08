@@ -451,7 +451,7 @@ function FormularioUsuario({
 
     const NOMBRE_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿÑñ' -]{2,50}$/;
     const TELEFONO_REGEX = /^\d{10}$/;
-    const CORREO_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const CORREO_REGEX = /^[^\s@]+@ipn\.mx$/i;
 
     if (!form.nombre.trim())
       e.nombre = "El nombre es obligatorio.";
@@ -466,7 +466,7 @@ function FormularioUsuario({
     if (!form.correo_institucional.trim())
       e.correo_institucional = "El correo institucional es obligatorio.";
     else if (!CORREO_REGEX.test(form.correo_institucional.trim()))
-    e.correo_institucional = "El correo no tiene un formato válido.";
+    e.correo_institucional = "El correo debe terminar en @ipn.mx.";
 
     if (!form.rol)
       e.rol = "Debes seleccionar un rol.";
