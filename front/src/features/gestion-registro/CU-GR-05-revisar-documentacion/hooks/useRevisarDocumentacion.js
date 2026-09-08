@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesDocumentacion, decidirDocumentacion, verDocumentoPDF } from "@/services/coordinadorDocumentacionService";
 
+const INTERVALO_MS = 120000;
+
 export function useRevisarDocumentacion() {
   const [solicitudes, setSolicitudes] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -20,7 +22,11 @@ export function useRevisarDocumentacion() {
       .finally(() => setCargandoLista(false));
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    const intervalo = setInterval(cargar, INTERVALO_MS);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const verDetalle = (s) => {
     setSeleccionada(s);

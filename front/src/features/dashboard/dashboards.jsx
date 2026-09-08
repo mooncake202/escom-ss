@@ -585,7 +585,9 @@ export default function Dashboards() {
       }
     }
     cargar();
-  }, []); // una sola vez al montar — ver nota sobre el loop de useSesion()
+    const intervalo = setInterval(cargar, 120000);
+    return () => clearInterval(intervalo);
+  }, []); // se repite cada 120s — ver nota sobre el loop de useSesion()
 
   async function handleLeerNotificacion(id) {
     setNotificaciones((prev) => prev.filter((n) => n.id !== id));

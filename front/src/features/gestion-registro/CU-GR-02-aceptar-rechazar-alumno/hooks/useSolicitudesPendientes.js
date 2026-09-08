@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesPendientes, decidirSolicitud } from "@/services/profesorSolicitudesService";
 
+const INTERVALO_MS = 120000;
+
 export function useSolicitudesPendientes() {
   const [solicitudes, setSolicitudes]     = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -16,7 +18,11 @@ export function useSolicitudesPendientes() {
       .finally(() => setCargandoLista(false));
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    const intervalo = setInterval(cargar, INTERVALO_MS);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const verDetalle = (solicitud) => {
     setSeleccionada(solicitud);

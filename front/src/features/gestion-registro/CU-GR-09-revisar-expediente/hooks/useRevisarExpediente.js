@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { getExpedientesPendientes, decidirExpediente, verDocumentoPDF } from "@/services/coordinadorExpedienteService";
 
+const INTERVALO_MS = 120000;
+
 export function useRevisarExpediente() {
   const [expedientes, setExpedientes] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -19,7 +21,11 @@ export function useRevisarExpediente() {
       .finally(() => setCargandoLista(false));
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    const intervalo = setInterval(cargar, INTERVALO_MS);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const verDetalle = (exp) => {
     setSeleccionado(exp);

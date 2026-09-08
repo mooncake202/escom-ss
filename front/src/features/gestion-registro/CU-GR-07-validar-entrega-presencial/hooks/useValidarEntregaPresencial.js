@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesCartaCompromiso, registrarRecepcionCarta } from "@/services/coordinadorCartaCompromisoService";
 
+const INTERVALO_MS = 120000;
+
 export function useValidarEntregaPresencial() {
   const [pendientes, setPendientes] = useState([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -17,7 +19,11 @@ export function useValidarEntregaPresencial() {
       .finally(() => setCargandoLista(false));
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => {
+    cargar();
+    const intervalo = setInterval(cargar, INTERVALO_MS);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const verDetalle = (item) => {
     setSeleccionado(item);
