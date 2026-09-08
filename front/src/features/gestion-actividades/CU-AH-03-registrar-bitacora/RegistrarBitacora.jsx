@@ -3,9 +3,11 @@ import { DashboardLayout }       from "@/components/layout/DashboardLayout";
 import { JornadaTimer }          from "./components/JornadaTimer";
 import { FormularioBitacora }    from "./components/FormularioBitacora";
 import { useRegistrarBitacora }  from "./hooks/useRegistrarBitacora";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 export default function RegistrarBitacora() {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
   const {
     alumno, fase, segundos, form, avances, errores, loading,
     limiteHoras, horasTrabajadas, porcentajeJornada, tiempoRestante,
@@ -18,8 +20,8 @@ export default function RegistrarBitacora() {
     <DashboardLayout
       titulo="Registrar bitácora"
       subtitulo="CU-AH-03 · Alumno"
-      rol="alumno"
-      usuario="García López Juan Carlos"
+      rol={sesion?.rol ?? "alumno_asignado"}
+      usuario={nombreCompletoSesion(sesion)}
     >
       <div style={{ maxWidth: 680, margin: "0 auto" }}>
 

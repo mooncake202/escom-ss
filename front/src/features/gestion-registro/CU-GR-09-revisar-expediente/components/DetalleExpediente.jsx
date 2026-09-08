@@ -15,34 +15,10 @@ function InfoRow({ label, value, C }) {
   );
 }
 
-function DocCheck({ label, incluido, C }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: `1px solid ${C.borderSubtle}` }}>
-      <div style={{
-        width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-        background: incluido ? C.successSoft : C.bgInput,
-        border: `1px solid ${incluido ? C.success : C.borderDefault}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 11, color: incluido ? C.success : C.textDisabled,
-      }}>
-        {incluido ? "✓" : "—"}
-      </div>
-      <span style={{ fontSize: 13, color: incluido ? C.textPrimary : C.textDisabled }}>
-        {label}
-      </span>
-      {!incluido && (
-        <span style={{ fontSize: 11, padding: "1px 7px", borderRadius: 20, background: C.bgInput, color: C.textDisabled, marginLeft: "auto" }}>
-          No incluido
-        </span>
-      )}
-    </div>
-  );
-}
-
-export function DetalleExpediente({ item, loading, comentario, setComentario, modoRechazo, setModoRechazo, onDecidir, onCerrar, C }) {
+export function DetalleExpediente({ item, loading, comentario, setComentario, modoRechazo, setModoRechazo, onDecidir, onVerPdf, errorDescarga, onCerrar, C }) {
   if (!item) return null;
 
-  const fmtFecha = (iso) => new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
+  const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
 
   return (
     <>
@@ -56,62 +32,63 @@ export function DetalleExpediente({ item, loading, comentario, setComentario, mo
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}>
 
-        {/* Header */}
         <div style={{ padding: "1.25rem 1.5rem", borderBottom: `1px solid ${C.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>CU-GR-09 · Revisión de expediente</p>
+            <p style={{ margin: 0, fontSize: 11, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}></p>
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.textPrimary, fontWeight: 700 }}>Revisar expediente</h2>
           </div>
           <button onClick={onCerrar} style={{ background: "none", border: "none", cursor: "pointer", color: C.textMuted, fontSize: 20, padding: 4 }}>✕</button>
         </div>
 
-        {/* Contenido scrolleable */}
         <div style={{ flex: 1, overflowY: "auto", padding: "1.25rem 1.5rem" }}>
 
-          {/* Datos alumno */}
           <p style={{ margin: "0 0 10px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Datos del alumno</p>
-          <InfoRow label="Nombre"    value={item.alumno.nombre}                         C={C} />
-          <InfoRow label="Boleta"    value={item.alumno.boleta}                         C={C} />
-          <InfoRow label="Carrera"   value={CARRERA_LABEL[item.alumno.carrera]}         C={C} />
-          <InfoRow label="Créditos"  value={`${item.alumno.creditos}%`}                 C={C} />
-          <InfoRow label="Correo"    value={item.alumno.correoInst}                     C={C} />
-          <InfoRow label="Profesor"  value={item.profesor}                              C={C} />
+          <InfoRow label="Nombre"    value={item.alumno.nombre}                                        C={C} />
+          <InfoRow label="Boleta"    value={item.alumno.boleta}                                        C={C} />
+          <InfoRow label="Carrera"   value={CARRERA_LABEL[item.alumno.carrera] || item.alumno.carrera} C={C} />
+          <InfoRow label="Créditos"  value={`${item.alumno.creditos}%`}                                C={C} />
+          <InfoRow label="Correo"    value={item.alumno.correoInst}                                    C={C} />
+          <InfoRow label="Profesor"  value={item.profesor || "—"}                                      C={C} />
           <InfoRow label="Periodo"   value={`${fmtFecha(item.periodoInicio)} — ${fmtFecha(item.periodoFin)}`} C={C} />
 
-          {/* Expediente — RN-GR-49 al RN-GR-51 */}
+          {/* Expediente — RF-GR-107 */}
           <p style={{ margin: "1.25rem 0 10px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Expediente</p>
 
-          {/* Archivo PDF */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: RADIUS.md, background: C.bgInput, border: `1px solid ${C.borderDefault}`, marginBottom: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.accentText} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.accentText} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" />
               </svg>
-              <div>
-                <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: C.textPrimary }}>{item.expediente.nombre}</p>
-                <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{item.expediente.tamaño}</p>
-              </div>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                {item.expediente.nombreArchivo || "Expediente"}
+              </p>
             </div>
-            <button style={{ padding: "5px 12px", borderRadius: RADIUS.md, fontSize: 12, fontWeight: 600, cursor: "pointer", background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accentText, fontFamily: "inherit" }}>
+            <button
+              onClick={() => onVerPdf(item.expediente.documentoId)}
+              style={{ padding: "5px 12px", borderRadius: RADIUS.md, fontSize: 12, fontWeight: 600, cursor: "pointer", background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accentText, fontFamily: "inherit", flexShrink: 0 }}
+            >
               Ver PDF
             </button>
           </div>
+          {errorDescarga && <p style={{ margin: "0 0 12px", fontSize: 12, color: C.danger }}>{errorDescarga}</p>}
 
-          {/* Checklist de documentos — RN-GR-49 */}
-          <p style={{ margin: "0 0 6px", fontSize: 12, color: C.textMuted }}>Documentos incluidos:</p>
-          <DocCheck label="Carta compromiso (ambos lados)" incluido={item.expediente.cartaCompromiso}    C={C} />
-          <DocCheck label="CURP vigente"                   incluido={item.expediente.curp}               C={C} />
-          <DocCheck label="Constancia de créditos"         incluido={item.expediente.constanciaCreditos} C={C} />
-          <DocCheck label="Dictamen (no aplica)"           incluido={item.expediente.dictamen}           C={C} />
-
-          {/* Aviso aprobación — RN-GR-53 y RN-GR-54 */}
-          <div style={{ marginTop: "1.25rem", padding: "12px 14px", borderRadius: RADIUS.md, background: C.accentSoft, border: `1px solid ${C.accent}` }}>
-            <p style={{ margin: 0, fontSize: 12, color: C.accentText, lineHeight: 1.5 }}>
-              Al aprobar el expediente, el sistema asignará al alumno con el profesor seleccionado y cambiará su rol a <strong>AlumnoAsignado</strong>, habilitando el módulo de actividades y horas.
+          {/* RN-GR-69: la verificación de contenido es visual, el sistema
+              solo puede indicar si DEBE incluir dictamen o no. */}
+          <div style={{ padding: "10px 14px", borderRadius: RADIUS.md, background: C.bgPage, border: `1px solid ${C.borderSubtle}` }}>
+            <p style={{ margin: 0, fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>
+              {item.requiereDictamen
+                ? <>Este alumno declaró <strong>{item.dictamenLabel}</strong> — verifica que el PDF incluya carta compromiso, CURP, constancia de créditos y el dictamen.</>
+                : <>Este alumno no declaró dictamen — el PDF debe incluir solo carta compromiso, CURP y constancia de créditos.</>
+              }
             </p>
           </div>
 
-          {/* Textarea rechazo — RN-GR-55 */}
+          <div style={{ marginTop: "1.25rem", padding: "12px 14px", borderRadius: RADIUS.md, background: C.accentSoft, border: `1px solid ${C.accent}` }}>
+            <p style={{ margin: 0, fontSize: 12, color: C.accentText, lineHeight: 1.5 }}>
+              Al aprobar el expediente, el alumno pasará a ser <strong>Alumno Asignado</strong>, habilitando el módulo de actividades y horas.
+            </p>
+          </div>
+
           {modoRechazo && (
             <div style={{ marginTop: "1.25rem" }}>
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
@@ -137,7 +114,6 @@ export function DetalleExpediente({ item, loading, comentario, setComentario, mo
           )}
         </div>
 
-        {/* Botones */}
         <div style={{ padding: "1.25rem 1.5rem", borderTop: `1px solid ${C.borderSubtle}`, flexShrink: 0 }}>
           {!modoRechazo ? (
             <div style={{ display: "flex", gap: "0.75rem" }}>

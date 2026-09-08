@@ -1,5 +1,6 @@
 import { Field, InputField, ErrorMsg } from "../../../../components/ui/FormFields";
 import { RADIUS } from "../../../../themes/colors";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 export function StepCredenciales({ form, errors, handleChange, aceptaCreditos, setAcepta, ofertas, periodos, C }) {
   const ofertaSeleccionada =  ofertas?.find(o => String(o.id) === String(form.oferta))?.titulo;
@@ -7,13 +8,8 @@ export function StepCredenciales({ form, errors, handleChange, aceptaCreditos, s
   const inicioSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fechaInicio;
   const finSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo))?.fechaFin;
 
-  const inicioFormateado = inicioSeleccionado
-  ? new Date(inicioSeleccionado).toLocaleDateString("es-MX")
-  : "";
-
-const finFormateado = finSeleccionado
-  ? new Date(finSeleccionado).toLocaleDateString("es-MX")
-  : "";
+  const inicioFormateado = formatearFechaUTC(inicioSeleccionado);
+  const finFormateado = formatearFechaUTC(finSeleccionado);
 
   return (
     <div>

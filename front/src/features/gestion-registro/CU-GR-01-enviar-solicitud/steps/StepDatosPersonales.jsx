@@ -44,12 +44,12 @@ export function StepDatosPersonales({ form, errors, handleChange, C }) {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}> 
         <Field label="Número de celular" C={C}>
-        <InputField C={C} name="telefono" placeholder="XX XXXX XXXX" value={form.telefono} onChange={handleChange} />
+        <InputField C={C} name="telefono" placeholder="XX XXXX XXXX" maxLength={10} value={form.telefono} onChange={handleChange} />
         <ErrorMsg field="telefono" errors={errors} C={C} />
         </Field>
 
         <Field label="Número de boleta" C={C}>
-          <InputField C={C} name="boleta" placeholder="XXXX63XXXX" value={form.boleta} onChange={handleChange} />
+          <InputField C={C} name="boleta" placeholder="XXXX63XXXX" maxLength={10} value={form.boleta} onChange={handleChange} />
           <ErrorMsg field="boleta" errors={errors} C={C} />
         </Field>
         

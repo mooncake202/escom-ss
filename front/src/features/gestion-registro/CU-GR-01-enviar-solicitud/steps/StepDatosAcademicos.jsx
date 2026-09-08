@@ -1,9 +1,28 @@
 import { Field, InputField, SelectField, ErrorMsg } from "../../../../components/ui/FormFields";
 import { RADIUS } from "../../../../themes/colors";
 import { CARRERAS } from "../utils/constants";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 
 export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) {
+  const periodoSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo));
+
+  // Rango del input de créditos según el dictamen activo.
+  // ⚠️ Asumo que "min 96.01" (redondeado a 97) es del dictamen POR ELECTIVA
+  // y "max 70" es del dictamen DE CRÉDITOS — confirmar si no es así.
+  const creditosMin = form.tipoLiberacion === "creditos" ? 60
+    : form.tipoLiberacion === "electiva" ? 96.01
+    : 0; // sin dictamen o estancia: el mínimo real (70) se valida aparte, el input no lo fuerza para no bloquear mientras el alumno escribe
+  const creditosMax = form.tipoLiberacion === "creditos" ? 70 : 100;
+
+  // Permite deseleccionar un dictamen haciendo clic de nuevo sobre el que
+  // ya está activo — los radios nativos de HTML no hacen esto solos.
+  function handleDictamenClick(valor) {
+    if (form.tipoLiberacion === valor) {
+      handleChange({ target: { name: "tipoLiberacion", value: "" } });
+    }
+  }
+
   return (
     <div>
       <h2 style={{ margin: "0 0 0.25rem", color: C.textPrimary, fontSize: 20, fontWeight: 700 }}>
@@ -21,8 +40,23 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
         <ErrorMsg field="carrera" errors={errors} C={C} />
       </Field>
 
-      <Field label="Porcentaje de créditos cubiertos" hint="Coloca el porcentaje exacto que muestra tu constancia" C={C}>
-        <InputField C={C} name="creditos" type="number" placeholder="Necesitas mínimo el 70%" min="0" max="100" value={form.creditos} onChange={handleChange} />
+      <Field
+        label="Porcentaje de créditos cubiertos"
+        hint={
+          form.tipoLiberacion === "creditos"
+            ? "Con este dictamen, tus créditos deben estar entre 60% y 70%"
+            : form.tipoLiberacion === "electiva"
+              ? "Con este dictamen necesitas mínimo 96.01% de créditos"
+              : "Coloca el porcentaje exacto que muestra tu constancia"
+        }
+        C={C}
+      >
+        <InputField
+          C={C} name="creditos" type="number"
+          placeholder="Necesitas mínimo el 70%"
+          min={creditosMin} max={creditosMax} step="0.01"
+          value={form.creditos} onChange={handleChange}
+        />
         <ErrorMsg field="creditos" errors={errors} C={C} />
 
         <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
@@ -46,21 +80,34 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
       <Field label="Periodo autorizado este semestre" C={C}>
         <SelectField C={C} name="periodo" value={form.periodo} onChange={handleChange}>
           <option value="">Seleccionar periodo</option>
-          {periodos && periodos.map(p => {
-  
-  return (
-    <option key={p.id} value={p.id}>
-      {new Date(p.fechaInicio).toLocaleDateString("es-MX")} — {new Date(p.fechaFin).toLocaleDateString("es-MX")}
-    </option>
-  );
-})}
+          {periodos && periodos.map(p => (
+            <option key={p.id} value={p.id}>
+              {formatearFechaUTC(p.fechaInicio)} — {formatearFechaUTC(p.fechaFin)}
+            </option>
+          ))}
 
         </SelectField>
 
         <ErrorMsg field="periodo" errors={errors} C={C} />
+
+        {/* RF-GR-03 / RN-GR-04: aviso de fecha límite de expediente y cancelación automática */}
+        {periodoSeleccionado && (
+          <div style={{
+            marginTop: "0.5rem", padding: "10px 12px",
+            background: C.dangerSoft, borderRadius: RADIUS.md,
+            border: `1px solid ${C.danger}`,
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: C.danger, lineHeight: 1.5 }}>
+              ⚠ Fecha límite para enviar tu expediente:{" "}
+              <strong>{formatearFechaUTC(periodoSeleccionado.fechaLimiteExpediente)}</strong>{" "}
+              antes de las 2:00 pm. Si no lo envías a tiempo, tu solicitud se cancelará automáticamente y
+              tendrás que modificarla y reenviarla.
+            </p>
+          </div>
+        )}
       </Field>
 
-      <Field label="Solicitud de dictamen" hint="Selecciona una opción para ver las instrucciones" C={C}>
+      <Field label="Solicitud de dictamen" hint="Selecciona una opción para ver las instrucciones. Puedes hacer clic de nuevo sobre la opción activa para quitarla." C={C}>
   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
 
     {[
@@ -99,6 +146,7 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
             value={opt.value}
             checked={form.tipoLiberacion === opt.value}
             onChange={handleChange}
+            onClick={() => handleDictamenClick(opt.value)}
           />
 
           <div>
@@ -149,7 +197,7 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
                 REQUISITOS PARA SOLICITAR DICTAMEN POR ESTANCIA PROFESIONAL<br />
                 1. HABER CUBIERTO TODAS TUS MATERIAS ACADEMICAS<br />
                 2. QUE SOLO TE FALTE LA ESTANCIA PROFESIONAL
-                EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE DCITAMEN<br /><br />
+                EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE DICTAMEN<br /><br />
                 Si cumples con los 2 requisitos anteriores podrás solicitar tu dictamen para iniciar el servicio social,
                 solo debes enviar al siguiente correo servicio_social_escom@ipn.mx la siguiente información para que
                 elaboren tu dictamen.<br /><br />
@@ -169,8 +217,7 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
               <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
                 REQUISITOS PARA SOLICITAR DICTAMEN POR ELECTIVA<br />
                 1. TENER EL 96.01% DE CREDITOS CURSADOS<br />
-                2. QUE SOLO TE FALTE LA ELECTIVA, EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE 
-                DCITAMEN<br /><br />
+                2. QUE SOLO TE FALTE LA ELECTIVA, EN CASO QUE TE FALTE OTRA MATERIA NO APLICA ESTE DICTAMEN<br /><br />
                 Si cumples con los 2 requisitos anteriores podrás solicitar tu dictamen para iniciar el servicio social,
                 solo debes enviar al siguiente correo servicio_social_escom@ipn.mx la siguiente información para que
                 elaboren tu dictamen<br /><br />

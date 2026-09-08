@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { OfertaCard } from "../components/OfertaCard";
 
-export function StepSeleccionOferta({ form, errors, ofertas, onSelect, handleChange, C }) {
+export function StepSeleccionOferta({ form, errors, ofertas, ofertasCargando, onSelect, handleChange, C }) {
   const [perfiles, setPerfiles] = useState([]);
   const [perfilesFiltro, setPerfilesFiltro] = useState([]);
 
@@ -61,17 +61,23 @@ export function StepSeleccionOferta({ form, errors, ofertas, onSelect, handleCha
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-        {ofertas.length === 0
+        {ofertasCargando
           ? <p style={{ color: C.textDisabled, textAlign: "center", padding: "2rem" }}>Cargando ofertas...</p>
-          : ofertasFiltradas.length === 0
-            ? <p style={{ color: C.textDisabled, textAlign: "center", padding: "2rem" }}>No hay ofertas del perfil que buscas</p>
-            : ofertasFiltradas.map(o => (
-              <OfertaCard
-                key={o.id} oferta={o} C={C}
-                selected={form.oferta === o.id}
-                onSelect={onSelect}
-              />
-            ))
+          : ofertas.length === 0
+            // Flujo Alterno 7.1: distinto de "cargando" — ya se sabe con
+            // certeza que no hay ninguna oferta con cupos disponibles.
+            ? <p style={{ color: C.textDisabled, textAlign: "center", padding: "2rem" }}>
+                No hay ofertas de servicio social disponibles en este momento. Intenta más tarde.
+              </p>
+            : ofertasFiltradas.length === 0
+              ? <p style={{ color: C.textDisabled, textAlign: "center", padding: "2rem" }}>No hay ofertas del perfil que buscas</p>
+              : ofertasFiltradas.map(o => (
+                <OfertaCard
+                  key={o.id} oferta={o} C={C}
+                  selected={form.oferta === o.id}
+                  onSelect={onSelect}
+                />
+              ))
         }
       </div>
 

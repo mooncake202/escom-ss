@@ -1,19 +1,40 @@
 import { useState, useEffect } from "react";
+import { getSolicitudesPendientes, decidirSolicitud } from "@/services/profesorSolicitudesService";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useSolicitudesPendientes() {
-  const [solicitudes, setSolicitudes]   = useState([]);
-  const [seleccionada, setSeleccionada] = useState(null);
-  const [loading, setLoading]           = useState(false);
-  const [resultado, setResultado]       = useState(null);
+  const [solicitudes, setSolicitudes]     = useState([]);
+  const [cargandoLista, setCargandoLista] = useState(true);
+  const [seleccionada, setSeleccionada]   = useState(null);
+  const [loading, setLoading]             = useState(false);
+  const [resultado, setResultado]         = useState(null);
+  const { socket } = useSocket();
+
+  const cargar = () => {
+    getSolicitudesPendientes()
+      .then(setSolicitudes)
+      .catch((err) => console.error(err))
+      .finally(() => setCargandoLista(false));
+  };
 
   useEffect(() => {
-    const usuario = JSON.parse(localStorage.getItem("usuario"));
-    if (!usuario) return;
-    fetch(`api/profesor/${usuario.id}/solicitudes`)
-      .then(r => r.json())
-      .then(data => setSolicitudes(data.map(s => ({ ...s, estado: "PendienteProfesor" }))))
-      .catch(console.error);
+    cargar();
   }, []);
+
+  // Socket — reemplaza el polling de 120s. 'solicitud:aceptada'/'rechazada'/
+  // 'rechazada_por_cupos' se emiten solo al ALUMNO (Parte 2), nunca al
+  // profesor — las propias decisiones de este profesor ya refrescan local
+  // (ver `decidir` más abajo). El único evento real dirigido al profesor
+  // en esta pantalla es 'solicitud:nueva'.
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("solicitud:nueva", cargar);
+    return () => socket.off("solicitud:nueva", cargar);
+  }, [socket]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const verDetalle = (solicitud) => {
     setSeleccionada(solicitud);
@@ -28,25 +49,24 @@ export function useSolicitudesPendientes() {
   const decidir = async (id, decision) => {
     setLoading(true);
     try {
-      const res = await fetch(`api/profesor/solicitudes/${id}/decidir`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ decision }),
-      });
-      if (!res.ok) throw new Error("Error al procesar");
-
+      await decidirSolicitud(id, decision);
       const nombre = solicitudes.find(s => s.id === id)?.nombre ?? "";
-      setSolicitudes(prev => prev.filter(s => s.id !== id));
       setResultado({ tipo: decision, nombre });
       setSeleccionada(null);
+      // RN-GR-11: si aceptar esta solicitud cubrió los cupos, el backend ya
+      // rechazó automáticamente las demás pendientes de esa oferta — se
+      // vuelve a pedir la lista completa (no solo quitar esta tarjeta) para
+      // que esas otras también desaparezcan de la pantalla.
+      cargar();
     } catch (err) {
-      console.error(err);
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const pendientes = solicitudes.filter(s => s.estado === "PendienteProfesor");
-
-  return { pendientes, seleccionada, loading, resultado, verDetalle, cerrarDetalle, decidir };
+  return {
+    pendientes: solicitudes, cargandoLista, seleccionada, loading, resultado,
+    verDetalle, cerrarDetalle, decidir,
+  };
 }

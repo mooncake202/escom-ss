@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme, GRADIENTS, BRAND } from "@/themes/colors";
+import { apiFetch } from "@/services/apiClient";
+import { useSocket } from "@/context/SocketContext";
 
 // ── Iconos SVG inline ────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
@@ -23,57 +25,73 @@ const ICONS = {
   calendario:   "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
   baja:         "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z M15 3v4a1 1 0 001 1h4",
   userMinus:    "M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6h12a6 6 0 00-6-6z M22 11h-6",
-  chevron:      "M9 18l6-6-6-6",
   logout:       "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
   oferta:       "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
   alumnos:      "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
 };
 
-// Menú por rol
+const NAV_ITEMS_ALUMNO = [
+  { key: "dashboard",   label: "Inicio",        path: "/dashboard",                     icon: "dashboard" },
+  { key: "actividades", label: "Actividades",   path: "/alumno/actividades",            icon: "actividades" },
+  { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
+  { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
+  { key: "contacto",    label: "Mi profesor",   path: "/alumno/contacto-profesor",      icon: "contacto" },
+  { key: "bajaSS",      label: "Baja SS",       path: "/alumno/solicitar-baja",         icon: "userMinus" },
+  { key: "institucion", label: "Coordinación",  path: "/alumno/contacto-institucional", icon: "institucion" },
+  { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
+];
+
+const NAV_ITEMS_PROFESOR = [
+  { key: "dashboard",     label: "Inicio",             path: "/dashboard",                       icon: "dashboard" },
+  { key: "solicitudes",   label: "Solicitudes",        path: "/profesor/solicitudes",            icon: "solicitudes" },
+  { key: "actividades",   label: "Actividades",        path: "/profesor/actividades",            icon: "actividades" },
+  { key: "mis-alumnos",   label: "Mis alumnos",        path: "/profesor/mis-alumnos",            icon: "alumnos" },
+  { key: "ofertas",       label: "Mis ofertas",        path: "/profesor/proyectos",              icon: "oferta" },
+  { key: "reportes",      label: "Reportes",           path: "/profesor/reportes",               icon: "reportes" },
+  { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
+  { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
+  { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
+  { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
+];
+
+const NAV_ITEMS_COORDINACION = [
+  { key: "dashboard",       label: "Inicio",               path: "/dashboard",                              icon: "dashboard" },
+  { key: "reportes",        label: "Reportes",             path: "/coordinacion/reportes",                  icon: "reportes" },
+  { key: "ofertas",         label: "Ofertas SS",           path: "/coordinacion/ofertas",                   icon: "oferta" },
+  { key: "calendario",      label: "Calendario",           path: "/coordinacion/calendario",                icon: "calendario" },
+  { key: "bajas",           label: "Gestionar bajas",      path: "/coordinacion/gestionar-bajas",           icon: "baja" },
+  { key: "caracteristicas", label: "Características",      path: "/coordinacion/solicitudes-caracteristicas", icon: "actividades" },
+  { key: "usuarios",        label: "Usuarios asignados",   path: "/coordinacion/usuarios-asignados",        icon: "alumnos" },
+  { key: "recursos",        label: "Recursos",             path: "/coordinacion/admin/recursos",            icon: "recursos" },
+  { key: "anuncios",        label: "Anuncios",             path: "/coordinacion/admin/anuncios",            icon: "anuncios" },
+  { key: "institucion",     label: "Contacto inst.",       path: "/coordinacion/contacto-institucional",    icon: "institucion" },
+];
+
+// Menú por rol. "coordinador" es alias de "coordinacion" (mismo array) porque
+// el backend usa el enum "coordinador" pero esta pantalla ya existía usando
+// "coordinacion" — se mantienen ambas claves para no romper otras pantallas
+// que aún pasen rol="coordinacion".
 const NAV_ITEMS = {
-  alumno: [
-    { key: "dashboard",   label: "Inicio",        path: "/dashboard",                     icon: "dashboard" },
-    { key: "solicitudes", label: "Mi solicitud",  path: "/registro",                      icon: "solicitudes" },
-    { key: "actividades", label: "Actividades",   path: "/alumno/actividades",            icon: "actividades" },
-    { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
-    { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
-    { key: "contacto",    label: "Mi profesor",   path: "/alumno/contacto-profesor",      icon: "contacto" },
-    { key: "bajaSS",      label: "Baja SS",       path: "/alumno/solicitar-baja",         icon: "userMinus" },
-    { key: "institucion", label: "Coordinación",  path: "/alumno/contacto-institucional", icon: "institucion" },
-    { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
-  ],
-  profesor: [
-    { key: "dashboard",     label: "Inicio",             path: "/dashboard",                       icon: "dashboard" },
-    { key: "solicitudes",   label: "Solicitudes",        path: "/profesor/solicitudes",            icon: "solicitudes" },
-    { key: "actividades",   label: "Actividades",        path: "/profesor/actividades",            icon: "actividades" },
-    { key: "mis-alumnos",   label: "Mis alumnos",        path: "/profesor/mis-alumnos",            icon: "alumnos" },
-    { key: "ofertas",       label: "Mis ofertas",        path: "/profesor/proyectos",              icon: "oferta" },
-    { key: "reportes",      label: "Reportes",           path: "/profesor/reportes",               icon: "reportes" },
-    { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
-    { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
-    { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
-    { key: "institucion",   label: "Coordinación",       path: "/profesor/contacto-institucional", icon: "institucion" },
-    { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
-  ],
-  coordinacion: [
-    { key: "dashboard",       label: "Inicio",               path: "/dashboard",                              icon: "dashboard" },
-    { key: "reportes",        label: "Reportes",             path: "/coordinacion/reportes",                  icon: "reportes" },
-    { key: "ofertas",         label: "Ofertas SS",           path: "/coordinacion/ofertas",                   icon: "oferta" },
-    { key: "calendario",      label: "Calendario",           path: "/coordinacion/calendario",                icon: "calendario" },
-    { key: "bajas",           label: "Gestionar bajas",      path: "/coordinacion/gestionar-bajas",           icon: "baja" },
-    { key: "caracteristicas", label: "Características",      path: "/coordinacion/solicitudes-caracteristicas", icon: "actividades" },
-    { key: "usuarios",        label: "Usuarios asignados",   path: "/coordinacion/usuarios-asignados",        icon: "alumnos" },
-    { key: "recursos",        label: "Recursos",             path: "/coordinacion/admin/recursos",            icon: "recursos" },
-    { key: "anuncios",        label: "Anuncios",             path: "/coordinacion/admin/anuncios",            icon: "anuncios" },
-    { key: "institucion",     label: "Contacto inst.",       path: "/coordinacion/contacto-institucional",    icon: "institucion" },
-  ],
+  alumno_asignado: NAV_ITEMS_ALUMNO,
+  profesor: NAV_ITEMS_PROFESOR,
+  coordinacion: NAV_ITEMS_COORDINACION,
+  coordinador: NAV_ITEMS_COORDINACION,
 };
 
 export function Sidebar({ rol = "profesor", enProyecto = false }) {
   const { C } = useTheme();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(() => localStorage.getItem("sidebarExpandido") === "true");
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { desconectar } = useSocket();
+
+  const toggleExpanded = () => {
+    setExpanded(e => {
+      const next = !e;
+      localStorage.setItem("sidebarExpandido", String(next));
+      return next;
+    });
+  };
 
   const items = (NAV_ITEMS[rol] ?? NAV_ITEMS.profesor).filter(
   item => item.key !== "equipo" || enProyecto
@@ -104,29 +122,25 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
         {expanded && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, overflow: "hidden" }}>
             <div style={{ width: 28, height: 28, borderRadius: 6, background: GRADIENTS.primary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <span style={{ fontSize: 14 }}>🏫</span>
             </div>
             <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", letterSpacing: "0.01em" }}>
-              Serv. Social
+              Servicio Social
             </span>
           </div>
         )}
         <button
-          onClick={() => setExpanded(e => !e)}
+          onClick={toggleExpanded}
           style={{
             width: 32, height: 32, borderRadius: 6, border: "none",
             background: "transparent", cursor: "pointer",
-            color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center",
+            color: "#F1F1F1", display: "flex", alignItems: "center", justifyContent: "center",
             transition: "background 0.15s",
             flexShrink: 0,
           }}
           onMouseEnter={e => e.currentTarget.style.background = C.navItemHover}
           onMouseLeave={e => e.currentTarget.style.background = "transparent"}
         >
-          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round"
-            style={{ transform: expanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.22s ease" }}>
-            <path d={ICONS.chevron} />
-          </svg>
+          <span style={{ fontSize: 20, lineHeight: 1 }}>☰</span>
         </button>
       </div>
 
@@ -154,7 +168,6 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
               onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.navItemHover; }}
               onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
             >
-              {/* Indicador activo */}
               {active && (
                 <div style={{ position: "absolute", left: 0, width: 3, height: 24, borderRadius: "0 3px 3px 0", background: GRADIENTS.primary }} />
               )}
@@ -169,9 +182,23 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
 
       {/* Logout */}
       <div style={{ padding: "8px 6px", borderTop: `1px solid ${C.navBorder}`, flexShrink: 0 }}>
-        <button
-          onClick={() => navigate("/login")}
+          <button
+          onClick={async () => {
+            try {
+              await apiFetch("/auth/logout", { method: "POST" });
+            } catch (err) {
+              // Si falla el aviso al backend, no importa — igual cerramos localmente.
+              console.error("No se pudo notificar el logout al backend:", err);
+            }
+            localStorage.removeItem("token");
+            localStorage.removeItem("usuario");
+            desconectar();
+            navigate("/");
+          }}
           title={!expanded ? "Cerrar sesión" : undefined}
+
+
+
           style={{
             width: "100%", height: 40,
             display: "flex", alignItems: "center",

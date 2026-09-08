@@ -68,7 +68,7 @@ function NavButtons({ step, totalSteps, loading, onBack, onNext, onSubmit, C }) 
           boxShadow: loading ? "none" : SHADOWS.accent,
         }}
       >
-        {isLast ? (loading ? "Enviando..." : "Enviar solicitud ✓") : "Siguiente →"}
+        {isLast ? (loading ? "Enviando..." : "Enviar solicitud ✓") : (loading ? "Verificando..." : "Siguiente →")}
       </button>
     </div>
   );
@@ -78,7 +78,7 @@ function NavButtons({ step, totalSteps, loading, onBack, onNext, onSubmit, C }) 
 export default function RegistroSolicitud() {
   const { C } = useTheme();
   const {
-    step, form, errors, ofertas, periodos, aceptaCreditos, submitted, loading, totalSteps,
+    step, form, errors, ofertas, ofertasCargando, periodos, aceptaCreditos, submitted, loading, totalSteps,
     handleChange, seleccionarOferta, setAcepta, next, back, submit,
   } = useRegistroForm();
 
@@ -107,7 +107,7 @@ export default function RegistroSolicitud() {
 
         {step === 0 && <StepDatosPersonales {...stepProps} />}
         {step === 1 && <StepDatosAcademicos {...stepProps} periodos={periodos} />}
-        {step === 2 && <StepSeleccionOferta {...stepProps} ofertas={ofertas} onSelect={seleccionarOferta} handleChange={handleChange}/>}
+        {step === 2 && <StepSeleccionOferta {...stepProps} ofertas={ofertas} ofertasCargando={ofertasCargando} onSelect={seleccionarOferta} handleChange={handleChange}/>}
         {step === 3 && <StepCredenciales   {...stepProps} aceptaCreditos={aceptaCreditos} setAcepta={setAcepta} ofertas={ofertas} periodos={periodos}/>}
 
         <NavButtons step={step} totalSteps={totalSteps} loading={loading} onBack={back} onNext={next} onSubmit={submit} C={C} />

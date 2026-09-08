@@ -50,7 +50,7 @@ export function DocumentoUploader({ label, descripcion, obligatorio = true, arch
           <p style={{ margin: 0, fontSize: 13, color: C.textMuted, textAlign: "center" }}>
             Haz clic para seleccionar un archivo
           </p>
-          <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>Solo PDF · Máx. 10 MB</p>
+          <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>Solo PDF · Máx. 1.5 MB</p>
         </div>
       ) : (
         /* Archivo cargado */

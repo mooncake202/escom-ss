@@ -6,9 +6,13 @@ const CARRERA_LABEL = {
   LCD: "Lic. Ciencia de Datos",
 };
 
+const ESTADOS_COMPLETADA = ["completada_a_tiempo", "completada_tarde"];
+
 export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
-  const activas = alumno.actividades.filter(a => a.estado !== "Completada").length;
-  const completadas = alumno.actividades.filter(a => a.estado === "Completada").length;
+  // "Activas" = solo lo que aún requiere acción del alumno. Vencida queda
+  // fuera de ambos contadores (ni activa ni completada).
+  const activas = alumno.actividades.filter(a => a.estado === "sin_comenzar" || a.estado === "en_progreso").length;
+  const completadas = alumno.actividades.filter(a => ESTADOS_COMPLETADA.includes(a.estado)).length;
 
   return (
     <div

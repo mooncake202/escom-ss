@@ -4,7 +4,8 @@ export function validateStep(step, form, aceptaCreditos) {
     const correoPersonalRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const telefonoRegex = /^[2-9]\d{9}$/;
     const nombresRegex = /^[A-ZÁÉÍÓÚÜÑ]+(?:\s+[A-ZÁÉÍÓÚÜÑ]+)*$/;
-    const apellidosRegex = /^[A-ZÁÉÍÓÚÜÑ]+(?:\s+[A-ZÁÉÍÓÚÜÑ]+)+$/;
+    // Exactamente dos apellidos (paterno y materno) — ni uno ni tres.
+    const apellidosRegex = /^[A-ZÁÉÍÓÚÜÑ]+\s+[A-ZÁÉÍÓÚÜÑ]+$/;
     const boletaRegex = /^(19|20)\d{2}63\d{4}$/;
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
 
@@ -19,8 +20,9 @@ export function validateStep(step, form, aceptaCreditos) {
 
 
 
-    if (!form.correoPersonal) errors.correoPersonal = "Campo requerido";
-    else if (!correoPersonalRegex.test(form.correoPersonal.trim()))
+    // correoPersonal es OPCIONAL (según el schema y la ficha del CU) —
+    // solo se valida el formato si el alumno decide capturarlo.
+    if (form.correoPersonal && !correoPersonalRegex.test(form.correoPersonal.trim()))
       errors.correoPersonal = "Ingresa un correo válido";
 
 
@@ -36,7 +38,7 @@ export function validateStep(step, form, aceptaCreditos) {
 
     if (!form.apellidos)   errors.apellidos   = "Campo requerido";
     else if(!apellidosRegex.test(form.apellidos.trim().toUpperCase()))
-      errors.apellidos="Ingresa un nombre válido";
+      errors.apellidos="Ingresa tus dos apellidos (paterno y materno)";
 
     if (!form.boleta)   errors.boleta   = "Campo requerido";
     else if(!boletaRegex.test(form.boleta))
@@ -47,12 +49,33 @@ export function validateStep(step, form, aceptaCreditos) {
     if (!form.carrera)  errors.carrera  = "Selecciona una carrera";
 
     if (!form.creditos) errors.creditos = "Campo requerido";
-    else if (form.creditos<70)
-      errors.creditos="Necesitas mínimo el 70% para realizar tu servicio";
-
+    if (!form.semestre)  errors.semestre  = "Campo requerido";
     if (!form.periodo)  errors.periodo  = "Selecciona un periodo";
 
-    if (!form.semestre)  errors.semestre  = "Campo requerido";
+    // RN-GR-02 / RN-GR-03 / Flujos Alternos A y B: el umbral de créditos
+    // depende del dictamen activo (form.tipoLiberacion).
+    if (form.creditos && form.semestre) {
+      const creditos = Number(form.creditos);
+      const semestre = Number(form.semestre);
+
+      if (!form.tipoLiberacion) {
+        if (creditos < 70)
+          errors.creditos = "Necesitas mínimo el 70% para realizar tu servicio";
+      } else if (form.tipoLiberacion === "creditos") {
+        // Rango 60–70%: este dictamen es específicamente para quien está
+        // por debajo del 70% requerido normalmente.
+        if (creditos < 60 || creditos > 70 || semestre < 6)
+          errors.tipoLiberacion = "Con este dictamen tus créditos deben estar entre 60% y 70%, y debes estar en semestre 6 o superior";
+      } else if (form.tipoLiberacion === "electiva") {
+        
+        if (creditos < 96.01)
+          errors.tipoLiberacion = "Con este dictamen necesitas mínimo 96.01% de créditos";
+      } else if (form.tipoLiberacion === "estancia") {
+        // RN-GR-03: estancia profesional no modifica los rangos.
+        if (creditos < 70)
+          errors.creditos = "Necesitas mínimo el 70% para realizar tu servicio";
+      }
+    }
   }//listo
 
   if (step === 2) {

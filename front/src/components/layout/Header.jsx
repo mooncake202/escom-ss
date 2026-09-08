@@ -1,15 +1,19 @@
 import { useTheme, GRADIENTS } from "@/themes/colors";
 
 const ROL_LABEL = {
-  alumno:       "Alumno",
-  profesor:     "Profesor",
-  coordinacion: "Coordinación",
+  alumno:          "Alumno",       // usado por pantallas con datos mock
+  alumno_asignado: "Alumno",       // valor real que manda la sesión/backend
+  profesor:        "Profesor",
+  coordinacion:    "Coordinación",
+  coordinador:     "Coordinador",  // valor real que manda la sesión/backend
 };
 
 const ROL_COLOR = {
-  alumno:       { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
-  profesor:     { bg: "rgba(34,197,94,0.12)",  color: "#22C55E" },
-  coordinacion: { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
+  alumno:          { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
+  alumno_asignado: { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
+  profesor:        { bg: "rgba(34,197,94,0.12)",  color: "#22C55E" },
+  coordinacion:    { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
+  coordinador:     { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
 };
 
 export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario" }) {
@@ -46,6 +50,12 @@ export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario
         )}
       </div>
 
+      {/* Nombre completo del usuario — mismo estilo que ya usa
+          ProcesoLayout.jsx (alumno_sin_asignar) junto a su avatar */}
+      <span style={{ fontSize: 13, color: C.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}>
+        {usuario}
+      </span>
+
       {/* Badge de rol */}
       <div style={{
         padding: "3px 10px", borderRadius: 20,
@@ -53,7 +63,7 @@ export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario
         fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
         flexShrink: 0,
       }}>
-        {ROL_LABEL[rol]}
+        {ROL_LABEL[rol] ?? rol}
       </div>
 
       {/* Avatar usuario */}

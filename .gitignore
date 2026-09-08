@@ -65,6 +65,11 @@ lerna-debug.log*
 *.sw?
 
 # ===========================
+# Herramientas locales (Claude Code / preview)
+# ===========================
+.claude/
+
+# ===========================
 # Sistema operativo
 # ===========================
 .DS_Store
@@ -87,3 +92,6 @@ Desktop.ini
 coverage/
 .nyc_output/
 *.tsbuildinfo
+
+
+backend/uploads/

@@ -1,0 +1,73 @@
+services:
+  mariadb:
+    image: mariadb:10.11
+    container_name: escom_mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: "America/Mexico_City"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    container_name: escom_redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: node:20
+    container_name: escom_backend
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/backend/node_modules
+    command: sh -c "which gs > /dev/null 2>&1 || (apt-get update && apt-get install -y --no-install-recommends ghostscript && rm -rf /var/lib/apt/lists/*); if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx prisma generate; cd backend; if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx nodemon server.js"
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@mariadb:3306/${MYSQL_DATABASE}"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      REDIS_URL: "redis://redis:6379"
+      FRONTEND_URL: "https://ttservicio.com"
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      CORREO_DOMINIOS_EXTRA: "gmail.com"
+      TZ: "America/Mexico_City"
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: escom_nginx
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./front/dist:/usr/share/nginx/html:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mariadb_data:

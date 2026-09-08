@@ -1,86 +1,74 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+import { getOfertas, getPeriodos } from "@/services/registroService";
+import { getInfoModificarSolicitud, reenviarSolicitudModificada } from "@/services/estadoSolicitudService";
 
-// ── Datos en duro (reemplazar por llamadas a API) ─────────────
-const ALUMNO_PRECARGADO = {
-  correoInst:      "a2023630123@alumno.ipn.mx",
-  correoPersonal:  "david.sixtos@gmail.com",
-  nombres:         "DAVID",
-  apellidos:       "SIXTOS HERNÁNDEZ",
-  telefono:        "5512345678",
-  boleta:          "2023630123",
-  carrera:         "ISC",
-  creditos:        "68",
-  semestre:        "6",
-  periodo:         "1",
-  tipoLiberacion:  "",
-  oferta:          "",
-  motivacion:      "",
-  password:        "**********", // solo display, no editable
+const FORM_VACIO = {
+  correoInst: "", correoPersonal: "", nombres: "", apellidos: "", telefono: "", boleta: "",
+  carrera: "", creditos: "", semestre: "", tipoLiberacion: "",
+  periodo: "", oferta: "", motivacion: "",
 };
 
-const MOTIVO_RECHAZO =
-  "El alumno no cumplía con el 70% de créditos requerido al momento de la solicitud. " +
-  "Se requiere actualizar la constancia de créditos vigente antes de reenviar.";
+// Mismos patrones que CU-GR-01/utils/validations.js — validación de UX en
+// cliente; la fuente de verdad sigue siendo el backend (reenviarSolicitudModificada
+// ya reutiliza las mismas validaciones que enviarSolicitudRegistro).
+const correoPersonalRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const telefonoRegex = /^[2-9]\d{9}$/;
+const nombresRegex = /^[A-ZÁÉÍÓÚÜÑ]+(?:\s+[A-ZÁÉÍÓÚÜÑ]+)*$/;
+const apellidosRegex = /^[A-ZÁÉÍÓÚÜÑ]+\s+[A-ZÁÉÍÓÚÜÑ]+$/;
+const boletaRegex = /^(19|20)\d{2}63\d{4}$/;
 
-const OFERTAS_MOCK = [
-  {
-    id: 1,
-    titulo: "Desarrollo de herramientas educativas",
-    profesor: "Dr. Ramírez López",
-    descripcion: "Apoyo en el desarrollo de plataformas y recursos digitales para uso académico.",
-    actividades: "Programación web, diseño de interfaces, pruebas.",
-    cuposDisponibles: 5,
-    perfiles: "ISC,IA",
-  },
-  {
-    id: 2,
-    titulo: "Análisis de datos de salud pública",
-    profesor: "Dra. Torres Méndez",
-    descripcion: "Procesamiento y visualización de datasets del sector salud.",
-    actividades: "Python, pandas, visualizaciones, reportes.",
-    cuposDisponibles: 2,
-    perfiles: "LCD,IA",
-  },
-  {
-    id: 3,
-    titulo: "Mantenimiento de infraestructura de red",
-    profesor: "Ing. Castillo Vera",
-    descripcion: "Soporte técnico y monitoreo de equipos de red institucionales.",
-    actividades: "Configuración de switches, documentación, soporte.",
-    cuposDisponibles: 4,
-    perfiles: "ISD,ISC",
-  },
-];
-
-const PERIODOS_MOCK = [
-  { id: 1, fechaInicio: "2025-02-03T00:00:00", fechaFin: "2025-07-31T00:00:00" },
-  { id: 2, fechaInicio: "2025-08-18T00:00:00", fechaFin: "2026-01-30T00:00:00" },
-];
-
-// ── Validaciones por paso ─────────────────────────────────────
 function validarPaso(step, form, acepta) {
   const errs = {};
 
   if (step === 0) {
-    if (!form.correoPersonal) errs.correoPersonal = "El correo personal es requerido";
-    if (!form.nombres)        errs.nombres        = "El nombre es requerido";
-    if (!form.apellidos)      errs.apellidos      = "Los apellidos son requeridos";
-    if (!form.telefono || form.telefono.replace(/\D/g, "").length < 10)
-      errs.telefono = "Ingresa un número de 10 dígitos";
-    if (!form.boleta) errs.boleta = "La boleta es requerida";
+    if (form.correoPersonal && !correoPersonalRegex.test(form.correoPersonal.trim()))
+      errs.correoPersonal = "Ingresa un correo válido";
+
+    if (!form.nombres) errs.nombres = "Campo requerido";
+    else if (!nombresRegex.test(form.nombres.trim().toUpperCase()))
+      errs.nombres = "Ingresa un nombre válido";
+
+    if (!form.apellidos) errs.apellidos = "Campo requerido";
+    else if (!apellidosRegex.test(form.apellidos.trim().toUpperCase()))
+      errs.apellidos = "Ingresa tus dos apellidos (paterno y materno)";
+
+    if (!form.telefono) errs.telefono = "Campo requerido";
+    else if (!telefonoRegex.test(form.telefono))
+      errs.telefono = "Ingresa un número válido";
+
+    if (!form.boleta) errs.boleta = "Campo requerido";
+    else if (!boletaRegex.test(form.boleta))
+      errs.boleta = "Ingresa una boleta válida en ESCOM";
   }
 
   if (step === 1) {
-    if (!form.carrera)  errs.carrera  = "Selecciona una carrera";
-    if (!form.creditos) errs.creditos = "Ingresa el porcentaje de créditos";
-    if (!form.semestre) errs.semestre = "Ingresa el semestre actual";
-    if (!form.periodo)  errs.periodo  = "Selecciona un periodo";
+    if (!form.carrera) errs.carrera = "Selecciona una carrera";
+    if (!form.creditos) errs.creditos = "Campo requerido";
+    if (!form.semestre) errs.semestre = "Campo requerido";
+    if (!form.periodo) errs.periodo = "Selecciona un periodo";
+
+    if (form.creditos && form.semestre) {
+      const creditos = Number(form.creditos);
+      const semestre = Number(form.semestre);
+
+      if (!form.tipoLiberacion) {
+        if (creditos < 70) errs.creditos = "Necesitas mínimo el 70% para realizar tu servicio";
+      } else if (form.tipoLiberacion === "creditos") {
+        if (creditos < 60 || creditos > 70 || semestre < 6)
+          errs.tipoLiberacion = "Con este dictamen tus créditos deben estar entre 60% y 70%, y debes estar en semestre 6 o superior";
+      } else if (form.tipoLiberacion === "electiva") {
+        if (creditos < 96.01)
+          errs.tipoLiberacion = "Con este dictamen necesitas mínimo 96.01% de créditos";
+      } else if (form.tipoLiberacion === "estancia") {
+        if (creditos < 70) errs.creditos = "Necesitas mínimo el 70% para realizar tu servicio";
+      }
+    }
   }
 
   if (step === 2) {
-    if (!form.oferta)    errs.oferta    = "Debes seleccionar una oferta";
-    if (form.oferta && !form.motivacion)
-      errs.motivacion = "Escribe tu motivación para esta oferta";
+    if (!form.oferta) errs.oferta = "Selecciona una oferta";
+    if (!form.motivacion || form.motivacion.trim().length < 20)
+      errs.motivacion = "Describe por qué deseas participar (mínimo 20 caracteres)";
   }
 
   if (step === 3) {
@@ -90,59 +78,68 @@ function validarPaso(step, form, acepta) {
   return errs;
 }
 
-// ── Hook ──────────────────────────────────────────────────────
 export function useModificarForm() {
-  const [screen,   setScreen]   = useState("reject"); // "reject" | "form"
-  const [step,     setStep]     = useState(0);
-  const [form,     setForm]     = useState(ALUMNO_PRECARGADO);
-  const [errors,   setErrors]   = useState({});
-  const [ofertas,  setOfertas]  = useState([]);
+  const [step, setStep] = useState(0);
+  const [form, setForm] = useState(FORM_VACIO);
+  const [errors, setErrors] = useState({});
+  const [ofertas, setOfertas] = useState([]);
+  const [ofertasCargando, setOfertasCargando] = useState(true);
   const [periodos, setPeriodos] = useState([]);
-  const [acepta,   setAcepta]   = useState(false);
-  const [submitted,setSubmitted]= useState(false);
-  const [loading,  setLoading]  = useState(false);
+  const [acepta, setAceptaState] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [cargandoInicial, setCargandoInicial] = useState(true);
+  const [errorInicial, setErrorInicial] = useState("");
 
   const totalSteps = 4;
 
-  // Cargar ofertas y periodos al montar
+  // Precarga los datos reales del alumno + catálogos al montar.
   useEffect(() => {
-    fetch("http://localhost:3000/ofertas")
-      .then(r => r.json())
-      .then(data => setOfertas(data))
-      .catch(() => setOfertas(OFERTAS_MOCK));
+    getInfoModificarSolicitud()
+      .then((info) => setForm((prev) => ({ ...prev, ...info })))
+      .catch((err) => setErrorInicial(err.message || "No se pudo cargar tu solicitud."))
+      .finally(() => setCargandoInicial(false));
 
-    fetch("http://localhost:3000/periodos")
-      .then(r => r.json())
-      .then(data => setPeriodos(data))
-      .catch(() => setPeriodos(PERIODOS_MOCK));
+    getOfertas()
+      .then(setOfertas)
+      .catch(() => setErrors((prev) => ({ ...prev, oferta: "Error al cargar ofertas. Recarga la página" })))
+      .finally(() => setOfertasCargando(false));
+
+    getPeriodos()
+      .then(setPeriodos)
+      .catch((err) => console.error(err));
   }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) setErrors(prev => { const n = { ...prev }; delete n[name]; return n; });
+    const valorFinal = ["nombres", "apellidos"].includes(name) ? value.toUpperCase() : value;
+    setForm((prev) => ({ ...prev, [name]: valorFinal }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
   const seleccionarOferta = (id) => {
-    setForm(prev => ({ ...prev, oferta: prev.oferta === id ? "" : id, motivacion: prev.oferta === id ? "" : prev.motivacion }));
-    if (errors.oferta) setErrors(prev => { const n = { ...prev }; delete n.oferta; return n; });
+    setForm((prev) => ({
+      ...prev,
+      oferta: prev.oferta === id ? "" : id,
+      motivacion: prev.oferta === id ? "" : prev.motivacion,
+    }));
+    setErrors((prev) => ({ ...prev, oferta: "" }));
   };
 
-  const iniciarModificacion = () => {
-    setScreen("form");
-    setStep(0);
+  const setAcepta = (val) => {
+    setAceptaState(val);
+    setErrors((prev) => ({ ...prev, acepta: "" }));
   };
 
   const next = () => {
     const errs = validarPaso(step, form, acepta);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setErrors({});
-    setStep(s => s + 1);
+    setStep((s) => s + 1);
   };
 
   const back = () => {
     setErrors({});
-    setStep(s => s - 1);
+    setStep((s) => s - 1);
   };
 
   const submit = async () => {
@@ -151,44 +148,45 @@ export function useModificarForm() {
 
     setLoading(true);
     try {
-      // Verificar que la oferta sigue teniendo cupos antes de enviar
-      const ofertaActual = ofertas.find(o => String(o.id) === String(form.oferta));
-      if (!ofertaActual || ofertaActual.cuposDisponibles < 1) {
-        setErrors({ oferta: "La oferta seleccionada ya no tiene cupos. Por favor elige otra." });
-        setStep(2);
-        setLoading(false);
-        return;
+      const resultado = await reenviarSolicitudModificada(form);
+      const actual = JSON.parse(localStorage.getItem("usuario") || "null");
+      if (actual) {
+        localStorage.setItem("usuario", JSON.stringify({
+          ...actual,
+          estado_solicitud: resultado.estado_solicitud,
+          estado_anterior: "modificar_reenviar",
+        }));
       }
-
-      await fetch("http://localhost:3000/solicitudes/modificar", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          aceptaCongruencia: acepta,
-          estadoSolicitud: "Pendiente de respuesta del profesor",
-        }),
-      });
-
-      setSubmitted(true);
-    } catch {
-      // En demo sin backend, igual marca como enviado
-      setSubmitted(true);
+      return { exito: true };
+    } catch (err) {
+      if (err.code === "OFERTA_SIN_CUPOS") {
+        setStep(2);
+        setForm((prev) => ({ ...prev, oferta: "" }));
+        getOfertas()
+          .then((data) => {
+            setOfertas(data);
+            setErrors({
+              oferta: data.length === 0
+                ? "Lo sentimos, no hay ofertas disponibles en este momento."
+                : "Lo sentimos, ese cupo se acaba de llenar. Selecciona otra oferta.",
+            });
+          })
+          .catch(() => setErrors({ oferta: "Error al actualizar oferta. Recarga la página." }));
+      } else {
+        alert(err.message);
+      }
+      return { exito: false };
     } finally {
       setLoading(false);
     }
   };
 
   return {
-    // estado
-    screen, step, form, errors,
-    ofertas, periodos,
-    acepta, submitted, loading, totalSteps,
-    motivoRechazo: MOTIVO_RECHAZO,
-    // acciones
-    handleChange, seleccionarOferta,
-    setAcepta,
-    iniciarModificacion,
+    step, form, errors,
+    ofertas, ofertasCargando, periodos,
+    acepta, loading, totalSteps,
+    cargandoInicial, errorInicial,
+    handleChange, seleccionarOferta, setAcepta,
     next, back, submit,
   };
 }
