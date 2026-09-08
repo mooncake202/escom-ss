@@ -4,9 +4,11 @@ const express = require('express');
 const { requireAuth, requireRole } = require('../../middleware/auth.middleware');
 const { postEnviarSolicitud, getVerificarCorreo, getEstadoSolicitud } = require('./gr.controller');
 const { postCambiarOferta, postContinuarSISS } = require('./gr.controller'); 
+
 const { getInfoSISS, postConfirmarSISS, postAdjuntarDocumentacion, postContinuarCartaCompromiso,
     postCorregirDocumentacion, postCorregirSISS, postModificarSolicitud, getMisDocumentos,
     postConfirmarCartaCompromiso, postContinuarExpediente, postCorregirExpediente, postContinuarAlumnoAsignado,
+    postConfirmarBienvenida,
 } = require('./gr.controller'); 
 
 const router = express.Router();
@@ -56,5 +58,9 @@ router.post('/subir-expediente', requireAuth, requireRole('alumno_sin_asignar'),
 //gr-11
 router.post('/corregir-expediente', requireAuth, requireRole('alumno_sin_asignar'), postCorregirExpediente);
 router.post('/continuar-alumno-asignado', requireAuth, requireRole('alumno_sin_asignar'), postContinuarAlumnoAsignado);
+
+// gr-12 — modal de bienvenida, sirve para ambos roles (ver nota en el service)
+router.post('/confirmar-bienvenida', requireAuth, postConfirmarBienvenida);
+
 
 module.exports = router;

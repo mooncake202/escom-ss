@@ -6,6 +6,8 @@ const {
   getDescargarDocumento,
   getSolicitudesCartaCompromiso,
   postRegistrarRecepcionCarta,
+  getExpedientesPendientes,
+  postDecidirExpediente,
 } = require('./gr-coordinador.controller');
 
 const router = express.Router();
@@ -21,9 +23,12 @@ router.post('/documentacion/:id/decidir', requireAuth, requireRole('coordinador'
 // aquí solo exigimos sesión, no un rol específico.
 router.get('/documentos/:id/descargar', requireAuth, getDescargarDocumento);
 
-
 //gr09
 router.get('/cartas-compromiso', requireAuth, requireRole('coordinador'), getSolicitudesCartaCompromiso);
 router.post('/cartas-compromiso/:id/registrar-recepcion', requireAuth, requireRole('coordinador'), postRegistrarRecepcionCarta);
+
+//gr12
+router.get('/expedientes', requireAuth, requireRole('coordinador'), getExpedientesPendientes);
+router.post('/expedientes/:id/decidir', requireAuth, requireRole('coordinador'), postDecidirExpediente);
 
 module.exports = router;

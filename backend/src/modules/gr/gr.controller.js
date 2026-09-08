@@ -249,8 +249,20 @@ async function postContinuarAlumnoAsignado(req, res) {
   }
 }
 
+async function postConfirmarBienvenida(req, res) {
+  try {
+    const resultado = await grService.confirmarBienvenidaAlumnoAsignado(req.usuario.sub);
+    return res.status(200).json({ message: resultado.mensaje, token: resultado.token });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al confirmar bienvenida:', err);
+    return res.status(status).json({ message });
+  }
+}
 
-module.exports = { 
+
+module.exports = {
   postEnviarSolicitud, 
   getVerificarCorreo, 
   getEstadoSolicitud,
@@ -270,6 +282,7 @@ module.exports = {
   postSubirExpediente,
   postCorregirExpediente,
   postContinuarAlumnoAsignado,
+  postConfirmarBienvenida,
 };
 
 

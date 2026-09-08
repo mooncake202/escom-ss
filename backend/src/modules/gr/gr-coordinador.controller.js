@@ -60,9 +60,32 @@ async function postRegistrarRecepcionCarta(req, res) {
   }
 }
 
+async function getExpedientesPendientes(req, res) {
+  try {
+    const expedientes = await grCoordinadorService.listarExpedientesPendientes();
+    return res.status(200).json(expedientes);
+  } catch (err) {
+    console.error('Error al listar expedientes pendientes:', err);
+    return res.status(500).json({ message: 'Ocurrió un error. Intenta de nuevo más tarde.' });
+  }
+}
+
+async function postDecidirExpediente(req, res) {
+  try {
+    const { decision, motivoRechazo } = req.body;
+    const resultado = await grCoordinadorService.decidirExpediente(req.params.id, decision, motivoRechazo, req.usuario.sub);
+    return res.status(200).json({ message: 'Decisión registrada correctamente.', estado_solicitud: resultado.estado_solicitud });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al decidir expediente:', err);
+    return res.status(status).json({ message });
+  }
+}
 
 
 module.exports = { getSolicitudesDocumentacion, 
   postDecidirDocumentacion, getDescargarDocumento,
   getSolicitudesCartaCompromiso, postRegistrarRecepcionCarta,
+  getExpedientesPendientes, postDecidirExpediente,
 };

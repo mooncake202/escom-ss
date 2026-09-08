@@ -17,7 +17,7 @@ export default function ValidarEntregaPresencial() {
   return (
     <DashboardLayout
       titulo="Validar entrega presencial"
-      subtitulo="CU-GR-09 · Coordinación"
+      
       rol="coordinador"
       usuario={nombreCoordinador}
     >

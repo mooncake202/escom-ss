@@ -388,11 +388,19 @@ async function obtenerEstadoActualPorUsuarioId(usuarioId) {
 
   const solicitud = await verificarYAplicarVencimiento(alumno.solicitud_registro.id);
 
+  const notificacionBienvenida = await prisma.notificacion.findFirst({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+  });
+
   return {
     estado_solicitud: solicitud.estado_solicitud,
     motivo_rechazo: solicitud.motivo_rechazo,
+    notificacionBienvenidaPendiente: !!notificacionBienvenida,
   };
 }
+
+
+
 
 // Estados desde los que se permite cambiar de oferta — RN-GR-17: "en los
 // tres escenarios" (pendiente, rechazada por perfil, rechazada por cupos).
@@ -952,10 +960,50 @@ async function continuarAlumnoAsignado(usuarioId) {
     prisma.usuario.update({ where: { id: usuarioId }, data: { rol: 'alumno_asignado' } }),
   ]);
 
-  const nuevoToken = generarToken({ sub: usuarioId, rol: 'alumno_asignado' });
+    const nuevoToken = generarToken({ sub: usuarioId, rol: 'alumno_asignado' });
 
   return { mensaje: '¡Felicidades! Ya eres Alumno Asignado.', estado_solicitud: 'alumno_asignado', token: nuevoToken };
 }
+
+/**
+ * Botón "Entendido" del modal de bienvenida — sirve tanto si el alumno
+ * sigue en la pantalla de espera (aún con rol alumno_sin_asignar en su
+ * token viejo) como si ya volvió a iniciar sesión (ya con rol
+ * alumno_asignado fresco). Por eso NO exige un rol específico.
+ */
+async function confirmarBienvenidaAlumnoAsignado(usuarioId) {
+  const notificacion = await prisma.notificacion.findFirst({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+  });
+  if (!notificacion) throw crearError('No hay ninguna bienvenida pendiente de confirmar.', 404);
+
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+
+  await prisma.$transaction(async (tx) => {
+    await tx.notificacion.update({ where: { id: notificacion.id }, data: { leida: true, fecha_leida: new Date() } });
+
+    // Si el alumno llegó aquí SIN haber pasado por login de nuevo, la
+    // transición de estado_solicitud todavía no ocurrió — se completa aquí.
+    if (alumno?.solicitud_registro?.estado_solicitud === 'expediente_aprobado') {
+      await tx.solicitud_registro.update({
+        where: { id: alumno.solicitud_registro.id },
+        data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_aprobado' },
+      });
+    }
+  });
+
+  // Si el JWT actual de quien pide esto todavía dice alumno_sin_asignar,
+  // hace falta un token nuevo — si ya entró con uno correcto desde el
+  // login, no hace falta emitir otro.
+  const usuarioActual = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+  const tokenNuevo = usuarioActual.rol === 'alumno_asignado' ? generarToken({ sub: usuarioId, rol: 'alumno_asignado' }) : null;
+
+  return { mensaje: 'Bienvenida confirmada.', token: tokenNuevo };
+}
+
 
 
 
@@ -984,4 +1032,5 @@ module.exports = {
   subirExpediente,
   corregirExpediente,
   continuarAlumnoAsignado,
+  confirmarBienvenidaAlumnoAsignado,
 };

@@ -27,7 +27,7 @@ export default function RevisarDocumentacion() {
   return (
     <DashboardLayout
       titulo="Revisión de documentación inicial"
-      subtitulo="CU-GR-07 · Coordinación"
+      
       rol="coordinador"
       usuario={nombreCoordinador}
     >

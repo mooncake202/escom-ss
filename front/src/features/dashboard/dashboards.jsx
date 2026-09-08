@@ -8,6 +8,7 @@ import {
   listarNotificacionesPendientes,
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
+import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
 
 // ── Iconos SVG inline ──────────────────────────────────────────────
 const Icon = ({ name, size = 18, color = "currentColor" }) => {
@@ -480,7 +481,7 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </Section>
 
         {/* CU-GR */}
-          <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge={resumen.solicitudesRegistroPendientes}>
+          <Section title="Registro de Alumnos" icon="users" {...T.blue} C={C} badge={(resumen.solicitudesRegistroPendientes ?? 0) + (resumen.expedientesPendientes ?? 0)}>
           <ActionItem icon="document" {...T.blue}   label="Revisar documentación inicial"  desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/documentacion")} C={C} />
           <SlotNotificacionCalculada
             mostrar={(resumen.solicitudesRegistroPendientes ?? 0) > 0}
@@ -491,7 +492,13 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
           />
           <ActionItem icon="check"    {...T.green}  label="Validar carta compromiso"       desc="Confirma cuando el alumno la entregue" onClick={() => navigate("/coordinacion/carta-presencial")} C={C} />
           <ActionItem icon="folder"   {...T.purple} label="Revisar expediente de registro" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/expedientes")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/expedientes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.expedientesPendientes ?? 0) > 0}
+            mensaje="Tienes expedientes pendientes de revisión."
+            ruta="/coordinacion/expedientes"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="folder"   {...T.purple} label="Envío de carta compromiso firmada" desc="Solicitudes pendientes" onClick={() => navigate("/cartacompromisofirmada")} C={C} />
         </Section>
 
@@ -617,10 +624,20 @@ export default function Dashboards() {
       </DashboardLayout>
     );
   }
+  
+  const notifBienvenida = notificaciones.find((n) => n.ruta_relacionada === "MODAL_BIENVENIDA_ALUMNO_ASIGNADO");
 
   return (
     <DashboardLayout titulo={cfg.titulo} subtitulo={cfg.subtitulo} rol={rol} usuario={nombreCompletoSesion(sesion)}>
+      {notifBienvenida && (
+        <ModalBienvenidaAlumnoAsignado
+          mensaje={notifBienvenida.mensaje}
+          onConfirmado={() => window.location.reload()}
+        />
+      )}
       <div style={{ maxWidth: "800px", margin: "0 auto", width: "100%" }}>
+
+
         {cargando ? (
           <p style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "2rem" }}>Cargando…</p>
         ) : (

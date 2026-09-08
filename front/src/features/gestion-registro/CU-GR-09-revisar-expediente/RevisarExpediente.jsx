@@ -7,19 +7,21 @@ import { useRevisarExpediente }   from "./hooks/useRevisarExpediente";
 export default function RevisarExpediente() {
   const { C } = useTheme();
   const {
-    pendientes, seleccionado, loading, resultado,
+    pendientes, cargandoLista, seleccionado, loading, resultado,
     comentario, setComentario, modoRechazo, setModoRechazo,
-    verDetalle, cerrar, decidir,
+    verDetalle, cerrar, decidir, verPdf, errorDescarga,
   } = useRevisarExpediente();
+
+  const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
+  const nombreCoordinador = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "Coordinación";
 
   return (
     <DashboardLayout
       titulo="Revisión de expedientes"
-      subtitulo="CU-GR-09 · Coordinación"
-      rol="coordinacion"
-      usuario="Coordinación ESCOM"
+      
+      rol="coordinador"
+      usuario={nombreCoordinador}
     >
-      {/* Toast resultado — RN-GR-55 */}
       {resultado && (
         <div style={{
           marginBottom: "1.25rem", padding: "12px 16px", borderRadius: RADIUS.md,
@@ -29,13 +31,12 @@ export default function RevisarExpediente() {
           fontSize: 13, fontWeight: 500,
         }}>
           {resultado.tipo === "aprobar"
-            ? `✓ Expediente de ${resultado.nombre} aprobado. El alumno fue asignado al profesor y su rol fue actualizado a AlumnoAsignado.`
+            ? `✓ Expediente de ${resultado.nombre} aprobado. El alumno fue asignado al profesor y su rol fue actualizado a Alumno Asignado.`
             : `✕ Expediente de ${resultado.nombre} rechazado. El alumno fue notificado con el motivo para realizar correcciones.`
           }
         </div>
       )}
 
-      {/* Encabezado */}
       <div style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ margin: "0 0 0.25rem", fontSize: 20, fontWeight: 700, color: C.textPrimary }}>
           Expedientes pendientes de revisión
@@ -45,8 +46,9 @@ export default function RevisarExpediente() {
         </p>
       </div>
 
-      {/* Lista */}
-      {pendientes.length === 0 ? (
+      {cargandoLista ? (
+        <p style={{ color: C.textMuted, fontSize: 13, textAlign: "center", padding: "2rem" }}>Cargando...</p>
+      ) : pendientes.length === 0 ? (
         <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
           <p style={{ fontSize: 32, margin: "0 0 0.75rem" }}>📭</p>
           <p style={{ fontSize: 15, color: C.textMuted, margin: 0 }}>No hay expedientes pendientes de revisión</p>
@@ -62,7 +64,6 @@ export default function RevisarExpediente() {
         </div>
       )}
 
-      {/* Panel detalle */}
       <DetalleExpediente
         item={seleccionado}
         loading={loading}
@@ -71,6 +72,8 @@ export default function RevisarExpediente() {
         modoRechazo={modoRechazo}
         setModoRechazo={setModoRechazo}
         onDecidir={decidir}
+        onVerPdf={verPdf}
+        errorDescarga={errorDescarga}
         onCerrar={cerrar}
         C={C}
       />

@@ -122,8 +122,8 @@ async function resumenCoordinacion() {
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoLabel: formatearPeriodo(periodoMasReciente),
-        // Ya resuelto por CU-GR-07.
     solicitudesRegistroPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'SISS_y_documentacion_pendiente' } }),
+    expedientesPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'expediente_pendiente_revision' } }),
     reportesPorRevisar: 0,
     reportesAprobadosMes: 0,
     ofertasPorValidar: 0,

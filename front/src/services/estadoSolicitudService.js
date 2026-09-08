@@ -53,17 +53,13 @@ export async function subirExpediente({ cartaCompromiso, curp, constanciaCredito
   if (dictamen) formData.append("dictamen", dictamen);
   return apiFetch("/registro/subir-expediente", { method: "POST", body: formData });
 }
-
-/**
- * CU-GR-11, Flujo A — botón "Corregir y reenviar expediente".
- */
 export async function corregirExpediente() {
   return apiFetch("/registro/corregir-expediente", { method: "POST" });
 }
 
 /**
- * CU-GR-11, Flujo B — botón "Continuar" cuando expediente_aprobado.
- * Regresa también un JWT nuevo, porque el rol del usuario cambió de verdad.
+ * CU-GR-11, Flujo B — fallback manual (el flujo normal ahora pasa por el
+ * modal de bienvenida, ver ModalBienvenidaAlumnoAsignado.jsx).
  */
 export async function continuarAlumnoAsignado() {
   return apiFetch("/registro/continuar-alumno-asignado", { method: "POST" });

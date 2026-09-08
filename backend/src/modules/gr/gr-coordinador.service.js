@@ -3,6 +3,7 @@ const path = require('path');
 const prisma = require('../../lib/prisma');
 const { descifrarBuffer } = require('../../lib/fileEncryption');
 const { dictamenLabel, RUTA_BASE_DOCUMENTOS } = require('./gr.service');
+const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
@@ -237,12 +238,121 @@ async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
       fecha_carta_compromiso: new Date(),
     },
   });
-
   return { mensaje: 'Recepción registrada correctamente.' };
+}
+
+/**
+ * RF-GR-107: expedientes pendientes de revisión.
+ */
+async function listarExpedientesPendientes() {
+  const solicitudes = await prisma.solicitud_registro.findMany({
+    where: { estado_solicitud: 'expediente_pendiente_revision' },
+    include: {
+      alumno: { include: { usuario: true } },
+      oferta: { include: { profesor: { include: { usuario: true } } } },
+      periodo_registro: { include: { evento_calendario: true } },
+    },
+    orderBy: { fecha_aplicacion: 'asc' },
+  });
+
+  const boletas = solicitudes.map((s) => s.alumno_id);
+  const documentos = await prisma.documento.findMany({
+    where: { alumno_id: { in: boletas }, tipo_documento: 'expediente' },
+  });
+
+  return solicitudes.map((s) => {
+    const docExpediente = documentos.find((d) => d.alumno_id === s.alumno_id);
+    return {
+      id: s.id,
+      alumno: {
+        nombre: `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`,
+        boleta: s.alumno.boleta,
+        carrera: s.alumno.carrera,
+        correoInst: s.alumno.usuario.correo_institucional,
+        creditos: s.alumno.creditos,
+      },
+      profesor: s.oferta?.profesor ? `${s.oferta.profesor.usuario.nombre} ${s.oferta.profesor.usuario.apellidos}` : null,
+      periodoInicio: s.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
+      periodoFin: s.periodo_registro?.evento_calendario?.fecha_fin ?? null,
+      fechaEnvio: s.fecha_aplicacion,
+      requiereDictamen: s.dictamen !== null,
+      dictamenLabel: dictamenLabel(s.dictamen),
+      expediente: {
+        documentoId: docExpediente?.id ?? null,
+        nombreArchivo: docExpediente?.nombre_expediente ?? null,
+      },
+    };
+  });
+}
+
+/**
+ * CU-GR-12 — aprobar o rechazar con correcciones.
+ */
+async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinadorUsuarioId) {
+  if (!['aprobar', 'rechazar'].includes(decision)) throw crearError('Decisión inválida.');
+  if (decision === 'rechazar' && (!motivoRechazo || !motivoRechazo.trim())) {
+    throw crearError('Debes ingresar un motivo.');
+  }
+
+  const coordinador = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
+  if (!coordinador) throw crearError('No se encontró tu perfil de coordinador.', 404);
+
+  const solicitud = await prisma.solicitud_registro.findUnique({
+    where: { id: Number(solicitudId) },
+    include: { alumno: true },
+  });
+  if (!solicitud) throw crearError('Solicitud no encontrada.', 404);
+  if (solicitud.estado_solicitud !== 'expediente_pendiente_revision') {
+    throw crearError('Esta solicitud ya fue procesada.', 409);
+  }
+
+  const documentoExpediente = await prisma.documento.findFirst({
+    where: { alumno_id: solicitud.alumno_id, tipo_documento: 'expediente' },
+  });
+
+  if (decision === 'aprobar') {
+    await prisma.$transaction([
+      prisma.solicitud_registro.update({
+        where: { id: solicitud.id },
+        data: { estado_solicitud: 'expediente_aprobado', estado_anterior: 'expediente_pendiente_revision' },
+      }),
+      // RN-GR-73: el rol cambia aquí mismo, tal como dice la ficha. El
+      // modal de bienvenida (ver notificación abajo) es lo que garantiza
+      // que la transición de estado_solicitud a alumno_asignado se
+      // complete sin importar si el alumno recarga, cierra sesión o
+      // sigue en la misma pantalla.
+      prisma.usuario.update({ where: { id: solicitud.alumno.usuario_id }, data: { rol: 'alumno_asignado' } }),
+      ...(documentoExpediente
+        ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } })]
+        : []),
+    ]);
+
+    await crearNotificacion({
+      usuarioId: solicitud.alumno.usuario_id,
+      tipo: 'success',
+      mensaje: 'Coordinación validó tu expediente. Tus actividades permanecerán deshabilitadas hasta la fecha de inicio de tu periodo de servicio social.',
+      rutaRelacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO',
+    });
+
+    return { estado_solicitud: 'expediente_aprobado' };
+  }
+
+  // rechazar — RN-GR-71, mismo patrón de reutilizar fila que en GR-11.
+  await prisma.$transaction([
+    prisma.solicitud_registro.update({
+      where: { id: solicitud.id },
+      data: { estado_solicitud: 'expediente_con_correcciones', estado_anterior: 'expediente_pendiente_revision', motivo_rechazo: motivoRechazo, tipo_rechazo: 'corregible' },
+    }),
+    ...(documentoExpediente
+      ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'con_correcciones' } })]
+      : []),
+  ]);
+  return { estado_solicitud: 'expediente_con_correcciones' };
 }
 
 
 module.exports = { listarSolicitudesDocumentacionPendiente, 
   decidirDocumentacion, descargarDocumento,
   listarSolicitudesEsperandoCarta, registrarRecepcionCarta,
+  listarExpedientesPendientes, decidirExpediente,
 };

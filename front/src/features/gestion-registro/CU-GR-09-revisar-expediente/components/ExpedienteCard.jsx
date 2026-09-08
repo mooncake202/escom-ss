@@ -22,15 +22,17 @@ export function ExpedienteCard({ item, onVer, C }) {
           {item.alumno.nombre}
         </p>
         <p style={{ margin: "0 0 3px", fontSize: 12, color: C.textMuted }}>
-          {CARRERA_LABEL[item.alumno.carrera]} · Boleta {item.alumno.boleta}
+          {CARRERA_LABEL[item.alumno.carrera] || item.alumno.carrera} · Boleta {item.alumno.boleta}
         </p>
         <p style={{ margin: "0 0 4px", fontSize: 12, color: C.textMuted }}>
-          Profesor: {item.profesor}
+          Profesor: {item.profesor || "—"}
         </p>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.accentSoft, color: C.accentText, fontWeight: 600 }}>
-            {item.expediente.tamaño}
-          </span>
+          {item.requiereDictamen && (
+            <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.accentSoft, color: C.accentText, fontWeight: 600 }}>
+              Con {item.dictamenLabel?.toLowerCase()}
+            </span>
+          )}
           <span style={{ fontSize: 12, color: C.textDisabled }}>
             Enviado: {fecha}
           </span>

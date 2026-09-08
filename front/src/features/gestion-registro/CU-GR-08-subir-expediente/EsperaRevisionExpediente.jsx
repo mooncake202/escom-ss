@@ -4,6 +4,7 @@ import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLayout } from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
 import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoSolicitud";
 import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
+import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
 import { corregirExpediente, continuarAlumnoAsignado } from "@/services/estadoSolicitudService";
 
 function actualizarUsuarioLocal(cambios) {
@@ -26,7 +27,6 @@ export default function EsperaRevisionExpediente() {
 
   if (cargando) return null;
 
-  // Excepción E1
   if (error) {
     return (
       <ProcesoLayout pasoActual={6} usuario={nombre}>
@@ -37,9 +37,6 @@ export default function EsperaRevisionExpediente() {
     );
   }
 
-  // RN-GR-68 / RF-GR-106: si el plazo (Reloj 2) venció mientras el alumno
-  // estaba en expediente_con_correcciones, el polling ya lo movió aquí —
-  // no hace falta código nuevo, es el mismo componente compartido de siempre.
   if (estadoSolicitud === "rechazada_definitivamente") {
     return (
       <ProcesoLayout pasoActual={6} usuario={nombre}>
@@ -47,6 +44,15 @@ export default function EsperaRevisionExpediente() {
       </ProcesoLayout>
     );
   }
+
+  // ── Flujo B — RN-GR-67: prioridad sobre cualquier otra rama. Aparece
+  // "sobre" lo que sea que esta pantalla iba a mostrar, sin importar si el
+  // alumno llegó aquí sin recargar o volviendo a iniciar sesión.
+  const modalBienvenida = estado?.notificacionBienvenidaPendiente ? (
+    <ModalBienvenidaAlumnoAsignado
+      mensaje="Coordinación validó tu expediente. Tus actividades permanecerán deshabilitadas hasta la fecha de inicio de tu periodo de servicio social."
+    />
+  ) : null;
 
   // ── Flujo A — RN-GR-65: corregir y reenviar ──
   if (estadoSolicitud === "expediente_con_correcciones") {
@@ -65,6 +71,7 @@ export default function EsperaRevisionExpediente() {
 
     return (
       <ProcesoLayout pasoActual={6} usuario={nombre}>
+        {modalBienvenida}
         <div style={{ maxWidth: 580, margin: "0 auto" }}>
           <div style={{
             padding: "14px 18px", borderRadius: RADIUS.md,
@@ -112,15 +119,15 @@ export default function EsperaRevisionExpediente() {
     );
   }
 
-  // ── Flujo B — RN-GR-66/67: aprobado, pasa a Alumno Asignado ──
+  // ── Flujo B — RN-GR-66/67: aprobado. El modal (arriba) ya cubre el caso
+  // normal; este botón es un respaldo defensivo por si por alguna razón la
+  // notificación ya se confirmó pero la transición no se completó.
   if (estadoSolicitud === "expediente_aprobado") {
     const handleContinuar = async () => {
       setEnviando(true);
       setErrorAccion("");
       try {
         const resultado = await continuarAlumnoAsignado();
-        // El rol cambió de verdad — hay que reemplazar el JWT completo, no
-        // solo el objeto cosmético de localStorage (ver nota en el backend).
         localStorage.setItem("token", resultado.token);
         actualizarUsuarioLocal({ estado_solicitud: resultado.estado_solicitud, estado_anterior: "expediente_aprobado", rol: "alumno_asignado" });
         navigate("/dashboard");
@@ -132,6 +139,7 @@ export default function EsperaRevisionExpediente() {
 
     return (
       <ProcesoLayout pasoActual={6} usuario={nombre}>
+        {modalBienvenida}
         <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
           <div style={{ fontSize: 52, marginBottom: "1rem" }}>🎓</div>
           <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.success }}>
@@ -165,6 +173,7 @@ export default function EsperaRevisionExpediente() {
   // ── RF-GR-99 — expediente_pendiente_revision (estado por defecto) ──
   return (
     <ProcesoLayout pasoActual={6} usuario={nombre}>
+      {modalBienvenida}
       <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
 
         <div style={{ fontSize: 52, marginBottom: "1rem" }}>🕐</div>
