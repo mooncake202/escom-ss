@@ -47,7 +47,11 @@ router.get('/mis-documentos', requireAuth, requireRole('alumno_sin_asignar'), ge
 router.post('/confirmar-carta-compromiso', requireAuth, requireRole('alumno_sin_asignar'), postConfirmarCartaCompromiso);
 router.post('/continuar-expediente', requireAuth, requireRole('alumno_sin_asignar'), postContinuarExpediente);
 
+//gr-10
+const { getInfoExpediente, postSubirExpediente } = require('./gr.controller');
 
+router.get('/info-expediente', requireAuth, requireRole('alumno_sin_asignar'), getInfoExpediente);
+router.post('/subir-expediente', requireAuth, requireRole('alumno_sin_asignar'), postSubirExpediente);
 
 
 

@@ -20,6 +20,7 @@
     "multer": "^2.3.0",
     "mysql2": "^3.19.1",
     "nodemailer": "^9.1.1",
+    "pdf-lib": "^1.17.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {

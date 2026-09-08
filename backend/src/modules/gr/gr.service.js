@@ -8,6 +8,8 @@ const {
   validarContrasena,
 } = require('../../lib/validators');
 
+const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
+
 const fs = require('fs');
 const path = require('path');
 const { cifrarBuffer, generarNombreSeguro } = require('../../lib/fileEncryption');
@@ -39,10 +41,6 @@ const DICTAMEN_LABEL = { 1: 'Dictamen de créditos', 2: 'Dictamen de estancia pr
 function dictamenLabel(codigo) {
   return DICTAMEN_LABEL[codigo] || null;
 }
-
-
-
-
 
 // Reglas extra de GR (más estrictas que el validador compartido, confirmadas
 // por el usuario) — no se meten en validators.js porque no aplican a
@@ -195,7 +193,6 @@ async function enviarSolicitudRegistro(datos) {
           apellidos: apellidosNormalizados,
           contrasena: contrasenaHash,
           fecha_creacion: ahora,
-          
         },
       });
 
@@ -232,13 +229,6 @@ async function enviarSolicitudRegistro(datos) {
     throw err;
   }
 
-  
-
-
-
-
-
-
   return { mensaje: 'Tu solicitud fue enviada correctamente. Ya puedes iniciar sesión para ver el estado de tu proceso.' };
 }
 
@@ -249,26 +239,29 @@ async function verificarCorreoDisponible(correoInst) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Vencimiento de plazo de expediente (RN-GR-04)
+// Vencimiento de plazo (RN-GR-04 = Reloj 1, RN-GR-63 = Reloj 2)
 // ─────────────────────────────────────────────────────────────
-// RN-GR-04 (Reloj 1: fecha_max_expediente) deja de aplicar en cuanto el
-// alumno YA ENVIÓ su expediente — a partir de ahí entra un reloj distinto
-// (RN-GR-05: fecha_inicio del periodo, "Reloj 2"), que se checará aparte
-// cuando construyamos CU-GR-11. Por ahora estos 3 quedan sin ningún
-// chequeo de vencimiento (hueco temporal controlado, mejor que aplicarles
-// el reloj equivocado).
-const ESTADOS_EXCLUIDOS_DE_VENCIMIENTO = [
+
+// Estados donde NINGÚN reloj aplica — el proceso ya terminó (bien o mal)
+// para efectos de vencimiento.
+const ESTADOS_SIN_RELOJ = [
   'rechazada_definitivamente',
   'modificar_reenviar',
   'alumno_asignado',
-  'expediente_pendiente_revision',
-  'expediente_con_correcciones',
   'expediente_aprobado',
 ];
 
+// Reloj 2 (RN-GR-63, segunda mitad): una vez que el expediente ya se
+// envió, el límite deja de ser fecha_max_expediente y pasa a ser
+// fecha_inicio del periodo — sin importar cuántas veces vaya y venga por
+// correcciones, lo único que importa es que quede aprobado antes de que
+// el periodo arranque.
+const ESTADOS_RELOJ_2 = ['expediente_pendiente_revision', 'expediente_con_correcciones'];
+
 // Estados en los que el profesor YA aceptó al alumno (por lo tanto ya se
-// había decrementado cupos_disponibles en CU-GR-02) — si el plazo vence
-// estando en cualquiera de estos, hay que liberar ese cupo de vuelta.
+// había decrementado cupos_disponibles en CU-GR-02) — si cualquiera de
+// los 2 relojes vence estando en cualquiera de estos, hay que liberar
+// ese cupo de vuelta.
 const ESTADOS_CON_CUPO_CONSUMIDO = [
   'registro_SISS',
   'adjuntar_documentacion_inicial',
@@ -284,53 +277,19 @@ const ESTADOS_CON_CUPO_CONSUMIDO = [
   'expediente_con_correcciones',
 ];
 
-const MOTIVO_RECHAZO_VENCIMIENTO = 'Plazo de envío de expediente vencido';
+const MOTIVO_RECHAZO_VENCIMIENTO_EXPEDIENTE = 'Plazo de envío de expediente vencido';
+const MOTIVO_RECHAZO_VENCIMIENTO_INICIO = 'Tu periodo de servicio social inició sin que tu expediente quedara aprobado';
 
 /**
- * RN-GR-04: revisa si el plazo de envío de expediente del periodo de una
- * solicitud ya venció (antes de las 2:00 pm de ese día) y, si es así,
- * ejecuta el "borrado parcial" descrito en la ficha. Se llama desde 2
- * lugares que comparten esta misma lógica: el login (auth.service.js), y
- * más adelante el polling de las pantallas de espera.
- *
- * ⚠️ Todavía NO implementa RN-GR-05 (revisar contra la fecha de INICIO del
- * periodo para expediente_aprobado/expediente_con_correcciones) — queda
- * pendiente como regla aparte.
- *
- * @param {number} solicitudId
- * @returns {Promise<object|null>} la solicitud actualizada (si se aplicó el
- *   borrado), la solicitud sin cambios (si no venció nada), o null si no existe.
+ * Borrado parcial compartido por ambos relojes: transiciona a
+ * rechazada_definitivamente, libera el cupo si aplica, y ELIMINA todos
+ * los documentos del alumno (filas + archivos físicos), tal como pide la
+ * ficha de GR-10 — antes esto solo se hacía en el rechazo manual de
+ * Coordinador (GR-07), nunca en el vencimiento automático.
  */
-async function verificarYAplicarVencimiento(solicitudId) {
-  const solicitud = await prisma.solicitud_registro.findUnique({
-    where: { id: solicitudId },
-    include: { periodo_registro: true },
-  });
-
-  if (!solicitud) return null;
-  if (ESTADOS_EXCLUIDOS_DE_VENCIMIENTO.includes(solicitud.estado_solicitud)) return solicitud;
-  if (!solicitud.periodo_registro) return solicitud;
-
-  const fechaLimite = new Date(solicitud.periodo_registro.fecha_max_expediente);
-  // RN-GR-04: antes de las 2:00 pm HORA DE MÉXICO de ese día.
-  // fecha_max_expediente es @db.Date — Prisma la representa como medianoche
-  // UTC, que ya "es" las 6pm del día ANTERIOR en México. Por eso NO se usa
-  // setHours() (trabaja en hora local del proceso y movería el límite un
-  // día completo antes sin avisar) — se construye directo en UTC:
-  // 2:00 pm México (UTC-6, sin horario de verano desde 2022) = 20:00 UTC.
-  const limite = new Date(Date.UTC(
-    fechaLimite.getUTCFullYear(),
-    fechaLimite.getUTCMonth(),
-    fechaLimite.getUTCDate(),
-    20, 0, 0, 0
-  ));
-
-
-
-
-  if (new Date() < limite) return solicitud;
-
+async function ejecutarBorradoParcial(solicitud, motivo) {
   const cupoConsumido = ESTADOS_CON_CUPO_CONSUMIDO.includes(solicitud.estado_solicitud);
+  const documentosDelAlumno = await prisma.documento.findMany({ where: { alumno_id: solicitud.alumno_id } });
 
   const operaciones = [
     prisma.solicitud_registro.update({
@@ -341,26 +300,74 @@ async function verificarYAplicarVencimiento(solicitudId) {
         oferta_id: null,
         motivacion_oferta: null,
         tipo_rechazo: 'definitivo',
-        motivo_rechazo: MOTIVO_RECHAZO_VENCIMIENTO,
+        motivo_rechazo: motivo,
         registro_siss: false,
         docs_iniciales: false,
         carta_compromiso: false,
         expediente: false,
       },
     }),
+    prisma.documento.deleteMany({ where: { alumno_id: solicitud.alumno_id } }),
   ];
 
   if (cupoConsumido && solicitud.oferta_id) {
     operaciones.push(
-      prisma.oferta_servicio.update({
-        where: { id: solicitud.oferta_id },
-        data: { cupos_disponibles: { increment: 1 } },
-      })
+      prisma.oferta_servicio.update({ where: { id: solicitud.oferta_id }, data: { cupos_disponibles: { increment: 1 } } })
     );
   }
 
   const [solicitudActualizada] = await prisma.$transaction(operaciones);
+
+  // Archivos físicos DESPUÉS de que la BD confirmó — mismo orden seguro que en GR-07.
+  documentosDelAlumno.forEach((d) => {
+    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, d.ruta_archivo)); } catch {}
+  });
+
   return solicitudActualizada;
+}
+
+/**
+ * RN-GR-04 (Reloj 1) y RN-GR-63 (Reloj 2): revisa cuál de los 2 relojes le
+ * toca a la solicitud según su estado actual, y ejecuta el borrado
+ * parcial si ya venció. Se llama desde 2 lugares que comparten esta misma
+ * lógica: el login (auth.service.js), y el polling de las pantallas de espera.
+ *
+ * @param {number} solicitudId
+ * @returns {Promise<object|null>} la solicitud actualizada (si se aplicó el
+ *   borrado), la solicitud sin cambios (si no venció nada), o null si no existe.
+ */
+async function verificarYAplicarVencimiento(solicitudId) {
+  const solicitud = await prisma.solicitud_registro.findUnique({
+    where: { id: solicitudId },
+    include: { periodo_registro: { include: { evento_calendario: true } } },
+  });
+
+  if (!solicitud) return null;
+  if (ESTADOS_SIN_RELOJ.includes(solicitud.estado_solicitud)) return solicitud;
+  if (!solicitud.periodo_registro) return solicitud;
+
+  const esReloj2 = ESTADOS_RELOJ_2.includes(solicitud.estado_solicitud);
+  let limite;
+  let motivo;
+
+  if (esReloj2) {
+    // Medianoche de MÉXICO del día en que inicia el periodo. fecha_inicio
+    // es @db.Date -> Prisma la da como medianoche UTC de ese día; medianoche
+    // México de ESE MISMO día calendario equivale a las 06:00 UTC
+    // (México es UTC-6, sin horario de verano desde 2022).
+    const fechaInicio = new Date(solicitud.periodo_registro.evento_calendario.fecha_inicio);
+    limite = new Date(Date.UTC(fechaInicio.getUTCFullYear(), fechaInicio.getUTCMonth(), fechaInicio.getUTCDate(), 6, 0, 0, 0));
+    motivo = MOTIVO_RECHAZO_VENCIMIENTO_INICIO;
+  } else {
+    // Antes de las 2:00 pm MÉXICO del día límite de expediente.
+    const fechaLimite = new Date(solicitud.periodo_registro.fecha_max_expediente);
+    limite = new Date(Date.UTC(fechaLimite.getUTCFullYear(), fechaLimite.getUTCMonth(), fechaLimite.getUTCDate(), 20, 0, 0, 0));
+    motivo = MOTIVO_RECHAZO_VENCIMIENTO_EXPEDIENTE;
+  }
+
+  if (new Date() < limite) return solicitud;
+
+  return ejecutarBorradoParcial(solicitud, motivo);
 }
 
 /**
@@ -438,7 +445,7 @@ async function cambiarOferta(usuarioId, { ofertaId, motivacion }) {
     },
   });
 
-    return { mensaje: 'Tu selección de oferta fue actualizada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
+  return { mensaje: 'Tu selección de oferta fue actualizada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
 }
 
 /**
@@ -466,7 +473,7 @@ async function continuarARegistroSISS(usuarioId) {
     },
   });
 
-    return { mensaje: 'Avanzaste al registro en SISS.', estado_solicitud: 'registro_SISS' };
+  return { mensaje: 'Avanzaste al registro en SISS.', estado_solicitud: 'registro_SISS' };
 }
 
 /**
@@ -737,13 +744,166 @@ async function continuarAExpediente(usuarioId) {
   return { mensaje: 'Avanzaste al paso de expediente.', estado_solicitud: 'adjuntar_expediente' };
 }
 
+const LIMITE_EXPEDIENTE_BYTES = 2 * 1024 * 1024; // 2 MB — RN-GR-62
+
+const ETIQUETA_DOCUMENTO_EXPEDIENTE = {
+  cartaCompromiso: 'la carta compromiso',
+  curp: 'el CURP',
+  constanciaCreditos: 'la constancia de créditos',
+  dictamen: 'el dictamen',
+};
+
+/**
+ * CU-GR-10, RF-GR-89 — datos para mostrar antes de subir (si necesita
+ * dictamen, y el nombre sugerido del PDF final).
+ */
+async function obtenerInfoExpediente(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true, usuario: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+
+  const solicitud = alumno.solicitud_registro;
+  if (solicitud.estado_solicitud !== 'adjuntar_expediente') {
+    throw crearError('Tu solicitud no está en el paso de subir expediente.', 409);
+  }
+
+  const [apellidoPaterno, apellidoMaterno = ''] = alumno.usuario.apellidos.trim().split(/\s+/);
+  const nombreLimpio = alumno.usuario.nombre.trim().replace(/\s+/g, '_');
+
+  return {
+    requiereDictamen: solicitud.dictamen !== null,
+    dictamenLabel: dictamenLabel(solicitud.dictamen),
+    nombreExpedienteSugerido: `${apellidoPaterno}_${apellidoMaterno}_${nombreLimpio}_${alumno.boleta}.pdf`,
+  };
+}
+
+/**
+ * CU-GR-10 — Subir expediente (unir + comprimir + guardar)
+ */
+async function subirExpediente(usuarioId, archivos) {
+  const { cartaCompromiso, curp, constanciaCreditos, dictamen } = archivos;
+
+  if (!cartaCompromiso || !curp || !constanciaCreditos) {
+    throw crearError('Debes adjuntar todos los documentos obligatorios.');
+  }
+
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true, usuario: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+
+  const solicitud = alumno.solicitud_registro;
+  if (solicitud.estado_solicitud !== 'adjuntar_expediente') {
+    throw crearError('Tu solicitud no está en el paso de subir expediente.', 409);
+  }
+
+  // RN-GR-59: el dictamen solo es obligatorio si se declaró en CU-GR-01.
+  const requiereDictamen = solicitud.dictamen !== null;
+  if (requiereDictamen && !dictamen) {
+    throw crearError('Debes adjuntar tu documento de dictamen.');
+  }
+
+  // RN-GR-60: orden fijo — carta compromiso, CURP, constancia, dictamen si aplica.
+  const documentosOrdenados = [
+    { clave: 'cartaCompromiso', archivo: cartaCompromiso },
+    { clave: 'curp', archivo: curp },
+    { clave: 'constanciaCreditos', archivo: constanciaCreditos },
+    ...(requiereDictamen ? [{ clave: 'dictamen', archivo: dictamen }] : []),
+  ];
+
+  for (const { archivo } of documentosOrdenados) {
+    if (!esPdfValido(archivo.buffer)) {
+      throw crearError('Alguno de los archivos no es un PDF válido.');
+    }
+  }
+
+  let pdfUnido;
+  try {
+    pdfUnido = await unirPdfs(documentosOrdenados.map((d) => d.archivo.buffer));
+  } catch (err) {
+    console.error('Error al unir los PDFs del expediente:', err);
+    throw crearError('No se pudieron combinar los documentos. Verifica que todos sean PDFs válidos.', 500);
+  }
+
+  // Compresión en cascada — RN-GR-62.
+  let pdfFinal = pdfUnido;
+  if (pdfFinal.length > LIMITE_EXPEDIENTE_BYTES) {
+    try {
+      const comprimidoEbook = await comprimirPdfGhostscript(pdfUnido, '/ebook');
+      pdfFinal = comprimidoEbook;
+      if (pdfFinal.length > LIMITE_EXPEDIENTE_BYTES) {
+        pdfFinal = await comprimirPdfGhostscript(pdfUnido, '/screen'); // sobre el original, no en cascada sobre el ebook
+      }
+    } catch (err) {
+      console.error('Error al comprimir el expediente con Ghostscript:', err);
+      throw crearError('Ocurrió un error al procesar tus documentos. Intenta de nuevo.', 500);
+    }
+  }
+
+  // Excepción E3.
+  if (pdfFinal.length > LIMITE_EXPEDIENTE_BYTES) {
+    const masGrande = documentosOrdenados.reduce((a, b) => (b.archivo.buffer.length > a.archivo.buffer.length ? b : a));
+    throw crearError(
+      `El expediente sigue siendo muy grande incluso después de comprimirlo. El documento que más pesa es ${ETIQUETA_DOCUMENTO_EXPEDIENTE[masGrande.clave]} — sustitúyelo por una versión más ligera e intenta de nuevo.`,
+      400,
+      'EXPEDIENTE_MUY_GRANDE'
+    );
+  }
+
+  // RN-GR-61.
+  const [apellidoPaterno, apellidoMaterno = ''] = alumno.usuario.apellidos.trim().split(/\s+/);
+  const nombreLimpio = alumno.usuario.nombre.trim().replace(/\s+/g, '_');
+  const nombreExpediente = `${apellidoPaterno}_${apellidoMaterno}_${nombreLimpio}_${alumno.boleta}.pdf`;
+
+  const carpetaAlumno = path.join(RUTA_BASE_DOCUMENTOS, alumno.boleta);
+  fs.mkdirSync(carpetaAlumno, { recursive: true });
+  const rutaRelativa = path.join(alumno.boleta, generarNombreSeguro());
+  fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa), cifrarBuffer(pdfFinal));
+
+  const ahora = new Date();
+  let rutaViejaABorrar = null;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const existente = await tx.documento.findFirst({ where: { alumno_id: alumno.boleta, tipo_documento: 'expediente' } });
+      if (existente) {
+        rutaViejaABorrar = existente.ruta_archivo;
+        await tx.documento.update({
+          where: { id: existente.id },
+          data: { ruta_archivo: rutaRelativa, nombre_expediente: nombreExpediente, estado_documento: 'en_revision', creador_id: usuarioId, fecha_creacion: ahora, aprobado_por_id: null },
+        });
+      } else {
+        await tx.documento.create({
+          data: { alumno_id: alumno.boleta, creador_id: usuarioId, tipo_documento: 'expediente', fecha_creacion: ahora, estado_documento: 'en_revision', ruta_archivo: rutaRelativa, nombre_expediente: nombreExpediente },
+        });
+      }
+
+      await tx.solicitud_registro.update({
+        where: { id: solicitud.id },
+        data: { estado_solicitud: 'expediente_pendiente_revision', estado_anterior: 'adjuntar_expediente', expediente: true },
+      });
+    });
+  } catch (err) {
+    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa)); } catch {}
+    throw crearError('Ocurrió un error al procesar la solicitud.', 500);
+  }
+
+  if (rutaViejaABorrar) {
+    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaViejaABorrar)); } catch {}
+  }
+
+  return { mensaje: 'Tu expediente fue enviado correctamente y será revisado por Coordinación.', estado_solicitud: 'expediente_pendiente_revision' };
+}
 
 module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
   verificarYAplicarVencimiento,
   obtenerEstadoActualPorUsuarioId,
-  DICTAMEN_MAP, 
+  DICTAMEN_MAP,
   dictamenLabel,
   cambiarOferta,
   continuarARegistroSISS,
@@ -758,8 +918,6 @@ module.exports = {
   RUTA_BASE_DOCUMENTOS,
   confirmarCartaCompromiso,
   continuarAExpediente,
-
+  obtenerInfoExpediente,
+  subirExpediente,
 };
-
-
-

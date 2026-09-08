@@ -35,7 +35,7 @@ services:
       - ./:/app
       - /app/node_modules
       - /app/backend/node_modules
-    command: sh -c "if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx prisma generate; cd backend; if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx nodemon server.js"
+    command: sh -c "which gs > /dev/null 2>&1 || (apt-get update && apt-get install -y --no-install-recommends ghostscript && rm -rf /var/lib/apt/lists/*); if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx prisma generate; cd backend; if [ ! -f node_modules/.install-stamp ] || [ package-lock.json -nt node_modules/.install-stamp ]; then npm install --no-audit --no-fund --prefer-offline && touch node_modules/.install-stamp; fi; npx nodemon server.js"
     ports:
       - "3000:3000"
     environment:

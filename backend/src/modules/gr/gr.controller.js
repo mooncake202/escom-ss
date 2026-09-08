@@ -174,6 +174,68 @@ async function getMisDocumentos(req, res) {
 }
 
 
+
+async function getInfoExpediente(req, res) {
+  try {
+    const info = await grService.obtenerInfoExpediente(req.usuario.sub);
+    return res.status(200).json(info);
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al obtener info de expediente:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+const LIMITE_EXPEDIENTE_ARCHIVO_BYTES = 1 * 1024 * 1024; // 1 MB por archivo individual
+
+const uploadExpediente = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: LIMITE_EXPEDIENTE_ARCHIVO_BYTES },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') return cb(new Error('SOLO_PDF'));
+    cb(null, true);
+  },
+}).fields([
+  { name: 'cartaCompromiso', maxCount: 1 },
+  { name: 'curp', maxCount: 1 },
+  { name: 'constanciaCreditos', maxCount: 1 },
+  { name: 'dictamen', maxCount: 1 },
+]);
+
+function postSubirExpediente(req, res) {
+  uploadExpediente(req, res, async (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ message: 'Alguno de los archivos excede el tamaño máximo permitido (1 MB por documento).' });
+      }
+      if (err.message === 'SOLO_PDF') {
+        return res.status(400).json({ message: 'Solo se permiten archivos en formato PDF.' });
+      }
+      console.error('Error al procesar archivos del expediente:', err);
+      return res.status(500).json({ message: 'Ocurrió un error al procesar los archivos.' });
+    }
+    try {
+      const archivos = {
+        cartaCompromiso: req.files?.cartaCompromiso?.[0],
+        curp: req.files?.curp?.[0],
+        constanciaCreditos: req.files?.constanciaCreditos?.[0],
+        dictamen: req.files?.dictamen?.[0],
+      };
+      const resultado = await grService.subirExpediente(req.usuario.sub, archivos);
+      return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud });
+    } catch (error) {
+      const status = error.status || 500;
+      const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : error.message;
+      if (status === 500) console.error('Error al subir expediente:', error);
+      const body = { message };
+      if (error.code) body.code = error.code;
+      return res.status(status).json(body);
+    }
+  });
+}
+
+
 module.exports = { 
   postEnviarSolicitud, 
   getVerificarCorreo, 
@@ -190,6 +252,8 @@ module.exports = {
   getMisDocumentos,
   postConfirmarCartaCompromiso,
   postContinuarExpediente,
+  getInfoExpediente,
+  postSubirExpediente,
 };
 
 
