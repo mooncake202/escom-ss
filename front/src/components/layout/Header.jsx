@@ -1,17 +1,19 @@
 import { useTheme, GRADIENTS } from "@/themes/colors";
 
 const ROL_LABEL = {
-  alumno:       "Alumno",
-  profesor:     "Profesor",
-  coordinacion: "Coordinación",
-  coordinador:  "Coordinación", // alias: el backend usa "coordinador"
+  alumno:          "Alumno",       // usado por pantallas con datos mock
+  alumno_asignado: "Alumno",       // valor real que manda la sesión/backend
+  profesor:        "Profesor",
+  coordinacion:    "Coordinación",
+  coordinador:     "Coordinador",  // valor real que manda la sesión/backend
 };
 
 const ROL_COLOR = {
-  alumno:       { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
-  profesor:     { bg: "rgba(34,197,94,0.12)",  color: "#22C55E" },
-  coordinacion: { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
-  coordinador:  { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" }, // alias
+  alumno:          { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
+  alumno_asignado: { bg: "rgba(10,102,194,0.12)", color: "#2E86DE" },
+  profesor:        { bg: "rgba(34,197,94,0.12)",  color: "#22C55E" },
+  coordinacion:    { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
+  coordinador:     { bg: "rgba(245,158,11,0.12)", color: "#F59E0B" },
 };
 
 export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario" }) {
