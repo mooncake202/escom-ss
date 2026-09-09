@@ -337,6 +337,39 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         </Section>
 
       </div>
+
+      <div style={{
+        background: C.bgCard, borderRadius: RADIUS.lg,
+        border: `1px solid ${C.borderSubtle}`, padding: "1rem 1.25rem", marginTop: "0.875rem",
+      }}>
+        <p style={{ margin: "0 0 0.875rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Anuncios recientes</p>
+        {[
+          { from: "Dr. Alejandro Méndez", text: "Recuerden que la sesión de seguimiento es el viernes a las 10:00 AM en el cubículo B-203.", time: "Hace 2 horas", isNew: true },
+          { from: "Coordinación SS",      text: "El periodo de entrega de reportes mensuales cierra el 15 de abril. No olviden firmar sus documentos.", time: "Ayer", isNew: true },
+          { from: "Dr. Alejandro Méndez", text: "Actividades del mes de abril han sido actualizadas. Revisen las fechas límite.", time: "Hace 3 días", isNew: false },
+        ].map((a, i, arr) => (
+          <div key={i} style={{
+            display: "flex", gap: 12, padding: "10px 0",
+            borderBottom: i < arr.length - 1 ? `1px solid ${C.borderSubtle}` : "none",
+          }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+              background: GRADIENTS.primary,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <Icon name="user" size={15} color="#fff" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{a.from}</span>
+                {a.isNew && <Badge {...T.blue}>Nuevo</Badge>}
+                <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>{a.time}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.55 }}>{a.text}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </>
   );
 };
