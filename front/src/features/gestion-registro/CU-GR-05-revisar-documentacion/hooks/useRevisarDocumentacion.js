@@ -15,7 +15,6 @@ export function useRevisarDocumentacion() {
   const [errorDescarga, setErrorDescarga] = useState("");
 
   const cargar = () => {
-    setCargandoLista(true);
     getSolicitudesDocumentacion()
       .then(setSolicitudes)
       .catch((err) => console.error("No se pudieron cargar las solicitudes:", err))

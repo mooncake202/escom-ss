@@ -14,7 +14,6 @@ export function useRevisarExpediente() {
   const [errorDescarga, setErrorDescarga] = useState("");
 
   const cargar = () => {
-    setCargandoLista(true);
     getExpedientesPendientes()
       .then(setExpedientes)
       .catch((err) => console.error("No se pudieron cargar los expedientes:", err))

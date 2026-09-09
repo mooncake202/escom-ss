@@ -11,7 +11,6 @@ export function useSolicitudesPendientes() {
   const [resultado, setResultado]         = useState(null);
 
   const cargar = () => {
-    setCargandoLista(true);
     getSolicitudesPendientes()
       .then(setSolicitudes)
       .catch((err) => console.error(err))

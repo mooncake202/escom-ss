@@ -568,8 +568,9 @@ export default function Dashboards() {
   const [notificaciones, setNotificaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  // Carga única al montar — esta sí debe mostrar "Cargando…".
   useEffect(() => {
-    async function cargar() {
+    async function cargarInicial() {
       setCargando(true);
       try {
         const [resumenData, notiData] = await Promise.all([
@@ -584,10 +585,28 @@ export default function Dashboards() {
         setCargando(false);
       }
     }
-    cargar();
-    const intervalo = setInterval(cargar, 120000);
+    cargarInicial();
+  }, []); // ver nota sobre el loop de useSesion()
+
+  // Polling de 120s — refresca resumen Y notificaciones (badges, mensajes
+  // calculados de SlotNotificacionCalculada, y el modal de bienvenida).
+  // NUNCA toca `cargando`: no debe ocultar el dashboard ya pintado.
+  useEffect(() => {
+    async function refrescar() {
+      try {
+        const [resumenData, notiData] = await Promise.all([
+          obtenerResumenDashboard(),
+          listarNotificacionesPendientes(),
+        ]);
+        setResumen(resumenData);
+        setNotificaciones(notiData);
+      } catch (err) {
+        console.error('Error al refrescar el dashboard:', err);
+      }
+    }
+    const intervalo = setInterval(refrescar, 120000);
     return () => clearInterval(intervalo);
-  }, []); // se repite cada 120s — ver nota sobre el loop de useSesion()
+  }, []);
 
   async function handleLeerNotificacion(id) {
     setNotificaciones((prev) => prev.filter((n) => n.id !== id));

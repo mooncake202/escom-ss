@@ -12,7 +12,6 @@ export function useValidarEntregaPresencial() {
   const [error, setError] = useState("");
 
   const cargar = () => {
-    setCargandoLista(true);
     getSolicitudesCartaCompromiso()
       .then(setPendientes)
       .catch((err) => console.error("No se pudo cargar la lista:", err))
