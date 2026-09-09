@@ -100,6 +100,29 @@ function validarDictamenYCreditos(dictamenTexto, creditos, semestre) {
 }
 
 /**
+ * Revalidación de oferta+cupo compartida por CU-GR-01, CU-GR-03 y CU-GR-13:
+ * la oferta debe existir, estar Aprobada, y tener cupo disponible en el
+ * momento justo antes de confirmar — nunca se confía solo en lo que el
+ * alumno vio al seleccionarla.
+ */
+async function validarOfertaDisponibleYConCupo(ofertaId) {
+  const ofertaEncontrada = await prisma.oferta_servicio.findUnique({
+    where: { id: Number(ofertaId) },
+    include: { profesor: true },
+  });
+
+  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'Aprobada') {
+    throw crearError('La oferta seleccionada ya no está disponible.');
+  }
+
+  if (ofertaEncontrada.cupos_disponibles <= 0) {
+    throw crearError('Lo sentimos, el cupo se acaba de llenar. Selecciona otra oferta.', 409, 'OFERTA_SIN_CUPOS');
+  }
+
+  return ofertaEncontrada;
+}
+
+/**
  * CU-GR-01 — Enviar solicitud de registro en oferta
  * @param {object} datos - todo lo capturado en los 4 pasos del formulario del frontend
  */
@@ -153,20 +176,9 @@ async function enviarSolicitudRegistro(datos) {
     throw crearError('El periodo seleccionado ya no está disponible. Selecciona otro.');
   }
 
-  const ofertaEncontrada = await prisma.oferta_servicio.findUnique({
-    where: { id: Number(oferta) },
-    include: { profesor: true },
-  });
-
-  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'Aprobada') {
-    throw crearError('La oferta seleccionada ya no está disponible.');
-  }
-
   // RF-GR-09 / Flujo Alterno 10.1: se revalida el cupo justo antes de crear la solicitud.
   // No se decrementa aquí — eso ocurre hasta CU-GR-02 al aceptar.
-  if (ofertaEncontrada.cupos_disponibles <= 0) {
-    throw crearError('Lo sentimos, el cupo se acaba de llenar. Selecciona otra oferta.', 409, 'OFERTA_SIN_CUPOS');
-  }
+  const ofertaEncontrada = await validarOfertaDisponibleYConCupo(oferta);
 
   // ── 3. Duplicados (chequeo temprano para un mensaje de error más claro) ─
   const correoExistente = await prisma.usuario.findUnique({ where: { correo_institucional: correoInst } });
@@ -429,18 +441,8 @@ async function cambiarOferta(usuarioId, { ofertaId, motivacion }) {
     throw crearError('Describe tu motivo de postulación (mínimo 20 caracteres).');
   }
 
-  const ofertaEncontrada = await prisma.oferta_servicio.findUnique({
-    where: { id: Number(ofertaId) },
-  });
-
-  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'Aprobada') {
-    throw crearError('La oferta seleccionada ya no está disponible.');
-  }
-
   // RF-GR-37 / Excepción E2: mismo patrón de revalidación que en CU-GR-01.
-  if (ofertaEncontrada.cupos_disponibles <= 0) {
-    throw crearError('Lo sentimos, esa oferta ya no tiene cupo disponible. Selecciona otra.', 409, 'OFERTA_SIN_CUPOS');
-  }
+  const ofertaEncontrada = await validarOfertaDisponibleYConCupo(ofertaId);
 
   await prisma.solicitud_registro.update({
     where: { id: solicitud.id },
@@ -691,13 +693,162 @@ async function iniciarModificarSolicitud(usuarioId) {
       oferta_id: null,
       motivacion_oferta: null,
       tipo_rechazo: null,
-      motivo_rechazo: null,
+      // motivo_rechazo se CONSERVA a propósito — el alumno necesita verlo
+      // en el formulario de ModificarSolicitud.jsx. Se limpia hasta que
+      // reenvíe con éxito (en reenviarSolicitudModificada).
       registro_siss: false,
       docs_iniciales: false,
       periodo_registro_id: null,
     },
   });
   return { mensaje: 'Ya puedes modificar y reenviar tu solicitud.', estado_solicitud: 'modificar_reenviar' };
+}
+
+// Reverso de DICTAMEN_MAP: convierte el código numérico guardado en BD de
+// vuelta al texto que usa el formulario ("creditos"|"estancia"|"electiva").
+function dictamenTexto(codigo) {
+  if (codigo === null || codigo === undefined) return '';
+  const entrada = Object.entries(DICTAMEN_MAP).find(([, valor]) => valor === codigo);
+  return entrada ? entrada[0] : '';
+}
+
+/**
+ * CU-GR-13 — datos actuales del alumno para precargar el formulario de
+ * modificación. oferta/periodo/motivacion regresan vacíos porque
+ * iniciarModificarSolicitud ya los limpió.
+ */
+async function obtenerInfoModificarSolicitud(usuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { usuario: true, solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'modificar_reenviar') {
+    throw crearError('Tu solicitud no está en el paso de modificar y reenviar.', 409);
+  }
+
+  return {
+    correoInst: alumno.usuario.correo_institucional,
+    correoPersonal: alumno.correo_personal || '',
+    nombres: alumno.usuario.nombre,
+    apellidos: alumno.usuario.apellidos,
+    telefono: alumno.celular,
+    boleta: alumno.boleta,
+    carrera: alumno.carrera,
+    creditos: alumno.creditos,
+    semestre: alumno.semestre,
+    tipoLiberacion: dictamenTexto(alumno.solicitud_registro.dictamen),
+  };
+}
+
+/**
+ * CU-GR-13 — reenvía la solicitud modificada: modificar_reenviar ->
+ * espera_respuesta_de_profesor. Reutiliza EXACTAMENTE las mismas
+ * validaciones que enviarSolicitudRegistro (CU-GR-01) para los campos que
+ * comparten, sin duplicar esa lógica.
+ */
+async function reenviarSolicitudModificada(usuarioId, datos) {
+  const {
+    nombres, apellidos, telefono, boleta, correoPersonal,
+    carrera, creditos, semestre, tipoLiberacion,
+    periodo, oferta, motivacion,
+  } = datos;
+
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: usuarioId },
+    include: { solicitud_registro: true },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
+  if (alumno.solicitud_registro.estado_solicitud !== 'modificar_reenviar') {
+    throw crearError('Tu solicitud no está en el paso de modificar y reenviar.', 409);
+  }
+
+  // ── Validaciones — mismas funciones/regex que CU-GR-01 ──────────────────
+  validarNombreOApellidos(nombres, 'El nombre');
+  validarNombreOApellidos(apellidos, 'Los apellidos');
+  if (!DOS_APELLIDOS_REGEX.test((apellidos || '').trim())) {
+    throw crearError('Debes ingresar exactamente dos apellidos (paterno y materno).');
+  }
+
+  validarTelefono(telefono, { requerido: true });
+  if (!TELEFONO_PRIMER_DIGITO_REGEX.test(telefono)) {
+    throw crearError('El número de celular no puede iniciar en 0 ni 1.');
+  }
+
+  validarBoleta(boleta);
+
+  if (!motivacion || motivacion.trim().length < 20) {
+    throw crearError('Describe tu motivo de postulación (mínimo 20 caracteres).');
+  }
+
+  if (!creditos || !semestre || isNaN(Number(creditos)) || isNaN(Number(semestre))) {
+    throw crearError('Créditos y semestre son obligatorios y válidos.');
+  }
+
+  const dictamenNumerico = validarDictamenYCreditos(tipoLiberacion, Number(creditos), Number(semestre));
+
+  const carreraEncontrada = await prisma.carrera.findFirst({ where: { nombre: carrera } });
+  if (!carreraEncontrada) {
+    throw crearError('Selecciona una carrera válida.');
+  }
+
+  const periodoEncontrado = await prisma.periodo_registro.findUnique({ where: { id: Number(periodo) } });
+  if (!periodoEncontrado) {
+    throw crearError('El periodo seleccionado ya no está disponible. Selecciona otro.');
+  }
+
+  const ofertaEncontrada = await validarOfertaDisponibleYConCupo(oferta);
+
+  // RN confirmada: la boleta SÍ es editable — solo se revalida unicidad si cambió.
+  const boletaActual = alumno.boleta;
+  if (boleta !== boletaActual) {
+    const boletaExistente = await prisma.alumno.findUnique({ where: { boleta } });
+    if (boletaExistente) {
+      throw crearError('Esta boleta ya está registrada a otro alumno.', 409);
+    }
+  }
+
+  const nombreNormalizado = nombres.trim().toUpperCase();
+  const apellidosNormalizados = apellidos.trim().toUpperCase();
+
+  await prisma.$transaction([
+    prisma.usuario.update({
+      where: { id: alumno.usuario_id },
+      data: { nombre: nombreNormalizado, apellidos: apellidosNormalizados },
+    }),
+    prisma.alumno.update({
+      where: { boleta: boletaActual },
+      data: {
+        boleta,
+        celular: telefono,
+        correo_personal: correoPersonal || null,
+        carrera,
+        creditos: Number(creditos).toFixed(2),
+        semestre: Number(semestre),
+      },
+    }),
+    prisma.solicitud_registro.update({
+      where: { id: alumno.solicitud_registro.id },
+      data: {
+        carrera_id: carreraEncontrada.id,
+        dictamen: dictamenNumerico,
+        periodo_registro_id: periodoEncontrado.id,
+        oferta_id: ofertaEncontrada.id,
+        motivacion_oferta: motivacion,
+        estado_solicitud: 'espera_respuesta_de_profesor',
+        estado_anterior: 'modificar_reenviar',
+        fecha_aplicacion: new Date(),
+        // Ahora sí se limpia — el alumno ya reenvió y el motivo viejo ya
+        // no aplica (se conservó a propósito solo hasta este momento,
+        // ver iniciarModificarSolicitud).
+        tipo_rechazo: null,
+        motivo_rechazo: null,
+
+      },
+    }),
+  ]);
+
+  return { mensaje: 'Tu solicitud fue reenviada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
 }
 
 /**
@@ -1024,6 +1175,8 @@ module.exports = {
   corregirDocumentacion,
   corregirRegistroSISS,
   iniciarModificarSolicitud,
+  obtenerInfoModificarSolicitud,
+  reenviarSolicitudModificada,
   obtenerMisDocumentos,
   RUTA_BASE_DOCUMENTOS,
   confirmarCartaCompromiso,

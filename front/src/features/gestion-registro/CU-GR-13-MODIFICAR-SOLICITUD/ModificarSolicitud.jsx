@@ -1,58 +1,12 @@
+import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { useModificarForm }         from "./hooks/useModificarForm";
 import { STEPS_MODIFICAR }          from "./utils/constants";
 import { StepProgressBar }          from "@/components/ui/StepProgressBar";
-import { RejectionScreen }          from "./screens/RejectionScreen";
 import { StepModDatosPersonales }   from "./steps/StepModDatosPersonales";
-import { StepDatosAcademicos }      from "./steps/StepDatosAcademicos";   // reutilizado del CU-GR-01
-import { StepSeleccionOferta }      from "./steps/StepSeleccionOferta";   // reutilizado del CU-GR-01
+import { StepDatosAcademicos }      from "../CU-GR-01-enviar-solicitud/steps/StepDatosAcademicos";
+import { StepSeleccionOferta }      from "../CU-GR-01-enviar-solicitud/steps/StepSeleccionOferta";
 import { StepModCredenciales }      from "./steps/StepModCredenciales";
-
-// ── Pantalla de éxito ─────────────────────────────────────────
-function SuccessScreen({ C }) {
-  return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: C.bgPage,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <div style={{ textAlign: "center", padding: "3rem 1rem" }}>
-        <div style={{ fontSize: 56, marginBottom: "1rem" }}>🎓</div>
-
-        <h2 style={{ color: C.success, fontSize: 24, margin: "0 0 0.75rem", fontWeight: 700 }}>
-          ¡Solicitud reenviada exitosamente!
-        </h2>
-
-        <p style={{ color: C.textMuted, maxWidth: 380, margin: "0 auto 1.25rem", fontSize: 14, lineHeight: 1.6 }}>
-          Tu solicitud ha sido actualizada. El profesor de la oferta seleccionada
-          recibirá una notificación. Puedes dar seguimiento a tu proceso desde tu
-          cuenta.
-        </p>
-
-        {/* Estado resultante */}
-        <div
-          style={{
-            display: "inline-block",
-            padding: "6px 18px",
-            background: C.successSoft,
-            border: `1px solid ${C.success}30`,
-            borderRadius: RADIUS.md,
-            fontSize: 13,
-            color: C.success,
-            fontWeight: 600,
-            marginBottom: "1.5rem",
-          }}
-        >
-          Estado: Pendiente de respuesta del profesor
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Botones de navegación ─────────────────────────────────────
 function NavButtons({ step, totalSteps, loading, onBack, onNext, onSubmit, C }) {
@@ -115,33 +69,37 @@ function NavButtons({ step, totalSteps, loading, onBack, onNext, onSubmit, C }) 
 // ── Página principal ──────────────────────────────────────────
 export default function ModificarSolicitud() {
   const { C } = useTheme();
+  const navigate = useNavigate();
   const {
-    screen, step, form, errors,
-    ofertas, periodos,
-    acepta, submitted, loading, totalSteps,
-    motivoRechazo,
-    handleChange, seleccionarOferta,
-    setAcepta,
-    iniciarModificacion,
+    step, form, errors,
+    ofertas, ofertasCargando, periodos,
+    acepta, loading, totalSteps,
+    cargandoInicial, errorInicial,
+    handleChange, seleccionarOferta, setAcepta,
     next, back, submit,
   } = useModificarForm();
 
-  // 1. Solicitud enviada con éxito
-  if (submitted) return <SuccessScreen C={C} />;
+  const handleSubmit = async () => {
+    const { exito } = await submit();
+    if (exito) navigate("/alumnoSinAsignar/esperando_profesor");
+  };
 
-  // 2. Pantalla inicial de rechazo
-  if (screen === "reject") {
+  if (cargandoInicial) {
     return (
-      <RejectionScreen
-        motivoRechazo={motivoRechazo}
-        alumno={form}
-        onIniciar={iniciarModificacion}
-        C={C}
-      />
+      <div style={{ minHeight: "100vh", background: C.bgPage, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: C.textMuted, fontSize: 14 }}>Cargando tu solicitud…</p>
+      </div>
     );
   }
 
-  // 3. Formulario de modificación (4 pasos)
+  if (errorInicial) {
+    return (
+      <div style={{ minHeight: "100vh", background: C.bgPage, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <p style={{ color: C.danger, fontSize: 14 }}>{errorInicial}</p>
+      </div>
+    );
+  }
+
   const stepProps = { form, errors, handleChange, C };
 
   return (
@@ -180,7 +138,7 @@ export default function ModificarSolicitud() {
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 20 }}>🎓</span>
+          <span style={{ fontSize: 20 }}></span>
         </div>
         <div style={{ textAlign: "left" }}>
           <p
@@ -233,6 +191,7 @@ export default function ModificarSolicitud() {
           <StepSeleccionOferta
             {...stepProps}
             ofertas={ofertas}
+            ofertasCargando={ofertasCargando}
             onSelect={seleccionarOferta}
             handleChange={handleChange}
           />
@@ -253,7 +212,7 @@ export default function ModificarSolicitud() {
           loading={loading}
           onBack={back}
           onNext={next}
-          onSubmit={submit}
+          onSubmit={handleSubmit}
           C={C}
         />
       </div>

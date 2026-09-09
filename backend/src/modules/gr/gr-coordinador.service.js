@@ -139,6 +139,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
         tipo_rechazo: 'definitivo',
         motivo_rechazo: motivoRechazo,
         oferta_id: null,
+        motivacion_oferta: null,
         docs_iniciales: false,
         registro_siss: false,
         periodo_registro_id: null,

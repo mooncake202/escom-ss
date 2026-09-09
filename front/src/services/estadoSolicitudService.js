@@ -33,6 +33,12 @@ export async function corregirRegistroSISS() {
 export async function iniciarModificarSolicitud() {
   return apiFetch("/registro/modificar-solicitud", { method: "POST" });
 }
+export async function getInfoModificarSolicitud() {
+  return apiFetch("/registro/info-modificar-solicitud");
+}
+export async function reenviarSolicitudModificada(datos) {
+  return apiFetch("/registro/reenviar-solicitud", { method: "POST", body: JSON.stringify(datos) });
+}
 export async function getMisDocumentos() {
   return apiFetch("/registro/mis-documentos");
 }

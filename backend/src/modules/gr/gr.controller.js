@@ -160,6 +160,32 @@ const postModificarSolicitud = crearHandlerAccion(grService.iniciarModificarSoli
 const postConfirmarCartaCompromiso = crearHandlerAccion(grService.confirmarCartaCompromiso, 'Error al confirmar carta compromiso:');
 const postContinuarExpediente = crearHandlerAccion(grService.continuarAExpediente, 'Error al continuar a expediente:');
 
+async function getInfoModificarSolicitud(req, res) {
+  try {
+    const info = await grService.obtenerInfoModificarSolicitud(req.usuario.sub);
+    return res.status(200).json(info);
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al obtener info para modificar solicitud:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+async function postReenviarSolicitud(req, res) {
+  try {
+    const resultado = await grService.reenviarSolicitudModificada(req.usuario.sub, req.body);
+    return res.status(200).json({ message: resultado.mensaje, estado_solicitud: resultado.estado_solicitud });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al reenviar solicitud modificada:', err);
+    const body = { message };
+    if (err.code) body.code = err.code;
+    return res.status(status).json(body);
+  }
+}
+
 
 async function getMisDocumentos(req, res) {
   try {
@@ -275,6 +301,8 @@ module.exports = {
   postCorregirDocumentacion, 
   postCorregirSISS,
   postModificarSolicitud,
+  getInfoModificarSolicitud,
+  postReenviarSolicitud,
   getMisDocumentos,
   postConfirmarCartaCompromiso,
   postContinuarExpediente,
