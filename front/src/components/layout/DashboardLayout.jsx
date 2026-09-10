@@ -4,7 +4,7 @@ import { Header }  from "./Header";
 
 /**
  * Uso:
- * <DashboardLayout titulo="Solicitudes pendientes" subtitulo="CU-GR-02" rol="profesor" usuario="Dr. Torres Vega">
+ * <DashboardLayout titulo="Solicitudes pendientes" rol="profesor" usuario="Dr. Torres Vega">
  *   <TuPagina />
  * </DashboardLayout>
  */

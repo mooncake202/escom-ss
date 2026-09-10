@@ -116,7 +116,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
     await prisma.$transaction([
       prisma.solicitud_registro.update({
         where: { id: solicitud.id },
-        data: { estado_solicitud: 'SISS_docs_aprobados', estado_anterior: 'SISS_y_documentacion_pendiente', registro_siss: true, docs_iniciales: true },
+        data: { estado_solicitud: 'SISS_docs_aprobados', estado_anterior: 'SISS_y_documentacion_pendiente', registro_siss: true, docs_iniciales: true, tipo_rechazo: null, motivo_rechazo: null },
       }),
       prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } }),
     ]);
@@ -351,7 +351,7 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
     await prisma.$transaction([
       prisma.solicitud_registro.update({
         where: { id: solicitud.id },
-        data: { estado_solicitud: 'expediente_aprobado', estado_anterior: 'expediente_pendiente_revision' },
+        data: { estado_solicitud: 'expediente_aprobado', estado_anterior: 'expediente_pendiente_revision', tipo_rechazo: null, motivo_rechazo: null },
       }),
       // RN-GR-73: el rol cambia aquí mismo, tal como dice la ficha. El
       // modal de bienvenida (ver notificación abajo) es lo que garantiza

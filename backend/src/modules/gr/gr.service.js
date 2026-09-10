@@ -1171,16 +1171,13 @@ async function corregirExpediente(usuarioId) {
     throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
   }
 
-  await prisma.$transaction([
-    prisma.solicitud_registro.update({
-      where: { id: alumno.solicitud_registro.id },
-      data: { estado_solicitud: 'adjuntar_expediente', estado_anterior: 'expediente_con_correcciones' },
-    }),
-    prisma.documento.updateMany({
-      where: { alumno_id: alumno.boleta, tipo_documento: 'expediente' },
-      data: { estado_documento: 'en_revision' },
-    }),
-  ]);
+  // NO se toca `documento` aquí — estado_documento debe quedarse en
+  // 'con_correcciones' hasta que el alumno realmente reenvíe el archivo
+  // (subirExpediente es quien lo cambia a 'en_revision', en ese momento).
+  await prisma.solicitud_registro.update({
+    where: { id: alumno.solicitud_registro.id },
+    data: { estado_solicitud: 'adjuntar_expediente', estado_anterior: 'expediente_con_correcciones' },
+  });
 
   return { mensaje: 'Vuelve a integrar y enviar tu expediente.', estado_solicitud: 'adjuntar_expediente' };
 }
@@ -1262,6 +1259,8 @@ module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
   verificarYAplicarVencimiento,
+  ESTADOS_SIN_RELOJ,
+  ESTADOS_RELOJ_2,
   obtenerEstadoActualPorUsuarioId,
   DICTAMEN_MAP,
   dictamenLabel,

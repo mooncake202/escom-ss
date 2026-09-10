@@ -37,9 +37,7 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
         {/* Header del panel */}
         <div style={{ padding: "1.25rem 1.5rem", borderBottom: `1px solid ${C.borderSubtle}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>
-              CU-GR-02 · Solicitud de registro
-            </p>
+            
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.textPrimary, fontWeight: 700 }}>
               Revisar solicitud
             </h2>

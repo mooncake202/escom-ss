@@ -8,16 +8,40 @@ const { emitirAUsuario } = require('../../sockets/socket.server');
 const ESTADOS_MARCABLES_VENCIDA = ['sin_comenzar', 'en_progreso'];
 
 /**
- * Corte a medianoche UTC del día actual, construido explícitamente con
- * Date.UTC(...) — nunca con setHours(), porque eso depende de la zona
- * horaria del proceso Node en vez de usar UTC explícito (mismo motivo por
- * el que GR evita setHours() para su propio corte de medianoche México).
- * 06:00 UTC = medianoche México (UTC-6, sin horario de verano desde 2022),
- * mismo criterio horario que ya usa GR.
+ * Corte a medianoche del día calendario MÉXICO actual, expresado en UTC
+ * (00:00 UTC de ese día — mismo formato/base de comparación que ya usan
+ * los `fecha_limite` @db.Date almacenados).
+ *
+ * Antes esto se calculaba con `ahora.getUTCFullYear/Month/Date()` — daba
+ * el resultado correcto SOLO porque el cron real siempre se dispara
+ * exactamente a las 06:00 UTC (momento en el que el día calendario UTC y
+ * el día calendario México coinciden). Si esta función se invoca a otra
+ * hora (ej. manualmente desde test-cron-vencimiento.js), entre las
+ * 00:00-05:59 UTC el día calendario UTC ya es "mañana" mientras que en
+ * México todavía es "hoy" — el corte quedaba hasta 6 horas adelantado.
+ *
+ * Ahora se resuelve el día calendario México real con Intl.DateTimeFormat
+ * (timeZone explícito, sin hardcodear el offset -6) — mismo patrón ya
+ * validado en reubicar-periodo-alumno-prueba.js y
+ * reubicar-fecha-reloj-prueba.js. A las 06:00 UTC exactas (el schedule
+ * real de producción) da EXACTAMENTE el mismo resultado que antes.
+ *
+ * `ahora` es parametrizable (default `new Date()`) solo para poder
+ * probar el cálculo en un instante fijo sin esperar la hora real ni
+ * mockear el reloj global — el comportamiento por defecto no cambia.
  */
-function calcularCorteMedianocheUTC() {
-  const ahora = new Date();
-  return new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+function calcularCorteMedianocheUTC(ahora = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(ahora);
+  const obtener = (tipo) => Number(partes.find(p => p.type === tipo).value);
+
+  const anioMx = obtener('year');
+  const mesMx = obtener('month') - 1; // 0-indexado para Date.UTC
+  const diaMx = obtener('day');
+
+  return new Date(Date.UTC(anioMx, mesMx, diaMx));
 }
 
 async function marcarActividadesVencidas() {
@@ -73,4 +97,4 @@ function iniciarCronVencimientoActividades() {
   console.log('[ah.cron] Cron de vencimiento de actividades registrado (06:00 UTC diario).');
 }
 
-module.exports = { iniciarCronVencimientoActividades, marcarActividadesVencidas };
+module.exports = { iniciarCronVencimientoActividades, marcarActividadesVencidas, calcularCorteMedianocheUTC };

@@ -84,3 +84,8 @@ iniciarCronVencimientoActividades();
 
 //gr07
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));
+
+//GR — Cron de vencimiento (Reloj 1 / Reloj 2) — arranque explícito y
+// visible, mismo criterio que el cron de AH.
+const { inicializarCronGR } = require('./src/modules/gr/gr.cron');
+inicializarCronGR();
