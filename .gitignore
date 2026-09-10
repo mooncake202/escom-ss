@@ -65,6 +65,11 @@ lerna-debug.log*
 *.sw?
 
 # ===========================
+# Herramientas locales (Claude Code / preview)
+# ===========================
+.claude/
+
+# ===========================
 # Sistema operativo
 # ===========================
 .DS_Store

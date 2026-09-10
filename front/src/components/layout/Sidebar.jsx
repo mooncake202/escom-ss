@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme, GRADIENTS, BRAND } from "@/themes/colors";
 import { apiFetch } from "@/services/apiClient";
+import { useSocket } from "@/context/SocketContext";
 
 // ── Iconos SVG inline ────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
@@ -82,6 +83,7 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
   const [expanded, setExpanded] = useState(() => localStorage.getItem("sidebarExpandido") === "true");
   const navigate  = useNavigate();
   const location  = useLocation();
+  const { desconectar } = useSocket();
 
   const toggleExpanded = () => {
     setExpanded(e => {
@@ -190,6 +192,7 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
             }
             localStorage.removeItem("token");
             localStorage.removeItem("usuario");
+            desconectar();
             navigate("/");
           }}
           title={!expanded ? "Cerrar sesión" : undefined}

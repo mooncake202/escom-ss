@@ -1,5 +1,6 @@
 const prisma = require('../../lib/prisma');
 const { dictamenLabel } = require('./gr.service');
+const { emitirAUsuario } = require('../../sockets/socket.server');
 
 const MOTIVO_RECHAZO_PROFESOR = 'Rechazado por profesor';
 const MOTIVO_RECHAZO_CUPOS = 'Cupos de la oferta cubiertos';
@@ -67,7 +68,7 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
 
   const solicitud = await prisma.solicitud_registro.findUnique({
     where: { id: Number(solicitudId) },
-    include: { oferta: true },
+    include: { oferta: true, alumno: true },
   });
 
   // La solicitud debe existir Y pertenecer a una oferta de ESTE profesor —
@@ -92,6 +93,17 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
         motivo_rechazo: MOTIVO_RECHAZO_PROFESOR,
       },
     });
+
+    try {
+      emitirAUsuario(solicitud.alumno.usuario_id, 'solicitud:rechazada', {
+        solicitudId: solicitud.id,
+        estado_solicitud: 'rechazada_por_profesor',
+        motivo: MOTIVO_RECHAZO_PROFESOR,
+      });
+    } catch (err) {
+      console.error('Error al emitir solicitud:rechazada:', err.message);
+    }
+
     return { estado_solicitud: 'rechazada_por_profesor' };
   }
 
@@ -117,6 +129,15 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
     });
   });
 
+  try {
+    emitirAUsuario(solicitud.alumno.usuario_id, 'solicitud:aceptada', {
+      solicitudId: solicitud.id,
+      estado_solicitud: 'aceptada_por_profesor',
+    });
+  } catch (err) {
+    console.error('Error al emitir solicitud:aceptada:', err.message);
+  }
+
   // RN-GR-11 / Excepción E3: el rechazo automático de las demás solicitudes
   // va FUERA de la transacción de aceptación, a propósito — si esto falla,
   // la aceptación YA quedó guardada y no debe revertirse (así lo pide E3:
@@ -125,6 +146,14 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
     const ofertaActualizada = await prisma.oferta_servicio.findUnique({ where: { id: solicitud.oferta_id } });
 
     if (ofertaActualizada.cupos_disponibles === 0) {
+      // Socket (Parte 2): un updateMany por sí solo pierde de vista A QUIÉN
+      // afectó — se resuelve la lista de alumnos afectados ANTES del
+      // updateMany, con el mismo `where`, para poder emitirles después.
+      const solicitudesAfectadas = await prisma.solicitud_registro.findMany({
+        where: { oferta_id: solicitud.oferta_id, estado_solicitud: 'espera_respuesta_de_profesor' },
+        select: { id: true, alumno: { select: { usuario_id: true } } },
+      });
+
       await prisma.solicitud_registro.updateMany({
         where: { oferta_id: solicitud.oferta_id, estado_solicitud: 'espera_respuesta_de_profesor' },
         data: {
@@ -134,6 +163,18 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
           motivo_rechazo: MOTIVO_RECHAZO_CUPOS,
         },
       });
+
+      for (const s of solicitudesAfectadas) {
+        try {
+          emitirAUsuario(s.alumno.usuario_id, 'solicitud:rechazada_por_cupos', {
+            solicitudId: s.id,
+            estado_solicitud: 'rechazada_por_cupos',
+            motivo: MOTIVO_RECHAZO_CUPOS,
+          });
+        } catch (err) {
+          console.error('Error al emitir solicitud:rechazada_por_cupos:', err.message);
+        }
+      }
     }
   } catch (err) {
     // Excepción E3: alerta interna para revisión manual.

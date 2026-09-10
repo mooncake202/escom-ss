@@ -4,6 +4,7 @@ const prisma = require('../../lib/prisma');
 const { descifrarBuffer } = require('../../lib/fileEncryption');
 const { dictamenLabel, RUTA_BASE_DOCUMENTOS } = require('./gr.service');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
+const { emitirAUsuario } = require('../../sockets/socket.server');
 
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
@@ -81,7 +82,10 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
   const coordinador = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
   if (!coordinador) throw crearError('No se encontró tu perfil de coordinador.', 404);
 
-  const solicitud = await prisma.solicitud_registro.findUnique({ where: { id: Number(solicitudId) } });
+  const solicitud = await prisma.solicitud_registro.findUnique({
+    where: { id: Number(solicitudId) },
+    include: { alumno: true },
+  });
   if (!solicitud) throw crearError('Solicitud no encontrada.', 404);
   if (solicitud.estado_solicitud !== 'SISS_y_documentacion_pendiente') {
     throw crearError('Esta solicitud ya fue procesada.', 409);
@@ -92,6 +96,21 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
   });
   const idsDocumentos = documentos.map((d) => d.id);
 
+  // Socket — un solo evento 'documentacion:decidida' para las 4 ramas,
+  // distinguibles por `resultado`. Fail-open, nunca tumba la decisión ya
+  // guardada.
+  function emitirDecision(resultado) {
+    try {
+      emitirAUsuario(solicitud.alumno.usuario_id, 'documentacion:decidida', {
+        solicitudId: solicitud.id,
+        resultado,
+        motivo: motivoRechazo || null,
+      });
+    } catch (err) {
+      console.error('Error al emitir documentacion:decidida:', err.message);
+    }
+  }
+
   if (decision === 'aceptar') {
     // No borra ningún archivo — no aplica el reordenamiento aquí.
     await prisma.$transaction([
@@ -101,6 +120,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
       }),
       prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } }),
     ]);
+    emitirDecision('aprobado');
     return { estado_solicitud: 'SISS_docs_aprobados' };
   }
 
@@ -114,6 +134,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
     ]);
     // Solo hasta aquí, con la BD ya confirmada, se tocan los archivos físicos.
     borrarArchivosFisicos(documentos);
+    emitirDecision('corregir_siss');
     return { estado_solicitud: 'corregir_SISS' };
   }
 
@@ -126,6 +147,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
       prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'con_correcciones' } }),
     ]);
     borrarArchivosFisicos(documentos);
+    emitirDecision('corregir_documentos');
     return { estado_solicitud: 'corregir_docsini' };
   }
 
@@ -156,6 +178,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
   // La transacción ya eliminó las filas en BD; ahora sí se borran los
   // archivos físicos que quedaron huérfanos.
   borrarArchivosFisicos(documentos);
+  emitirDecision('rechazado');
   return { estado_solicitud: 'rechazada_definitivamente' };
 }
 
@@ -224,7 +247,10 @@ async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
   const coordinador = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
   if (!coordinador) throw crearError('No se encontró tu perfil de coordinador.', 404);
 
-  const solicitud = await prisma.solicitud_registro.findUnique({ where: { id: Number(solicitudId) } });
+  const solicitud = await prisma.solicitud_registro.findUnique({
+    where: { id: Number(solicitudId) },
+    include: { alumno: true },
+  });
   if (!solicitud) throw crearError('Solicitud no encontrada.', 404);
   if (solicitud.estado_solicitud !== 'espera_confirmacion_carta_compromiso') {
     throw crearError('Esta solicitud ya fue procesada.', 409);
@@ -239,6 +265,16 @@ async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
       fecha_carta_compromiso: new Date(),
     },
   });
+
+  try {
+    emitirAUsuario(solicitud.alumno.usuario_id, 'carta:recibida', {
+      solicitudId: solicitud.id,
+      estado_solicitud: 'carta_compromiso_confirmada',
+    });
+  } catch (err) {
+    console.error('Error al emitir carta:recibida:', err.message);
+  }
+
   return { mensaje: 'Recepción registrada correctamente.' };
 }
 
@@ -335,6 +371,15 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
       rutaRelacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO',
     });
 
+    try {
+      emitirAUsuario(solicitud.alumno.usuario_id, 'expediente:decidido', {
+        solicitudId: solicitud.id,
+        resultado: 'aprobado',
+      });
+    } catch (err) {
+      console.error('Error al emitir expediente:decidido:', err.message);
+    }
+
     return { estado_solicitud: 'expediente_aprobado' };
   }
 
@@ -348,6 +393,17 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
       ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'con_correcciones' } })]
       : []),
   ]);
+
+  try {
+    emitirAUsuario(solicitud.alumno.usuario_id, 'expediente:decidido', {
+      solicitudId: solicitud.id,
+      resultado: 'rechazado',
+      motivo: motivoRechazo,
+    });
+  } catch (err) {
+    console.error('Error al emitir expediente:decidido:', err.message);
+  }
+
   return { estado_solicitud: 'expediente_con_correcciones' };
 }
 

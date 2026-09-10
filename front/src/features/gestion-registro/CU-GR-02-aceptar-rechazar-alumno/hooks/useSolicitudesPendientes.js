@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesPendientes, decidirSolicitud } from "@/services/profesorSolicitudesService";
-
-const INTERVALO_MS = 120000;
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useSolicitudesPendientes() {
   const [solicitudes, setSolicitudes]     = useState([]);
@@ -9,6 +8,7 @@ export function useSolicitudesPendientes() {
   const [seleccionada, setSeleccionada]   = useState(null);
   const [loading, setLoading]             = useState(false);
   const [resultado, setResultado]         = useState(null);
+  const { socket } = useSocket();
 
   const cargar = () => {
     getSolicitudesPendientes()
@@ -19,9 +19,22 @@ export function useSolicitudesPendientes() {
 
   useEffect(() => {
     cargar();
-    const intervalo = setInterval(cargar, INTERVALO_MS);
-    return () => clearInterval(intervalo);
   }, []);
+
+  // Socket — reemplaza el polling de 120s. 'solicitud:aceptada'/'rechazada'/
+  // 'rechazada_por_cupos' se emiten solo al ALUMNO (Parte 2), nunca al
+  // profesor — las propias decisiones de este profesor ya refrescan local
+  // (ver `decidir` más abajo). El único evento real dirigido al profesor
+  // en esta pantalla es 'solicitud:nueva'.
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("solicitud:nueva", cargar);
+    return () => socket.off("solicitud:nueva", cargar);
+  }, [socket]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const verDetalle = (solicitud) => {
     setSeleccionada(solicitud);

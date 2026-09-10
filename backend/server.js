@@ -1,4 +1,10 @@
-require('./src/lib/redis');
+const redis = require('./src/lib/redis');
+// Conexión explícita al arrancar — con lazyConnect:true (ver lib/redis.js),
+// el servidor real debe seguir "caliente" desde el inicio; los scripts
+// sueltos que solo requieren este módulo transitivamente (sin llamar esto)
+// nunca abren la conexión y por eso terminan solos.
+redis.connect().catch((err) => console.error('Error al conectar a Redis en el arranque:', err.message));
+const http = require("http");
 const express = require("express");
 const cors = require("cors");
 
@@ -38,9 +44,18 @@ app.use('/perfil', require('./src/modules/perfil/perfil.routes'));
 //cambiar contraseña CRED 02
 app.use('/password', require('./src/modules/password/password.routes'));
 
-app.listen(3000,()=>{
+// http.createServer(app) en vez de app.listen directo — necesario para que
+// socket.io se adjunte al MISMO servidor HTTP, no un puerto/proceso aparte.
+const httpServer = http.createServer(app);
+
+httpServer.listen(3000,()=>{
 console.log("Servidor corriendo en http://localhost:3000");
 });
+
+// Socket.io — infraestructura base (sin eventos de negocio conectados
+// todavía), mismo criterio visible que ya se usó para el cron.
+const { inicializarSocketServer } = require('./src/sockets/socket.server');
+inicializarSocketServer(httpServer);
 
 //dashboard
 app.use('/notificaciones', require('./src/modules/notificaciones/notificaciones.routes'));

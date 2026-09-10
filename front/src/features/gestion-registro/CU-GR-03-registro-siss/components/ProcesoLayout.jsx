@@ -2,10 +2,12 @@ import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS } from "@/themes/colors";
 import { ProcesoSidebar } from "./ProcesoSidebar";
 import { apiFetch } from "@/services/apiClient";
+import { useSocket } from "@/context/SocketContext";
 
 export function ProcesoLayout({ pasoActual = 2, usuario = "Alumno", children }) {
   const { C } = useTheme();
   const navigate = useNavigate();
+  const { desconectar } = useSocket();
 
   const iniciales = usuario.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 
@@ -18,6 +20,7 @@ export function ProcesoLayout({ pasoActual = 2, usuario = "Alumno", children }) 
     }
     localStorage.removeItem("token");
     localStorage.removeItem("usuario");
+    desconectar();
     navigate("/");
   };
 

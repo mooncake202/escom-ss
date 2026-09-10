@@ -5,6 +5,7 @@ import './App.css'
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from './features/dashboard/dashboards'
 import { RutaProtegida } from './components/RutaProtegida'
+import { SocketProvider } from './context/SocketContext'
 
 //CRED
 import { AvisoSesionExpirada } from './components/AvisoSesionExpirada';
@@ -103,6 +104,7 @@ const COORDINADOR = ["coordinador"];
 
 function App() {
   return (
+    <SocketProvider>
     <BrowserRouter>
       <AvisoSesionExpirada />
       <Routes>
@@ -366,6 +368,7 @@ function App() {
 
       </Routes>
     </BrowserRouter>
+    </SocketProvider>
   );
 }
 

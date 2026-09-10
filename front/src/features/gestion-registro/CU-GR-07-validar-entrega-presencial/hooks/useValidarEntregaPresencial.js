@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesCartaCompromiso, registrarRecepcionCarta } from "@/services/coordinadorCartaCompromisoService";
-
-const INTERVALO_MS = 120000;
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useValidarEntregaPresencial() {
   const [pendientes, setPendientes] = useState([]);
@@ -10,6 +9,7 @@ export function useValidarEntregaPresencial() {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [error, setError] = useState("");
+  const { socket } = useSocket();
 
   const cargar = () => {
     getSolicitudesCartaCompromiso()
@@ -20,9 +20,23 @@ export function useValidarEntregaPresencial() {
 
   useEffect(() => {
     cargar();
-    const intervalo = setInterval(cargar, INTERVALO_MS);
-    return () => clearInterval(intervalo);
   }, []);
+
+  // Socket — reemplaza el polling de 120s. 'carta:recibida' cubre el caso
+  // de que OTRO coordinador registre la recepción desde su propia sesión.
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("carta:pendiente_confirmacion", cargar);
+    socket.on("carta:recibida", cargar);
+    return () => {
+      socket.off("carta:pendiente_confirmacion", cargar);
+      socket.off("carta:recibida", cargar);
+    };
+  }, [socket]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const verDetalle = (item) => {
     setSeleccionado(item);

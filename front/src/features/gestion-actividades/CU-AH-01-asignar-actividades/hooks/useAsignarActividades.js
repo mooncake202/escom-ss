@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getAlumnosAsignados,
   getDetalleAlumno as getDetalleAlumnoApi,
@@ -36,40 +36,13 @@ export function useAsignarActividades() {
       .finally(() => setCargandoAlumnos(false));
   }, []);
 
-  // Ref sincronizado con alumnoSeleccionado — el efecto de polling corre con
-  // deps [] (no se reinicia al cambiar de selección), así que necesita esta
-  // referencia para saber, en cada ciclo, cuál alumno está seleccionado EN
-  // ESE MOMENTO sin reiniciar su propio temporizador de 120s.
-  const alumnoSeleccionadoRef = useRef(null);
-  useEffect(() => {
-    alumnoSeleccionadoRef.current = alumnoSeleccionado;
-  }, [alumnoSeleccionado]);
-
-  // Polling de 120s (mismo intervalo que ya usa GR: useEstadoSolicitud.js,
-  // useSolicitudesPendientes.js, dashboards.jsx). NUNCA toca cargandoAlumnos
-  // ni cargandoDetalle (no debe parpadear lo ya pintado), ni el formulario
-  // abierto (modoFormulario/form/actividadEnEdicion) — son estados
-  // independientes que este efecto no toca. Además de refrescar la lista
-  // externa, si hay un alumno seleccionado también se refresca su detalle
-  // (mismo endpoint que seleccionarAlumno) sin cambiar cuál está elegido.
-  useEffect(() => {
-    const intervalo = setInterval(async () => {
-      getAlumnosAsignados()
-        .then(setAlumnos)
-        .catch((err) => console.error("Error al refrescar la lista de alumnos:", err));
-
-      const actual = alumnoSeleccionadoRef.current;
-      if (actual) {
-        try {
-          const detalle = await getDetalleAlumnoApi(actual.solicitudId);
-          setAlumno(detalle);
-        } catch (err) {
-          console.error("Error al refrescar el detalle del alumno seleccionado:", err);
-        }
-      }
-    }, 120000);
-    return () => clearInterval(intervalo);
-  }, []);
+  // Parte 3 (sockets): revisado contra el catálogo completo de eventos —
+  // los 5 eventos `actividad:*` se emiten únicamente al alumno dueño, nunca
+  // al profesor. Esta pantalla no tiene ningún evento real que escuchar
+  // hoy, así que NO se agrega ninguna suscripción de socket aquí (evitar
+  // "socket sin destino"). El único mecanismo de frescura que le queda es
+  // el refresco local tras las propias mutaciones del profesor, ya
+  // implementado más abajo (refrescarAlumnoSeleccionado / setAlumnos).
 
   const refrescarAlumnoSeleccionado = async (solicitudId) => {
     const detalle = await getDetalleAlumnoApi(solicitudId);

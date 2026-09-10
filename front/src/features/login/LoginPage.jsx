@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { postLogin } from "../../services/loginService";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "../../themes/colors";
 import { rutaCorrectaParaAlumnoSinAsignar } from "@/features/gestion-registro/utils/estadoRutas";
+import { useSocket } from "@/context/SocketContext";
 
 function InputField({ C, showToggle, ...props }) {
   const [focused, setFocused] = useState(false);
@@ -60,6 +61,7 @@ function Field({ label, children, C }) {
 export default function LoginPage() {
   const { C } = useTheme();
   const navigate = useNavigate();
+  const { conectar } = useSocket();
 
   const [form, setForm] = useState({ correoInst: "", password: "" });
   const [error, setError] = useState("");
@@ -87,6 +89,7 @@ export default function LoginPage() {
 
       localStorage.setItem("token", res.token);
       localStorage.setItem("usuario", JSON.stringify(res.usuario));
+      conectar();
 
       if (rol === "profesor" || rol === "coordinador" || rol === "alumno_asignado") {
         navigate("/dashboard");

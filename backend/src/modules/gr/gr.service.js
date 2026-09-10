@@ -9,6 +9,7 @@ const {
 } = require('../../lib/validators');
 
 const { generarToken } = require('../../lib/jwt');
+const { emitirAUsuario } = require('../../sockets/socket.server');
 
 const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 
@@ -55,6 +56,29 @@ function crearError(mensaje, status = 400, code) {
   err.status = status;
   if (code) err.code = code;
   return err;
+}
+
+/**
+ * Socket — helper compartido por los 3 puntos donde un alumno deja algo en
+ * una bandeja COMPARTIDA de Coordinación (documentación, carta, expediente).
+ * Esas pantallas no filtran por coordinador_id (cualquier coordinador ve
+ * todo), y la infraestructura de sockets (Parte 1) todavía no tiene salas
+ * por rol — así que se emite individualmente a cada coordinador existente.
+ * Fail-open por cada llamada, nunca tumba la operación de negocio.
+ */
+async function emitirATodosLosCoordinadores(evento, datos) {
+  try {
+    const coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+    for (const c of coordinadores) {
+      try {
+        emitirAUsuario(c.usuario_id, evento, datos);
+      } catch (err) {
+        console.error(`Error al emitir ${evento} a coordinador ${c.usuario_id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error(`Error al listar coordinadores para emitir ${evento}:`, err.message);
+  }
 }
 
 /**
@@ -197,6 +221,7 @@ async function enviarSolicitudRegistro(datos) {
   const nombreNormalizado = nombres.trim().toUpperCase();
   const apellidosNormalizados = apellidos.trim().toUpperCase();
 
+  let solicitudCreada;
   try {
     await prisma.$transaction(async (tx) => {
       const usuarioCreado = await tx.usuario.create({
@@ -222,7 +247,7 @@ async function enviarSolicitudRegistro(datos) {
         },
       });
 
-      await tx.solicitud_registro.create({
+      solicitudCreada = await tx.solicitud_registro.create({
         data: {
           alumno_id: boleta,
           carrera_id: carreraEncontrada.id,
@@ -241,6 +266,20 @@ async function enviarSolicitudRegistro(datos) {
       throw crearError('Este correo o boleta ya está registrado.', 409);
     }
     throw err;
+  }
+
+  // Socket — infraestructura Parte 2: avisa en vivo al profesor dueño de la
+  // oferta que tiene una solicitud nueva pendiente. Fail-open: nunca debe
+  // tumbar el registro ya confirmado.
+  try {
+    emitirAUsuario(ofertaEncontrada.profesor.usuario_id, 'solicitud:nueva', {
+      solicitudId: solicitudCreada.id,
+      alumnoNombre: `${nombreNormalizado} ${apellidosNormalizados}`,
+      boleta,
+      ofertaNombre: ofertaEncontrada.nombre_proyecto,
+    });
+  } catch (err) {
+    console.error('Error al emitir solicitud:nueva:', err.message);
   }
 
   return { mensaje: 'Tu solicitud fue enviada correctamente. Ya puedes iniciar sesión para ver el estado de tu proceso.' };
@@ -337,6 +376,20 @@ async function ejecutarBorradoParcial(solicitud, motivo) {
     try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, d.ruta_archivo)); } catch {}
   });
 
+  // Socket — avisa al MISMO alumno (sincroniza otras pestañas/dispositivos
+  // abiertos) que su solicitud venció automáticamente. Fail-open.
+  try {
+    const alumno = await prisma.alumno.findUnique({ where: { boleta: solicitud.alumno_id } });
+    if (alumno) {
+      emitirAUsuario(alumno.usuario_id, 'solicitud:vencida', {
+        estado_solicitud: solicitudActualizada.estado_solicitud,
+        motivo_rechazo: solicitudActualizada.motivo_rechazo,
+      });
+    }
+  } catch (err) {
+    console.error('Error al emitir solicitud:vencida:', err.message);
+  }
+
   return solicitudActualizada;
 }
 
@@ -424,7 +477,7 @@ const ESTADOS_PERMITEN_CAMBIO_OFERTA = ['espera_respuesta_de_profesor', 'rechaza
 async function cambiarOferta(usuarioId, { ofertaId, motivacion }) {
   const alumno = await prisma.alumno.findUnique({
     where: { usuario_id: usuarioId },
-    include: { solicitud_registro: true },
+    include: { solicitud_registro: true, usuario: true },
   });
 
   if (!alumno || !alumno.solicitud_registro) {
@@ -456,6 +509,18 @@ async function cambiarOferta(usuarioId, { ofertaId, motivacion }) {
       fecha_aplicacion: new Date(),
     },
   });
+
+  // Socket — avisa en vivo al profesor dueño de la nueva oferta. Fail-open.
+  try {
+    emitirAUsuario(ofertaEncontrada.profesor.usuario_id, 'solicitud:nueva', {
+      solicitudId: solicitud.id,
+      alumnoNombre: `${alumno.usuario.nombre} ${alumno.usuario.apellidos}`,
+      boleta: alumno.boleta,
+      ofertaNombre: ofertaEncontrada.nombre_proyecto,
+    });
+  } catch (err) {
+    console.error('Error al emitir solicitud:nueva:', err.message);
+  }
 
   return { mensaje: 'Tu selección de oferta fue actualizada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
 }
@@ -566,7 +631,7 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
 
   const alumno = await prisma.alumno.findUnique({
     where: { usuario_id: usuarioId },
-    include: { solicitud_registro: true },
+    include: { solicitud_registro: true, usuario: true },
   });
   if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
   if (alumno.solicitud_registro.estado_solicitud !== 'adjuntar_documentacion_inicial') {
@@ -618,6 +683,13 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
   }
 
   rutasViejasABorrar.forEach((ruta) => { try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, ruta)); } catch {} });
+
+  // Socket — avisa a Coordinación que hay documentación nueva por revisar.
+  emitirATodosLosCoordinadores('documentacion:pendiente', {
+    solicitudId: alumno.solicitud_registro.id,
+    alumnoNombre: `${alumno.usuario.nombre} ${alumno.usuario.apellidos}`,
+    boleta: alumno.boleta,
+  });
 
   return { mensaje: 'Tu documentación fue enviada correctamente y será revisada por Coordinación.', estado_solicitud: 'SISS_y_documentacion_pendiente' };
 }
@@ -848,6 +920,18 @@ async function reenviarSolicitudModificada(usuarioId, datos) {
     }),
   ]);
 
+  // Socket — avisa en vivo al profesor dueño de la oferta (re)seleccionada.
+  try {
+    emitirAUsuario(ofertaEncontrada.profesor.usuario_id, 'solicitud:nueva', {
+      solicitudId: alumno.solicitud_registro.id,
+      alumnoNombre: `${nombreNormalizado} ${apellidosNormalizados}`,
+      boleta,
+      ofertaNombre: ofertaEncontrada.nombre_proyecto,
+    });
+  } catch (err) {
+    console.error('Error al emitir solicitud:nueva:', err.message);
+  }
+
   return { mensaje: 'Tu solicitud fue reenviada correctamente.', estado_solicitud: 'espera_respuesta_de_profesor' };
 }
 
@@ -876,7 +960,7 @@ async function obtenerMisDocumentos(usuarioId) {
 async function confirmarCartaCompromiso(usuarioId) {
   const alumno = await prisma.alumno.findUnique({
     where: { usuario_id: usuarioId },
-    include: { solicitud_registro: true },
+    include: { solicitud_registro: true, usuario: true },
   });
   if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
   if (alumno.solicitud_registro.estado_solicitud !== 'descargar_carta_compromiso') {
@@ -886,6 +970,14 @@ async function confirmarCartaCompromiso(usuarioId) {
     where: { id: alumno.solicitud_registro.id },
     data: { estado_solicitud: 'espera_confirmacion_carta_compromiso', estado_anterior: 'descargar_carta_compromiso' },
   });
+
+  // Socket — avisa a Coordinación que hay una carta compromiso por confirmar.
+  emitirATodosLosCoordinadores('carta:pendiente_confirmacion', {
+    solicitudId: alumno.solicitud_registro.id,
+    alumnoNombre: `${alumno.usuario.nombre} ${alumno.usuario.apellidos}`,
+    boleta: alumno.boleta,
+  });
+
   return { mensaje: 'Quedas en espera de que Coordinación confirme la recepción de tu carta.', estado_solicitud: 'espera_confirmacion_carta_compromiso' };
 }
 
@@ -1055,6 +1147,13 @@ async function subirExpediente(usuarioId, archivos) {
   if (rutaViejaABorrar) {
     try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaViejaABorrar)); } catch {}
   }
+
+  // Socket — avisa a Coordinación que hay un expediente nuevo por revisar.
+  emitirATodosLosCoordinadores('expediente:pendiente_revision', {
+    solicitudId: solicitud.id,
+    alumnoNombre: `${alumno.usuario.nombre} ${alumno.usuario.apellidos}`,
+    boleta: alumno.boleta,
+  });
 
   return { mensaje: 'Tu expediente fue enviado correctamente y será revisado por Coordinación.', estado_solicitud: 'expediente_pendiente_revision' };
 }

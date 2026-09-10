@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { getSolicitudesDocumentacion, decidirDocumentacion, verDocumentoPDF } from "@/services/coordinadorDocumentacionService";
-
-const INTERVALO_MS = 120000;
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useRevisarDocumentacion() {
   const [solicitudes, setSolicitudes] = useState([]);
@@ -13,6 +12,7 @@ export function useRevisarDocumentacion() {
   // null | "corregir_siss" | "corregir_documentos" | "rechazar_definitivo"
   const [modoRechazo, setModoRechazo] = useState(null);
   const [errorDescarga, setErrorDescarga] = useState("");
+  const { socket } = useSocket();
 
   const cargar = () => {
     getSolicitudesDocumentacion()
@@ -23,9 +23,24 @@ export function useRevisarDocumentacion() {
 
   useEffect(() => {
     cargar();
-    const intervalo = setInterval(cargar, INTERVALO_MS);
-    return () => clearInterval(intervalo);
   }, []);
+
+  // Socket — reemplaza el polling de 120s. 'documentacion:pendiente' avisa
+  // de una solicitud nueva; 'documentacion:decidida' cubre el caso de que
+  // OTRO coordinador resuelva una de esta misma cola compartida.
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("documentacion:pendiente", cargar);
+    socket.on("documentacion:decidida", cargar);
+    return () => {
+      socket.off("documentacion:pendiente", cargar);
+      socket.off("documentacion:decidida", cargar);
+    };
+  }, [socket]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const verDetalle = (s) => {
     setSeleccionada(s);

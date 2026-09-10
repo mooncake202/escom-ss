@@ -1,5 +1,17 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getActividadesAlumno } from "@/services/ahAlumnoService";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+
+// Los 5 eventos que Parte 2 emite al alumno dueño de la actividad — ante
+// cualquiera de ellos, refetch completo (payloads chicos, prioriza
+// simplicidad/confiabilidad sobre merge local — mismo criterio para AH02).
+const EVENTOS_ACTIVIDAD = [
+  "actividad:creada",
+  "actividad:editada",
+  "actividad:fecha_extendida",
+  "actividad:eliminada",
+  "actividad:vencida",
+];
 
 // RN-AH-10: activas primero, luego las que ya no requieren acción del
 // alumno (vencida y ambas variantes de completada van al final, sin
@@ -21,34 +33,38 @@ export function useConsultarActividades() {
   const [cargando, setCargando]         = useState(true);
   const [seleccionada, setSelec]        = useState(null);
   const [filtro, setFiltro]             = useState("todas");
+  const { socket } = useSocket();
 
-  // Carga única al montar — esta sí debe mostrar "Cargando...".
-  useEffect(() => {
-    getActividadesAlumno()
+  const cargar = useCallback(() => {
+    return getActividadesAlumno()
       .then((data) => {
         setActividades(data.actividades ?? []);
         setFechaInicio(data.fechaInicio ?? null);
         setServicioIniciado(!!data.servicioIniciado);
       })
-      .catch((err) => console.error("No se pudieron cargar las actividades:", err))
-      .finally(() => setCargando(false));
+      .catch((err) => console.error("No se pudieron cargar las actividades:", err));
   }, []);
 
-  // Polling de 120s (mismo intervalo/patrón que GR) — así el alumno ve
-  // reflejado sin recargar cuando el cron marque una actividad 'vencida'.
-  // NUNCA toca `cargando`: no debe ocultar la lista ya pintada.
+  // Carga única al montar — esta sí debe mostrar "Cargando...".
   useEffect(() => {
-    const intervalo = setInterval(() => {
-      getActividadesAlumno()
-        .then((data) => {
-          setActividades(data.actividades ?? []);
-          setFechaInicio(data.fechaInicio ?? null);
-          setServicioIniciado(!!data.servicioIniciado);
-        })
-        .catch((err) => console.error("Error al refrescar las actividades:", err));
-    }, 120000);
-    return () => clearInterval(intervalo);
-  }, []);
+    cargar().finally(() => setCargando(false));
+  }, [cargar]);
+
+  // Socket — reemplaza el polling de 120s. Ante cualquiera de los 5
+  // eventos de actividad emitidos a este alumno, refetch completo. NUNCA
+  // toca `cargando`: no debe ocultar la lista ya pintada.
+  useEffect(() => {
+    if (!socket) return;
+
+    const handler = () => cargar();
+    EVENTOS_ACTIVIDAD.forEach((evento) => socket.on(evento, handler));
+    return () => {
+      EVENTOS_ACTIVIDAD.forEach((evento) => socket.off(evento, handler));
+    };
+  }, [socket, cargar]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const filtradas = actividades
     .filter(a => {

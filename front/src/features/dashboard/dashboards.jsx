@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, RADIUS, BRAND } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -8,6 +8,26 @@ import {
   listarNotificacionesPendientes,
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+
+// Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
+// revisado contra el catálogo completo de Parte 2. `carta:*` no tiene campo
+// propio en resumenCoordinacion() hoy, así que no se escucha aquí.
+const EVENTOS_POR_ROL = {
+  alumno_asignado: [
+    "actividad:creada", "actividad:editada", "actividad:fecha_extendida",
+    "actividad:eliminada", "actividad:vencida",
+    "expediente:decidido", // dispara la notificación real de bienvenida
+  ],
+  // 'solicitud:aceptada'/'rechazada'/'rechazada_por_cupos' NO se emiten al
+  // profesor (solo al alumno) — el único evento real dirigido a él aquí es
+  // 'solicitud:nueva'.
+  profesor: ["solicitud:nueva"],
+  coordinador: [
+    "documentacion:pendiente", "documentacion:decidida",
+    "expediente:pendiente_revision", "expediente:decidido",
+  ],
+};
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
 
 // ── Iconos SVG inline ──────────────────────────────────────────────
@@ -603,6 +623,7 @@ export default function Dashboards() {
   const { C } = useTheme();
   const navigate = useNavigate();
   const { usuario: sesion } = useSesion();
+  const { socket } = useSocket();
 
   const [resumen, setResumen] = useState({});
   const [notificaciones, setNotificaciones] = useState([]);
@@ -628,25 +649,38 @@ export default function Dashboards() {
     cargarInicial();
   }, []); // ver nota sobre el loop de useSesion()
 
-  // Polling de 120s — refresca resumen Y notificaciones (badges, mensajes
-  // calculados de SlotNotificacionCalculada, y el modal de bienvenida).
-  // NUNCA toca `cargando`: no debe ocultar el dashboard ya pintado.
-  useEffect(() => {
-    async function refrescar() {
-      try {
-        const [resumenData, notiData] = await Promise.all([
-          obtenerResumenDashboard(),
-          listarNotificacionesPendientes(),
-        ]);
-        setResumen(resumenData);
-        setNotificaciones(notiData);
-      } catch (err) {
-        console.error('Error al refrescar el dashboard:', err);
-      }
+  // Hoisteado a useCallback (antes vivía anidado dentro del efecto de
+  // eventos de negocio) para poder reutilizar EXACTAMENTE la misma función
+  // también en el refetch de reconexión, sin duplicarla.
+  const refrescar = useCallback(async () => {
+    try {
+      const [resumenData, notiData] = await Promise.all([
+        obtenerResumenDashboard(),
+        listarNotificacionesPendientes(),
+      ]);
+      setResumen(resumenData);
+      setNotificaciones(notiData);
+    } catch (err) {
+      console.error('Error al refrescar el dashboard:', err);
     }
-    const intervalo = setInterval(refrescar, 120000);
-    return () => clearInterval(intervalo);
   }, []);
+
+  // Socket — reemplaza el polling de 120s. Refresca resumen Y
+  // notificaciones juntas (badges, mensajes de SlotNotificacionCalculada, y
+  // el modal de bienvenida), igual que ya hacía el polling. NUNCA toca
+  // `cargando`: no debe ocultar el dashboard ya pintado.
+  useEffect(() => {
+    if (!socket || !sesion?.rol) return;
+
+    const eventos = EVENTOS_POR_ROL[sesion.rol] ?? [];
+    eventos.forEach((evento) => socket.on(evento, refrescar));
+    return () => {
+      eventos.forEach((evento) => socket.off(evento, refrescar));
+    };
+  }, [socket, sesion?.rol, refrescar]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(refrescar);
 
   async function handleLeerNotificacion(id) {
     setNotificaciones((prev) => prev.filter((n) => n.id !== id));

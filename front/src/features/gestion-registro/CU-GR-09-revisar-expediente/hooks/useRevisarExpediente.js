@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { getExpedientesPendientes, decidirExpediente, verDocumentoPDF } from "@/services/coordinadorExpedienteService";
-
-const INTERVALO_MS = 120000;
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useRevisarExpediente() {
   const [expedientes, setExpedientes] = useState([]);
@@ -12,6 +11,7 @@ export function useRevisarExpediente() {
   const [comentario, setComentario] = useState("");
   const [modoRechazo, setModoRechazo] = useState(false);
   const [errorDescarga, setErrorDescarga] = useState("");
+  const { socket } = useSocket();
 
   const cargar = () => {
     getExpedientesPendientes()
@@ -22,9 +22,23 @@ export function useRevisarExpediente() {
 
   useEffect(() => {
     cargar();
-    const intervalo = setInterval(cargar, INTERVALO_MS);
-    return () => clearInterval(intervalo);
   }, []);
+
+  // Socket — reemplaza el polling de 120s. 'expediente:decidido' cubre el
+  // caso de que OTRO coordinador resuelva uno de esta misma cola compartida.
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on("expediente:pendiente_revision", cargar);
+    socket.on("expediente:decidido", cargar);
+    return () => {
+      socket.off("expediente:pendiente_revision", cargar);
+      socket.off("expediente:decidido", cargar);
+    };
+  }, [socket]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(cargar);
 
   const verDetalle = (exp) => {
     setSeleccionado(exp);

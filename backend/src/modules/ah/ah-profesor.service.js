@@ -6,6 +6,7 @@ const {
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
 } = require('./validators');
+const { emitirAUsuario } = require('../../sockets/socket.server');
 
 async function resolverProfesor(profesorUsuarioId) {
   const profesor = await prisma.profesor.findUnique({ where: { usuario_id: profesorUsuarioId } });
@@ -140,7 +141,15 @@ async function crearActividad(profesorUsuarioId, solicitudId, datos) {
     },
   });
 
-  return mapearActividad(actividad, false);
+  const actividadMapeada = mapearActividad(actividad, false);
+
+  try {
+    emitirAUsuario(solicitud.alumno.usuario_id, 'actividad:creada', { actividad: actividadMapeada });
+  } catch (err) {
+    console.error('Error al emitir actividad:creada:', err.message);
+  }
+
+  return actividadMapeada;
 }
 
 async function resolverActividadDeProfesor(profesorUsuarioId, actividadId) {
@@ -150,7 +159,7 @@ async function resolverActividadDeProfesor(profesorUsuarioId, actividadId) {
     where: { id: Number(actividadId) },
     include: {
       solicitud_registro: {
-        include: { oferta: true, periodo_registro: { include: { evento_calendario: true } } },
+        include: { oferta: true, periodo_registro: { include: { evento_calendario: true } }, alumno: true },
       },
     },
   });
@@ -194,7 +203,15 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
     },
   });
 
-  return mapearActividad(actualizada, false);
+  const actividadMapeada = mapearActividad(actualizada, false);
+
+  try {
+    emitirAUsuario(actividad.solicitud_registro.alumno.usuario_id, 'actividad:editada', { actividad: actividadMapeada });
+  } catch (err) {
+    console.error('Error al emitir actividad:editada:', err.message);
+  }
+
+  return actividadMapeada;
 }
 
 /**
@@ -220,6 +237,16 @@ async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuev
     },
   });
 
+  try {
+    emitirAUsuario(actividad.solicitud_registro.alumno.usuario_id, 'actividad:fecha_extendida', {
+      actividadId: actualizada.id,
+      fecha_limite: actualizada.fecha_limite,
+      estado: actualizada.estado,
+    });
+  } catch (err) {
+    console.error('Error al emitir actividad:fecha_extendida:', err.message);
+  }
+
   return mapearActividad(actualizada, true);
 }
 
@@ -236,6 +263,12 @@ async function eliminarActividad(profesorUsuarioId, actividadId) {
   }
 
   await prisma.actividad.delete({ where: { id: actividad.id } });
+
+  try {
+    emitirAUsuario(actividad.solicitud_registro.alumno.usuario_id, 'actividad:eliminada', { actividadId: actividad.id });
+  } catch (err) {
+    console.error('Error al emitir actividad:eliminada:', err.message);
+  }
 }
 
 module.exports = {

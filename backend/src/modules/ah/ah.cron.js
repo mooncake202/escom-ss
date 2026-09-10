@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const prisma = require('../../lib/prisma');
+const { emitirAUsuario } = require('../../sockets/socket.server');
 
 // RN-AH: solo cambia el estado de la actividad a "vencida" — NO toca
 // cumulo_horas_y_faltas, no cuenta faltas, no cierra jornadas de bitácora
@@ -21,14 +22,40 @@ function calcularCorteMedianocheUTC() {
 
 async function marcarActividadesVencidas() {
   const corte = calcularCorteMedianocheUTC();
+  const where = {
+    fecha_limite: { lt: corte },
+    estado: { in: ESTADOS_MARCABLES_VENCIDA },
+  };
 
-  const resultado = await prisma.actividad.updateMany({
-    where: {
-      fecha_limite: { lt: corte },
-      estado: { in: ESTADOS_MARCABLES_VENCIDA },
+  // Socket (Parte 2): un updateMany por sí solo pierde de vista A QUÉ
+  // alumnos afectó — se resuelve ANTES del updateMany, con el mismo
+  // `where`, para poder emitirles después (agrupado por alumno, una sola
+  // vez cada uno aunque tengan varias actividades vencidas el mismo día).
+  const afectadas = await prisma.actividad.findMany({
+    where,
+    select: {
+      id: true,
+      titulo: true,
+      solicitud_registro: { select: { alumno: { select: { usuario_id: true } } } },
     },
-    data: { estado: 'vencida' },
   });
+
+  const resultado = await prisma.actividad.updateMany({ where, data: { estado: 'vencida' } });
+
+  const actividadesPorAlumno = new Map();
+  for (const a of afectadas) {
+    const usuarioId = a.solicitud_registro?.alumno?.usuario_id;
+    if (!usuarioId) continue;
+    if (!actividadesPorAlumno.has(usuarioId)) actividadesPorAlumno.set(usuarioId, []);
+    actividadesPorAlumno.get(usuarioId).push({ id: a.id, titulo: a.titulo });
+  }
+  for (const [usuarioId, actividades] of actividadesPorAlumno) {
+    try {
+      emitirAUsuario(usuarioId, 'actividad:vencida', { actividades });
+    } catch (err) {
+      console.error('[ah.cron] Error al emitir actividad:vencida:', err.message);
+    }
+  }
 
   console.log(`[ah.cron] Actividades marcadas como vencidas: ${resultado.count}`);
   return resultado.count;
