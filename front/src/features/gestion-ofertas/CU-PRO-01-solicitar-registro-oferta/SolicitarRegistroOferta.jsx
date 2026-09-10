@@ -5,11 +5,13 @@ import { useRegistroOferta } from "./hooks/useRegistroOferta";
 import { CampoFormulario } from "./components/CampoFormulario";
 import { ConfirmacionEnvio } from "./components/ConfirmacionEnvio";
 import { CarreraSelector } from "./components/CarreraSelector";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 export default function SolicitarRegistroOferta() {
   const { C } = useTheme();
   const navigate = useNavigate();
-  const { form, errores, enviado, handleChange, handleCarreraToggle, handleSubmit } = useRegistroOferta();
+  const { usuario } = useSesion();
+  const { form, errores, enviado, enviando, handleChange, handleCarreraToggle, handleSubmit } = useRegistroOferta();
 
   const inputStyle = (hasError) => ({
     width: "100%", padding: "10px 14px",
@@ -21,7 +23,7 @@ export default function SolicitarRegistroOferta() {
 
   if (enviado) {
     return (
-      <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario="Dr. Torres Vega">
+      <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
         <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <ConfirmacionEnvio tipo="proyecto" onVolver={() => navigate("/profesor/proyectos")} />
         </div>
@@ -30,7 +32,7 @@ export default function SolicitarRegistroOferta() {
   }
 
   return (
-    <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario="Dr. Torres Vega">
+    <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
       <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
 
         <button onClick={() => navigate("/profesor/proyectos")} style={{
@@ -53,6 +55,16 @@ export default function SolicitarRegistroOferta() {
           <strong>Aviso:</strong> Los cupos solicitados son una referencia inicial sujeta a los cupos que dispone.
         </div>
 
+        {errores.general && (
+          <div style={{
+            marginBottom: "1.5rem", padding: "12px 16px", borderRadius: RADIUS.md,
+            background: C.dangerSoft ?? "rgba(220,38,38,0.1)", border: `1px solid ${C.danger}`,
+            color: C.danger, fontSize: 13,
+          }}>
+            {errores.general}
+          </div>
+        )}
+
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.xl,
           border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
@@ -68,30 +80,74 @@ export default function SolicitarRegistroOferta() {
           </CampoFormulario>
 
           <CampoFormulario
-            label="Título para plataforma SISS" required
-            hint="Nombre del proyecto tal como aparecerá registrado en la plataforma SISS."
-            error={errores.tituloSISS}
-          >
-            <input name="tituloSISS" value={form.tituloSISS} onChange={handleChange}
-              placeholder="Ej. Academia de Ciencia de Datos"
-              style={inputStyle(!!errores.tituloSISS)} />
-          </CampoFormulario>
 
-          <CampoFormulario label="Descripción del proyecto" required error={errores.descripcion}>
-            <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
-              placeholder="Describe los objetivos, alcance y contexto del proyecto..."
-              rows={4} style={{ ...inputStyle(!!errores.descripcion), resize: "vertical", lineHeight: 1.55 }} />
+            label="Programa SISS"
+            required
+            hint="Selecciona el programa oficial de servicio social al que pertenece este proyecto."
+            error={errores.programaSISS}
+          >
+            <select
+              name="programaSISS"
+              value={form.programaSISS}
+              onChange={handleChange}
+              style={inputStyle(!!errores.programaSISS)}
+            >
+              <option value="">Selecciona un programa</option>
+              <option value="ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL">
+                ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL
+              </option>
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA">
+                ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA
+              </option>
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA">
+                ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA
+              </option>
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN">
+                ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN
+              </option>
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL">
+                ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL
+              </option>
+              <option value="ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO">
+                ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO
+              </option>
+              <option value="TUTORÍA ENTRE PARES">
+                TUTORÍA ENTRE PARES
+              </option>
+              <option value="VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM">
+                VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM
+              </option>
+            </select>
           </CampoFormulario>
 
           <CampoFormulario
-            label="Actividades a realizar" required
-            hint="Describe las actividades que desarrollarán los alumnos durante el servicio social."
-            error={errores.actividades}
+            label="Actividad SISS"
+            required
+            hint="Selecciona la actividad que corresponde al registro en la plataforma SISS."
+            error={errores.tituloSISS}
           >
-            <textarea name="actividades" value={form.actividades} onChange={handleChange}
-              placeholder="Ej. Análisis de requerimientos, diseño de base de datos, desarrollo de módulos, pruebas..."
-              rows={3} style={{ ...inputStyle(!!errores.actividades), resize: "vertical", lineHeight: 1.55 }} />
+            <select
+              name="tituloSISS"
+              value={form.tituloSISS}
+              onChange={handleChange}
+              style={inputStyle(!!errores.tituloSISS)}
+            >
+              <option value="">Selecciona una actividad</option>
+              <option value="Opcion 1">Opción 1</option>
+              <option value="Opcion 2">Opción 2</option>
+              <option value="Opcion 3">Opción 3</option>
+            </select>
           </CampoFormulario>
+
+          <CampoFormulario
+            label="Descripción y actividades a realizar" required
+            hint="Describe los objetivos, alcance, contexto del proyecto y las actividades que desarrollarán los alumnos durante el servicio social."
+            error={errores.descripcion}
+          >
+  <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
+    placeholder="Describe en qué consiste el proyecto, su contexto y las actividades concretas que realizarán los alumnos durante el servicio social..."
+    rows={6} style={{ ...inputStyle(!!errores.descripcion), resize: "vertical", lineHeight: 1.55 }} />
+</CampoFormulario>
 
           <div style={{ borderTop: `1px solid ${C.borderDefault}`, margin: "0.25rem 0 1.5rem" }} />
           <h3 style={{ margin: "0 0 1rem", fontSize: 15, fontWeight: 700, color: C.textPrimary }}>
@@ -100,11 +156,11 @@ export default function SolicitarRegistroOferta() {
 
           <CampoFormulario
             label="Total de cupos iniciales solicitados" required
-            hint="Número de alumnos que podría aceptar el proyecto. Sujeto a aprobación por coordinación."
+            hint="Número de alumnos que podría aceptar el proyecto. Mínimo 2. Sujeto a aprobación por coordinación."
             error={errores.cuposTotal}
           >
             <input type="number" name="cuposTotal" value={form.cuposTotal} onChange={handleChange}
-              min={1} max={5} placeholder="Ej. 3"
+              min={2} placeholder="Ej. 3"
               style={{ ...inputStyle(!!errores.cuposTotal), maxWidth: 160 }} />
           </CampoFormulario>
 
@@ -122,17 +178,18 @@ export default function SolicitarRegistroOferta() {
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button onClick={() => navigate("/profesor/proyectos")} style={{
+            <button onClick={() => navigate("/profesor/proyectos")} disabled={enviando} style={{
               flex: 1, padding: "10px", borderRadius: RADIUS.md,
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
+              fontSize: 13, fontWeight: 500, cursor: enviando ? "not-allowed" : "pointer",
               background: "transparent", border: `1px solid ${C.borderDefault}`,
               color: C.textMuted, fontFamily: "inherit",
             }}>Cancelar</button>
-            <button onClick={handleSubmit} style={{
+            <button onClick={handleSubmit} disabled={enviando} style={{
               flex: 2, padding: "10px", borderRadius: RADIUS.md,
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              fontSize: 13, fontWeight: 700, cursor: enviando ? "not-allowed" : "pointer",
               background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-            }}>Enviar solicitud</button>
+              opacity: enviando ? 0.6 : 1,
+            }}>{enviando ? "Enviando..." : "Enviar solicitud"}</button>
           </div>
         </div>
       </div>

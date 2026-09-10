@@ -24,6 +24,16 @@ export function FormCorreccion({ oferta, form, errores, onChange, onToggleCarrer
 
   return (
     <>
+      {errores.general && (
+        <div style={{
+          padding: "10px 14px", borderRadius: RADIUS.md,
+          background: C.dangerSoft, border: `1px solid ${C.danger}`,
+          fontSize: 13, color: C.danger, fontWeight: 500,
+        }}>
+          {errores.general}
+        </div>
+      )}
+
       <div>
         <label style={labelStyle}>Nombre de la oferta <span style={{ color: C.danger }}>*</span></label>
         <input name="nombre" value={form.nombre} onChange={onChange} style={inputStyle(!!errores.nombre)} />
@@ -31,7 +41,23 @@ export function FormCorreccion({ oferta, form, errores, onChange, onToggleCarrer
       </div>
 
       <div>
-        <label style={labelStyle}>Título para plataforma SISS <span style={{ color: C.danger }}>*</span></label>
+        <label style={labelStyle}>Programa SISS <span style={{ color: C.danger }}>*</span></label>
+        <select name="programaSISS" value={form.programaSISS} onChange={onChange} style={inputStyle(!!errores.programaSISS)}>
+          <option value="">Selecciona un programa</option>
+          <option value="ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL">ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL</option>
+          <option value="ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA">ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA</option>
+          <option value="ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA">ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA</option>
+          <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN">ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN</option>
+          <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL">ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL</option>
+          <option value="ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO">ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO</option>
+          <option value="TUTORÍA ENTRE PARES">TUTORÍA ENTRE PARES</option>
+          <option value="VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM">VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM</option>
+        </select>
+        {errores.programaSISS && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.programaSISS}</p>}
+      </div>
+
+      <div>
+        <label style={labelStyle}>Actividad SISS <span style={{ color: C.danger }}>*</span></label>
         <input name="tituloSISS" value={form.tituloSISS} onChange={onChange} style={inputStyle(!!errores.tituloSISS)} />
         {errores.tituloSISS && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.tituloSISS}</p>}
       </div>

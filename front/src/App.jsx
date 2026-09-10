@@ -66,6 +66,7 @@ import HistorialOfertas        from './features/gestion-ofertas/CU-PRO-05-histor
 import SolicitarRegistroOferta from './features/gestion-ofertas/CU-PRO-01-solicitar-registro-oferta/SolicitarRegistroOferta'
 import SolicitarOfertaIndividual from './features/gestion-ofertas/CU-PRO-01-solicitar-registro-oferta/SolicitarOfertaIndividual'
 import ConsultarOfertas        from './features/gestion-ofertas/CU-PRO-03-consultar-ofertas/ConsultarOfertas'
+import RevisarSolicitudOferta from './features/gestion-ofertas/CU-PRO-02-revisar-solicitud-oferta/RevisarSolicitudOferta'
 
 
 //import ContactoEquipo from './features/gestion-administrativa/CU-ADM-03-contacto-equipo/ContactoEquipo'
@@ -302,6 +303,9 @@ function App() {
         } />
         <Route path="/coordinacion/ofertas" element={
           <RutaProtegida roles={COORDINADOR}><ConsultarOfertas /></RutaProtegida>
+        } />
+        <Route path="/coordinacion/ofertas/revisar" element={
+          <RutaProtegida roles={COORDINADOR}><RevisarSolicitudOferta /></RutaProtegida>
         } />
 
 

@@ -22,10 +22,11 @@ const EVENTOS_POR_ROL = {
   // 'solicitud:aceptada'/'rechazada'/'rechazada_por_cupos' NO se emiten al
   // profesor (solo al alumno) — el único evento real dirigido a él aquí es
   // 'solicitud:nueva'.
-  profesor: ["solicitud:nueva"],
+  profesor: ["solicitud:nueva", "oferta:decidida", "oferta:concluida"],
   coordinador: [
     "documentacion:pendiente", "documentacion:decidida",
     "expediente:pendiente_revision", "expediente:decidido",
+    "oferta:nueva", "oferta:reenviada",
   ],
 };
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
@@ -198,7 +199,7 @@ const T = {
 // dónde ponerla — el dato mismo lo dice). Si no trae ruta (null), es una
 // notificación general y aparece en el bloque de arriba del dashboard.
 function notificacionPorRuta(notificaciones, ruta) {
-  return notificaciones.find((n) => n.ruta_relacionada === ruta) || null;
+  return notificaciones.find((n) => n.ruta_relacionada?.split('?')[0] === ruta) || null;
 }
 
 function SlotNotificacion({ ruta, notificaciones, onLeer, navigate, C }) {
@@ -464,10 +465,12 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         </Section>
 
         {/* CU-PRO */}
+        {/* CU-PRO */}
         <Section title="Gestión de Ofertas" icon="folder" {...T.purple} C={C}>
-          <ActionItem icon="plus"   {...T.purple} label="Solicitar apertura de oferta" desc="Nueva oferta de proyecto o individual" onClick={() => navigate("/profesor/proyectos/registrar")} C={C} />
+          <ActionItem icon="plus"   {...T.purple} label="Solicitar apertura de oferta" desc="Nueva oferta de proyecto o individual" onClick={() => navigate("/profesor/proyectos")} C={C} />
           <SlotNotificacion ruta="/profesor/proyectos/registrar" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="folder" {...T.slate}  label="Historial de ofertas"         desc="Consultar ofertas anteriores y activas" onClick={() => navigate("/profesor/proyectos")} C={C} />
+          <SlotNotificacion ruta="/profesor/proyectos" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
         {/* CU-ADM */}

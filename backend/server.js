@@ -1,3 +1,5 @@
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const redis = require('./src/lib/redis');
 // Conexión explícita al arrancar — con lazyConnect:true (ver lib/redis.js),
 // el servidor real debe seguir "caliente" desde el inicio; los scripts
@@ -8,7 +10,7 @@ const http = require("http");
 const express = require("express");
 const cors = require("cors");
 
-const ofertasRoutes = require("./routes/ofertas");
+
 const registroRoutes = require("./routes/registro");
 const periodosRoutes = require("./routes/fechas_periodo");
 const loginRoute = require("./routes/login");
@@ -25,7 +27,7 @@ app.set('trust proxy', true);
 app.use(cors());
 app.use(express.json());
 
-app.use("/api/ofertas", ofertasRoutes);
+//app.use("/api/ofertas", ofertasRoutes);
 //app.use("/api/registro", registroRoutes);
 //app.use("/api/periodos", periodosRoutes);
 //app.use("/api/login", loginRoute);
@@ -81,6 +83,11 @@ app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades } = require('./src/modules/ah/ah.cron');
 iniciarCronVencimientoActividades();
+// Cron de conclusión automática de ofertas (CU-PRO-04) — arranque explícito y
+// visible junto con el resto de los módulos de ofertas, no oculto dentro de
+// otro archivo.
+const { iniciarCronConclusionOfertas } = require('./src/modules/ofertas/ofertas.cron');
+iniciarCronConclusionOfertas();
 
 //gr07
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));

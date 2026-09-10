@@ -1,10 +1,24 @@
 import { useTheme, RADIUS } from "@/themes/colors";
 import { useDecisionOferta } from "../hooks/useDecisionOferta";
 
+const OPCIONES_PROGRAMA = [
+  "ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL",
+  "ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA",
+  "ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA",
+  "ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN",
+  "ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL",
+  "ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO",
+  "TUTORÍA ENTRE PARES",
+  "VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM",
+];
+
+// Placeholder hasta tener el catálogo real por programa (pendiente con coordinación).
+const OPCIONES_ACTIVIDAD = ["Opción 1", "Opción 2", "Opción 3"];
+
 export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
   const { C } = useTheme();
   const {
-    modo, motivos, setMotivos, errores,
+    modo, motivos, setMotivos, programaSISS, setProgramaSISS, actividadSISS, setActividadSISS, errores,
     abrirAprobar, abrirRechazar, cancelar,
     confirmarAprobacion, confirmarRechazo,
   } = useDecisionOferta();
@@ -17,6 +31,48 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
     borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none",
     boxSizing: "border-box", fontFamily: "inherit",
   });
+
+  const labelStyle = {
+    display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
+    textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6,
+  };
+
+  // Bloque compartido por ambos modos de aprobación (individual y grupal).
+  const camposSISS = (
+    <div style={{ marginBottom: "1rem" }}>
+      <div style={{ marginBottom: "0.875rem" }}>
+        <label style={labelStyle}>Programa SISS <span style={{ color: C.danger }}>*</span></label>
+        <select
+          value={programaSISS}
+          onChange={e => setProgramaSISS(e.target.value)}
+          style={inputBase(!!errores.programaSISS)}
+        >
+          <option value="">Selecciona un programa</option>
+          {OPCIONES_PROGRAMA.map(op => <option key={op} value={op}>{op}</option>)}
+        </select>
+        {errores.programaSISS && (
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.programaSISS}</p>
+        )}
+      </div>
+      <div>
+        <label style={labelStyle}>Actividad SISS <span style={{ color: C.danger }}>*</span></label>
+        <select
+          value={actividadSISS}
+          onChange={e => setActividadSISS(e.target.value)}
+          style={inputBase(!!errores.actividadSISS)}
+        >
+          <option value="">Selecciona una actividad</option>
+          {OPCIONES_ACTIVIDAD.map(op => <option key={op} value={op}>{op}</option>)}
+        </select>
+        {errores.actividadSISS && (
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.actividadSISS}</p>
+        )}
+      </div>
+      <p style={{ margin: "8px 0 0", fontSize: 11, color: C.textDisabled, lineHeight: 1.5 }}>
+        Confirma o corrige el Programa y Actividad SISS según las características reales del profesor.
+      </p>
+    </div>
+  );
 
   return (
     <>
@@ -51,7 +107,7 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
           }}>
             Rechazar
           </button>
-          <button onClick={abrirAprobar} style={{
+          <button onClick={() => abrirAprobar(oferta)} style={{
             flex: 2, padding: "10px", borderRadius: RADIUS.md,
             fontSize: 13, fontWeight: 700, cursor: "pointer",
             background: C.success, border: "none", color: "#fff", fontFamily: "inherit",
@@ -70,6 +126,7 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
           <p style={{ margin: "0 0 0.75rem", fontSize: 13, fontWeight: 700, color: C.success }}>
             Aprobar solicitud de proyecto
           </p>
+          {camposSISS}
           <p style={{ margin: "0 0 1.25rem", fontSize: 12, color: C.textDisabled }}>
             Al confirmar, se autorizarán los {oferta.cuposRegistrados} cupos solicitados y el profesor será notificado.
           </p>
@@ -106,9 +163,7 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
           }}>
             Cupo fijo: 1 lugar
           </div>
-          <p style={{ margin: "0 0 1.25rem", fontSize: 12, color: C.textDisabled }}>
-            Las ofertas individuales tienen cupo fijo de 1. No es necesario ingresar ningún valor adicional.
-          </p>
+          {camposSISS}
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button onClick={cancelar} style={{
               flex: 1, padding: "9px", borderRadius: RADIUS.md,
@@ -132,7 +187,7 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
           border: `1px solid ${C.danger}`, borderRadius: RADIUS.lg,
         }}>
           <p style={{ margin: "0 0 1rem", fontSize: 13, fontWeight: 700, color: C.danger }}>
-            Rechazar solicitud — registra los motivos
+            Rechazar solicitud
           </p>
           <label style={{
             display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
@@ -150,9 +205,6 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
           {errores.motivos && (
             <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger }}>{errores.motivos}</p>
           )}
-          <p style={{ margin: "4px 0 1.25rem", fontSize: 12, color: C.textDisabled }}>
-            Los motivos son obligatorios y se notificarán al profesor.
-          </p>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button onClick={cancelar} style={{
               flex: 1, padding: "9px", borderRadius: RADIUS.md,

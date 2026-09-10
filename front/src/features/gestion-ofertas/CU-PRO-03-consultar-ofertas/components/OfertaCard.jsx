@@ -2,15 +2,21 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { EstatusBadge } from "./EstatusBadge";
 import { ModalidadBadge } from "./ModalidadBadge";
 
-export function OfertaCard({ oferta, seleccionado, onSelect }) {
+export function OfertaCard({ oferta, seleccionado, onSelect, destacado }) {
   const { C } = useTheme();
   const isSelected = seleccionado?.id === oferta.id;
+
+  const colorDestacado = oferta.estado === "rechazado"   ? C.danger
+                       : oferta.estado === "aprobado"     ? C.success
+                       : oferta.estado === "pendiente"    ? C.warning
+                       : C.info;
+
   return (
     <button onClick={() => onSelect(oferta)} style={{
       width: "100%", textAlign: "left", cursor: "pointer",
       background: isSelected ? C.accentSoft : C.bgCard,
       borderRadius: RADIUS.lg,
-      border: `1px solid ${isSelected ? C.accent : C.borderDefault}`,
+      border: `2px solid ${isSelected ? C.accent : destacado ? colorDestacado : C.borderDefault}`,
       padding: "1rem 1.25rem", fontFamily: "inherit", outline: "none",
     }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem", marginBottom: 6 }}>

@@ -20,7 +20,7 @@ const CORREO_COORDINADOR = 'coordinador.test@ipn.mx';
 // Carreras del catálogo (mismos códigos que CARRERAS en el frontend).
 // Si la tabla `carrera` todavía no tiene estos 3 registros, este script los
 // crea (findFirst-or-create), para no depender de que exista un seed previo.
-const CARRERAS_CATALOGO = ['ISC', 'IA', 'LCD'];
+const CARRERAS_CATALOGO = ['ISC', 'IIA', 'LCD'];
 
 // Cada oferta se liga a un profesor por su correo (más legible que por id).
 const DATOS_OFERTAS = [
@@ -28,24 +28,27 @@ const DATOS_OFERTAS = [
     profesorCorreo: 'profesor.test@ipn.mx',
     nombre_SISS: 'Sistema de gestión de bibliotecas escolares',
     nombre_proyecto: 'Sistema de gestión de bibliotecas escolares',
+    programa_SISS: 'ESCOM-Aplicaciones de la Ing. en Sistemas Computacionales para el Servicio Social',
     tipo_oferta: 'proyecto',
     descripcion_actividades: 'Desarrollo de un sistema web para el control de préstamos, devoluciones e inventario de la biblioteca escolar, incluyendo panel administrativo y reportes de uso.',
     cupos_ofertados: 4,
-    carrerasDeseadas: ['ISC', 'IA'],
+    carrerasDeseadas: ['ISC', 'IIA'],
   },
   {
     profesorCorreo: 'profesor.test@ipn.mx',
     nombre_SISS: 'Soporte técnico y mantenimiento de laboratorios',
     nombre_proyecto: 'Soporte técnico y mantenimiento de laboratorios de cómputo',
+    programa_SISS: 'ESCOM-S. S. para Apoyo al Área Académica',
     tipo_oferta: 'individual',
     descripcion_actividades: 'Apoyo en mantenimiento preventivo y correctivo de equipo de cómputo, configuración de software académico y soporte a usuarios en los laboratorios del departamento.',
-    cupos_ofertados: 2,
+    cupos_ofertados: null, // individual siempre es 1 implícito, ver ternario en el create()
     carrerasDeseadas: [], // abierta a cualquier carrera
   },
   {
     profesorCorreo: 'jramirez@ipn.mx',
     nombre_SISS: 'App móvil para trámites escolares',
     nombre_proyecto: 'Desarrollo de aplicación móvil para trámites escolares',
+    programa_SISS: 'ESCOM-S. S. para Apoyo al Área Administrativa',
     tipo_oferta: 'proyecto',
     descripcion_actividades: 'Diseño y desarrollo de una app móvil (Android/iOS) para que los alumnos realicen trámites administrativos comunes desde su teléfono, con backend propio y notificaciones push.',
     cupos_ofertados: 3,
@@ -55,24 +58,27 @@ const DATOS_OFERTAS = [
     profesorCorreo: 'jramirez@ipn.mx',
     nombre_SISS: 'Análisis de datos académicos con ML',
     nombre_proyecto: 'Análisis de datos académicos con Machine Learning',
+    programa_SISS: 'ESCOM-S. S. para Apoyo al Área de Ciencias e Ingeniería de la Computación',
     tipo_oferta: 'proyecto',
     descripcion_actividades: 'Construcción de modelos predictivos sobre datos históricos de desempeño académico para identificar factores de riesgo de deserción escolar.',
     cupos_ofertados: 3,
-    carrerasDeseadas: ['IA', 'LCD'],
+    carrerasDeseadas: ['IIA', 'LCD'],
   },
   {
     profesorCorreo: 'lgomez@ipn.mx',
     nombre_SISS: 'Automatización de procesos administrativos',
     nombre_proyecto: 'Automatización de procesos administrativos internos',
+    programa_SISS: 'ESCOM-S. S. para Apoyo al Área de Servicios Educativos e Integración Social',
     tipo_oferta: 'individual',
     descripcion_actividades: 'Automatización de tareas repetitivas de captura y validación de información administrativa mediante scripts y macros, reduciendo tiempo de procesamiento manual.',
-    cupos_ofertados: 2,
+    cupos_ofertados: null, // individual siempre es 1 implícito, ver ternario en el create()
     carrerasDeseadas: [],
   },
   {
     profesorCorreo: 'lgomez@ipn.mx',
     nombre_SISS: 'Plataforma de visualización de datos institucionales',
     nombre_proyecto: 'Plataforma de visualización de datos institucionales',
+    programa_SISS: 'ESCOM-S. S. para la Sección de Estudios de Posgrado',
     tipo_oferta: 'proyecto',
     descripcion_actividades: 'Desarrollo de dashboards interactivos para visualizar indicadores institucionales (matrícula, egreso, servicio social) a partir de fuentes de datos existentes.',
     cupos_ofertados: 4,
@@ -82,6 +88,7 @@ const DATOS_OFERTAS = [
     profesorCorreo: 'rhernandez@ipn.mx',
     nombre_SISS: 'Ciberseguridad en redes del plantel',
     nombre_proyecto: 'Auditoría y ciberseguridad en redes del plantel',
+    programa_SISS: 'Tutoría entre Pares',
     tipo_oferta: 'proyecto',
     descripcion_actividades: 'Apoyo en auditorías de seguridad de la red institucional, detección de vulnerabilidades y elaboración de recomendaciones de hardening.',
     cupos_ofertados: 3,
@@ -91,10 +98,11 @@ const DATOS_OFERTAS = [
     profesorCorreo: 'rhernandez@ipn.mx',
     nombre_SISS: 'Investigación aplicada en inteligencia artificial',
     nombre_proyecto: 'Investigación aplicada en inteligencia artificial',
+    programa_SISS: 'ESCOM-Aplicaciones de la Ing. en Sistemas Computacionales para el Servicio Social',
     tipo_oferta: 'individual',
     descripcion_actividades: 'Apoyo en revisión bibliográfica, experimentación y documentación de resultados para un proyecto de investigación en curso sobre visión por computadora.',
-    cupos_ofertados: 2,
-    carrerasDeseadas: ['IA'],
+    cupos_ofertados: null, // individual siempre es 1 implícito, ver ternario en el create()
+    carrerasDeseadas: ['IIA'],
   },
 ];
 
@@ -167,10 +175,11 @@ async function main() {
           coordinador_id: coordinadorId,
           nombre_SISS: o.nombre_SISS,
           nombre_proyecto: o.nombre_proyecto,
+          programa_SISS: o.programa_SISS,
           tipo_oferta: o.tipo_oferta,
           descripcion_actividades: o.descripcion_actividades,
-          cupos_ofertados: o.cupos_ofertados,
-          cupos_disponibles: o.cupos_ofertados, // nadie aceptado todavía
+          cupos_ofertados: o.tipo_oferta === 'individual' ? null : o.cupos_ofertados,
+          cupos_disponibles: o.tipo_oferta === 'individual' ? 1 : o.cupos_ofertados,
           estado_oferta: ESTADO_OFERTA_ACTIVA,
           fecha_registro: ahora,
         },

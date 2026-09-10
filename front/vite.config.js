@@ -7,6 +7,10 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  server: {
+    allowedHosts: ['.trycloudflare.com'],
+    host: true
+  },
   define: {
     global: 'globalThis',
   },

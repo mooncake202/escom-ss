@@ -28,7 +28,7 @@ export function SocketProvider({ children }) {
     // HTTP, y el servidor lo rechaza con "Invalid namespace" (solo existe
     // el namespace default "/"). apiFetch() sigue usando API_URL completo
     // sin cambios — esto es exclusivo de cómo se abre el socket.
-    const nuevoSocket = io(new URL(API_URL).origin, { auth: { token } });
+    const nuevoSocket = io(window.location.origin, { auth: { token } });
     socketRef.current = nuevoSocket;
     setSocket(nuevoSocket);
   }, []);
