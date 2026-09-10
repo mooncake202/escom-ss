@@ -1,35 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  getAlumnosAsignados,
+  getDetalleAlumno as getDetalleAlumnoApi,
+  crearActividad as crearActividadApi,
+  editarActividad as editarActividadApi,
+  eliminarActividad as eliminarActividadApi,
+} from "@/services/ahProfesorService";
 
-// Mock de alumnos asignados al profesor — RN-AH-01
-const MOCK_ALUMNOS = [
-  {
-    id: 1,
-    nombre:   "García López Juan Carlos",
-    boleta:   "2021630412",
-    carrera:  "ISC",
-    correoInst: "jgarcia0412@alumno.ipn.mx",
-    actividades: [
-      { id: 1, titulo: "Análisis de requerimientos", descripcion: "Levantar requerimientos del sistema con el cliente.", entregable: "Documento de requerimientos", estado: "En progreso", progreso: 60, fechaAsignacion: "2026-03-15T09:00:00",   fechaLimite: "2026-04-01", },
-      { id: 2, titulo: "Diseño de base de datos", descripcion: "Modelar el esquema de la BD del sistema.", entregable: "Diagrama ER", estado: "Sin comenzar", progreso: 0, fechaAsignacion: "2026-03-18T10:00:00", fechaLimite: "2026-04-15" },
-    ],
-    proyecto: "Sistema Web",
-    
-  },
-  {
-    id: 2,
-    nombre:   "Ramírez Torres Ana Sofía",
-    boleta:   "2022630187",
-    carrera:  "IA",
-    correoInst: "aramirez0187@alumno.ipn.mx",
-    actividades: [
-      { id: 3, titulo: "Preparación del dataset", descripcion: "Limpiar y normalizar los datos para el modelo.", entregable: "Dataset limpio en CSV", estado: "Completada", progreso: 100, fechaAsignacion: "2026-03-10T08:00:00", fechaLimite: "2026-04-10" },
-    ],
-    proyecto: "Base de datos para IA",
-  
-  },
-];
-
-const FORM_INICIAL = { titulo: "", descripcion: "", entregable: "", fechaLimite: "" };
+const FORM_INICIAL = { titulo: "", descripcion: "", entregable_esperado: "", fecha_limite: "" };
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -38,75 +16,164 @@ const CARRERA_LABEL = {
 };
 
 export function useAsignarActividades() {
-  const [alumnos, setAlumnos]           = useState(MOCK_ALUMNOS);
-  const [alumnoSeleccionado, setAlumno] = useState(null);
+  const [alumnos, setAlumnos]                 = useState([]);
+  const [cargandoAlumnos, setCargandoAlumnos] = useState(true);
+  const [alumnoSeleccionado, setAlumno]       = useState(null);
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
+  const [actividadEnEdicion, setActividadEnEdicion] = useState(null);
   const [form, setForm]                 = useState(FORM_INICIAL);
   const [errores, setErrores]           = useState({});
   const [loading, setLoading]           = useState(false);
   const [exitoso, setExitoso]           = useState(false);
-  const [modoFormulario, setModoForm]   = useState(false);
+  // null | "crear" | "editar" | "extender-fecha"
+  const [modoFormulario, setModoForm]   = useState(null);
 
-  const seleccionarAlumno = (alumno) => {
-    setAlumno(alumno);
-    setModoForm(false);
+  useEffect(() => {
+    getAlumnosAsignados()
+      .then(setAlumnos)
+      .catch((err) => console.error("No se pudieron cargar los alumnos:", err))
+      .finally(() => setCargandoAlumnos(false));
+  }, []);
+
+  const refrescarAlumnoSeleccionado = async (solicitudId) => {
+    const detalle = await getDetalleAlumnoApi(solicitudId);
+    setAlumno(detalle);
+    setAlumnos((prev) => prev.map((a) => (a.solicitudId === solicitudId ? { ...a, actividades: detalle.actividades } : a)));
+    return detalle;
+  };
+
+  const seleccionarAlumno = async (alumno) => {
+    setModoForm(null);
+    setActividadEnEdicion(null);
     setExitoso(false);
+    setForm(FORM_INICIAL);
+    setErrores({});
+    setCargandoDetalle(true);
+    try {
+      const detalle = await getDetalleAlumnoApi(alumno.solicitudId);
+      setAlumno(detalle);
+    } catch (err) {
+      console.error("No se pudo cargar el detalle del alumno:", err);
+      setAlumno(null);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    setErrores((prev) => ({ ...prev, [e.target.name]: null }));
+  };
+
+  const cerrarFormulario = () => {
+    setModoForm(null);
+    setActividadEnEdicion(null);
     setForm(FORM_INICIAL);
     setErrores({});
   };
 
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setErrores(prev => ({ ...prev, [e.target.name]: null }));
+  const abrirCrear = () => {
+    setModoForm("crear");
+    setActividadEnEdicion(null);
+    setForm(FORM_INICIAL);
+    setErrores({});
   };
 
-  // RN-AH-03: título y descripción obligatorios, entregable opcional
+  const abrirEditar = (actividad) => {
+    setModoForm("editar");
+    setActividadEnEdicion(actividad);
+    setForm({
+      titulo: actividad.titulo,
+      descripcion: actividad.descripcion,
+      entregable_esperado: actividad.entregable_esperado,
+      fecha_limite: String(actividad.fecha_limite).slice(0, 10),
+    });
+    setErrores({});
+  };
+
+  const abrirExtenderFecha = (actividad) => {
+    setModoForm("extender-fecha");
+    setActividadEnEdicion(actividad);
+    setForm({ ...FORM_INICIAL, fecha_limite: "" });
+    setErrores({});
+  };
+
+  // RN-AH-02: los 4 campos obligatorios al crear/editar completo. Regla
+  // nueva (decisión de diseño, no está en la ficha original): fecha_limite
+  // > fecha de inicio del servicio social del alumno seleccionado.
   const validar = () => {
     const errs = {};
-    if (!form.titulo.trim())      errs.titulo      = "El título es obligatorio";
-    if (!form.descripcion.trim()) errs.descripcion = "La descripción es obligatoria";
-    if (!form.fechaLimite) errs.fechaLimite = "La fecha límite es obligatoria";
+
+    if (modoFormulario === "extender-fecha") {
+      if (!form.fecha_limite) {
+        errs.fecha_limite = "La nueva fecha límite es obligatoria";
+      } else {
+        const nueva = new Date(form.fecha_limite);
+        const actual = new Date(actividadEnEdicion.fecha_limite);
+        if (nueva <= actual) {
+          errs.fecha_limite = "Debe ser posterior a la fecha límite actual";
+        } else if (alumnoSeleccionado?.periodoInicio && nueva <= new Date(alumnoSeleccionado.periodoInicio)) {
+          errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+        }
+      }
+    } else {
+      if (!form.titulo.trim()) errs.titulo = "El título es obligatorio";
+      if (!form.descripcion.trim()) errs.descripcion = "La descripción es obligatoria";
+      if (!form.entregable_esperado.trim()) errs.entregable_esperado = "El entregable esperado es obligatorio";
+      if (!form.fecha_limite) {
+        errs.fecha_limite = "La fecha límite es obligatoria";
+      } else if (alumnoSeleccionado?.periodoInicio) {
+        const limite = new Date(form.fecha_limite);
+        const inicio = new Date(alumnoSeleccionado.periodoInicio);
+        if (limite <= inicio) errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+      }
+    }
+
     setErrores(errs);
     return Object.keys(errs).length === 0;
-
   };
 
-  // RN-AH-04: registra fecha y hora, RN-AH-07: estado inicial "Sin comenzar"
-  const registrarActividad = async () => {
+  // Punto de entrada único del formulario — decide qué llamar según el modo.
+  const guardar = async () => {
     if (!validar()) return;
     setLoading(true);
-    await new Promise(r => setTimeout(r, 700));
+    try {
+      if (modoFormulario === "crear") {
+        await crearActividadApi(alumnoSeleccionado.solicitudId, form);
+      } else if (modoFormulario === "editar") {
+        await editarActividadApi(actividadEnEdicion.id, form);
+      } else if (modoFormulario === "extender-fecha") {
+        await editarActividadApi(actividadEnEdicion.id, { fecha_limite: form.fecha_limite });
+      }
+      await refrescarAlumnoSeleccionado(alumnoSeleccionado.solicitudId);
+      cerrarFormulario();
+      setExitoso(true);
+      setTimeout(() => setExitoso(false), 3000);
+    } catch (err) {
+      setErrores({ general: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const nueva = {
-      id: Date.now(),
-      titulo:          form.titulo.trim(),
-      descripcion:     form.descripcion.trim(),
-      entregable:      form.entregable.trim() || null,
-      estado:          "Sin comenzar",
-      progreso:        0,
-      fechaAsignacion: new Date().toISOString(),
-      fechaLimite: form.fechaLimite,
-    };
-
-    setAlumnos(prev => prev.map(a =>
-      a.id === alumnoSeleccionado.id
-        ? { ...a, actividades: [...a.actividades, nueva] }
-        : a
-    ));
-
-    // Actualizar alumno seleccionado con la nueva actividad
-    setAlumno(prev => ({ ...prev, actividades: [...prev.actividades, nueva] }));
-
-    setForm(FORM_INICIAL);
-    setModoForm(false);
-    setExitoso(true);
-    setLoading(false);
-
-    setTimeout(() => setExitoso(false), 3000);
+  const eliminarActividad = async (actividadId) => {
+    try {
+      await eliminarActividadApi(actividadId);
+      await refrescarAlumnoSeleccionado(alumnoSeleccionado.solicitudId);
+    } catch (err) {
+      alert(err.message);
+    }
   };
 
   return {
-    alumnos, alumnoSeleccionado, form, errores, loading, exitoso,
-    modoFormulario, setModoForm,
-    seleccionarAlumno, handleChange, registrarActividad, CARRERA_LABEL,
+    alumnos, cargandoAlumnos,
+    alumnoSeleccionado, cargandoDetalle,
+    actividadEnEdicion,
+    form, errores, loading, exitoso,
+    modoFormulario,
+    seleccionarAlumno, handleChange,
+    abrirCrear, abrirEditar, abrirExtenderFecha, cerrarFormulario,
+    guardar, eliminarActividad,
+    CARRERA_LABEL,
   };
 }

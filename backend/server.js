@@ -56,5 +56,8 @@ app.use('/periodos', require('./src/modules/periodos/periodos.routes'));
 //GR02
 app.use('/profesor', require('./src/modules/gr/gr-profesor.routes'));
 
+//AH01
+app.use('/profesor', require('./src/modules/ah/ah.routes'));
+
 //gr07 
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));
