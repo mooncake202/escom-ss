@@ -59,5 +59,13 @@ app.use('/profesor', require('./src/modules/gr/gr-profesor.routes'));
 //AH01
 app.use('/profesor', require('./src/modules/ah/ah.routes'));
 
-//gr07 
+//AH02
+app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
+
+// Cron de vencimiento de actividades (AH02) — arranque explícito y visible
+// junto con el resto de los módulos AH, no oculto dentro de otro archivo.
+const { iniciarCronVencimientoActividades } = require('./src/modules/ah/ah.cron');
+iniciarCronVencimientoActividades();
+
+//gr07
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));

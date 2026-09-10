@@ -1,58 +1,73 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getActividadesAlumno } from "@/services/ahAlumnoService";
 
-// Mock — RN-AH-08: solo actividades del profesor supervisor
-const MOCK_ACTIVIDADES = [
-  {
-    id: 1,
-    titulo:          "Análisis de requerimientos",
-    descripcion:     "Levantar requerimientos del sistema con el cliente mediante entrevistas y talleres de trabajo.",
-    entregable:      "Documento de requerimientos en formato IEEE 830",
-    estado:          "En progreso",
-    progreso:        60,
-    fechaAsignacion: "2026-03-15T09:00:00",
-    fechaLimite:     "2026-03-25T17:00:00",
+// RN-AH-10: activas primero, luego las que ya no requieren acción del
+// alumno (vencida y ambas variantes de completada van al final, sin
+// desempate secundario entre ellas).
+const ESTADO_ORDEN = {
+  en_progreso: 0,
+  sin_comenzar: 1,
+  vencida: 2,
+  completada_a_tiempo: 2,
+  completada_tarde: 2,
+};
 
-  },
-  {
-    id: 2,
-    titulo:          "Diseño de base de datos",
-    descripcion:     "Modelar el esquema de la base de datos del sistema usando notación ER.",
-    entregable:      "Diagrama ER y script SQL de creación de tablas",
-    estado:          "Sin comenzar",
-    progreso:        0,
-    fechaAsignacion: "2026-03-18T10:00:00",
-    fechaLimite:     "2026-03-28T17:00:00",
-
-  },
-  {
-    id: 3,
-    titulo:          "Investigación de frameworks frontend",
-    descripcion:     "Comparar al menos tres frameworks frontend para seleccionar el más adecuado para el proyecto.",
-    entregable:      "Documento comparativo con conclusión justificada",
-    estado:          "Completada",
-    progreso:        100,
-    fechaAsignacion: "2026-03-10T08:00:00",
-    fechaLimite:     "2026-03-20T17:00:00",
-  },
-];
-
-const ESTADO_ORDEN = { "En progreso": 0, "Sin comenzar": 1, "Completada": 2 };
+const ESTADOS_COMPLETADA = ["completada_a_tiempo", "completada_tarde"];
 
 export function useConsultarActividades() {
-  const [actividades]           = useState(MOCK_ACTIVIDADES);
-  const [seleccionada, setSelec] = useState(null);
-  const [filtro, setFiltro]      = useState("todas");
+  const [actividades, setActividades]   = useState([]);
+  const [fechaInicio, setFechaInicio]   = useState(null);
+  const [servicioIniciado, setServicioIniciado] = useState(true);
+  const [cargando, setCargando]         = useState(true);
+  const [seleccionada, setSelec]        = useState(null);
+  const [filtro, setFiltro]             = useState("todas");
+
+  // Carga única al montar — esta sí debe mostrar "Cargando...".
+  useEffect(() => {
+    getActividadesAlumno()
+      .then((data) => {
+        setActividades(data.actividades ?? []);
+        setFechaInicio(data.fechaInicio ?? null);
+        setServicioIniciado(!!data.servicioIniciado);
+      })
+      .catch((err) => console.error("No se pudieron cargar las actividades:", err))
+      .finally(() => setCargando(false));
+  }, []);
+
+  // Polling de 120s (mismo intervalo/patrón que GR) — así el alumno ve
+  // reflejado sin recargar cuando el cron marque una actividad 'vencida'.
+  // NUNCA toca `cargando`: no debe ocultar la lista ya pintada.
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      getActividadesAlumno()
+        .then((data) => {
+          setActividades(data.actividades ?? []);
+          setFechaInicio(data.fechaInicio ?? null);
+          setServicioIniciado(!!data.servicioIniciado);
+        })
+        .catch((err) => console.error("Error al refrescar las actividades:", err));
+    }, 120000);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const filtradas = actividades
-    .filter(a => filtro === "todas" || a.estado === filtro)
+    .filter(a => {
+      if (filtro === "todas") return true;
+      if (filtro === "completadas") return ESTADOS_COMPLETADA.includes(a.estado);
+      return a.estado === filtro;
+    })
     .sort((a, b) => (ESTADO_ORDEN[a.estado] ?? 9) - (ESTADO_ORDEN[b.estado] ?? 9));
 
   const totales = {
-    todas:         actividades.length,
-    "Sin comenzar": actividades.filter(a => a.estado === "Sin comenzar").length,
-    "En progreso":  actividades.filter(a => a.estado === "En progreso").length,
-    "Completada":   actividades.filter(a => a.estado === "Completada").length,
+    todas: actividades.length,
+    sin_comenzar: actividades.filter(a => a.estado === "sin_comenzar").length,
+    en_progreso: actividades.filter(a => a.estado === "en_progreso").length,
+    vencida: actividades.filter(a => a.estado === "vencida").length,
+    completadas: actividades.filter(a => ESTADOS_COMPLETADA.includes(a.estado)).length,
   };
 
-  return { filtradas, seleccionada, setSelec, filtro, setFiltro, totales };
+  return {
+    filtradas, seleccionada, setSelec, filtro, setFiltro, totales,
+    cargando, fechaInicio, servicioIniciado,
+  };
 }

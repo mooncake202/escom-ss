@@ -45,6 +45,21 @@ function validarFechaLimiteContraInicio(fechaLimite, fechaInicioPeriodo) {
 }
 
 /**
+ * Regla INDEPENDIENTE y adicional a validarFechaLimiteContraInicio: sin
+ * importar cuándo inició el periodo del alumno, fecha_limite nunca puede
+ * caer antes de HOY (día calendario real, no la hora exacta — permite que
+ * fecha_limite sea hoy mismo). Ambas reglas deben cumplirse a la vez.
+ */
+function validarFechaLimiteNoPasada(fechaLimite) {
+  const limite = new Date(fechaLimite);
+  const ahora = new Date();
+  const hoy = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+  if (limite < hoy) {
+    throw crearError(`La fecha límite no puede ser anterior a hoy (${formatearFecha(hoy)}).`);
+  }
+}
+
+/**
  * RN-AH-05: al extender fecha_limite (actividad con avance ya registrado),
  * la nueva fecha debe ser una extensión hacia adelante Y seguir siendo
  * posterior al inicio del periodo del alumno.
@@ -65,5 +80,6 @@ module.exports = {
   crearError,
   validarCamposActividad,
   validarFechaLimiteContraInicio,
+  validarFechaLimiteNoPasada,
   validarExtensionFecha,
 };

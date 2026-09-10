@@ -3,6 +3,7 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { HistorialRow }    from "./components/HistorialRow";
 import { useHistorial, MOCK_PROFESORES } from "./hooks/useHistorial";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 
 export const CARRERA_LABEL = {
@@ -126,6 +127,7 @@ function PanelHistorial({ registros, totales, tipoFiltro, setTipoFiltro, estadoF
 // ── Página principal ─────────────────────────────────────────
 export default function HistorialActividades({ rol = "alumno" }) {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
   const [filtroNombre, setFiltroNombre] = useState("");
   const [filtroCarrera, setFiltroCarrera] = useState([]);
   const [nivelProf, setNivelProf] = useState("profesores");
@@ -176,8 +178,14 @@ export default function HistorialActividades({ rol = "alumno" }) {
   p.dept.toLowerCase().includes(filtroProfesor.toLowerCase())
 );
 
+  // "rol" aquí decide qué VISTA renderizar (alumno/profesor/coordinacion) —
+  // ese contrato interno no cambia. Pero el Sidebar (NAV_ITEMS en
+  // Sidebar.jsx) espera la clave real "alumno_asignado", no "alumno" — sin
+  // este mapeo cae al fallback de NAV_ITEMS.profesor.
+  const rolSidebar = rol === "alumno" ? "alumno_asignado" : rol;
+
   return (
-    <DashboardLayout titulo={titulo} subtitulo={sub} rol={rol} usuario={rol === "alumno" ? "García López Juan Carlos" : rol === "profesor" ? "Dr. Torres Vega" : "Coordinación ESCOM"}>
+    <DashboardLayout titulo={titulo} subtitulo={sub} rol={rolSidebar} usuario={nombreCompletoSesion(sesion)}>
 
       {/* ── Vista alumno: solo su historial ── */}
       {rol === "alumno" && (

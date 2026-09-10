@@ -282,6 +282,13 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
           <ActionItem icon="plus"   {...T.blue}  label="Registrar bitácora del día"      desc="Sin completar"          onClick={() => navigate("/alumno/bitacora")} C={C} />
           <ActionItem icon="book"   {...T.teal}  label="Consultar actividades asignadas" desc="Actividades activas"    onClick={() => navigate("/alumno/actividades")} C={C} />
           <SlotNotificacion ruta="/alumno/actividades" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={!!resumen.actividadesPendientes}
+            mensaje="Tienes actividades pendientes"
+            ruta="/alumno/actividades"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="folder" {...T.slate} label="Historial de actividades y bitácoras" desc="Ver todas las actividades completadas" onClick={() => navigate("/alumno/historial")} C={C} />
           <SlotNotificacion ruta="/alumno/historial" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="chart"  {...T.green} label="Horas acumuladas"                desc="Detalle de horas en el servicio social" onClick={() => navigate("/alumno/horas")} C={C} />

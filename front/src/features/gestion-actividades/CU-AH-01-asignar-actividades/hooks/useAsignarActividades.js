@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getAlumnosAsignados,
   getDetalleAlumno as getDetalleAlumnoApi,
@@ -28,11 +28,47 @@ export function useAsignarActividades() {
   // null | "crear" | "editar" | "extender-fecha"
   const [modoFormulario, setModoForm]   = useState(null);
 
+  // Carga única al montar — esta sí debe mostrar "Cargando...".
   useEffect(() => {
     getAlumnosAsignados()
       .then(setAlumnos)
       .catch((err) => console.error("No se pudieron cargar los alumnos:", err))
       .finally(() => setCargandoAlumnos(false));
+  }, []);
+
+  // Ref sincronizado con alumnoSeleccionado — el efecto de polling corre con
+  // deps [] (no se reinicia al cambiar de selección), así que necesita esta
+  // referencia para saber, en cada ciclo, cuál alumno está seleccionado EN
+  // ESE MOMENTO sin reiniciar su propio temporizador de 120s.
+  const alumnoSeleccionadoRef = useRef(null);
+  useEffect(() => {
+    alumnoSeleccionadoRef.current = alumnoSeleccionado;
+  }, [alumnoSeleccionado]);
+
+  // Polling de 120s (mismo intervalo que ya usa GR: useEstadoSolicitud.js,
+  // useSolicitudesPendientes.js, dashboards.jsx). NUNCA toca cargandoAlumnos
+  // ni cargandoDetalle (no debe parpadear lo ya pintado), ni el formulario
+  // abierto (modoFormulario/form/actividadEnEdicion) — son estados
+  // independientes que este efecto no toca. Además de refrescar la lista
+  // externa, si hay un alumno seleccionado también se refresca su detalle
+  // (mismo endpoint que seleccionarAlumno) sin cambiar cuál está elegido.
+  useEffect(() => {
+    const intervalo = setInterval(async () => {
+      getAlumnosAsignados()
+        .then(setAlumnos)
+        .catch((err) => console.error("Error al refrescar la lista de alumnos:", err));
+
+      const actual = alumnoSeleccionadoRef.current;
+      if (actual) {
+        try {
+          const detalle = await getDetalleAlumnoApi(actual.solicitudId);
+          setAlumno(detalle);
+        } catch (err) {
+          console.error("Error al refrescar el detalle del alumno seleccionado:", err);
+        }
+      }
+    }, 120000);
+    return () => clearInterval(intervalo);
   }, []);
 
   const refrescarAlumnoSeleccionado = async (solicitudId) => {
@@ -122,10 +158,18 @@ export function useAsignarActividades() {
       if (!form.entregable_esperado.trim()) errs.entregable_esperado = "El entregable esperado es obligatorio";
       if (!form.fecha_limite) {
         errs.fecha_limite = "La fecha límite es obligatoria";
-      } else if (alumnoSeleccionado?.periodoInicio) {
+      } else {
         const limite = new Date(form.fecha_limite);
-        const inicio = new Date(alumnoSeleccionado.periodoInicio);
-        if (limite <= inicio) errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+        // Regla independiente y adicional: sin importar el inicio del
+        // periodo del alumno, la fecha límite no puede ser anterior a hoy.
+        const ahora = new Date();
+        const hoy = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+        if (limite < hoy) {
+          errs.fecha_limite = "No puede ser anterior a hoy";
+        } else if (alumnoSeleccionado?.periodoInicio) {
+          const inicio = new Date(alumnoSeleccionado.periodoInicio);
+          if (limite <= inicio) errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+        }
       }
     }
 

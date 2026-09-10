@@ -4,10 +4,12 @@ import { BitacoraCard }       from "./components/BitacoraCard";
 import { DetalleBitacora }    from "./components/DetalleBitacora";
 import { useRevisarAvances }  from "./hooks/useRevisarAvances";
 import { CARRERA_LABEL } from "../CU-AH-06-historial/HistorialActividades";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { useState } from "react";
 
 export default function RevisarAvances() {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
   const {
     pendientes, alumnos, seleccionada, loading, resultado,
     comentario, setComentario, modoRechazo, setModoRechazo, 
@@ -25,7 +27,7 @@ export default function RevisarAvances() {
       titulo="Revisar avances y horas"
       subtitulo="CU-AH-04 · Profesor"
       rol="profesor"
-      usuario="Dr. Torres Vega"
+      usuario={nombreCompletoSesion(sesion)}
     >
       {/* Toast resultado — RN-AH-37 */}
       {resultado && (

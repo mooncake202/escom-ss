@@ -3,6 +3,8 @@ import { DashboardLayout }       from "@/components/layout/DashboardLayout";
 import { AlumnoCard }            from "./components/AlumnoCard";
 import { ActividadRow }          from "./components/ActividadRow";
 import { useAsignarActividades } from "./hooks/useAsignarActividades";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { SelectField } from "@/components/ui/FormFields";
 import { useState } from "react";
 
 const TITULO_MODO = {
@@ -19,8 +21,10 @@ const BOTON_MODO = {
 
 export default function AsignarActividades() {
   const { C } = useTheme();
-  const [filtroProyecto, setFiltroProyecto] = useState([]);
+  const { usuario: sesion } = useSesion();
+  const [filtroProyecto, setFiltroProyecto] = useState("todas");
   const [filtroCarrera, setFiltroCarrera] = useState([]);
+  const [acordeonVencidasAbierto, setAcordeonVencidasAbierto] = useState(false);
   const {
     alumnos, cargandoAlumnos,
     alumnoSeleccionado, cargandoDetalle,
@@ -34,11 +38,6 @@ export default function AsignarActividades() {
 
   const proyectos = [...new Set(alumnos.map(a => a.proyecto).filter(Boolean))];
   const carreras = ["ISC", "IA", "LCD"];
-  const toggleProyecto = (p) => {
-    setFiltroProyecto(prev =>
-      prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]
-    );
-  };
 
   const toggleCarrera = (c) => {
     setFiltroCarrera(prev =>
@@ -47,7 +46,7 @@ export default function AsignarActividades() {
   };
 
   const alumnosFiltrados = alumnos.filter(a => {
-    const matchProyecto = filtroProyecto.length === 0 || filtroProyecto.includes(a.proyecto);
+    const matchProyecto = filtroProyecto === "todas" || a.proyecto === filtroProyecto;
     const matchCarrera = filtroCarrera.length === 0 || filtroCarrera.includes(a.carrera);
     return matchProyecto && matchCarrera;
   });
@@ -56,12 +55,17 @@ export default function AsignarActividades() {
     ? new Date(alumnoSeleccionado.periodoInicio).toLocaleDateString("es-MX", { timeZone: "UTC" })
     : null;
 
+  // La lista general excluye vencidas — esas viven aparte, en el acordeón,
+  // para no duplicarlas en dos lugares.
+  const actividadesActivas = alumnoSeleccionado?.actividades.filter(a => a.estado !== "vencida") ?? [];
+  const actividadesVencidas = alumnoSeleccionado?.actividades.filter(a => a.estado === "vencida") ?? [];
+
   return (
     <DashboardLayout
       titulo="Asignar actividades"
-      subtitulo="CU-AH-01 · Profesor"
+      
       rol="profesor"
-      usuario="Dr. Torres Vega"
+      usuario={nombreCompletoSesion(sesion)}
     >
       <div style={{ display: "grid", gridTemplateColumns: "500px 1fr", gap: "1.5rem", height: "calc(100vh - 56px - 3.5rem)", minHeight: 0 }}>
 
@@ -71,25 +75,18 @@ export default function AsignarActividades() {
           {/* FILTROS */}
           <div style={{ marginBottom: "1rem" }}>
 
-            {/* PROYECTOS */}
-            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.5rem" }}>
-              {proyectos.map(p => (
-                <button
-                  key={p}
-                  onClick={() => toggleProyecto(p)}
-                  style={{
-                    padding: "4px 14px",
-                    borderRadius: "999px",
-                    border: `1px solid ${filtroProyecto.includes(p) ? C.accent : C.borderDefault}`,
-                    background: filtroProyecto.includes(p) ? C.accent : "transparent",
-                    color: filtroProyecto.includes(p) ? "#fff" : C.textMuted,
-                    fontSize: 12,
-                    cursor: "pointer"
-                  }}
-                >
-                  {p}
-                </button>
-              ))}
+            {/* PROYECTOS — selección única, a diferencia de carreras */}
+            <div style={{ maxWidth: 260, marginBottom: "0.5rem" }}>
+              <SelectField
+                C={C}
+                value={filtroProyecto}
+                onChange={e => setFiltroProyecto(e.target.value)}
+              >
+                <option value="todas">Todos los proyectos</option>
+                {proyectos.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </SelectField>
             </div>
 
             {/* CARRERAS */}
@@ -301,24 +298,24 @@ export default function AsignarActividades() {
                 </div>
               )}
 
-              {/* Lista de actividades — RN-AH-05 */}
+              {/* Lista de actividades — RN-AH-05 (excluye vencidas, ver acordeón abajo) */}
               <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "1.25rem 1.5rem" }}>
                 <p style={{ margin: "0 0 0.25rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>
                   Actividades asignadas
                 </p>
                 <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.textMuted }}>
-                  {alumnoSeleccionado.actividades.length === 0
+                  {actividadesActivas.length === 0
                     ? "Aún no has asignado actividades a este alumno"
-                    : `${alumnoSeleccionado.actividades.length} actividad${alumnoSeleccionado.actividades.length !== 1 ? "es" : ""}`
+                    : `${actividadesActivas.length} actividad${actividadesActivas.length !== 1 ? "es" : ""}`
                   }
                 </p>
 
-                {alumnoSeleccionado.actividades.length === 0 ? (
+                {actividadesActivas.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "2rem", color: C.textDisabled, fontSize: 13 }}>
                     El alumno no podrá registrar bitácoras hasta que asignes al menos una actividad.
                   </div>
                 ) : (
-                  alumnoSeleccionado.actividades.map(act => (
+                  actividadesActivas.map(act => (
                     <ActividadRow
                       key={act.id} actividad={act} C={C}
                       onEditar={abrirEditar}
@@ -328,6 +325,34 @@ export default function AsignarActividades() {
                   ))
                 )}
               </div>
+
+              {/* Acordeón de actividades vencidas — colapsado por defecto,
+                  solo aparece si hay al menos una. Reutiliza ActividadRow
+                  tal cual, sin estilo nuevo. */}
+              {actividadesVencidas.length > 0 && (
+                <div style={{ marginTop: "1rem", background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "1.25rem 1.5rem" }}>
+                  <button
+                    onClick={() => setAcordeonVencidasAbierto(v => !v)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", color: "#EF4444", fontSize: 13, fontWeight: 700 }}
+                  >
+                    <span>{acordeonVencidasAbierto ? "▾" : "▸"}</span>
+                    {actividadesVencidas.length} actividad{actividadesVencidas.length !== 1 ? "es" : ""} vencida{actividadesVencidas.length !== 1 ? "s" : ""}
+                  </button>
+
+                  {acordeonVencidasAbierto && (
+                    <div style={{ marginTop: "1rem" }}>
+                      {actividadesVencidas.map(act => (
+                        <ActividadRow
+                          key={act.id} actividad={act} C={C}
+                          onEditar={abrirEditar}
+                          onEliminar={eliminarActividad}
+                          onExtenderFecha={abrirExtenderFecha}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

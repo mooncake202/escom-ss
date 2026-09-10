@@ -50,6 +50,12 @@ export function Header({ titulo, subtitulo, rol = "profesor", usuario = "Usuario
         )}
       </div>
 
+      {/* Nombre completo del usuario — mismo estilo que ya usa
+          ProcesoLayout.jsx (alumno_sin_asignar) junto a su avatar */}
+      <span style={{ fontSize: 13, color: C.textSecondary, whiteSpace: "nowrap", flexShrink: 0 }}>
+        {usuario}
+      </span>
+
       {/* Badge de rol */}
       <div style={{
         padding: "3px 10px", borderRadius: 20,

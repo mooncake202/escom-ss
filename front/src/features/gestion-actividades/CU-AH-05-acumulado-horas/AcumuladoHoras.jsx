@@ -3,6 +3,7 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout }   from "@/components/layout/DashboardLayout";
 import { ProgresoCircular, MetricaCards, BarraProgreso } from "./components/ProgresoHoras";
 import { useAcumuladoHoras } from "./hooks/useAcumuladoHoras";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -343,6 +344,7 @@ function VistaCoordinacion({ profesores, C }) {
 // ── Página principal ─────────────────────────────────────────
 export default function AcumuladoHoras({ rol = "alumno" }) {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
   const { propio, alumnos, profesores } = useAcumuladoHoras(rol);
 
   const titulos = {
@@ -352,9 +354,15 @@ export default function AcumuladoHoras({ rol = "alumno" }) {
   };
   const { titulo, sub } = titulos[rol] ?? titulos.alumno;
 
+  // "rol" aquí decide qué VISTA renderizar (alumno/profesor/coordinacion) —
+  // ese contrato interno no cambia. Pero el Sidebar (NAV_ITEMS en
+  // Sidebar.jsx) espera la clave real "alumno_asignado", no "alumno" — sin
+  // este mapeo cae al fallback de NAV_ITEMS.profesor.
+  const rolSidebar = rol === "alumno" ? "alumno_asignado" : rol;
+
   return (
-    <DashboardLayout titulo={titulo} subtitulo={sub} rol={rol}
-      usuario={rol === "alumno" ? "García López Juan Carlos" : rol === "profesor" ? "Dr. Torres Vega" : "Coordinación ESCOM"}>
+    <DashboardLayout titulo={titulo} subtitulo={sub} rol={rolSidebar}
+      usuario={nombreCompletoSesion(sesion)}>
       {rol === "alumno"  && <VistaAlumno propio={propio} C={C} />}
       {rol === "profesor" && <VistaProfesor alumnos={alumnos} C={C} />}
       {rol === "coordinacion" && <VistaCoordinacion profesores={profesores} C={C} />}

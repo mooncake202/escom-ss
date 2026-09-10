@@ -1,4 +1,5 @@
 const prisma = require('../../lib/prisma');
+const { tieneActividadesPendientes } = require('../ah/ah.shared');
 
 const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
 const ESTADO_LSS_EVALUACION_SOLICITADA = 'evaluacion_solicitada';
@@ -31,9 +32,10 @@ async function resumenAlumno(usuarioId) {
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesEnviados] = await Promise.all([
+  const [actividadesAsignadas, reportesEnviados, actividadesPendientes] = await Promise.all([
     prisma.actividad.count({ where: { solicitud_registro_id: solicitudId } }),
     prisma.reporte_mensual.count({ where: { solicitud_registro_id: solicitudId } }),
+    tieneActividadesPendientes(solicitudId),
   ]);
 
   return {
@@ -42,6 +44,7 @@ async function resumenAlumno(usuarioId) {
     faltasConsecutivas: alumno.cumulo_horas_y_faltas?.faltas_consecutivas ?? 0,
     actividadesAsignadas,
     reportesEnviados,
+    actividadesPendientes,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
   };

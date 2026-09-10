@@ -3,12 +3,9 @@ const {
   crearError,
   validarCamposActividad,
   validarFechaLimiteContraInicio,
+  validarFechaLimiteNoPasada,
   validarExtensionFecha,
 } = require('./validators');
-
-// RF-AH-06: estados que cuentan como "ya terminada" — todo lo demás cuenta
-// como pendiente para efectos de la notificación tipo A.
-const ESTADOS_COMPLETADA = ['completada_a_tiempo', 'completada_tarde'];
 
 async function resolverProfesor(profesorUsuarioId) {
   const profesor = await prisma.profesor.findUnique({ where: { usuario_id: profesorUsuarioId } });
@@ -129,6 +126,7 @@ async function crearActividad(profesorUsuarioId, solicitudId, datos) {
   validarCamposActividad(datos);
   const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
+  validarFechaLimiteNoPasada(datos.fecha_limite);
 
   const actividad = await prisma.actividad.create({
     data: {
@@ -184,6 +182,7 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
   validarCamposActividad(datos);
   const fechaInicioPeriodo = actividad.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
+  validarFechaLimiteNoPasada(datos.fecha_limite);
 
   const actualizada = await prisma.actividad.update({
     where: { id: actividad.id },
@@ -239,22 +238,6 @@ async function eliminarActividad(profesorUsuarioId, actividadId) {
   await prisma.actividad.delete({ where: { id: actividad.id } });
 }
 
-/**
- * RF-AH-06 — Notificación tipo A, conteo en vivo (NO tabla `notificacion`).
- * Pensada para que dashboard.service.js del alumno la consuma más adelante,
- * mismo patrón que obtenerResumenDashboard de GR — aquí solo se expone la
- * función, no se conecta a ningún dashboard en esta tarea.
- */
-async function tieneActividadesPendientes(solicitudRegistroId) {
-  const conteo = await prisma.actividad.count({
-    where: {
-      solicitud_registro_id: Number(solicitudRegistroId),
-      estado: { notIn: ESTADOS_COMPLETADA },
-    },
-  });
-  return conteo > 0;
-}
-
 module.exports = {
   listarAlumnosDeProfesor,
   obtenerDetalleAlumno,
@@ -262,5 +245,4 @@ module.exports = {
   editarActividad,
   extenderFechaLimiteActividad,
   eliminarActividad,
-  tieneActividadesPendientes,
 };
