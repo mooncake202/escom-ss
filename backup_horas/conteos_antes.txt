@@ -1,0 +1,4 @@
+t	c
+cumulo_horas_y_faltas	7
+bitacora	2
+notificacion	77

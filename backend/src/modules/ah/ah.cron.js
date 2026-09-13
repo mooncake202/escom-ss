@@ -5,12 +5,12 @@ const { crearNotificacion } = require('../notificaciones/notificaciones.service'
 const { formatearFecha } = require('./validators');
 const {
   HORAS_POR_JORNADA,
-  LIMITE_HORAS_SERVICIO,
   calcularDiaMexicoUTC,
   restarDias,
   esDiaLaborable,
   obtenerBitacoraDelDia,
   obtenerOCrearCumulo,
+  limiteHorasAlcanzado,
 } = require('./ah.shared');
 
 // RN-AH: solo cambia el estado de la actividad a "vencida" — NO toca
@@ -248,12 +248,14 @@ async function contabilizarFaltasDiarias(ahora = new Date()) {
       const boleta = s.alumno.boleta;
       const cumulo = await obtenerOCrearCumulo(boleta);
 
-      // RN-AH-17: un alumno que ya completó las 480 horas no debe seguir
-      // acumulando faltas por no registrar bitácora — ya terminó su
+      // RN-AH-17: un alumno que ya completó las 480 horas NETAS no debe
+      // seguir acumulando faltas por no registrar bitácora — ya terminó su
       // servicio social, aunque su estado_solicitud siga en
       // 'alumno_asignado' (el cierre formal de la solicitud es otro CU).
-      // No se toca iniciarJornada — esa validación es independiente.
-      if (cumulo.horas_acumuladas >= LIMITE_HORAS_SERVICIO) continue;
+      // Mismo criterio compartido que iniciarJornada (limiteHorasAlcanzado,
+      // ah.shared.js) — horas_acumuladas sola ya no basta, hay que restar
+      // horas_rechazadas.
+      if (limiteHorasAlcanzado(cumulo)) continue;
 
       const puntoPartidaPorFechaInicio = new Date(fechaInicio); // el propio día de inicio ya es evaluable
       const puntoPartidaPorUltimaEvaluacion = cumulo.fecha_ultima_evaluacion_faltas

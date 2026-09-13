@@ -10,6 +10,8 @@ const {
   esDiaLaborable,
   obtenerBitacoraDelDia,
   obtenerOCrearCumulo,
+  calcularHorasNetas,
+  limiteHorasAlcanzado,
 } = require('./ah.shared');
 
 /**
@@ -156,10 +158,11 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
   ]);
 
   const horasAcumuladas = cumulo?.horas_acumuladas ?? 0;
+  const horasNetas = calcularHorasNetas(cumulo);
 
   const bloqueos = {
     noEsDiaLaborable: !esLaborable,
-    limiteHorasAlcanzado: horasAcumuladas >= LIMITE_HORAS_SERVICIO,
+    limiteHorasAlcanzado: limiteHorasAlcanzado(cumulo),
     sinActividades: actividades.length === 0,
     yaRegistroHoy: !!bitacoraHoy && bitacoraHoy.estado !== 'pendiente_datos' && bitacoraHoy.estado !== 'en_curso',
   };
@@ -191,6 +194,7 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
     pendienteDatos: !!pendiente,
     limiteHoras: HORAS_POR_JORNADA,
     horasAcumuladas,
+    horasNetas,
     limiteHorasServicio: LIMITE_HORAS_SERVICIO,
     bloqueos,
     actividades: actividades.map(mapearActividad),
@@ -218,7 +222,7 @@ async function iniciarJornada(alumnoUsuarioId) {
   }
 
   const cumulo = await prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumno.boleta } });
-  if ((cumulo?.horas_acumuladas ?? 0) >= LIMITE_HORAS_SERVICIO) {
+  if (limiteHorasAlcanzado(cumulo)) {
     throw crearError('Ya alcanzaste las 480 horas del servicio social.');
   }
 

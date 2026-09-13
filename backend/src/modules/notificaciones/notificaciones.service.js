@@ -30,6 +30,22 @@ async function marcarLeida(id, usuarioId) {
 }
 
 /**
+ * Marca como leídas TODAS las notificaciones sin leer de un usuario que
+ * compartan la misma `ruta_relacionada` — pensado para pantallas que deben
+ * limpiar su propio tipo de notificación con solo "entrar" (ej. CU-AH-06,
+ * que todavía no existe como pantalla completa: esto es lo mínimo que
+ * necesita para poder marcar como leída la notificación de "bitácora
+ * revisada" al montar /alumno/historial, sin construir el resto del CU).
+ * Genérico y reutilizable — no exige que la ruta sea justo esa.
+ */
+async function marcarLeidasPorRuta(usuarioId, rutaRelacionada) {
+  await prisma.notificacion.updateMany({
+    where: { usuario_id: usuarioId, ruta_relacionada: rutaRelacionada, leida: false },
+    data: { leida: true, fecha_leida: new Date() },
+  });
+}
+
+/**
  * Helper para que OTROS módulos (reportes, actividades, LSS, etc.) creen
  * notificaciones cuando su propia spec diga "notifica a X" — es lo mismo
  * que ya insertamos directo en cada flujo (ej. inicio_sesion), solo que
@@ -60,4 +76,4 @@ async function crearNotificacion({ usuarioId, tipo, mensaje, rutaRelacionada = n
   });
 }
 
-module.exports = { listarPendientes, marcarLeida, crearNotificacion };
+module.exports = { listarPendientes, marcarLeida, marcarLeidasPorRuta, crearNotificacion };

@@ -94,6 +94,17 @@ function validarActividadNoCompletada(estadoActividad) {
 }
 
 /**
+ * CU-AH-04: RN-AH-21 es solo una guía de criterio para el profesor (avisar
+ * si la evidencia es inexistente/inconsistente) — NO una validación técnica
+ * de contenido. Cualquier texto no vacío es válido como motivo de rechazo.
+ */
+function validarMotivoRechazo(motivo) {
+  if (!motivo || !String(motivo).trim()) {
+    throw crearError('Debes indicar un motivo de rechazo.');
+  }
+}
+
+/**
  * CU-AH-03: valida el array `avances` que el alumno envía al confirmar su
  * bitácora — sin límite superior de actividades (confirmado con el
  * usuario), pero al menos una, y cada fila con sus 4 campos propios.
@@ -149,6 +160,7 @@ module.exports = {
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
   validarActividadNoCompletada,
+  validarMotivoRechazo,
   validarAvancesBitacora,
   validarActividadesReportables,
 };

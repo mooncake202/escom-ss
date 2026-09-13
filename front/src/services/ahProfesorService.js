@@ -32,3 +32,23 @@ export async function extenderFechaLimite(actividadId, nuevaFecha) {
     body: JSON.stringify({ fecha_limite: nuevaFecha }),
   });
 }
+
+// CU-AH-04 — revisar bitácoras.
+export async function listarBitacorasPendientes(filtroNombre) {
+  const query = filtroNombre ? `?nombre=${encodeURIComponent(filtroNombre)}` : "";
+  return apiFetch(`/profesor/bitacoras${query}`);
+}
+
+export async function aprobarBitacora(bitacoraId, actividadAdicional = null) {
+  return apiFetch(`/profesor/bitacoras/${bitacoraId}/aprobar`, {
+    method: "POST",
+    body: JSON.stringify({ actividadAdicional }),
+  });
+}
+
+export async function rechazarBitacora(bitacoraId, motivoRechazo) {
+  return apiFetch(`/profesor/bitacoras/${bitacoraId}/rechazar`, {
+    method: "POST",
+    body: JSON.stringify({ motivoRechazo }),
+  });
+}

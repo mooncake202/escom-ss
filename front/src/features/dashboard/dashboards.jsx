@@ -289,7 +289,7 @@ function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalc
 // ══════════════════════════════════════════════════════════════════
 const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   const stats = [
-    { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasAcumuladas ?? 0,       ...T.blue  },
+    { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasNetas ?? 0,             ...T.blue  },
     { icon: "document", label: "Reportes enviados",   value: resumen.reportesEnviados ?? 0,      ...T.teal  },
     { icon: "check",    label: "Actividades activas", value: resumen.actividadesAsignadas ?? 0,  ...T.green },
     { icon: "flag",     label: "Faltas totales",      value: resumen.faltasAcumuladas ?? 0,      ...T.slate },
@@ -401,9 +401,9 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
             </div>
             <div style={{ marginBottom: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
-                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasAcumuladas ?? 0}/480</span>
+                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasNetas ?? 0}/480</span>
               </div>
-              <ProgressBar value={resumen.horasAcumuladas ?? 0} max={480} color={C.textDisabled} C={C} />
+              <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
             </div>
           </div>
           <ActionItem icon="arrow"  {...T.slate} label="Ver proceso de liberación" desc="Disponible al cumplir los requisitos" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
@@ -495,6 +495,12 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             mensaje: "Un alumno no tiene actividades. Asígnales más.",
             ruta: "/profesor/actividades",
             tipo: "warning",
+          },
+          {
+            mostrar: !!resumen.bitacorasRevisionAtrasada,
+            mensaje: "Tienes bitácoras pendientes de revisión hace más de 5 días hábiles.",
+            ruta: "/profesor/bitacoras",
+            tipo: "urgente",
           },
         ]}
       />

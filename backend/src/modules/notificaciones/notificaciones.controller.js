@@ -23,4 +23,18 @@ async function putMarcarLeida(req, res) {
   }
 }
 
-module.exports = { getPendientes, putMarcarLeida };
+async function putMarcarLeidasPorRuta(req, res) {
+  try {
+    const { rutaRelacionada } = req.body;
+    if (!rutaRelacionada) {
+      return res.status(400).json({ message: 'rutaRelacionada es obligatoria.' });
+    }
+    await notificacionesService.marcarLeidasPorRuta(req.usuario.sub, rutaRelacionada);
+    return res.status(200).json({ message: 'Notificaciones marcadas como leídas.' });
+  } catch (err) {
+    console.error('Error al marcar notificaciones por ruta:', err);
+    return res.status(500).json({ message: 'Ocurrió un error. Intenta de nuevo más tarde.' });
+  }
+}
+
+module.exports = { getPendientes, putMarcarLeida, putMarcarLeidasPorRuta };

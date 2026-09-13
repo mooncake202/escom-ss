@@ -6,6 +6,9 @@ const {
   postCrearActividad,
   putEditarActividad,
   deleteActividad,
+  getBitacorasPendientes,
+  postAprobarBitacora,
+  postRechazarBitacora,
 } = require('./ah.controller');
 
 const router = express.Router();
@@ -18,5 +21,10 @@ router.get('/actividades/alumnos/:solicitudId', requireAuth, requireRole('profes
 router.post('/actividades/alumnos/:solicitudId', requireAuth, requireRole('profesor'), postCrearActividad);
 router.put('/actividades/:id', requireAuth, requireRole('profesor'), putEditarActividad);
 router.delete('/actividades/:id', requireAuth, requireRole('profesor'), deleteActividad);
+
+// CU-AH-04 — revisar bitácoras.
+router.get('/bitacoras', requireAuth, requireRole('profesor'), getBitacorasPendientes);
+router.post('/bitacoras/:id/aprobar', requireAuth, requireRole('profesor'), postAprobarBitacora);
+router.post('/bitacoras/:id/rechazar', requireAuth, requireRole('profesor'), postRechazarBitacora);
 
 module.exports = router;

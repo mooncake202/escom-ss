@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { HistorialRow }    from "./components/HistorialRow";
 import { useHistorial, MOCK_PROFESORES } from "./hooks/useHistorial";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { marcarLeidasPorRuta } from "@/services/notificacionesService";
 
 
 export const CARRERA_LABEL = {
@@ -132,6 +133,21 @@ export default function HistorialActividades({ rol = "alumno" }) {
   const [filtroCarrera, setFiltroCarrera] = useState([]);
   const [nivelProf, setNivelProf] = useState("profesores");
   const [filtroProfesor, setFiltroProfesor] = useState("");
+
+  // Al entrar a su propio historial, el alumno "ve" cualquier bitácora
+  // recién revisada (CU-AH-04) — marca esa notificación como leída
+  // automáticamente, sin que tenga que hacer clic en ella. Efecto aparte
+  // del hook (que es puramente mock/filtros, sin llamadas de red) y
+  // separado de cualquier otra carga: solo aplica a la vista "alumno",
+  // nunca a profesor/coordinación viendo el historial de otra persona.
+  // Fail-safe: si la llamada falla, solo se registra en consola, la
+  // pantalla sigue funcionando igual.
+  useEffect(() => {
+    if (rol !== "alumno") return;
+    marcarLeidasPorRuta("/alumno/historial").catch((err) => {
+      console.error("No se pudo marcar como leída la notificación de historial:", err);
+    });
+  }, [rol]);
 
   const toggleCarrera = (c) => {
   setFiltroCarrera(prev =>

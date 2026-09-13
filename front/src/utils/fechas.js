@@ -62,3 +62,15 @@ export function formatearFechaMexico(fecha, opciones = {}) {
   if (!fecha) return "";
   return new Date(fecha).toLocaleDateString("es-MX", { ...opciones, timeZone: "America/Mexico_City" });
 }
+
+/**
+ * Hora sola (HH:mm, 24h) de un timestamp real, en hora MÉXICO explícita —
+ * mismo motivo que formatearFechaMexico, para los campos hora_inicio/
+ * hora_fin de bitacora (CU-AH-04).
+ */
+export function formatearHoraMexico(fecha) {
+  if (!fecha) return "";
+  return new Date(fecha).toLocaleTimeString("es-MX", {
+    timeZone: "America/Mexico_City", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+}

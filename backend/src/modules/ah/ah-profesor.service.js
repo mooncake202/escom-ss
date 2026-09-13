@@ -6,8 +6,11 @@ const {
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
   validarActividadNoCompletada,
+  validarMotivoRechazo,
 } = require('./validators');
+const { HORAS_POR_JORNADA } = require('./ah.shared');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
 /**
  * Genérico (fail-open): avisa al PROPIO profesor que ejecutó la mutación
@@ -22,6 +25,39 @@ function emitirResumenActualizadoProfesor(profesorUsuarioId) {
   } catch (err) {
     console.error('Error al emitir resumen:actualizado (profesor):', err.message);
   }
+}
+
+/**
+ * Mismo criterio, pero hacia el alumno dueño de la bitácora — afecta su
+ * propio resumen (horas, historial) tras la decisión del profesor.
+ */
+function emitirResumenActualizadoAlumno(alumnoUsuarioId) {
+  try {
+    emitirAUsuario(alumnoUsuarioId, 'resumen:actualizado', {});
+  } catch (err) {
+    console.error('Error al emitir resumen:actualizado (alumno):', err.message);
+  }
+}
+
+/**
+ * Notificación Tipo B DEDUPLICADA: si el alumno ya tiene una notificación
+ * sin leer de "bitácora revisada" (identificada únicamente por
+ * ruta_relacionada='/alumno/historial' — ninguna otra notificación del
+ * proyecto usa esa ruta), no crea otra. El mensaje es genérico a propósito
+ * (no distingue aprobación de rechazo).
+ */
+async function notificarBitacoraRevisada(alumnoUsuarioId) {
+  const yaExiste = await prisma.notificacion.findFirst({
+    where: { usuario_id: alumnoUsuarioId, ruta_relacionada: '/alumno/historial', leida: false },
+  });
+  if (yaExiste) return;
+
+  await crearNotificacion({
+    usuarioId: alumnoUsuarioId,
+    tipo: 'info',
+    mensaje: 'Te han revisado una bitácora.',
+    rutaRelacionada: '/alumno/historial',
+  });
 }
 
 async function resolverProfesor(profesorUsuarioId) {
@@ -295,6 +331,195 @@ async function eliminarActividad(profesorUsuarioId, actividadId) {
   emitirResumenActualizadoProfesor(profesorUsuarioId);
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-AH-04: revisar bitácoras.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * RN-AH-19: solo bitácoras de alumnos bajo supervisión de ESTE profesor,
+ * y solo las que de verdad están esperando decisión.
+ */
+async function listarBitacorasPendientes(profesorUsuarioId, filtroNombre = null) {
+  const profesor = await resolverProfesor(profesorUsuarioId);
+
+  const bitacoras = await prisma.bitacora.findMany({
+    where: {
+      estado: 'pendiente_revision',
+      solicitud_registro: {
+        oferta: { profesor_id: profesor.id },
+        ...(filtroNombre
+          ? {
+              alumno: {
+                usuario: {
+                  OR: [
+                    { nombre: { contains: filtroNombre } },
+                    { apellidos: { contains: filtroNombre } },
+                  ],
+                },
+              },
+            }
+          : {}),
+      },
+    },
+    include: {
+      solicitud_registro: {
+        include: { alumno: { include: { usuario: true } }, oferta: true },
+      },
+      registro_bitacora_actividades: { include: { actividad: true } },
+    },
+    orderBy: { fecha_registro: 'asc' },
+  });
+
+  return bitacoras.map((b) => ({
+    id: b.id,
+    alumno: {
+      nombre: `${b.solicitud_registro.alumno.usuario.nombre} ${b.solicitud_registro.alumno.usuario.apellidos}`,
+      boleta: b.solicitud_registro.alumno.boleta,
+      carrera: b.solicitud_registro.alumno.carrera,
+      oferta: b.solicitud_registro.oferta?.nombre_proyecto ?? null,
+    },
+    fecha: b.fecha_registro,
+    horaInicio: b.hora_inicio,
+    horaFin: b.hora_fin,
+    horasTrabajadas: b.horas_contabilizadas,
+    avances: b.registro_bitacora_actividades.map((r) => ({
+      actividad_id: r.actividad_id,
+      actividad: r.actividad.titulo,
+      progreso: r.porcentaje_avance_registrado,
+      descripcion: r.descripcion,
+      evidencia: r.evidencia,
+    })),
+  }));
+}
+
+async function resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId) {
+  const profesor = await resolverProfesor(profesorUsuarioId);
+
+  const bitacora = await prisma.bitacora.findUnique({
+    where: { id: Number(bitacoraId) },
+    include: {
+      solicitud_registro: {
+        include: {
+          oferta: true,
+          alumno: { include: { usuario: true } },
+          periodo_registro: { include: { evento_calendario: true } },
+        },
+      },
+    },
+  });
+
+  if (!bitacora || bitacora.solicitud_registro.oferta?.profesor_id !== profesor.id) {
+    throw crearError('Bitácora no encontrada.', 404);
+  }
+  if (bitacora.estado !== 'pendiente_revision') {
+    throw crearError('Esta bitácora ya fue revisada.', 409);
+  }
+
+  return { profesor, bitacora };
+}
+
+/**
+ * Aprueba una bitácora — opcionalmente en la MISMA transacción crea una
+ * actividad adicional para el mismo alumno (mismas reglas de validación
+ * que CU-AH-01). Si la actividad es inválida, TODA la transacción aborta
+ * (la bitácora tampoco queda aprobada).
+ *
+ * horas_acumuladas NO se toca — ya se sumó en confirmarBitacora (AH-03).
+ * El progreso/estado de las actividades reportadas tampoco se vuelve a
+ * tocar — ya se aplicó ahí, esto es puramente confirmatorio.
+ */
+async function aprobarBitacora(profesorUsuarioId, bitacoraId, actividadAdicional = null) {
+  const { profesor, bitacora } = await resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId);
+
+  if (actividadAdicional) {
+    validarCamposActividad(actividadAdicional);
+    const fechaInicioPeriodo = bitacora.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+    validarFechaLimiteContraInicio(actividadAdicional.fecha_limite, fechaInicioPeriodo);
+    validarFechaLimiteNoPasada(actividadAdicional.fecha_limite);
+  }
+
+  const [, actividadCreada] = await prisma.$transaction([
+    prisma.bitacora.update({
+      where: { id: bitacora.id },
+      data: { estado: 'aprobada', fecha_revision: new Date(), revisado_por_id: profesor.id },
+    }),
+    ...(actividadAdicional
+      ? [
+          prisma.actividad.create({
+            data: {
+              solicitud_registro_id: bitacora.solicitud_registro_id,
+              titulo: actividadAdicional.titulo.trim(),
+              descripcion: actividadAdicional.descripcion.trim(),
+              entregable_esperado: actividadAdicional.entregable_esperado.trim(),
+              fecha_limite: new Date(actividadAdicional.fecha_limite),
+              estado: 'sin_comenzar',
+              fecha_asignacion: new Date(),
+            },
+          }),
+        ]
+      : []),
+  ]);
+
+  const alumnoUsuarioId = bitacora.solicitud_registro.alumno.usuario_id;
+  const actividadMapeada = actividadCreada ? mapearActividad(actividadCreada, false) : null;
+
+  if (actividadMapeada) {
+    try {
+      emitirAUsuario(alumnoUsuarioId, 'actividad:creada', { actividad: actividadMapeada });
+    } catch (err) {
+      console.error('Error al emitir actividad:creada:', err.message);
+    }
+  }
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId);
+
+  return { estado: 'aprobada', actividadCreada: actividadMapeada };
+}
+
+/**
+ * Rechaza una bitácora — incrementa horas_rechazadas por las horas que esa
+ * jornada había sumado (horas_acumuladas, el bruto histórico, NUNCA se
+ * toca). El progreso/estado de las actividades reportadas NO se revierte
+ * (decisión de negocio confirmada: solo se rechazan las horas, no el
+ * avance ya aplicado).
+ */
+async function rechazarBitacora(profesorUsuarioId, bitacoraId, motivoRechazo) {
+  const { profesor, bitacora } = await resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId);
+
+  validarMotivoRechazo(motivoRechazo);
+
+  const horasARestar = bitacora.horas_contabilizadas ?? HORAS_POR_JORNADA;
+  const alumnoBoleta = bitacora.solicitud_registro.alumno_id;
+
+  await prisma.$transaction([
+    prisma.bitacora.update({
+      where: { id: bitacora.id },
+      data: {
+        estado: 'rechazada',
+        motivo_rechazo: motivoRechazo.trim(),
+        fecha_revision: new Date(),
+        revisado_por_id: profesor.id,
+      },
+    }),
+    // horas_acumuladas es el bruto histórico — NUNCA se toca aquí. Lo que
+    // se rechaza se registra en horas_rechazadas; las horas NETAS
+    // (calcularHorasNetas, ah.shared.js) son siempre acumuladas-rechazadas.
+    prisma.cumulo_horas_y_faltas.update({
+      where: { alumno_id: alumnoBoleta },
+      data: { horas_rechazadas: { increment: horasARestar } },
+    }),
+  ]);
+
+  const alumnoUsuarioId = bitacora.solicitud_registro.alumno.usuario_id;
+
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId);
+
+  return { estado: 'rechazada' };
+}
+
 module.exports = {
   listarAlumnosDeProfesor,
   obtenerDetalleAlumno,
@@ -302,4 +527,7 @@ module.exports = {
   editarActividad,
   extenderFechaLimiteActividad,
   eliminarActividad,
+  listarBitacorasPendientes,
+  aprobarBitacora,
+  rechazarBitacora,
 };

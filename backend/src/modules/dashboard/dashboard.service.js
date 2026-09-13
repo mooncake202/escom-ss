@@ -1,5 +1,5 @@
 const prisma = require('../../lib/prisma');
-const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC } = require('../ah/ah.shared');
+const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
 
 const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
 const ESTADO_LSS_EVALUACION_SOLICITADA = 'evaluacion_solicitada';
@@ -60,6 +60,26 @@ async function calcularAlertasActividadesProfesor(profesorId) {
   return { actividadesProximasACaducar, alumnoSinActividades };
 }
 
+/**
+ * RN-AH-24 (AH-04): notificación calculada — basta con que exista UNA
+ * bitácora 'pendiente_revision' de este profesor con más de 5 días HÁBILES
+ * de antigüedad (no días calendario) respecto a hoy (México).
+ */
+async function calcularBitacorasRevisionAtrasada(profesorId) {
+  const pendientes = await prisma.bitacora.findMany({
+    where: { estado: 'pendiente_revision', solicitud_registro: { oferta: { profesor_id: profesorId } } },
+    select: { fecha_registro: true },
+  });
+  if (pendientes.length === 0) return false;
+
+  const hoy = calcularDiaMexicoUTC();
+  for (const b of pendientes) {
+    const dias = await contarDiasHabilesTranscurridos(new Date(b.fecha_registro), hoy);
+    if (dias > 5) return true;
+  }
+  return false;
+}
+
 async function resumenAlumno(usuarioId) {
   const alumno = await prisma.alumno.findUnique({
     where: { usuario_id: usuarioId },
@@ -73,7 +93,7 @@ async function resumenAlumno(usuarioId) {
 
   if (!alumno || !alumno.solicitud_registro) {
     return {
-      horasAcumuladas: 0, faltasAcumuladas: 0, faltasConsecutivas: 0,
+      horasAcumuladas: 0, horasNetas: 0, faltasAcumuladas: 0, faltasConsecutivas: 0,
       actividadesAsignadas: 0, reportesEnviados: 0,
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
@@ -94,6 +114,9 @@ async function resumenAlumno(usuarioId) {
 
   return {
     horasAcumuladas: alumno.cumulo_horas_y_faltas?.horas_acumuladas ?? 0,
+    // Horas netas/reales — SIEMPRE acumuladas menos rechazadas. horasAcumuladas
+    // se mantiene tal cual (bruto histórico) por si algo más lo necesita crudo.
+    horasNetas: calcularHorasNetas(alumno.cumulo_horas_y_faltas),
     faltasAcumuladas: alumno.cumulo_horas_y_faltas?.faltas_acumuladas ?? 0,
     faltasConsecutivas: alumno.cumulo_horas_y_faltas?.faltas_consecutivas ?? 0,
     actividadesAsignadas,
@@ -123,11 +146,12 @@ async function resumenProfesor(usuarioId) {
       reportesPorRevisar: 0, bitacorasPorRevisar: 0, solicitudesPendientes: 0,
       alumnosConFaltasCriticas: 0,
       actividadesProximasACaducar: false, alumnoSinActividades: false,
+      bitacorasRevisionAtrasada: false,
       departamento: null, cubiculo: null, caracteristicas: [],
     };
   }
 
-const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades] = await Promise.all([
+const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades, bitacorasRevisionAtrasada] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
     // final del proceso GR.
@@ -160,10 +184,12 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
       where: { estado: 'pendiente_revision', solicitud_registro: { oferta: { profesor_id: profesor.id } } },
     }),
     calcularAlertasActividadesProfesor(profesor.id),
+    calcularBitacorasRevisionAtrasada(profesor.id),
   ]);
 
   return {
     alumnosAsignados,
+    bitacorasRevisionAtrasada,
     actividadesProximasACaducar: alertasActividades.actividadesProximasACaducar,
     alumnoSinActividades: alertasActividades.alumnoSinActividades,
     cuposTotales: profesor.cupos_totales,
@@ -182,6 +208,19 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
 
 
 
+/**
+ * Prisma no puede filtrar por una resta calculada (horas_acumuladas -
+ * horas_rechazadas) directamente en un `where` — se trae el mínimo
+ * necesario de todos los cúmulos y se cuenta en JS con el mismo criterio
+ * de horas netas que el resto del módulo (limiteHorasAlcanzado).
+ */
+async function contarAlumnosConHorasCompletas() {
+  const cumulos = await prisma.cumulo_horas_y_faltas.findMany({
+    select: { horas_acumuladas: true, horas_rechazadas: true },
+  });
+  return cumulos.filter(limiteHorasAlcanzado).length;
+}
+
 async function resumenCoordinacion() {
   const [
     alumnosRegistrados,
@@ -194,7 +233,7 @@ async function resumenCoordinacion() {
     prisma.solicitud_registro.count(),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EVALUACION_SOLICITADA } }),
-    prisma.cumulo_horas_y_faltas.count({ where: { horas_acumuladas: { gte: 480 } } }),
+    contarAlumnosConHorasCompletas(),
     prisma.liberacion_proceso.count({ where: { NOT: { estado: ESTADO_LSS_TERMINAL } } }),
     prisma.periodo_registro.findFirst({ orderBy: { id: 'desc' } }),
   ]);

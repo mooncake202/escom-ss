@@ -102,6 +102,43 @@ async function tieneJornadaPendienteDatos(solicitudRegistroId) {
 }
 
 /**
+ * RN-AH-24 (AH-04, no confundir con el RN-AH-24 de faltas en AH-03 —
+ * fichas distintas con el mismo número): cuenta días HÁBILES transcurridos
+ * entre `desdeUTC` (exclusivo) y `hastaUTC` (inclusive) — mismo patrón de
+ * loop día por día ya usado en contabilizarFaltasDiarias (ah.cron.js),
+ * reutilizando esDiaLaborable en vez de reimplementar el criterio.
+ */
+async function contarDiasHabilesTranscurridos(desdeUTC, hastaUTC) {
+  let dias = 0;
+  for (let d = restarDias(desdeUTC, -1); d <= hastaUTC; d = restarDias(d, -1)) {
+    if (await esDiaLaborable(d)) dias++;
+  }
+  return dias;
+}
+
+/**
+ * RN-AH-17: horas_acumuladas es el total BRUTO histórico (solo sube, nunca
+ * baja, ni siquiera al rechazar una bitácora — ver rechazarBitacora en
+ * ah-profesor.service.js). horas_rechazadas es cuánto de ese bruto fue
+ * descartado. Las horas NETAS/reales son SIEMPRE la resta de ambas — nunca
+ * se debe comparar ni mostrar horas_acumuladas sola como si fuera el total
+ * real del alumno.
+ */
+function calcularHorasNetas(cumulo) {
+  return (cumulo?.horas_acumuladas ?? 0) - (cumulo?.horas_rechazadas ?? 0);
+}
+
+/**
+ * Único punto de comparación contra el límite de 480h — antes duplicado en
+ * iniciarJornada y obtenerEstadoJornadaActual (ah-alumno.service.js), cada
+ * uno comparando horas_acumuladas crudo por su cuenta. Ambos ahora llaman
+ * esta misma función con su propio `cumulo` ya obtenido.
+ */
+function limiteHorasAlcanzado(cumulo) {
+  return calcularHorasNetas(cumulo) >= LIMITE_HORAS_SERVICIO;
+}
+
+/**
  * Get-or-create perezoso de cumulo_horas_y_faltas — no existía ningún
  * patrón previo de esto en el módulo. Acepta `tx` para poder llamarse
  * dentro de una transacción interactiva (confirmarBitacora).
@@ -127,5 +164,8 @@ module.exports = {
   obtenerBitacoraDelDia,
   faltaBitacoraHoy,
   tieneJornadaPendienteDatos,
+  contarDiasHabilesTranscurridos,
+  calcularHorasNetas,
+  limiteHorasAlcanzado,
   obtenerOCrearCumulo,
 };

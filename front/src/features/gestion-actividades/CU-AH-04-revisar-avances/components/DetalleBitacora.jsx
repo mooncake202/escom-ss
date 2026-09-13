@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { GRADIENTS, RADIUS, SHADOWS } from "@/themes/colors";
-import { formatearFechaUTC } from "@/utils/fechas";
+import { formatearFechaUTC, formatearHoraMexico } from "@/utils/fechas";
 
 // Modos del panel: normal | rechazo | trabajo-adicional
 const MODO = { NORMAL: "normal", RECHAZO: "rechazo", ADICIONAL: "adicional" };
@@ -21,13 +21,14 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
   const [actTitulo, setActTitulo]           = useState("");
   const [actDescripcion, setActDescripcion] = useState("");
   const [actEntregable, setActEntregable]   = useState("");
+  const [actFechaLimite, setActFechaLimite] = useState("");
   const [actErrores, setActErrores]         = useState({});
 
   const resetModo = () => {
     setModo(MODO.NORMAL);
     setModoRechazo(false);
     setComentario("");
-    setActTitulo(""); setActDescripcion(""); setActEntregable("");
+    setActTitulo(""); setActDescripcion(""); setActEntregable(""); setActFechaLimite("");
     setActErrores({});
   };
 
@@ -35,22 +36,28 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
     const errs = {};
     if (!actTitulo.trim())      errs.titulo      = "El título es obligatorio";
     if (!actDescripcion.trim()) errs.descripcion = "La descripción es obligatoria";
+    if (!actEntregable.trim())  errs.entregable  = "El entregable esperado es obligatorio";
+    if (!actFechaLimite)        errs.fechaLimite = "La fecha límite es obligatoria";
     setActErrores(errs);
     return Object.keys(errs).length === 0;
   };
 
-  // RN-AH-43 y RN-AH-44: aprueba bitácora + registra nueva actividad
+  // RN-AH-43 y RN-AH-44: aprueba bitácora + registra nueva actividad (misma
+  // transacción combinada en el backend — si la actividad es inválida, la
+  // bitácora tampoco queda aprobada).
   const confirmarAdicional = () => {
     if (!validarActividad()) return;
     onDecidir(bitacora.id, "aprobar-adicional", {
       titulo: actTitulo.trim(),
       descripcion: actDescripcion.trim(),
-      entregable: actEntregable.trim() || null,
+      entregable_esperado: actEntregable.trim(),
+      fecha_limite: actFechaLimite,
     });
   };
 
   const fecha   = formatearFechaUTC(bitacora.fecha, { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
-  const esUrl   = bitacora.evidencia.startsWith("http");
+  const horaInicio = formatearHoraMexico(bitacora.horaInicio);
+  const horaFin     = formatearHoraMexico(bitacora.horaFin);
 
   return (
     <>
@@ -81,40 +88,35 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
           <InfoRow label="Oferta"      value={bitacora.alumno.oferta}  C={C} />
 
           <InfoRow label="Fecha"       value={fecha}                   C={C} />
-          <InfoRow label="Hora inicio" value={bitacora.horaInicio}     C={C} />
-          <InfoRow label="Hora fin"    value={bitacora.horaFin}        C={C} />
+          <InfoRow label="Hora inicio" value={horaInicio}              C={C} />
+          <InfoRow label="Hora fin"    value={horaFin}                 C={C} />
           <InfoRow label="Horas"       value={`${bitacora.horasTrabajadas}h trabajadas`} C={C} />
 
-          {/* Actividades y avances — múltiples */}
+          {/* Actividades y avances — múltiples, cada una con su propia
+              descripción/evidencia (así vive el dato real: por avance, no
+              uno solo para toda la jornada). */}
           <p style={{ margin: "1.25rem 0 10px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>
             Actividades reportadas ({bitacora.avances.length})
           </p>
-          {bitacora.avances.map((av, idx) => (
-            <div key={idx} style={{ padding: "10px 12px", marginBottom: 8, background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}` }}>
-              <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: C.textPrimary }}>{av.actividad}</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{ flex: 1, height: 4, background: C.borderSubtle, borderRadius: 2 }}>
-                  <div style={{ width: `${av.progreso}%`, height: "100%", borderRadius: 2, background: av.progreso === 100 ? "#22C55E" : "#2E86DE" }} />
+          {bitacora.avances.map((av) => {
+            const esUrl = av.evidencia.startsWith("http");
+            return (
+              <div key={av.actividad_id} style={{ padding: "10px 12px", marginBottom: 8, background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}` }}>
+                <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 600, color: C.textPrimary }}>{av.actividad}</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <div style={{ flex: 1, height: 4, background: C.borderSubtle, borderRadius: 2 }}>
+                    <div style={{ width: `${av.progreso}%`, height: "100%", borderRadius: 2, background: av.progreso === 100 ? "#22C55E" : "#2E86DE" }} />
+                  </div>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, minWidth: 34, textAlign: "right" }}>{av.progreso}%</span>
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.textPrimary, minWidth: 34, textAlign: "right" }}>{av.progreso}%</span>
+                <p style={{ margin: "0 0 6px", fontSize: 12, color: C.textSecondary, lineHeight: 1.5 }}>{av.descripcion}</p>
+                {esUrl
+                  ? <a href={av.evidencia} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.accentText, wordBreak: "break-all" }}>{av.evidencia}</a>
+                  : <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>{av.evidencia}</p>
+                }
               </div>
-            </div>
-          ))}
-
-          {/* Descripción */}
-          <p style={{ margin: "1.25rem 0 8px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Descripción del trabajo</p>
-          <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.textSecondary, lineHeight: 1.6, padding: "10px 14px", background: C.bgInput, borderRadius: RADIUS.md }}>
-            {bitacora.descripcion}
-          </p>
-
-          {/* Evidencia — RN-AH-32 */}
-          <p style={{ margin: "0 0 8px", fontSize: 11, color: C.accentText, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase" }}>Evidencia</p>
-          <div style={{ padding: "10px 14px", background: C.bgInput, borderRadius: RADIUS.md, marginBottom: "1.25rem" }}>
-            {esUrl
-              ? <a href={bitacora.evidencia} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, color: C.accentText, wordBreak: "break-all" }}>{bitacora.evidencia}</a>
-              : <p style={{ margin: 0, fontSize: 13, color: C.textSecondary }}>{bitacora.evidencia}</p>
-            }
-          </div>
+            );
+          })}
 
           {/* Aviso — RN-AH-42 */}
           <div style={{ padding: "10px 14px", borderRadius: RADIUS.md, background: C.accentSoft, border: `1px solid ${C.accent}` }}>
@@ -175,17 +177,32 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
                 {actErrores.descripcion && <p style={{ margin: "3px 0 0", fontSize: 12, color: C.danger }}>{actErrores.descripcion}</p>}
               </div>
 
-              {/* Entregable opcional */}
-              <div>
+              {/* Entregable esperado */}
+              <div style={{ marginBottom: "0.875rem" }}>
                 <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
-                  Entregable <span style={{ fontWeight: 400, textTransform: "none" }}>(opcional)</span>
+                  Entregable esperado *
                 </label>
                 <input
                   value={actEntregable}
-                  onChange={e => setActEntregable(e.target.value)}
+                  onChange={e => { setActEntregable(e.target.value); setActErrores(p => ({ ...p, entregable: null })); }}
                   placeholder="Ej. Documento corregido en PDF"
-                  style={{ width: "100%", padding: "9px 12px", background: C.bgInput, border: `1px solid ${C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                  style={{ width: "100%", padding: "9px 12px", background: C.bgInput, border: `1px solid ${actErrores.entregable ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
                 />
+                {actErrores.entregable && <p style={{ margin: "3px 0 0", fontSize: 12, color: C.danger }}>{actErrores.entregable}</p>}
+              </div>
+
+              {/* Fecha límite */}
+              <div>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>
+                  Fecha límite *
+                </label>
+                <input
+                  type="date"
+                  value={actFechaLimite}
+                  onChange={e => { setActFechaLimite(e.target.value); setActErrores(p => ({ ...p, fechaLimite: null })); }}
+                  style={{ width: "100%", padding: "9px 12px", background: C.bgInput, border: `1px solid ${actErrores.fechaLimite ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                />
+                {actErrores.fechaLimite && <p style={{ margin: "3px 0 0", fontSize: 12, color: C.danger }}>{actErrores.fechaLimite}</p>}
               </div>
             </div>
           )}

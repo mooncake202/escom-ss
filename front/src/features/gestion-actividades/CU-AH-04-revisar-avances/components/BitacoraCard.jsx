@@ -1,5 +1,5 @@
 import { RADIUS } from "@/themes/colors";
-import { formatearFechaUTC } from "@/utils/fechas";
+import { formatearFechaUTC, formatearHoraMexico } from "@/utils/fechas";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -11,6 +11,8 @@ export function BitacoraCard({ bitacora, onVer, C }) {
   const fecha = formatearFechaUTC(bitacora.fecha, {
     weekday: "long", day: "2-digit", month: "long",
   });
+  const horaInicio = formatearHoraMexico(bitacora.horaInicio);
+  const horaFin = formatearHoraMexico(bitacora.horaFin);
 
   return (
     <div style={{
@@ -32,10 +34,10 @@ export function BitacoraCard({ bitacora, onVer, C }) {
             {bitacora.horasTrabajadas}h trabajadas
           </span>
           <span style={{ fontSize: 12, color: C.textDisabled }}>
-            {bitacora.horaInicio} – {bitacora.horaFin}
+            {horaInicio} – {horaFin}
           </span>
           <span style={{ fontSize: 12, color: C.textMuted }}>
-            {bitacora.actividad}
+            {bitacora.avances.length} actividad{bitacora.avances.length !== 1 ? "es" : ""} reportada{bitacora.avances.length !== 1 ? "s" : ""}
           </span>
         </div>
       </div>

@@ -22,8 +22,14 @@ async function listarPeriodosVigentes() {
   // exacto actual, lo que hacía desaparecer un periodo hasta 18h antes de
   // su día real de inicio en México (medianoche UTC ocurre a las 18:00
   // hora México del día anterior).
+  //
+  // El campo correcto contra el que comparar es fecha_max_expediente, no
+  // fecha_inicio: fecha_max_expediente es el plazo real para completar el
+  // trámite y siempre es ANTERIOR a fecha_inicio — un periodo deja de estar
+  // disponible para elegir en cuanto pasa esa fecha límite, aunque
+  // fecha_inicio todavía no llegue.
   const periodos = await prisma.periodo_registro.findMany({
-    where: { evento_calendario: { fecha_inicio: { gte: calcularDiaMexicoUTC() } } },
+    where: { fecha_max_expediente: { gte: calcularDiaMexicoUTC() } },
     include: { evento_calendario: true },
     orderBy: { evento_calendario: { fecha_inicio: 'asc' } },
   });

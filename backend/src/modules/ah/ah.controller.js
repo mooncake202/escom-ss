@@ -56,4 +56,35 @@ async function deleteActividad(req, res) {
   }
 }
 
-module.exports = { getAlumnos, getDetalleAlumno, postCrearActividad, putEditarActividad, deleteActividad };
+async function getBitacorasPendientes(req, res) {
+  try {
+    const filtroNombre = req.query.nombre || null;
+    const bitacoras = await ahProfesorService.listarBitacorasPendientes(req.usuario.sub, filtroNombre);
+    return res.status(200).json(bitacoras);
+  } catch (err) {
+    return manejarError(err, res, 'Error al listar bitácoras pendientes:');
+  }
+}
+
+async function postAprobarBitacora(req, res) {
+  try {
+    const resultado = await ahProfesorService.aprobarBitacora(req.usuario.sub, req.params.id, req.body.actividadAdicional || null);
+    return res.status(200).json({ message: 'Bitácora aprobada correctamente.', ...resultado });
+  } catch (err) {
+    return manejarError(err, res, 'Error al aprobar bitácora:');
+  }
+}
+
+async function postRechazarBitacora(req, res) {
+  try {
+    const resultado = await ahProfesorService.rechazarBitacora(req.usuario.sub, req.params.id, req.body.motivoRechazo);
+    return res.status(200).json({ message: 'Bitácora rechazada correctamente.', ...resultado });
+  } catch (err) {
+    return manejarError(err, res, 'Error al rechazar bitácora:');
+  }
+}
+
+module.exports = {
+  getAlumnos, getDetalleAlumno, postCrearActividad, putEditarActividad, deleteActividad,
+  getBitacorasPendientes, postAprobarBitacora, postRechazarBitacora,
+};
