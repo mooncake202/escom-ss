@@ -1,9 +1,9 @@
 import { GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 
 export function FormularioBitacora({
-  form, errores, actividades, horasTrabajadas,
+  errores, actividades, horasTrabajadas, pendienteDatos,
   avances, onAgregarAvance, onQuitarAvance, onCambiarAvance,
-  handleChange, onRegistrar, loading, C
+  onRegistrar, loading, C
 }) {
 
   // Actividades que aún no fueron seleccionadas
@@ -18,7 +18,8 @@ export function FormularioBitacora({
         Completa tu bitácora del día
       </p>
       <p style={{ margin: "0 0 1.5rem", fontSize: 13, color: C.textMuted }}>
-        Jornada registrada: <strong style={{ color: C.textPrimary }}>{horasTrabajadas} hora{horasTrabajadas !== 1 ? "s" : ""}</strong>
+        {pendienteDatos ? "Horas ya contabilizadas: " : "Jornada registrada: "}
+        <strong style={{ color: C.textPrimary }}>{horasTrabajadas} hora{horasTrabajadas !== 1 ? "s" : ""}</strong>
       </p>
 
       {/* ── Actividades con avance ── */}
@@ -46,7 +47,7 @@ export function FormularioBitacora({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {avances.map((av, idx) => (
-              <div key={idx} style={{ padding: "0.875rem 1rem", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${errores[`avance_${idx}`] ? C.danger : C.borderSubtle}` }}>
+              <div key={idx} style={{ padding: "0.875rem 1rem", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${errores[`avance_${idx}_actividad`] || errores[`avance_${idx}_descripcion`] || errores[`avance_${idx}_evidencia`] ? C.danger : C.borderSubtle}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
 
                   {/* Select de actividad */}
@@ -60,7 +61,7 @@ export function FormularioBitacora({
                     {actividades
                       .filter(a => String(a.id) === av.actividadId || !avances.some((x, i) => i !== idx && x.actividadId === String(a.id)))
                       .map(a => (
-                        <option key={a.id} value={String(a.id)}>{a.titulo}</option>
+                        <option key={a.id} value={String(a.id)}>{a.titulo}{a.estado === "vencida" ? " (vencida)" : ""}</option>
                       ))
                     }
                   </select>
@@ -76,8 +77,22 @@ export function FormularioBitacora({
                   )}
                 </div>
 
+                {errores[`avance_${idx}_actividad`] && (
+                  <p style={{ margin: "0 0 8px", fontSize: 12, color: C.danger }}>{errores[`avance_${idx}_actividad`]}</p>
+                )}
+
+                {/* Descripción de la actividad seleccionada (la que puso el profesor al asignarla) */}
+                {(() => {
+                  const seleccionada = actividades.find(a => String(a.id) === av.actividadId);
+                  return seleccionada ? (
+                    <p style={{ margin: "0 0 8px", fontSize: 12, color: C.textDisabled, lineHeight: 1.5 }}>
+                      {seleccionada.descripcion}
+                    </p>
+                  ) : null;
+                })()}
+
                 {/* Slider de progreso */}
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                   <span style={{ fontSize: 11, color: C.textDisabled, whiteSpace: "nowrap" }}>Avance</span>
                   <input
                     type="range" min="0" max="100" step="5"
@@ -90,48 +105,37 @@ export function FormularioBitacora({
                   </span>
                 </div>
 
-                {errores[`avance_${idx}`] && (
-                  <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores[`avance_${idx}`]}</p>
-                )}
+                {/* Descripción individual de esta actividad */}
+                <div style={{ marginBottom: 8 }}>
+                  <textarea
+                    value={av.descripcion}
+                    onChange={e => onCambiarAvance(idx, "descripcion", e.target.value)}
+                    placeholder="¿Qué hiciste hoy en esta actividad? *"
+                    rows={2}
+                    style={{ width: "100%", padding: "8px 12px", background: C.bgCard, border: `1px solid ${errores[`avance_${idx}_descripcion`] ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }}
+                  />
+                  {errores[`avance_${idx}_descripcion`] && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores[`avance_${idx}_descripcion`]}</p>
+                  )}
+                </div>
+
+                {/* Evidencia individual de esta actividad */}
+                <div>
+                  <input
+                    value={av.evidencia}
+                    onChange={e => onCambiarAvance(idx, "evidencia", e.target.value)}
+                    placeholder="Evidencia: URL del documento, repositorio, o descripción de la entrega *"
+                    style={{ width: "100%", padding: "8px 12px", background: C.bgCard, border: `1px solid ${errores[`avance_${idx}_evidencia`] ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                  />
+                  {errores[`avance_${idx}_evidencia`] && (
+                    <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores[`avance_${idx}_evidencia`]}</p>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
         {errores.avances && <p style={{ margin: "6px 0 0", fontSize: 12, color: C.danger }}>{errores.avances}</p>}
-      </div>
-
-      {/* ── Descripción general ── */}
-      <div style={{ marginBottom: "1rem" }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-          Descripción general del trabajo *
-        </label>
-        <textarea
-          name="descripcion"
-          value={form.descripcion}
-          onChange={handleChange}
-          placeholder="Describe lo que realizaste durante la jornada de hoy..."
-          rows={4}
-          style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.descripcion ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }}
-        />
-        {errores.descripcion && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.descripcion}</p>}
-      </div>
-
-      {/* ── Evidencia general ── */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-          Evidencia del trabajo *
-        </label>
-        <input
-          name="evidencia"
-          value={form.evidencia}
-          onChange={handleChange}
-          placeholder="URL del documento, repositorio, o descripción de cómo entregaste el avance..."
-          style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.evidencia ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-        />
-        <p style={{ margin: "4px 0 0", fontSize: 11, color: C.textDisabled }}>
-          Puede ser un enlace a documento, repositorio, o descripción de entrega por otro medio.
-        </p>
-        {errores.evidencia && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.evidencia}</p>}
       </div>
 
       <button

@@ -18,11 +18,15 @@ const EVENTOS_POR_ROL = {
     "actividad:creada", "actividad:editada", "actividad:fecha_extendida",
     "actividad:eliminada", "actividad:vencida",
     "expediente:decidido", // dispara la notificación real de bienvenida
+    "resumen:actualizado", // genérico: bitácora/faltas/jornada abandonada
   ],
   // 'solicitud:aceptada'/'rechazada'/'rechazada_por_cupos' NO se emiten al
-  // profesor (solo al alumno) — el único evento real dirigido a él aquí es
-  // 'solicitud:nueva'.
-  profesor: ["solicitud:nueva"],
+  // profesor (solo al alumno). 'expediente:decidido' NO se agrega aquí:
+  // solo se emite al alumno, y su aprobación no completa todavía la
+  // transición real de estado_solicitud a 'alumno_asignado' (eso ocurre
+  // después, cuando el alumno confirma el modal de bienvenida) — contarlo
+  // aquí desincronizaría el widget alumnosAsignados de listarAlumnosDeProfesor.
+  profesor: ["solicitud:nueva", "resumen:actualizado"],
   coordinador: [
     "documentacion:pendiente", "documentacion:decidida",
     "expediente:pendiente_revision", "expediente:decidido",
@@ -233,19 +237,47 @@ function SlotNotificacionCalculada({ mostrar, mensaje, ruta, tipo = "info", navi
 
 
 
-function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C }) {
-  const generales = notificaciones.filter((n) => !n.ruta_relacionada);
-  if (generales.length === 0) return null;
+// slotsCalculados: Tipo A ya resuelto por el dashboard llamador
+// ({ mostrar, mensaje, ruta, tipo }[]) — se mezcla aquí con las Tipo B
+// generales (sin ruta) y con las Tipo B "promovidas" (rutasPromovidas):
+// notificaciones reales que normalmente caerían en su propio slot
+// posicionado, pero que para esta franja superior deben mostrarse aquí
+// en su lugar (ej. "Faltaste el [fecha]", ruta_relacionada='/alumno/horas').
+//
+// Ambos tipos se normalizan a un shape común { key, tipo, mensaje, ruta, id }
+// — Tipo A siempre trae id:null (nunca se "marca como leída", desaparece
+// sola cuando `mostrar` deja de ser true); Tipo B trae su id real. El
+// onClick se calcula por ítem: si tiene id se marca leída, si tiene ruta
+// se navega — así una notificación general genuina (sin ruta, como
+// siempre ha sido el único caso soportado hasta ahora) sigue
+// comportándose igual que antes (solo onLeer, sin navegar).
+function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalculados = [], rutasPromovidas = [] }) {
+  const generales = notificaciones.filter(
+    (n) => !n.ruta_relacionada || rutasPromovidas.includes(n.ruta_relacionada)
+  );
+
+  const items = [
+    ...generales.map((n) => ({ key: `n-${n.id}`, tipo: n.tipo, mensaje: n.mensaje, ruta: n.ruta_relacionada, id: n.id })),
+    ...slotsCalculados
+      .filter((s) => s.mostrar)
+      .map((s) => ({ key: `s-${s.ruta}`, tipo: s.tipo, mensaje: s.mensaje, ruta: s.ruta, id: null })),
+  ];
+
+  if (items.length === 0) return null;
+
   return (
     <div style={{ marginBottom: "1.25rem" }}>
-      {generales.map((n) => (
+      {items.map((item) => (
         <AlertBanner
-          key={n.id}
-          tipo={n.tipo}
+          key={item.key}
+          tipo={item.tipo}
           C={C}
-          onClick={() => onLeer(n.id)}
+          onClick={() => {
+            if (item.id) onLeer(item.id);
+            if (item.ruta) navigate(item.ruta);
+          }}
         >
-          {n.mensaje}
+          {item.mensaje}
         </AlertBanner>
       ))}
     </div>
@@ -275,7 +307,16 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         </p>
       </div>
 
-      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+      <BloqueAlertasGenerales
+        notificaciones={notificaciones}
+        onLeer={onLeerNotificacion}
+        navigate={navigate}
+        C={C}
+        slotsCalculados={[
+          { mostrar: !!resumen.bitacoraHoyPendiente, mensaje: "Falta tu bitácora del día", ruta: "/alumno/bitacora", tipo: "urgente" },
+        ]}
+        rutasPromovidas={["/alumno/horas"]}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
         {stats.map(s => <StatCard key={s.label} {...s} C={C} />)}
@@ -299,7 +340,15 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
 
         {/* CU-AH */}
         <Section title="Actividades y Horas" icon="clock" {...T.blue} C={C}>
-          <ActionItem icon="plus"   {...T.blue}  label="Registrar bitácora del día"      desc="Sin completar"          onClick={() => navigate("/alumno/bitacora")} C={C} />
+          <ActionItem icon="plus"   {...T.blue}  label="Registrar bitácora del día"              onClick={() => navigate("/alumno/bitacora")} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={!!resumen.jornadaSinTerminar}
+            mensaje="Tienes una jornada sin terminar"
+            ruta="/alumno/bitacora"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="book"   {...T.teal}  label="Consultar actividades asignadas" desc="Actividades activas"    onClick={() => navigate("/alumno/actividades")} C={C} />
           <SlotNotificacion ruta="/alumno/actividades" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <SlotNotificacionCalculada
@@ -423,7 +472,20 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
 
       </div>
 
-      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+      <BloqueAlertasGenerales
+        notificaciones={notificaciones}
+        onLeer={onLeerNotificacion}
+        navigate={navigate}
+        C={C}
+        slotsCalculados={[
+          {
+            mostrar: (resumen.alumnosConFaltasCriticas ?? 0) > 0,
+            mensaje: `Tienes ${resumen.alumnosConFaltasCriticas} alumno(s) con faltas criticas`,
+            ruta: "/profesor/solicitar-baja-alumno",
+            tipo: "urgente",
+          },
+        ]}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
         <StatCard icon="users"    label="Alumnos asignados"    value={resumen.alumnosAsignados ?? 0} sub={`de ${resumen.cuposTotales ?? 0} cupos`} {...T.teal} C={C} />
@@ -442,6 +504,14 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
           <ActionItem icon="plus"  {...T.blue}  label="Asignar actividades por alumno" desc="Crear y asignar nuevas actividades" onClick={() => navigate("/profesor/actividades")} C={C} />
           <ActionItem icon="book"  {...T.green} label="Revisar bitácoras por alumno"   desc="Bitácoras pendientes de revisión" onClick={() => navigate("/profesor/bitacoras")} C={C} />
           <SlotNotificacion ruta="/profesor/bitacoras" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.bitacorasPorRevisar ?? 0) > 0}
+            mensaje={`${resumen.bitacorasPorRevisar} bitácora(s) pendiente(s) de revisión`}
+            ruta="/profesor/bitacoras"
+            tipo="warning"
+            navigate={navigate}
+            C={C}
+          />
         </Section>
 
         {/* CU-GR */}

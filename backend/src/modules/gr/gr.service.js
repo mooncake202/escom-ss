@@ -1183,40 +1183,42 @@ async function corregirExpediente(usuarioId) {
 }
 
 /**
- * CU-GR-11, Flujo B / Salida #4 — RN-GR-67/RF-GR-103: el alumno pasa a
- * Alumno Asignado de verdad. Como requireRole() valida contra el rol
- * FIRMADO dentro del JWT (no una consulta fresca a la BD), hay que emitir
- * un token nuevo — si no, el alumno seguiría siendo tratado como
- * alumno_sin_asignar en cualquier endpoint futuro que exija el rol nuevo.
+ * CU-GR-11, Flujo B / Salida #4 — respaldo defensivo del modal de
+ * bienvenida (RN-GR-73). La transición real a Alumno Asignado
+ * (estado_solicitud + rol) ya ocurre atómicamente en decidirExpediente
+ * (gr-coordinador.service.js) en el momento en que Coordinación aprueba —
+ * esta función YA NO la completa, solo cubre el caso raro de que la
+ * notificación de bienvenida se haya marcado leída por otra vía sin que
+ * el alumno haya recibido un token nuevo. Como requireRole() valida
+ * contra el rol FIRMADO en el JWT (no una consulta fresca a BD), sigue
+ * haciendo falta reemitir el token aquí.
  */
 async function continuarAlumnoAsignado(usuarioId) {
-  const alumno = await prisma.alumno.findUnique({
-    where: { usuario_id: usuarioId },
-    include: { solicitud_registro: true },
-  });
-  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
-  if (alumno.solicitud_registro.estado_solicitud !== 'expediente_aprobado') {
-    throw crearError('Tu solicitud no está en el paso correcto para continuar.', 409);
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+  if (!usuario) throw crearError('No se encontró tu usuario.', 404);
+  if (usuario.rol !== 'alumno_asignado') {
+    throw crearError('Tu solicitud todavía no ha sido aprobada.', 409);
   }
 
-  await prisma.$transaction([
-    prisma.solicitud_registro.update({
-      where: { id: alumno.solicitud_registro.id },
-      data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_aprobado' },
-    }),
-    prisma.usuario.update({ where: { id: usuarioId }, data: { rol: 'alumno_asignado' } }),
-  ]);
+  const notificacion = await prisma.notificacion.findFirst({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+  });
+  if (notificacion) {
+    await prisma.notificacion.update({ where: { id: notificacion.id }, data: { leida: true, fecha_leida: new Date() } });
+  }
 
-    const nuevoToken = generarToken({ sub: usuarioId, rol: 'alumno_asignado' });
+  const nuevoToken = generarToken({ sub: usuarioId, rol: 'alumno_asignado' });
 
   return { mensaje: '¡Felicidades! Ya eres Alumno Asignado.', estado_solicitud: 'alumno_asignado', token: nuevoToken };
 }
 
 /**
- * Botón "Entendido" del modal de bienvenida — sirve tanto si el alumno
- * sigue en la pantalla de espera (aún con rol alumno_sin_asignar en su
- * token viejo) como si ya volvió a iniciar sesión (ya con rol
- * alumno_asignado fresco). Por eso NO exige un rol específico.
+ * Botón "Entendido" del modal de bienvenida — puramente informativo
+ * ahora: la transición real a Alumno Asignado ya ocurrió en
+ * decidirExpediente. Sirve tanto si el alumno sigue en la pantalla de
+ * espera (aún con rol alumno_sin_asignar en su token viejo) como si ya
+ * volvió a iniciar sesión (ya con rol alumno_asignado fresco). Por eso
+ * NO exige un rol específico.
  */
 async function confirmarBienvenidaAlumnoAsignado(usuarioId) {
   const notificacion = await prisma.notificacion.findFirst({
@@ -1224,23 +1226,7 @@ async function confirmarBienvenidaAlumnoAsignado(usuarioId) {
   });
   if (!notificacion) throw crearError('No hay ninguna bienvenida pendiente de confirmar.', 404);
 
-  const alumno = await prisma.alumno.findUnique({
-    where: { usuario_id: usuarioId },
-    include: { solicitud_registro: true },
-  });
-
-  await prisma.$transaction(async (tx) => {
-    await tx.notificacion.update({ where: { id: notificacion.id }, data: { leida: true, fecha_leida: new Date() } });
-
-    // Si el alumno llegó aquí SIN haber pasado por login de nuevo, la
-    // transición de estado_solicitud todavía no ocurrió — se completa aquí.
-    if (alumno?.solicitud_registro?.estado_solicitud === 'expediente_aprobado') {
-      await tx.solicitud_registro.update({
-        where: { id: alumno.solicitud_registro.id },
-        data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_aprobado' },
-      });
-    }
-  });
+  await prisma.notificacion.update({ where: { id: notificacion.id }, data: { leida: true, fecha_leida: new Date() } });
 
   // Si el JWT actual de quien pide esto todavía dice alumno_sin_asignar,
   // hace falta un token nuevo — si ya entró con uno correcto desde el

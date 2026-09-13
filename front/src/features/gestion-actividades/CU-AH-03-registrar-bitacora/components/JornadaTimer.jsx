@@ -1,6 +1,10 @@
-import { GRADIENTS, RADIUS } from "@/themes/colors";
+import { useState } from "react";
+import { GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 
-export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onFinalizar, C }) {
+const SEGUNDOS_MINIMOS_JORNADA = 3600;
+
+export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onFinalizar, onDescartar, C }) {
+  const [mostrarConfirmMinimo, setMostrarConfirmMinimo] = useState(false);
   const radio   = 54;
   const circunf = 2 * Math.PI * radio;
   const offset  = circunf * (1 - porcentaje / 100);
@@ -64,7 +68,13 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
 
       {/* Botón finalizar */}
       <button
-        onClick={onFinalizar}
+        onClick={() => {
+          if (segundos < SEGUNDOS_MINIMOS_JORNADA) {
+            setMostrarConfirmMinimo(true);
+          } else {
+            onFinalizar();
+          }
+        }}
         style={{
           padding: "12px 40px", borderRadius: RADIUS.md,
           fontSize: 14, fontWeight: 600, cursor: "pointer",
@@ -78,6 +88,54 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
       >
         Finalizar jornada
       </button>
+
+      {/* Confirmación de jornada por debajo del mínimo de 1 hora — mismo
+          lenguaje visual (overlay + tarjeta centrada) que
+          ModalBienvenidaAlumnoAsignado.jsx, el único modal equivalente ya
+          existente en el proyecto. */}
+      {mostrarConfirmMinimo && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            maxWidth: 440, width: "90%", background: C.bgCard, borderRadius: RADIUS.lg,
+            boxShadow: SHADOWS.xl, padding: "2rem", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: "1rem" }}>⚠️</div>
+            <h2 style={{ margin: "0 0 0.75rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
+              La jornada mínima es de 1 hora
+            </h2>
+            <p style={{ margin: "0 0 1.5rem", fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+              Llevas <strong>{tiempo}</strong>. Si continúas, esta jornada NO se contará como tu bitácora de hoy. Solo se permite una bitácora por día laboral.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                onClick={() => setMostrarConfirmMinimo(false)}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: RADIUS.md,
+                  fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  background: GRADIENTS.primary, border: "none",
+                  color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent,
+                }}
+              >
+                Seguir trabajando
+              </button>
+              <button
+                onClick={() => { setMostrarConfirmMinimo(false); onDescartar(); }}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: RADIUS.md,
+                  fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  background: "transparent", border: `2px solid ${C.danger}`,
+                  color: C.danger, fontFamily: "inherit",
+                }}
+              >
+                Descartar jornada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

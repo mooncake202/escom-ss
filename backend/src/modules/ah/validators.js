@@ -29,18 +29,22 @@ function validarCamposActividad({ titulo, descripcion, entregable_esperado, fech
 
 /**
  * Regla nueva (decisión de diseño propia, no está en la ficha original):
- * fecha_limite debe ser posterior a la fecha de inicio del periodo de
- * servicio social de ESE alumno (solicitud_registro -> periodo_registro ->
- * evento_calendario.fecha_inicio). El profesor SÍ puede asignar actividades
- * antes de que el servicio social del alumno inicie — solo la fecha límite
- * debe caer después del inicio, no la asignación en sí.
+ * fecha_limite debe ser posterior o igual a la fecha de inicio del periodo
+ * de servicio social de ESE alumno (solicitud_registro -> periodo_registro
+ * -> evento_calendario.fecha_inicio) — el propio día de inicio ya es una
+ * jornada laboral válida, así que una fecha_limite ahí es aceptable. El
+ * profesor SÍ puede asignar actividades antes de que el servicio social del
+ * alumno inicie — solo la fecha límite debe caer en o después del inicio,
+ * no la asignación en sí. Compartida por crearActividad, editarActividad y
+ * (vía validarExtensionFecha) extenderFechaLimiteActividad — misma regla de
+ * negocio en los 3 casos, no se bifurca.
  */
 function validarFechaLimiteContraInicio(fechaLimite, fechaInicioPeriodo) {
   if (!fechaInicioPeriodo) return; // no debería ocurrir para un alumno_asignado, pero no truena si falta
   const limite = new Date(fechaLimite);
   const inicio = new Date(fechaInicioPeriodo);
-  if (limite <= inicio) {
-    throw crearError(`La fecha límite debe ser posterior al inicio del servicio social del alumno (${formatearFecha(inicio)}).`);
+  if (limite < inicio) {
+    throw crearError(`La fecha límite debe ser posterior o igual al inicio del servicio social del alumno (${formatearFecha(inicio)}).`);
   }
 }
 
@@ -76,10 +80,61 @@ function validarExtensionFecha(nuevaFecha, fechaActual, fechaInicioPeriodo) {
   validarFechaLimiteContraInicio(nuevaFecha, fechaInicioPeriodo);
 }
 
+/**
+ * CU-AH-03: valida el array `avances` que el alumno envía al confirmar su
+ * bitácora — sin límite superior de actividades (confirmado con el
+ * usuario), pero al menos una, y cada fila con sus 4 campos propios.
+ */
+function validarAvancesBitacora(avances) {
+  if (!Array.isArray(avances) || avances.length === 0) {
+    throw crearError('Debes reportar al menos una actividad trabajada.');
+  }
+
+  avances.forEach((av, idx) => {
+    const n = idx + 1;
+    const actividadId = Number(av?.actividad_id);
+    if (!Number.isInteger(actividadId) || actividadId <= 0) {
+      throw crearError(`Selecciona una actividad válida en la fila ${n}.`);
+    }
+    if (!av?.descripcion || !String(av.descripcion).trim()) {
+      throw crearError(`Describe el trabajo realizado en la fila ${n}.`);
+    }
+    if (!av?.evidencia || !String(av.evidencia).trim()) {
+      throw crearError(`Agrega evidencia del trabajo en la fila ${n}.`);
+    }
+    const pct = Number(av?.porcentaje_avance);
+    if (!Number.isInteger(pct) || pct < 0 || pct > 100) {
+      throw crearError(`El porcentaje de avance de la fila ${n} debe ser un número entre 0 y 100.`);
+    }
+  });
+
+  const ids = avances.map((av) => Number(av.actividad_id));
+  if (new Set(ids).size !== ids.length) {
+    throw crearError('No puedes reportar la misma actividad dos veces en la misma bitácora.');
+  }
+}
+
+/**
+ * CU-AH-03: cada actividad_id reportada debe pertenecer al conjunto de
+ * actividades reportables (ESTADOS_ACTIVIDAD_REPORTABLE) ya traído de BD
+ * para ese alumno — 404 genérico, mismo criterio que obtenerDetalleActividad.
+ */
+function validarActividadesReportables(avances, actividadesDelAlumno) {
+  const reportablesIds = new Set(actividadesDelAlumno.map((a) => a.id));
+  for (const av of avances) {
+    if (!reportablesIds.has(Number(av.actividad_id))) {
+      throw crearError('Una de las actividades seleccionadas no existe o no puede reportarse.', 404);
+    }
+  }
+}
+
 module.exports = {
   crearError,
+  formatearFecha,
   validarCamposActividad,
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
+  validarAvancesBitacora,
+  validarActividadesReportables,
 };

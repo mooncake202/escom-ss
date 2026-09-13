@@ -336,7 +336,7 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
 
   const solicitud = await prisma.solicitud_registro.findUnique({
     where: { id: Number(solicitudId) },
-    include: { alumno: true },
+    include: { alumno: true, oferta: { include: { profesor: true } } },
   });
   if (!solicitud) throw crearError('Solicitud no encontrada.', 404);
   if (solicitud.estado_solicitud !== 'expediente_pendiente_revision') {
@@ -349,15 +349,14 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
 
   if (decision === 'aprobar') {
     await prisma.$transaction([
+      // RN-GR-73: la transición completa a Alumno Asignado (estado_solicitud
+      // + rol) ocurre aquí mismo, atómicamente, en el momento en que
+      // Coordinación aprueba — ya no depende de que el alumno confirme el
+      // modal de bienvenida (que ahora es puramente informativo).
       prisma.solicitud_registro.update({
         where: { id: solicitud.id },
-        data: { estado_solicitud: 'expediente_aprobado', estado_anterior: 'expediente_pendiente_revision', tipo_rechazo: null, motivo_rechazo: null },
+        data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_pendiente_revision', tipo_rechazo: null, motivo_rechazo: null },
       }),
-      // RN-GR-73: el rol cambia aquí mismo, tal como dice la ficha. El
-      // modal de bienvenida (ver notificación abajo) es lo que garantiza
-      // que la transición de estado_solicitud a alumno_asignado se
-      // complete sin importar si el alumno recarga, cierra sesión o
-      // sigue en la misma pantalla.
       prisma.usuario.update({ where: { id: solicitud.alumno.usuario_id }, data: { rol: 'alumno_asignado' } }),
       ...(documentoExpediente
         ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } })]
@@ -380,7 +379,18 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
       console.error('Error al emitir expediente:decidido:', err.message);
     }
 
-    return { estado_solicitud: 'expediente_aprobado' };
+    // Genérico (fail-open): aquí es donde alumnosAsignados y
+    // listarAlumnosDeProfesor REALMENTE cambian para el profesor.
+    const profesorUsuarioId = solicitud.oferta?.profesor?.usuario_id;
+    if (profesorUsuarioId) {
+      try {
+        emitirAUsuario(profesorUsuarioId, 'resumen:actualizado', {});
+      } catch (err) {
+        console.error('Error al emitir resumen:actualizado (profesor, alumno asignado):', err.message);
+      }
+    }
+
+    return { estado_solicitud: 'alumno_asignado' };
   }
 
   // rechazar — RN-GR-71, mismo patrón de reutilizar fila que en GR-11.

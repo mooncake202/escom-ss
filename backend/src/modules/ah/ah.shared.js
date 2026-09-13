@@ -19,4 +19,124 @@ async function tieneActividadesPendientes(solicitudRegistroId) {
   return conteo > 0;
 }
 
-module.exports = { tieneActividadesPendientes, ESTADOS_COMPLETADA };
+// ─────────────────────────────────────────────────────────────
+// CU-AH-03: bitácora del día — helpers compartidos entre
+// ah-alumno.service.js, ah.cron.js y dashboard.service.js.
+// ─────────────────────────────────────────────────────────────
+
+// Estados de actividad sobre los que el alumno puede reportar avance en una
+// bitácora — nunca las ya terminadas (ESTADOS_COMPLETADA de arriba).
+const ESTADOS_ACTIVIDAD_REPORTABLE = ['sin_comenzar', 'en_progreso', 'vencida'];
+
+const HORAS_POR_JORNADA = 4;
+const LIMITE_HORAS_SERVICIO = 480; // RN-AH-17
+// Jornada mínima para poder finalizar/confirmar como bitácora del día — por
+// debajo de esto, el alumno solo puede seguir trabajando o descartarla por
+// completo (cancelarJornada) e intentar de nuevo el mismo día.
+const SEGUNDOS_MINIMOS_JORNADA = 3600;
+
+// RN-AH-14: tipos de evento_calendario que vuelven un día no laborable
+// además de sábado/domingo.
+const TIPOS_EVENTO_NO_LABORABLE = ['Inhabil', 'Vacacional'];
+
+/**
+ * Medianoche del día calendario MÉXICO actual, expresada en UTC — mismo
+ * patrón ya validado en gr.cron.js/ah.cron.js (Intl.DateTimeFormat con
+ * timeZone explícito, nunca getUTCFullYear/Month/Date directo). Se duplica
+ * aquí a propósito en vez de importarse de ah.cron.js: así dashboard.service.js
+ * (que ya importa este archivo) no termina acoplado a los crons, y no se
+ * toca ah.cron.js fuera de lo que esta tarea pide agregarle.
+ */
+function calcularDiaMexicoUTC(ahora = new Date()) {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Mexico_City',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(ahora);
+  const obtener = (tipo) => Number(partes.find((p) => p.type === tipo).value);
+  return new Date(Date.UTC(obtener('year'), obtener('month') - 1, obtener('day')));
+}
+
+function restarDias(diaUTC, n) {
+  return new Date(diaUTC.getTime() - n * 86400000);
+}
+
+/**
+ * RN-AH-14: un día es laborable salvo que sea sábado/domingo, o esté
+ * cubierto por un evento_calendario de tipo Inhabil/Vacacional (el
+ * calendario escolar es global, no se filtra por coordinador_id).
+ */
+async function esDiaLaborable(diaUTC) {
+  const dow = diaUTC.getUTCDay(); // 0 domingo, 6 sábado
+  if (dow === 0 || dow === 6) return false;
+
+  const conteo = await prisma.evento_calendario.count({
+    where: {
+      tipo: { in: TIPOS_EVENTO_NO_LABORABLE },
+      fecha_inicio: { lte: diaUTC },
+      OR: [
+        { fecha_fin: { gte: diaUTC } },
+        { AND: [{ fecha_fin: null }, { fecha_inicio: diaUTC }] },
+      ],
+    },
+  });
+  return conteo === 0;
+}
+
+async function obtenerBitacoraDelDia(solicitudRegistroId, diaUTC) {
+  return prisma.bitacora.findFirst({
+    where: { solicitud_registro_id: Number(solicitudRegistroId), fecha_registro: diaUTC },
+  });
+}
+
+/**
+ * Notificación tipo A #1 ("Falta tu bitácora del día"): hoy es día laboral
+ * Y no existe ninguna bitácora de hoy (en cualquier estado) para la solicitud.
+ */
+async function faltaBitacoraHoy(solicitudRegistroId) {
+  const hoy = calcularDiaMexicoUTC();
+  if (!(await esDiaLaborable(hoy))) return false;
+  const existente = await obtenerBitacoraDelDia(solicitudRegistroId, hoy);
+  return !existente;
+}
+
+/**
+ * Notificación tipo A #3 ("Tienes una jornada sin terminar"): existe una
+ * bitácora 'pendiente_datos' (auto-cerrada por abandono) sin confirmar
+ * todavía. No se limita a "hoy" a propósito — una jornada abandonada ayer
+ * sigue pendiente de completarse.
+ */
+async function tieneJornadaPendienteDatos(solicitudRegistroId) {
+  const conteo = await prisma.bitacora.count({
+    where: { solicitud_registro_id: Number(solicitudRegistroId), estado: 'pendiente_datos' },
+  });
+  return conteo > 0;
+}
+
+/**
+ * Get-or-create perezoso de cumulo_horas_y_faltas — no existía ningún
+ * patrón previo de esto en el módulo. Acepta `tx` para poder llamarse
+ * dentro de una transacción interactiva (confirmarBitacora).
+ */
+async function obtenerOCrearCumulo(alumnoBoleta, tx = prisma) {
+  return tx.cumulo_horas_y_faltas.upsert({
+    where: { alumno_id: alumnoBoleta },
+    update: {},
+    create: { alumno_id: alumnoBoleta },
+  });
+}
+
+module.exports = {
+  tieneActividadesPendientes,
+  ESTADOS_COMPLETADA,
+  ESTADOS_ACTIVIDAD_REPORTABLE,
+  HORAS_POR_JORNADA,
+  LIMITE_HORAS_SERVICIO,
+  SEGUNDOS_MINIMOS_JORNADA,
+  calcularDiaMexicoUTC,
+  restarDias,
+  esDiaLaborable,
+  obtenerBitacoraDelDia,
+  faltaBitacoraHoy,
+  tieneJornadaPendienteDatos,
+  obtenerOCrearCumulo,
+};

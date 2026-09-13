@@ -79,8 +79,12 @@ app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
 
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
-const { iniciarCronVencimientoActividades } = require('./src/modules/ah/ah.cron');
+const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');
 iniciarCronVencimientoActividades();
+
+// Crons de bitácora (AH03) — auto-cierre de jornadas abandonadas (cada 15
+// min) y contabilización nocturna de faltas (06:00 UTC = medianoche México).
+iniciarCronsBitacora();
 
 //gr07
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));

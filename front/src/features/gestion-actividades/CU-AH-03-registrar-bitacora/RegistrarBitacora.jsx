@@ -9,25 +9,48 @@ export default function RegistrarBitacora() {
   const { C } = useTheme();
   const { usuario: sesion } = useSesion();
   const {
-    alumno, fase, segundos, form, avances, errores, loading,
+    cargando, fase, segundos, avances, errores, loading, errorEnvio,
     limiteHoras, horasTrabajadas, porcentajeJornada, tiempoRestante,
-    actividades, iniciarJornada, finalizarJornada,
-    handleChange, agregarAvance, quitarAvance, cambiarAvance,
+    actividades, mensajeBloqueo, pendienteDatos, horasContabilizadas,
+    iniciarJornada, finalizarJornada, cancelarJornada,
+    agregarAvance, quitarAvance, cambiarAvance,
     registrarBitacora, segundosAHHMM,
   } = useRegistrarBitacora();
 
   return (
     <DashboardLayout
       titulo="Registrar bitácora"
-      subtitulo="CU-AH-03 · Alumno"
+      
       rol={sesion?.rol ?? "alumno_asignado"}
       usuario={nombreCompletoSesion(sesion)}
     >
       <div style={{ maxWidth: 680, margin: "0 auto" }}>
 
-        
+        {errorEnvio && (
+          <div style={{ marginBottom: "1rem", padding: "12px 16px", borderRadius: RADIUS.md, background: C.dangerSoft, border: `1px solid ${C.danger}` }}>
+            <p style={{ margin: 0, fontSize: 13, color: C.danger, fontWeight: 500 }}>{errorEnvio}</p>
+          </div>
+        )}
 
-        
+        {/* ── FASE: cargando ── */}
+        {cargando && fase === "cargando" && (
+          <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "2.5rem", textAlign: "center" }}>
+            <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>Cargando tu jornada…</p>
+          </div>
+        )}
+
+        {/* ── FASE: bloqueado ── */}
+        {fase === "bloqueado" && (
+          <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "2.5rem", textAlign: "center" }}>
+            <p style={{ fontSize: 40, margin: "0 0 1rem" }}>⚠️</p>
+            <h2 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
+              No puedes iniciar jornada
+            </h2>
+            <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
+              {mensajeBloqueo}
+            </p>
+          </div>
+        )}
 
         {/* ── FASE: inicio ── */}
         {fase === "inicio" && (
@@ -36,8 +59,14 @@ export default function RegistrarBitacora() {
             <h2 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
               ¿Listo para iniciar tu jornada?
             </h2>
+            <h2 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
+              Recuerda que solo es una al día
+            </h2>
             <p style={{ margin: "0 0 0.5rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
               Límite por día: <strong style={{ color: C.textPrimary }}>{limiteHoras} horas</strong>
+            </p>
+            <p style={{ margin: "0 0 0.5rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
+              Mínimo por día: <strong style={{ color: C.textPrimary }}>1 hora</strong>
             </p>
             <p style={{ margin: "0 0 2rem", fontSize: 12, color: C.textDisabled }}>
               Al iniciar se registrará automáticamente la hora de inicio de tu jornada.
@@ -66,6 +95,7 @@ export default function RegistrarBitacora() {
               limiteHoras={limiteHoras}
               porcentaje={porcentajeJornada}
               onFinalizar={finalizarJornada}
+              onDescartar={cancelarJornada}
               C={C}
             />
           </div>
@@ -75,17 +105,26 @@ export default function RegistrarBitacora() {
         {fase === "formulario" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Resumen jornada */}
-            <div style={{ padding: "12px 16px", borderRadius: RADIUS.md, background: C.successSoft, border: `1px solid ${C.success}`, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 16 }}>⏱</span>
-              <p style={{ margin: 0, fontSize: 13, color: C.success, fontWeight: 500 }}>
-                Jornada finalizada — <strong>{horasTrabajadas} hora{horasTrabajadas !== 1 ? "s" : ""} registradas</strong> ({segundosAHHMM(segundos)} exactas). Ahora completa tu bitácora.
-              </p>
-            </div>
+            {pendienteDatos ? (
+              <div style={{ padding: "12px 16px", borderRadius: RADIUS.md, background: C.warningSoft, border: `1px solid ${C.warning}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <p style={{ margin: 0, fontSize: 13, color: C.warning, fontWeight: 500 }}>
+                  Tu jornada anterior se cerró automáticamente al cumplir {horasContabilizadas} horas sin que la finalizaras. Ya se contabilizaron tus horas — solo falta que completes el detalle de tus avances.
+                </p>
+              </div>
+            ) : (
+              <div style={{ padding: "12px 16px", borderRadius: RADIUS.md, background: C.successSoft, border: `1px solid ${C.success}`, display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⏱</span>
+                <p style={{ margin: 0, fontSize: 13, color: C.success, fontWeight: 500 }}>
+                  Jornada finalizada — <strong>{horasTrabajadas} hora{horasTrabajadas !== 1 ? "s" : ""} registradas</strong> ({segundosAHHMM(segundos)} exactas). Ahora completa tu bitácora.
+                </p>
+              </div>
+            )}
             <FormularioBitacora
-              form={form} errores={errores} actividades={actividades}
+              errores={errores} actividades={actividades}
               avances={avances}
               horasTrabajadas={horasTrabajadas}
-              handleChange={handleChange}
+              pendienteDatos={pendienteDatos}
               onAgregarAvance={agregarAvance}
               onQuitarAvance={quitarAvance}
               onCambiarAvance={cambiarAvance}

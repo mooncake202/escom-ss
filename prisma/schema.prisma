@@ -306,6 +306,10 @@ model cumulo_horas_y_faltas {
   horas_rechazadas    Int    @default(0) @db.UnsignedSmallInt
   faltas_acumuladas   Int    @default(0) @db.UnsignedTinyInt
   faltas_consecutivas Int    @default(0) @db.UnsignedTinyInt
+  // Último día (calendario México) ya evaluado por contabilizarFaltasDiarias
+  // para este alumno — permite recorrer días pendientes si el cron no corrió
+  // uno o varios días (servidor apagado), en vez de perderlos para siempre.
+  fecha_ultima_evaluacion_faltas DateTime? @db.Date
 
   alumno alumno @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
 }
@@ -434,8 +438,12 @@ model bitacora {
   id                    Int       @id @default(autoincrement())
   solicitud_registro_id Int
   hora_inicio           DateTime  @db.DateTime(0)
-  hora_fin              DateTime  @db.DateTime(0)
-  horas_contabilizadas  Int       @db.UnsignedTinyInt
+  // NULL mientras la jornada sigue 'en_curso' — se llenan al finalizar
+  // jornada o al auto-cierre por abandono (CU-AH-03).
+  hora_fin              DateTime? @db.DateTime(0)
+  horas_contabilizadas  Int?      @db.UnsignedTinyInt
+  // estado: 'en_curso' | 'pendiente_datos' | 'pendiente_revision'
+  //         | 'aprobada' | 'rechazada'   (los 2 últimos los usa CU-AH-04)
   estado                String    @db.VarChar(30)
   fecha_registro        DateTime  @db.Date
   motivo_rechazo        String?   @db.Text
@@ -446,6 +454,11 @@ model bitacora {
   revisado_por       profesor?          @relation(fields: [revisado_por_id], references: [id], onDelete: SetNull)
 
   registro_bitacora_actividades registro_bitacora_actividades[]
+
+  // RN-AH-12: una sola bitácora por día laboral por alumno. La validación
+  // en aplicación (iniciarJornada) es la primera línea; esta constraint es
+  // el respaldo final contra doble click / condición de carrera.
+  @@unique([solicitud_registro_id, fecha_registro])
 }
 
 model registro_bitacora_actividades {

@@ -29,4 +29,57 @@ async function getDetalleActividad(req, res) {
   }
 }
 
-module.exports = { getMisActividades, getDetalleActividad };
+async function getEstadoJornada(req, res) {
+  try {
+    const estado = await ahAlumnoService.obtenerEstadoJornadaActual(req.usuario.sub);
+    return res.status(200).json(estado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener estado de jornada:');
+  }
+}
+
+async function postIniciarJornada(req, res) {
+  try {
+    const resultado = await ahAlumnoService.iniciarJornada(req.usuario.sub);
+    return res.status(201).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al iniciar jornada:');
+  }
+}
+
+async function postFinalizarJornada(req, res) {
+  try {
+    const resultado = await ahAlumnoService.finalizarJornada(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al finalizar jornada:');
+  }
+}
+
+async function postCancelarJornada(req, res) {
+  try {
+    const resultado = await ahAlumnoService.cancelarJornada(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al cancelar jornada:');
+  }
+}
+
+async function postConfirmarBitacora(req, res) {
+  try {
+    const resultado = await ahAlumnoService.confirmarBitacora(req.usuario.sub, req.body);
+    return res.status(201).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al confirmar bitácora:');
+  }
+}
+
+module.exports = {
+  getMisActividades,
+  getDetalleActividad,
+  getEstadoJornada,
+  postIniciarJornada,
+  postFinalizarJornada,
+  postCancelarJornada,
+  postConfirmarBitacora,
+};

@@ -141,7 +141,7 @@ export function useAsignarActividades() {
           errs.fecha_limite = "No puede ser anterior a hoy";
         } else if (alumnoSeleccionado?.periodoInicio) {
           const inicio = new Date(alumnoSeleccionado.periodoInicio);
-          if (limite <= inicio) errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+          if (limite < inicio) errs.fecha_limite = "Debe ser posterior o igual al inicio del servicio social del alumno";
         }
       }
     }
