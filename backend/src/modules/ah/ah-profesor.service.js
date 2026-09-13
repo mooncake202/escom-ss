@@ -5,8 +5,24 @@ const {
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
+  validarActividadNoCompletada,
 } = require('./validators');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+
+/**
+ * Genérico (fail-open): avisa al PROPIO profesor que ejecutó la mutación
+ * que su resumen del dashboard (actividadesProximasACaducar,
+ * alumnoSinActividades) pudo haber cambiado — cualquier mutación de
+ * actividad puede alterar ambas condiciones. Mismo criterio ya usado en
+ * el resto de la sesión: sin payload significativo, nunca tumba el flujo.
+ */
+function emitirResumenActualizadoProfesor(profesorUsuarioId) {
+  try {
+    emitirAUsuario(profesorUsuarioId, 'resumen:actualizado', {});
+  } catch (err) {
+    console.error('Error al emitir resumen:actualizado (profesor):', err.message);
+  }
+}
 
 async function resolverProfesor(profesorUsuarioId) {
   const profesor = await prisma.profesor.findUnique({ where: { usuario_id: profesorUsuarioId } });
@@ -148,6 +164,7 @@ async function crearActividad(profesorUsuarioId, solicitudId, datos) {
   } catch (err) {
     console.error('Error al emitir actividad:creada:', err.message);
   }
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
 
   return actividadMapeada;
 }
@@ -184,6 +201,8 @@ async function resolverActividadDeProfesor(profesorUsuarioId, actividadId) {
 async function editarActividad(profesorUsuarioId, actividadId, datos) {
   const { actividad, tieneAvance } = await resolverActividadDeProfesor(profesorUsuarioId, actividadId);
 
+  validarActividadNoCompletada(actividad.estado);
+
   if (tieneAvance) {
     return extenderFechaLimiteActividad(profesorUsuarioId, actividadId, datos.fecha_limite);
   }
@@ -210,6 +229,7 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
   } catch (err) {
     console.error('Error al emitir actividad:editada:', err.message);
   }
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
 
   return actividadMapeada;
 }
@@ -220,6 +240,8 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
  */
 async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuevaFechaLimite) {
   const { actividad } = await resolverActividadDeProfesor(profesorUsuarioId, actividadId);
+
+  validarActividadNoCompletada(actividad.estado);
 
   const fechaInicioPeriodo = actividad.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarExtensionFecha(nuevaFechaLimite, actividad.fecha_limite, fechaInicioPeriodo);
@@ -246,6 +268,7 @@ async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuev
   } catch (err) {
     console.error('Error al emitir actividad:fecha_extendida:', err.message);
   }
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
 
   return mapearActividad(actualizada, true);
 }
@@ -269,6 +292,7 @@ async function eliminarActividad(profesorUsuarioId, actividadId) {
   } catch (err) {
     console.error('Error al emitir actividad:eliminada:', err.message);
   }
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
 }
 
 module.exports = {

@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -7,8 +8,8 @@ const CARRERA_LABEL = {
 };
 
 export function SolicitudDocCard({ solicitud, onVer, C }) {
-  const fecha = new Date(solicitud.fechaEnvio).toLocaleDateString("es-MX", {
-    day: "2-digit", month: "short", year: "numeric", timeZone: "UTC",
+  const fecha = formatearFechaMexico(solicitud.fechaEnvio, {
+    day: "2-digit", month: "short", year: "numeric",
   });
 
   return (

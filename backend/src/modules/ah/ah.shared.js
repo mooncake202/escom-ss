@@ -1,4 +1,5 @@
 const prisma = require('../../lib/prisma');
+const { calcularDiaMexicoUTC } = require('../../lib/fechas');
 
 // RF-AH-06: estados que cuentan como "ya terminada" — todo lo demás cuenta
 // como pendiente para efectos de la notificación tipo A.
@@ -39,22 +40,10 @@ const SEGUNDOS_MINIMOS_JORNADA = 3600;
 // además de sábado/domingo.
 const TIPOS_EVENTO_NO_LABORABLE = ['Inhabil', 'Vacacional'];
 
-/**
- * Medianoche del día calendario MÉXICO actual, expresada en UTC — mismo
- * patrón ya validado en gr.cron.js/ah.cron.js (Intl.DateTimeFormat con
- * timeZone explícito, nunca getUTCFullYear/Month/Date directo). Se duplica
- * aquí a propósito en vez de importarse de ah.cron.js: así dashboard.service.js
- * (que ya importa este archivo) no termina acoplado a los crons, y no se
- * toca ah.cron.js fuera de lo que esta tarea pide agregarle.
- */
-function calcularDiaMexicoUTC(ahora = new Date()) {
-  const partes = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/Mexico_City',
-    year: 'numeric', month: '2-digit', day: '2-digit',
-  }).formatToParts(ahora);
-  const obtener = (tipo) => Number(partes.find((p) => p.type === tipo).value);
-  return new Date(Date.UTC(obtener('year'), obtener('month') - 1, obtener('day')));
-}
+// calcularDiaMexicoUTC ahora vive en backend/src/lib/fechas.js (utilidad
+// genérica, reutilizada también por periodos.service.js) — se re-exporta
+// aquí sin cambios para no tocar ningún import existente (ah.cron.js,
+// ah-alumno.service.js, dashboard.service.js, validators.js).
 
 function restarDias(diaUTC, n) {
   return new Date(diaUTC.getTime() - n * 86400000);

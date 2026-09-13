@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const ESTADO_LABEL = {
   sin_comenzar: "Sin comenzar",
@@ -20,8 +21,9 @@ const ESTADO_STYLE = {
 export function ActividadRow({ actividad, C, onEditar, onEliminar, onExtenderFecha }) {
   const estilo = ESTADO_STYLE[actividad.estado] ?? ESTADO_STYLE.sin_comenzar;
   const etiqueta = ESTADO_LABEL[actividad.estado] ?? actividad.estado;
-  const fecha = new Date(actividad.fecha_asignacion).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  const fecha = formatearFechaMexico(actividad.fecha_asignacion, { day: "2-digit", month: "short", year: "numeric" });
   const esVencida = actividad.estado === "vencida";
+  const esCompletada = actividad.estado === "completada_a_tiempo" || actividad.estado === "completada_tarde";
 
   const handleEliminar = () => {
     if (window.confirm(`¿Eliminar la actividad "${actividad.titulo}"? Esta acción no se puede deshacer.`)) {
@@ -70,32 +72,36 @@ export function ActividadRow({ actividad, C, onEditar, onEliminar, onExtenderFec
         <span style={{ fontSize: 11, color: C.textDisabled }}>{fecha}</span>
       </div>
 
-      {/* RN-AH-05/RF-AH-07: acciones según si ya tiene avance en bitácora */}
-      <div style={{ display: "flex", gap: 8 }}>
-        {actividad.tieneAvance ? (
-          <button
-            onClick={() => onExtenderFecha(actividad)}
-            style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.accent}`, color: C.accentText, fontFamily: "inherit" }}
-          >
-            Extender fecha límite
-          </button>
-        ) : (
-          <>
+      {/* RN-AH-05/RF-AH-07: acciones según si ya tiene avance en bitácora.
+          Una actividad completada (a tiempo o tarde) es un registro
+          histórico cerrado — nunca se muestra ningún botón de acción. */}
+      {!esCompletada && (
+        <div style={{ display: "flex", gap: 8 }}>
+          {actividad.tieneAvance ? (
             <button
-              onClick={() => onEditar(actividad)}
-              style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textSecondary, fontFamily: "inherit" }}
+              onClick={() => onExtenderFecha(actividad)}
+              style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.accent}`, color: C.accentText, fontFamily: "inherit" }}
             >
-              Editar
+              Extender fecha límite
             </button>
-            <button
-              onClick={handleEliminar}
-              style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.danger}`, color: C.danger, fontFamily: "inherit" }}
-            >
-              Eliminar
-            </button>
-          </>
-        )}
-      </div>
+          ) : (
+            <>
+              <button
+                onClick={() => onEditar(actividad)}
+                style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textSecondary, fontFamily: "inherit" }}
+              >
+                Editar
+              </button>
+              <button
+                onClick={handleEliminar}
+                style={{ padding: "5px 12px", borderRadius: RADIUS.sm, fontSize: 12, fontWeight: 600, cursor: "pointer", background: "transparent", border: `1px solid ${C.danger}`, color: C.danger, fontFamily: "inherit" }}
+              >
+                Eliminar
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

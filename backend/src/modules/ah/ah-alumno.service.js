@@ -70,7 +70,10 @@ async function listarActividadesAlumno(alumnoUsuarioId) {
   const { solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
 
   const fechaInicio = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
-  const servicioIniciado = fechaInicio ? new Date() >= new Date(fechaInicio) : false;
+  // Día calendario MÉXICO de hoy contra el día calendario de fechaInicio —
+  // antes comparaba el instante exacto actual contra la medianoche UTC de
+  // fechaInicio, activando servicioIniciado hasta 18h antes de lo real.
+  const servicioIniciado = fechaInicio ? calcularDiaMexicoUTC() >= new Date(fechaInicio) : false;
 
   const actividades = await prisma.actividad.findMany({
     where: { solicitud_registro_id: solicitud.id },

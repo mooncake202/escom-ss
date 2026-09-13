@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -7,7 +8,7 @@ const CARRERA_LABEL = {
 };
 
 export function ExpedienteCard({ item, onVer, C }) {
-  const fecha = new Date(item.fechaEnvio).toLocaleDateString("es-MX", {
+  const fecha = formatearFechaMexico(item.fechaEnvio, {
     day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 

@@ -1,5 +1,6 @@
 import { Field, InputField, ErrorMsg } from "@/components/ui/FormFields";
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 export function StepModCredenciales({
   form,
@@ -19,10 +20,10 @@ export function StepModCredenciales({
   );
 
   const inicioFormateado = periodoSeleccionado
-    ? new Date(periodoSeleccionado.fechaInicio).toLocaleDateString("es-MX")
+    ? formatearFechaUTC(periodoSeleccionado.fechaInicio)
     : "";
   const finFormateado = periodoSeleccionado
-    ? new Date(periodoSeleccionado.fechaFin).toLocaleDateString("es-MX")
+    ? formatearFechaUTC(periodoSeleccionado.fechaFin)
     : "";
 
   return (

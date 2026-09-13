@@ -2,6 +2,8 @@
 // backend/src/lib/validators.js a propósito, ese archivo es solo para datos
 // personales/académicos de GR.
 
+const { calcularDiaMexicoUTC, ESTADOS_COMPLETADA } = require('./ah.shared');
+
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
   err.status = status;
@@ -56,8 +58,7 @@ function validarFechaLimiteContraInicio(fechaLimite, fechaInicioPeriodo) {
  */
 function validarFechaLimiteNoPasada(fechaLimite) {
   const limite = new Date(fechaLimite);
-  const ahora = new Date();
-  const hoy = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+  const hoy = calcularDiaMexicoUTC();
   if (limite < hoy) {
     throw crearError(`La fecha límite no puede ser anterior a hoy (${formatearFecha(hoy)}).`);
   }
@@ -78,6 +79,18 @@ function validarExtensionFecha(nuevaFecha, fechaActual, fechaInicioPeriodo) {
     throw crearError(`La nueva fecha límite debe ser posterior a la fecha límite actual (${formatearFecha(actual)}).`);
   }
   validarFechaLimiteContraInicio(nuevaFecha, fechaInicioPeriodo);
+}
+
+/**
+ * RN-AH: una actividad completada (a tiempo o tarde) es un registro
+ * histórico cerrado — no se puede editar ni extender su fecha_limite.
+ * `vencida` NO está en ESTADOS_COMPLETADA y sigue permitiendo ambas
+ * acciones exactamente igual que antes.
+ */
+function validarActividadNoCompletada(estadoActividad) {
+  if (ESTADOS_COMPLETADA.includes(estadoActividad)) {
+    throw crearError('No se puede modificar una actividad ya completada.', 409);
+  }
 }
 
 /**
@@ -135,6 +148,7 @@ module.exports = {
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
+  validarActividadNoCompletada,
   validarAvancesBitacora,
   validarActividadesReportables,
 };

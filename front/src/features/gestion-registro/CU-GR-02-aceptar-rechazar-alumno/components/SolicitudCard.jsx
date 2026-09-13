@@ -1,9 +1,10 @@
 import { RADIUS } from "../../../../themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const CARRERA_LABEL = { ISC: "Ing. Sistemas Computacionales", IA: "Inteligencia Artificial", LCD: "Lic. Ciencia de Datos" };
 
 export function SolicitudCard({ solicitud, onVer, C }) {
-  const fecha = new Date(solicitud.fechaCreacion).toLocaleDateString("es-MX", {
+  const fecha = formatearFechaMexico(solicitud.fechaCreacion, {
     day: "2-digit", month: "short", year: "numeric",
   });
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GRADIENTS, RADIUS, SHADOWS } from "@/themes/colors";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 // Modos del panel: normal | rechazo | trabajo-adicional
 const MODO = { NORMAL: "normal", RECHAZO: "rechazo", ADICIONAL: "adicional" };
@@ -48,7 +49,7 @@ export function DetalleBitacora({ bitacora, loading, comentario, setComentario, 
     });
   };
 
-  const fecha   = new Date(bitacora.fecha).toLocaleDateString("es-MX", { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
+  const fecha   = formatearFechaUTC(bitacora.fecha, { weekday: "long", day: "2-digit", month: "long", year: "numeric" });
   const esUrl   = bitacora.evidencia.startsWith("http");
 
   return (

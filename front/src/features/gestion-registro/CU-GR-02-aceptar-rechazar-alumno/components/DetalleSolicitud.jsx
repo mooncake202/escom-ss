@@ -1,4 +1,5 @@
 import { GRADIENTS, RADIUS, SHADOWS } from "../../../../themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const CARRERA_LABEL = { ISC: "Ing. Sistemas Computacionales", IA: "Inteligencia Artificial", LCD: "Lic. Ciencia de Datos" };
 
@@ -15,6 +16,10 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
   if (!solicitud) return null;
 
   const fmtFecha = (iso) => iso ? new Date(iso).toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric", timeZone: "UTC" }) : "—";
+  // fechaCreacion es un timestamp real (fecha_aplicacion, @db.DateTime), no
+  // un día calendario puro como periodoInicio/periodoFin — necesita México
+  // explícito, no UTC (fmtFecha arriba se queda igual para esos dos).
+  const fmtFechaHora = (iso) => iso ? formatearFechaMexico(iso, { day: "2-digit", month: "long", year: "numeric" }) : "—";
 
   return (
     <>
@@ -73,7 +78,7 @@ export function DetalleSolicitud({ solicitud, loading, onDecidir, onCerrar, C })
           <InfoRow label="Dictamen"         value={solicitud.dictamen || "Sin dictamen"} C={C} />
           <InfoRow label="Periodo inicio"   value={fmtFecha(solicitud.periodoInicio)} C={C} />
           <InfoRow label="Periodo término"  value={fmtFecha(solicitud.periodoFin)}    C={C} />
-          <InfoRow label="Fecha de envío"   value={fmtFecha(solicitud.fechaCreacion)}    C={C} />
+          <InfoRow label="Fecha de envío"   value={fmtFechaHora(solicitud.fechaCreacion)}    C={C} />
           <InfoRow label="Vacante" value={solicitud.tituloOferta} C={C} />
           <InfoRow label="Habilidades y motivación" value={solicitud.motivacion} C={C} />
 

@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const ESTADO_LABEL = {
   sin_comenzar: "Sin comenzar",
@@ -20,7 +21,7 @@ const ESTADO_STYLE = {
 export function ActividadCard({ actividad, expandida, onToggle, servicioIniciado = true, C }) {
   const estilo   = ESTADO_STYLE[actividad.estado] ?? ESTADO_STYLE.sin_comenzar;
   const etiqueta = ESTADO_LABEL[actividad.estado] ?? actividad.estado;
-  const fechaAsignacion = new Date(actividad.fecha_asignacion).toLocaleDateString("es-MX", {
+  const fechaAsignacion = formatearFechaMexico(actividad.fecha_asignacion, {
     day: "2-digit", month: "long", year: "numeric",
   });
   const fechaLimite = actividad.fecha_limite

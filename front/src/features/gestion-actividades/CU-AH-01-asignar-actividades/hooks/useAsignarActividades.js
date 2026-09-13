@@ -6,6 +6,7 @@ import {
   editarActividad as editarActividadApi,
   eliminarActividad as eliminarActividadApi,
 } from "@/services/ahProfesorService";
+import { calcularDiaMexicoUTC } from "@/utils/fechas";
 
 const FORM_INICIAL = { titulo: "", descripcion: "", entregable_esperado: "", fecha_limite: "" };
 
@@ -134,9 +135,9 @@ export function useAsignarActividades() {
       } else {
         const limite = new Date(form.fecha_limite);
         // Regla independiente y adicional: sin importar el inicio del
-        // periodo del alumno, la fecha límite no puede ser anterior a hoy.
-        const ahora = new Date();
-        const hoy = new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate()));
+        // periodo del alumno, la fecha límite no puede ser anterior a hoy
+        // (día calendario MÉXICO, no UTC crudo — ver calcularDiaMexicoUTC).
+        const hoy = calcularDiaMexicoUTC();
         if (limite < hoy) {
           errs.fecha_limite = "No puede ser anterior a hoy";
         } else if (alumnoSeleccionado?.periodoInicio) {

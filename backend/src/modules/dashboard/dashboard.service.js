@@ -1,14 +1,63 @@
 const prisma = require('../../lib/prisma');
-const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos } = require('../ah/ah.shared');
+const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC } = require('../ah/ah.shared');
 
 const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
 const ESTADO_LSS_EVALUACION_SOLICITADA = 'evaluacion_solicitada';
 const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // último estado del flujo LSS
 
+const ESTADOS_ACTIVOS = ['sin_comenzar', 'en_progreso'];
+
 function formatearPeriodo(periodo) {
   if (!periodo) return null;
   const semestreNum = periodo.semestre.replace('s0', '');
   return `${periodo.anio}-${semestreNum}`;
+}
+
+/**
+ * Notificaciones calculadas del dashboard de profesor (Tipo A, sin tabla
+ * `notificacion`): por cada alumno de este profesor, evalúa sobre sus
+ * actividades ACTIVAS (sin_comenzar/en_progreso — nunca vencida ni
+ * completadas) dos condiciones independientes:
+ * - actividadesProximasACaducar: la fecha_limite MÁS LEJANA entre sus
+ *   activas está a menos de 2 días de hoy (México, día calendario) o ya
+ *   pasó — "la última actividad que le queda por hacer" está por vencer.
+ * - alumnoSinActividades: el alumno tiene CERO actividades activas y su
+ *   periodo ya inició o inicia mañana (no tiene sentido avisar de un
+ *   alumno cuyo servicio ni siquiera ha comenzado).
+ * Basta con que UN alumno cumpla cada condición para activar el aviso
+ * correspondiente — el mensaje es fijo, sin conteo.
+ */
+async function calcularAlertasActividadesProfesor(profesorId) {
+  const solicitudes = await prisma.solicitud_registro.findMany({
+    where: { estado_solicitud: 'alumno_asignado', oferta: { profesor_id: profesorId } },
+    select: {
+      periodo_registro: { select: { evento_calendario: { select: { fecha_inicio: true } } } },
+      actividad: { where: { estado: { in: ESTADOS_ACTIVOS } }, select: { fecha_limite: true } },
+    },
+  });
+
+  const hoy = calcularDiaMexicoUTC();
+  let actividadesProximasACaducar = false;
+  let alumnoSinActividades = false;
+
+  for (const s of solicitudes) {
+    if (s.actividad.length === 0) {
+      const fechaInicio = s.periodo_registro?.evento_calendario?.fecha_inicio;
+      if (fechaInicio) {
+        const diasHastaInicio = Math.round((new Date(fechaInicio) - hoy) / 86400000);
+        if (diasHastaInicio <= 1) alumnoSinActividades = true;
+      }
+      continue;
+    }
+    const maxFechaLimite = s.actividad.reduce(
+      (max, a) => (a.fecha_limite > max ? a.fecha_limite : max),
+      s.actividad[0].fecha_limite,
+    );
+    const diasHastaLimite = Math.round((new Date(maxFechaLimite) - hoy) / 86400000);
+    if (diasHastaLimite < 2) actividadesProximasACaducar = true;
+  }
+
+  return { actividadesProximasACaducar, alumnoSinActividades };
 }
 
 async function resumenAlumno(usuarioId) {
@@ -34,7 +83,9 @@ async function resumenAlumno(usuarioId) {
   const solicitudId = alumno.solicitud_registro.id;
 
   const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar] = await Promise.all([
-    prisma.actividad.count({ where: { solicitud_registro_id: solicitudId } }),
+    // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
+    // y ambas variantes de completada (antes contaba todo, bug reportado).
+    prisma.actividad.count({ where: { solicitud_registro_id: solicitudId, estado: { in: ['sin_comenzar', 'en_progreso'] } } }),
     prisma.reporte_mensual.count({ where: { solicitud_registro_id: solicitudId } }),
     tieneActividadesPendientes(solicitudId),
     faltaBitacoraHoy(solicitudId),
@@ -71,11 +122,12 @@ async function resumenProfesor(usuarioId) {
       alumnosAsignados: 0, cuposTotales: 0, ofertasActivas: 0,
       reportesPorRevisar: 0, bitacorasPorRevisar: 0, solicitudesPendientes: 0,
       alumnosConFaltasCriticas: 0,
+      actividadesProximasACaducar: false, alumnoSinActividades: false,
       departamento: null, cubiculo: null, caracteristicas: [],
     };
   }
 
-const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar] = await Promise.all([
+const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
     // final del proceso GR.
@@ -107,10 +159,13 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     prisma.bitacora.count({
       where: { estado: 'pendiente_revision', solicitud_registro: { oferta: { profesor_id: profesor.id } } },
     }),
+    calcularAlertasActividadesProfesor(profesor.id),
   ]);
 
   return {
     alumnosAsignados,
+    actividadesProximasACaducar: alertasActividades.actividadesProximasACaducar,
+    alumnoSinActividades: alertasActividades.alumnoSinActividades,
     cuposTotales: profesor.cupos_totales,
     ofertasActivas,
     solicitudesPendientes,

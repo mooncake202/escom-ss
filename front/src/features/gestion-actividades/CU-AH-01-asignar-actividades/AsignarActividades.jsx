@@ -25,6 +25,7 @@ export default function AsignarActividades() {
   const [filtroProyecto, setFiltroProyecto] = useState("todas");
   const [filtroCarrera, setFiltroCarrera] = useState([]);
   const [acordeonVencidasAbierto, setAcordeonVencidasAbierto] = useState(false);
+  const [acordeonCompletadasAbierto, setAcordeonCompletadasAbierto] = useState(false);
   const {
     alumnos, cargandoAlumnos,
     alumnoSeleccionado, cargandoDetalle,
@@ -55,10 +56,11 @@ export default function AsignarActividades() {
     ? new Date(alumnoSeleccionado.periodoInicio).toLocaleDateString("es-MX", { timeZone: "UTC" })
     : null;
 
-  // La lista general excluye vencidas — esas viven aparte, en el acordeón,
-  // para no duplicarlas en dos lugares.
-  const actividadesActivas = alumnoSeleccionado?.actividades.filter(a => a.estado !== "vencida") ?? [];
+  // La lista general excluye vencidas Y completadas — esas viven aparte,
+  // en sus propios acordeones, para no duplicarlas en dos lugares.
+  const actividadesActivas = alumnoSeleccionado?.actividades.filter(a => a.estado === "sin_comenzar" || a.estado === "en_progreso") ?? [];
   const actividadesVencidas = alumnoSeleccionado?.actividades.filter(a => a.estado === "vencida") ?? [];
+  const actividadesCompletadas = alumnoSeleccionado?.actividades.filter(a => a.estado === "completada_a_tiempo" || a.estado === "completada_tarde") ?? [];
 
   return (
     <DashboardLayout
@@ -342,6 +344,35 @@ export default function AsignarActividades() {
                   {acordeonVencidasAbierto && (
                     <div style={{ marginTop: "1rem" }}>
                       {actividadesVencidas.map(act => (
+                        <ActividadRow
+                          key={act.id} actividad={act} C={C}
+                          onEditar={abrirEditar}
+                          onEliminar={eliminarActividad}
+                          onExtenderFecha={abrirExtenderFecha}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Acordeón de actividades completadas (a tiempo + tarde,
+                  juntas) — colapsado por defecto, mismo mecanismo que el
+                  de vencidas. Nunca muestra botones de editar/extender
+                  (ActividadRow los oculta para estados completados). */}
+              {actividadesCompletadas.length > 0 && (
+                <div style={{ marginTop: "1rem", background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "1.25rem 1.5rem" }}>
+                  <button
+                    onClick={() => setAcordeonCompletadasAbierto(v => !v)}
+                    style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: 0, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit", color: "#22C55E", fontSize: 13, fontWeight: 700 }}
+                  >
+                    <span>{acordeonCompletadasAbierto ? "▾" : "▸"}</span>
+                    {actividadesCompletadas.length} actividad{actividadesCompletadas.length !== 1 ? "es" : ""} completada{actividadesCompletadas.length !== 1 ? "s" : ""}
+                  </button>
+
+                  {acordeonCompletadasAbierto && (
+                    <div style={{ marginTop: "1rem" }}>
+                      {actividadesCompletadas.map(act => (
                         <ActividadRow
                           key={act.id} actividad={act} C={C}
                           onEditar={abrirEditar}

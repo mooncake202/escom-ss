@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -7,7 +8,7 @@ const CARRERA_LABEL = {
 };
 
 export function BitacoraCard({ bitacora, onVer, C }) {
-  const fecha = new Date(bitacora.fecha).toLocaleDateString("es-MX", {
+  const fecha = formatearFechaUTC(bitacora.fecha, {
     weekday: "long", day: "2-digit", month: "long",
   });
 

@@ -484,6 +484,18 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             ruta: "/profesor/solicitar-baja-alumno",
             tipo: "urgente",
           },
+          {
+            mostrar: !!resumen.actividadesProximasACaducar,
+            mensaje: "Actividades de alumnos próximas a caducar. Asígnales más.",
+            ruta: "/profesor/actividades",
+            tipo: "urgente",
+          },
+          {
+            mostrar: !!resumen.alumnoSinActividades,
+            mensaje: "Un alumno no tiene actividades. Asígnales más.",
+            ruta: "/profesor/actividades",
+            tipo: "warning",
+          },
         ]}
       />
 

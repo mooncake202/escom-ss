@@ -71,24 +71,42 @@ async function marcarActividadesVencidas() {
     select: {
       id: true,
       titulo: true,
-      solicitud_registro: { select: { alumno: { select: { usuario_id: true } } } },
+      solicitud_registro: {
+        select: {
+          alumno: { select: { usuario_id: true } },
+          oferta: { select: { profesor: { select: { usuario_id: true } } } },
+        },
+      },
     },
   });
 
   const resultado = await prisma.actividad.updateMany({ where, data: { estado: 'vencida' } });
 
   const actividadesPorAlumno = new Map();
+  const profesoresAfectados = new Set();
   for (const a of afectadas) {
     const usuarioId = a.solicitud_registro?.alumno?.usuario_id;
-    if (!usuarioId) continue;
-    if (!actividadesPorAlumno.has(usuarioId)) actividadesPorAlumno.set(usuarioId, []);
-    actividadesPorAlumno.get(usuarioId).push({ id: a.id, titulo: a.titulo });
+    if (usuarioId) {
+      if (!actividadesPorAlumno.has(usuarioId)) actividadesPorAlumno.set(usuarioId, []);
+      actividadesPorAlumno.get(usuarioId).push({ id: a.id, titulo: a.titulo });
+    }
+    const profesorUsuarioId = a.solicitud_registro?.oferta?.profesor?.usuario_id;
+    if (profesorUsuarioId) profesoresAfectados.add(profesorUsuarioId);
   }
   for (const [usuarioId, actividades] of actividadesPorAlumno) {
     try {
       emitirAUsuario(usuarioId, 'actividad:vencida', { actividades });
     } catch (err) {
       console.error('[ah.cron] Error al emitir actividad:vencida:', err.message);
+    }
+  }
+  // Genérico (fail-open): una actividad que vence puede cambiar
+  // actividadesProximasACaducar/alumnoSinActividades del profesor dueño.
+  for (const profesorUsuarioId of profesoresAfectados) {
+    try {
+      emitirAUsuario(profesorUsuarioId, 'resumen:actualizado', {});
+    } catch (err) {
+      console.error('[ah.cron] Error al emitir resumen:actualizado (profesor):', err.message);
     }
   }
 
