@@ -185,13 +185,13 @@ function App() {
         } />
 
         <Route path="/alumno/horas" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><AcumuladoHoras rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><AcumuladoHoras /></RutaProtegida>
         } />
         <Route path="/profesor/horas" element={
-          <RutaProtegida roles={PROFESOR}><AcumuladoHoras rol="profesor" /></RutaProtegida>
+          <RutaProtegida roles={PROFESOR}><AcumuladoHoras /></RutaProtegida>
         } />
         <Route path="/coordinacion/horas" element={
-          <RutaProtegida roles={COORDINADOR}><AcumuladoHoras rol="coordinacion" /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><AcumuladoHoras /></RutaProtegida>
         } />
 
 

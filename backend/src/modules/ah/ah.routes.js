@@ -9,6 +9,7 @@ const {
   getBitacorasPendientes,
   postAprobarBitacora,
   postRechazarBitacora,
+  getAcumuladoAlumnos,
 } = require('./ah.controller');
 
 const router = express.Router();
@@ -26,5 +27,8 @@ router.delete('/actividades/:id', requireAuth, requireRole('profesor'), deleteAc
 router.get('/bitacoras', requireAuth, requireRole('profesor'), getBitacorasPendientes);
 router.post('/bitacoras/:id/aprobar', requireAuth, requireRole('profesor'), postAprobarBitacora);
 router.post('/bitacoras/:id/rechazar', requireAuth, requireRole('profesor'), postRechazarBitacora);
+
+// CU-AH-05 — consultar acumulado de horas.
+router.get('/horas', requireAuth, requireRole('profesor'), getAcumuladoAlumnos);
 
 module.exports = router;

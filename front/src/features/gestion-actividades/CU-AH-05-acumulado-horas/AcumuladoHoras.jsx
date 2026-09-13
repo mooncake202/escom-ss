@@ -42,6 +42,15 @@ function Breadcrumb({ items, C }) {
   );
 }
 
+// ── Aviso informativo, no bloqueante (RF-AH-45) ──────────────
+function AvisoSinBitacoras({ C }) {
+  return (
+    <p style={{ fontSize: 12, color: C.textMuted, marginTop: "0.75rem", textAlign: "center" }}>
+      Aún no hay bitácoras registradas.
+    </p>
+  );
+}
+
 // ── Stats del alumno (columna derecha) ───────────────────────
 function DetalleAlumno({ alumno, C }) {
   return (
@@ -71,6 +80,8 @@ function DetalleAlumno({ alumno, C }) {
         padding: "1.25rem 1.5rem", marginTop: "1rem" }}>
         <BarraProgreso datos={alumno} C={C} />
       </div>
+
+      {alumno.sinBitacoras && <AvisoSinBitacoras C={C} />}
     </div>
   );
 }
@@ -114,6 +125,8 @@ function VistaAlumno({ propio, C }) {
         padding: "1.25rem 1.5rem", marginTop: "1rem" }}>
         <BarraProgreso datos={propio} C={C} />
       </div>
+
+      {propio.sinBitacoras && <AvisoSinBitacoras C={C} />}
     </div>
   );
 }
@@ -201,10 +214,13 @@ function VistaProfesor({ alumnos, C }) {
 
       {/* Columna derecha */}
       <div style={{ flex: 1, borderLeft: `1px solid ${C.borderSubtle}`, paddingLeft: "1.5rem", minWidth: 0 }}>
-        {alumnoVisto
-          ? <DetalleAlumno alumno={alumnoVisto} C={C} />
-          : <Placeholder emoji="📋" texto="Selecciona un alumno para ver su progreso" C={C} />
-        }
+        {alumnoVisto ? (
+          <DetalleAlumno alumno={alumnoVisto} C={C} />
+        ) : alumnos.length === 0 ? (
+          <Placeholder emoji="🚫" texto="No tienes alumnos bajo tu supervisión" C={C} />
+        ) : (
+          <Placeholder emoji="📋" texto="Selecciona un alumno para ver su progreso" C={C} />
+        )}
       </div>
 
     </div>
@@ -290,7 +306,7 @@ function VistaCoordinacion({ profesores, C }) {
                 ))}
                 {profesoresFiltrados.length === 0 && (
                   <p style={{ fontSize: 12, color: C.textMuted, textAlign: "center", padding: "1rem 0" }}>
-                    Sin resultados
+                    {profesores.length === 0 ? "No hay profesores registrados" : "Sin resultados"}
                   </p>
                 )}
               </div>
@@ -330,7 +346,10 @@ function VistaCoordinacion({ profesores, C }) {
           {!profesorVisto && (
             <Placeholder emoji="👥" texto="Selecciona un profesor para ver sus alumnos" C={C} />
           )}
-          {profesorVisto && !alumnoVisto && (
+          {profesorVisto && !alumnoVisto && profesorVisto.alumnos.length === 0 && (
+            <Placeholder emoji="🚫" texto="Este profesor no tiene alumnos bajo su supervisión" C={C} />
+          )}
+          {profesorVisto && !alumnoVisto && profesorVisto.alumnos.length > 0 && (
             <Placeholder emoji="📋" texto="Selecciona un alumno para ver su progreso" C={C} />
           )}
           {alumnoVisto && <DetalleAlumno alumno={alumnoVisto} C={C} />}
@@ -341,31 +360,40 @@ function VistaCoordinacion({ profesores, C }) {
   );
 }
 
+// Rol REAL de sesión → clave interna que decide qué vista renderizar —
+// reemplaza el prop manual `rol` que antes pasaba App.jsx.
+const ROL_INTERNO = { alumno_asignado: "alumno", profesor: "profesor", coordinador: "coordinacion" };
+
 // ── Página principal ─────────────────────────────────────────
-export default function AcumuladoHoras({ rol = "alumno" }) {
+export default function AcumuladoHoras() {
   const { C } = useTheme();
   const { usuario: sesion } = useSesion();
-  const { propio, alumnos, profesores } = useAcumuladoHoras(rol);
+  const rolInterno = ROL_INTERNO[sesion?.rol] ?? "alumno";
+  const { propio, alumnos, profesores, cargando } = useAcumuladoHoras(rolInterno);
 
   const titulos = {
-    alumno:       { titulo: "Mi acumulado de horas", sub: "CU-AH-05 · Alumno"        },
-    profesor:     { titulo: "Acumulado de horas",    sub: "CU-AH-05 · Profesor"      },
-    coordinacion: { titulo: "Acumulado de horas",    sub: "CU-AH-05 · Coordinación"  },
+    alumno:       { titulo: "Mi acumulado de horas",         },
+    profesor:     { titulo: "Acumulado de horas",          },
+    coordinacion: { titulo: "Acumulado de horas",      },
   };
-  const { titulo, sub } = titulos[rol] ?? titulos.alumno;
-
-  // "rol" aquí decide qué VISTA renderizar (alumno/profesor/coordinacion) —
-  // ese contrato interno no cambia. Pero el Sidebar (NAV_ITEMS en
-  // Sidebar.jsx) espera la clave real "alumno_asignado", no "alumno" — sin
-  // este mapeo cae al fallback de NAV_ITEMS.profesor.
-  const rolSidebar = rol === "alumno" ? "alumno_asignado" : rol;
+  const { titulo, sub } = titulos[rolInterno];
 
   return (
-    <DashboardLayout titulo={titulo} subtitulo={sub} rol={rolSidebar}
+    <DashboardLayout titulo={titulo} subtitulo={sub} rol={sesion?.rol}
       usuario={nombreCompletoSesion(sesion)}>
-      {rol === "alumno"  && <VistaAlumno propio={propio} C={C} />}
-      {rol === "profesor" && <VistaProfesor alumnos={alumnos} C={C} />}
-      {rol === "coordinacion" && <VistaCoordinacion profesores={profesores} C={C} />}
+      {cargando ? (
+        <Placeholder emoji="⏳" texto="Cargando..." C={C} />
+      ) : (
+        <>
+          {rolInterno === "alumno" && (
+            propio
+              ? <VistaAlumno propio={propio} C={C} />
+              : <Placeholder emoji="⚠️" texto="No se pudo cargar tu acumulado de horas." C={C} />
+          )}
+          {rolInterno === "profesor"     && <VistaProfesor alumnos={alumnos} C={C} />}
+          {rolInterno === "coordinacion" && <VistaCoordinacion profesores={profesores} C={C} />}
+        </>
+      )}
     </DashboardLayout>
   );
 }

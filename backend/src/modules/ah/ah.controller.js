@@ -84,7 +84,17 @@ async function postRechazarBitacora(req, res) {
   }
 }
 
+async function getAcumuladoAlumnos(req, res) {
+  try {
+    const alumnos = await ahProfesorService.listarAcumuladoAlumnosDeProfesor(req.usuario.sub);
+    return res.status(200).json(alumnos);
+  } catch (err) {
+    return manejarError(err, res, 'Error al listar acumulado de horas (profesor):');
+  }
+}
+
 module.exports = {
   getAlumnos, getDetalleAlumno, postCrearActividad, putEditarActividad, deleteActividad,
   getBitacorasPendientes, postAprobarBitacora, postRechazarBitacora,
+  getAcumuladoAlumnos,
 };

@@ -321,6 +321,36 @@ async function cancelarJornada(alumnoUsuarioId) {
   return { cancelada: true, fase: 'inicio' };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-AH-05: consultar acumulado de horas (vista alumno).
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * RF-AH-45: los números se muestran siempre (en 0 si no hay nada) — el
+ * flag `sinBitacoras` es solo un aviso adicional, nunca bloquea el acceso.
+ */
+async function obtenerAcumuladoPropio(alumnoUsuarioId) {
+  const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
+
+  const [cumulo, totalBitacoras] = await Promise.all([
+    obtenerOCrearCumulo(alumno.boleta),
+    prisma.bitacora.count({ where: { solicitud_registro_id: solicitud.id } }),
+  ]);
+
+  const horasRealizadas = calcularHorasNetas(cumulo);
+
+  return {
+    horasTotales: LIMITE_HORAS_SERVICIO,
+    horasRealizadas,
+    horasRestantes: Math.max(LIMITE_HORAS_SERVICIO - horasRealizadas, 0),
+    horasRechazadas: cumulo.horas_rechazadas,
+    porcentajeAvance: Math.min(Math.round((horasRealizadas / LIMITE_HORAS_SERVICIO) * 100), 100),
+    faltasConsecutivas: cumulo.faltas_consecutivas,
+    faltasAcumuladas: cumulo.faltas_acumuladas,
+    sinBitacoras: totalBitacoras === 0,
+  };
+}
+
 async function confirmarBitacora(alumnoUsuarioId, { avances }) {
   const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
 
@@ -405,4 +435,5 @@ module.exports = {
   finalizarJornada,
   cancelarJornada,
   confirmarBitacora,
+  obtenerAcumuladoPropio,
 };

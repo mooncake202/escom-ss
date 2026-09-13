@@ -18,7 +18,7 @@ export default function RevisarAvances() {
   return (
     <DashboardLayout
       titulo="Revisar avances y horas"
-      subtitulo="CU-AH-04 · Profesor"
+      
       rol="profesor"
       usuario={nombreCompletoSesion(sesion)}
     >

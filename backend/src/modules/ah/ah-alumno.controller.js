@@ -74,6 +74,15 @@ async function postConfirmarBitacora(req, res) {
   }
 }
 
+async function getAcumuladoPropio(req, res) {
+  try {
+    const acumulado = await ahAlumnoService.obtenerAcumuladoPropio(req.usuario.sub);
+    return res.status(200).json(acumulado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener acumulado de horas (alumno):');
+  }
+}
+
 module.exports = {
   getMisActividades,
   getDetalleActividad,
@@ -82,4 +91,5 @@ module.exports = {
   postFinalizarJornada,
   postCancelarJornada,
   postConfirmarBitacora,
+  getAcumuladoPropio,
 };

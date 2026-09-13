@@ -1,49 +1,64 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+import { getAcumuladoPropio } from "@/services/ahAlumnoService";
+import { getAcumuladoAlumnos } from "@/services/ahProfesorService";
+import { getAcumuladoProfesores } from "@/services/ahCoordinadorService";
 
-const MOCK_PROGRESO = {
-  horasTotales: 480, horasRealizadas: 124, horasRechazadas: 12,
-  faltasSeguidas: 2, faltasTotal: 7,
-};
-
-const MOCK_ALUMNOS_1 = [
-  { id: 1, nombre: "García López Juan Carlos", boleta: "2021630412", carrera: "ISC",
-    horasTotales: 480, horasRealizadas: 124, horasRechazadas: 12, faltasSeguidas: 2, faltasTotal: 7 },
-  { id: 2, nombre: "Ramírez Torres Ana Sofía", boleta: "2022630187", carrera: "IA",
-    horasTotales: 480, horasRealizadas: 210, horasRechazadas: 4, faltasSeguidas: 0, faltasTotal: 3 },
-];
-
-const MOCK_ALUMNOS_2 = [
-  { id: 3, nombre: "Pérez Gómez Luis Alberto", boleta: "2021630500", carrera: "LCD",
-    horasTotales: 480, horasRealizadas: 380, horasRechazadas: 0, faltasSeguidas: 1, faltasTotal: 5 },
-];
-
-const MOCK_PROFESORES = [
-  { id: 1, nombre: "Dr. Torres Vega", dept: "Sistemas Computacionales", alumnos: MOCK_ALUMNOS_1 },
-  { id: 2, nombre: "Dra. Flores Ruiz", dept: "Inteligencia Artificial",  alumnos: MOCK_ALUMNOS_2 },
-];
-
-export function useAcumuladoHoras(rol = "alumno") {
-  const [progreso] = useState(MOCK_PROGRESO);
-
-  const calcular = (p) => ({
-    ...p,
-    horasRestantes: Math.max(p.horasTotales - p.horasRealizadas, 0),
-    porcentaje: Math.min(Math.round((p.horasRealizadas / p.horasTotales) * 100), 100),
-  });
-
-  // Alumnos planos para la vista profesor
-  const alumnos = MOCK_ALUMNOS_1.map(calcular);
-
-  // Profesores con sus alumnos calculados para coordinación
-  const profesores = MOCK_PROFESORES.map(p => ({
-    ...p,
-    alumnos: p.alumnos.map(calcular),
-  }));
-
+// El backend ya manda horasRealizadas/horasRestantes/porcentajeAvance
+// calculados (calcularHorasNetas/LIMITE_HORAS_SERVICIO, ah.shared.js) — no
+// se vuelve a calcular aquí, solo se renombra a los nombres que
+// ProgresoHoras.jsx ya consume (porcentaje, faltasSeguidas, faltasTotal).
+function normalizarAlumno(raw) {
   return {
-    propio: calcular(progreso),
-    alumnos,
-    profesores,
-    rol,
+    ...raw,
+    id: raw.boleta,
+    porcentaje: raw.porcentajeAvance,
+    faltasSeguidas: raw.faltasConsecutivas,
+    faltasTotal: raw.faltasAcumuladas,
   };
+}
+
+export function useAcumuladoHoras(rolInterno) {
+  const [propio, setPropio] = useState(null);
+  const [alumnos, setAlumnos] = useState([]);
+  const [profesores, setProfesores] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const { socket } = useSocket();
+
+  const cargar = useCallback(async () => {
+    try {
+      if (rolInterno === "alumno") {
+        const raw = await getAcumuladoPropio();
+        setPropio(normalizarAlumno(raw));
+      } else if (rolInterno === "profesor") {
+        const raw = await getAcumuladoAlumnos();
+        setAlumnos(raw.map(normalizarAlumno));
+      } else if (rolInterno === "coordinacion") {
+        const raw = await getAcumuladoProfesores();
+        setProfesores(raw.map((p) => ({ ...p, alumnos: p.alumnos.map(normalizarAlumno) })));
+      }
+    } catch (err) {
+      console.error("Error al cargar acumulado de horas:", err);
+    } finally {
+      setCargando(false);
+    }
+  }, [rolInterno]);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  // Socket — mismo patrón ya usado en dashboards.jsx (EVENTOS_POR_ROL).
+  // Coordinador no tiene hoy ninguna emisión de resumen:actualizado (ningún
+  // flujo del proyecto lo dispara para ese rol) — no se agrega ningún
+  // evento nuevo, la vista de coordinación solo refresca al entrar/recargar.
+  useEffect(() => {
+    if (!socket || rolInterno === "coordinacion") return;
+    socket.on("resumen:actualizado", cargar);
+    return () => socket.off("resumen:actualizado", cargar);
+  }, [socket, rolInterno, cargar]);
+
+  useSocketReconectado(rolInterno === "coordinacion" ? () => {} : cargar);
+
+  return { propio, alumnos, profesores, cargando };
 }

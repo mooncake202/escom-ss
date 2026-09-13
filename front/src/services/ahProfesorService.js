@@ -52,3 +52,8 @@ export async function rechazarBitacora(bitacoraId, motivoRechazo) {
     body: JSON.stringify({ motivoRechazo }),
   });
 }
+
+// CU-AH-05 — consultar acumulado de horas.
+export async function getAcumuladoAlumnos() {
+  return apiFetch("/profesor/horas");
+}

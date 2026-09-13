@@ -89,6 +89,10 @@ iniciarCronsBitacora();
 //gr07
 app.use('/coordinador', require('./src/modules/gr/gr-coordinador.routes'));
 
+// CU-AH-05 — coordinador consulta acumulado de horas (primer actor
+// coordinador del módulo ah/). Mismo prefijo que gr-coordinador.routes.js.
+app.use('/coordinador', require('./src/modules/ah/ah-coordinador.routes'));
+
 //GR — Cron de vencimiento (Reloj 1 / Reloj 2) — arranque explícito y
 // visible, mismo criterio que el cron de AH.
 const { inicializarCronGR } = require('./src/modules/gr/gr.cron');

@@ -8,7 +8,7 @@ const {
   validarActividadNoCompletada,
   validarMotivoRechazo,
 } = require('./validators');
-const { HORAS_POR_JORNADA } = require('./ah.shared');
+const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas } = require('./ah.shared');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
@@ -332,6 +332,58 @@ async function eliminarActividad(profesorUsuarioId, actividadId) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// CU-AH-05: consultar acumulado de horas (vista profesor).
+// ─────────────────────────────────────────────────────────────
+
+async function contarBitacorasPorSolicitud(solicitudIds) {
+  if (solicitudIds.length === 0) return new Map();
+  const filas = await prisma.bitacora.groupBy({
+    by: ['solicitud_registro_id'],
+    where: { solicitud_registro_id: { in: solicitudIds } },
+    _count: { _all: true },
+  });
+  return new Map(filas.map((f) => [f.solicitud_registro_id, f._count._all]));
+}
+
+/**
+ * RN-AH-25: mismo filtro exacto de listarAlumnosDeProfesor (alumnos
+ * realmente asignados a ESTE profesor) — aquí con horas en vez de
+ * actividades. Prisma no puede filtrar/ordenar por la resta calculada
+ * (horas_acumuladas - horas_rechazadas), mismo criterio ya documentado en
+ * dashboard.service.js::contarAlumnosConHorasCompletas: se trae el cúmulo
+ * completo y se invoca calcularHorasNetas en JS.
+ */
+async function listarAcumuladoAlumnosDeProfesor(profesorUsuarioId) {
+  const profesor = await resolverProfesor(profesorUsuarioId);
+
+  const solicitudes = await prisma.solicitud_registro.findMany({
+    where: { estado_solicitud: 'alumno_asignado', oferta: { profesor_id: profesor.id } },
+    include: { alumno: { include: { usuario: true, cumulo_horas_y_faltas: true } } },
+    orderBy: { fecha_aplicacion: 'asc' },
+  });
+
+  const conteos = await contarBitacorasPorSolicitud(solicitudes.map((s) => s.id));
+
+  return solicitudes.map((s) => {
+    const cumulo = s.alumno.cumulo_horas_y_faltas;
+    const horasRealizadas = calcularHorasNetas(cumulo);
+    return {
+      boleta: s.alumno.boleta,
+      nombre: `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`,
+      carrera: s.alumno.carrera,
+      horasTotales: LIMITE_HORAS_SERVICIO,
+      horasRealizadas,
+      horasRestantes: Math.max(LIMITE_HORAS_SERVICIO - horasRealizadas, 0),
+      horasRechazadas: cumulo?.horas_rechazadas ?? 0,
+      porcentajeAvance: Math.min(Math.round((horasRealizadas / LIMITE_HORAS_SERVICIO) * 100), 100),
+      faltasConsecutivas: cumulo?.faltas_consecutivas ?? 0,
+      faltasAcumuladas: cumulo?.faltas_acumuladas ?? 0,
+      sinBitacoras: (conteos.get(s.id) ?? 0) === 0,
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
 // CU-AH-04: revisar bitácoras.
 // ─────────────────────────────────────────────────────────────
 
@@ -522,6 +574,7 @@ async function rechazarBitacora(profesorUsuarioId, bitacoraId, motivoRechazo) {
 
 module.exports = {
   listarAlumnosDeProfesor,
+  listarAcumuladoAlumnosDeProfesor,
   obtenerDetalleAlumno,
   crearActividad,
   editarActividad,

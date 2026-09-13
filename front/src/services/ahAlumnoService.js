@@ -30,3 +30,8 @@ export async function confirmarBitacoraApi(avances) {
     body: JSON.stringify({ avances }),
   });
 }
+
+// CU-AH-05 — consultar acumulado de horas.
+export async function getAcumuladoPropio() {
+  return apiFetch("/alumno/horas");
+}

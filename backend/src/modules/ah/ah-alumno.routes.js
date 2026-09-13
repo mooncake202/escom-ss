@@ -8,6 +8,7 @@ const {
   postFinalizarJornada,
   postCancelarJornada,
   postConfirmarBitacora,
+  getAcumuladoPropio,
 } = require('./ah-alumno.controller');
 
 const router = express.Router();
@@ -22,5 +23,8 @@ router.post('/bitacora/iniciar', requireAuth, requireRole('alumno_asignado'), po
 router.post('/bitacora/finalizar', requireAuth, requireRole('alumno_asignado'), postFinalizarJornada);
 router.post('/bitacora/cancelar', requireAuth, requireRole('alumno_asignado'), postCancelarJornada);
 router.post('/bitacora/confirmar', requireAuth, requireRole('alumno_asignado'), postConfirmarBitacora);
+
+// CU-AH-05 — consultar acumulado de horas.
+router.get('/horas', requireAuth, requireRole('alumno_asignado'), getAcumuladoPropio);
 
 module.exports = router;
