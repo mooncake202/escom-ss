@@ -37,13 +37,6 @@ export async function eliminarActividad(actividadId) {
   return apiFetch(`/profesor/actividades/${actividadId}`, { method: "DELETE" });
 }
 
-export async function extenderFechaLimite(actividadId, nuevaFecha) {
-  return apiFetch(`/profesor/actividades/${actividadId}`, {
-    method: "PUT",
-    body: JSON.stringify({ fecha_limite: nuevaFecha }),
-  });
-}
-
 // CU-AH-04 — revisar bitácoras.
 export async function listarBitacorasPendientes(filtroNombre) {
   const query = filtroNombre ? `?nombre=${encodeURIComponent(filtroNombre)}` : "";

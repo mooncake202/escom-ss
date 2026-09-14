@@ -43,7 +43,7 @@ export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
               {activas} activa{activas !== 1 ? "s" : ""}
             </span>
           )}
-          {alumno.actividades.length === 0 && (
+          {activas === 0 && (
             <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: C.bgInput, color: C.textDisabled, fontWeight: 600 }}>
               Sin actividades
             </span>

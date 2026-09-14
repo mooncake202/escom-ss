@@ -2,6 +2,8 @@ const prisma = require('../../lib/prisma');
 const {
   crearError,
   validarCamposActividad,
+  validarCamposEdicionActividad,
+  validarAlMenosUnDiaHabilEnRango,
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
@@ -180,6 +182,7 @@ async function crearActividad(profesorUsuarioId, solicitudId, datos) {
   const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
   validarFechaLimiteNoPasada(datos.fecha_limite);
+  await validarAlMenosUnDiaHabilEnRango(datos.fecha_limite);
 
   const actividad = await prisma.actividad.create({
     data: {
@@ -227,12 +230,13 @@ async function resolverActividadDeProfesor(profesorUsuarioId, actividadId) {
 }
 
 /**
- * RN-AH-05/RF-AH-07: si NO tiene avance se puede editar TODO (título,
- * descripción, entregable esperado, fecha límite). Si SÍ tiene avance (al
- * menos una fila en registro_bitacora_actividades, sin importar el estado
- * de la bitácora que la contiene), se delega POR COMPLETO a
- * extenderFechaLimiteActividad — solo fecha_limite es editable en ese caso,
- * sin importar qué más mande el cliente en `datos`.
+ * RN-AH-05/RF-AH-07: "Editar" nunca toca fecha_limite (eso vive
+ * exclusivamente en extenderFechaLimiteActividad, disponible siempre sin
+ * importar el avance). Si la actividad YA tiene avance (al menos una fila
+ * en registro_bitacora_actividades, sin importar el estado de la bitácora
+ * que la contiene), no se puede editar nada de ella — mismo criterio que
+ * ya usa eliminarActividad (rechazo explícito 409, no una delegación
+ * silenciosa a otra operación).
  */
 async function editarActividad(profesorUsuarioId, actividadId, datos) {
   const { actividad, tieneAvance } = await resolverActividadDeProfesor(profesorUsuarioId, actividadId);
@@ -240,13 +244,10 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
   validarActividadNoCompletada(actividad.estado);
 
   if (tieneAvance) {
-    return extenderFechaLimiteActividad(profesorUsuarioId, actividadId, datos.fecha_limite);
+    throw crearError('No puedes editar esta actividad porque ya tiene avance registrado en bitácora. Usa "Extender fecha límite".', 409);
   }
 
-  validarCamposActividad(datos);
-  const fechaInicioPeriodo = actividad.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
-  validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
-  validarFechaLimiteNoPasada(datos.fecha_limite);
+  validarCamposEdicionActividad(datos);
 
   const actualizada = await prisma.actividad.update({
     where: { id: actividad.id },
@@ -254,7 +255,6 @@ async function editarActividad(profesorUsuarioId, actividadId, datos) {
       titulo: datos.titulo.trim(),
       descripcion: datos.descripcion.trim(),
       entregable_esperado: datos.entregable_esperado.trim(),
-      fecha_limite: new Date(datos.fecha_limite),
     },
   });
 
@@ -281,6 +281,7 @@ async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuev
 
   const fechaInicioPeriodo = actividad.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarExtensionFecha(nuevaFechaLimite, actividad.fecha_limite, fechaInicioPeriodo);
+  await validarAlMenosUnDiaHabilEnRango(nuevaFechaLimite);
 
   const nuevoEstado = actividad.porcentaje_progreso > 0 ? 'en_progreso' : 'sin_comenzar';
 

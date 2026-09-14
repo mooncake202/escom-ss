@@ -9,14 +9,10 @@ import { useState } from "react";
 
 const TITULO_MODO = {
   crear: "Nueva actividad",
-  editar: "Editar actividad",
-  "extender-fecha": "Extender fecha límite",
 };
 
 const BOTON_MODO = {
   crear: "Registrar actividad",
-  editar: "Guardar cambios",
-  "extender-fecha": "Extender fecha",
 };
 
 export default function AsignarActividades() {
@@ -61,6 +57,11 @@ export default function AsignarActividades() {
   const actividadesActivas = alumnoSeleccionado?.actividades.filter(a => a.estado === "sin_comenzar" || a.estado === "en_progreso") ?? [];
   const actividadesVencidas = alumnoSeleccionado?.actividades.filter(a => a.estado === "vencida") ?? [];
   const actividadesCompletadas = alumnoSeleccionado?.actividades.filter(a => a.estado === "completada_a_tiempo" || a.estado === "completada_tarde") ?? [];
+
+  // Estado de edición/extensión, para que cada ActividadRow sepa si le toca
+  // mostrar su propio formulario inline (Ajuste 5) — una sola fuente de
+  // verdad (este hook), solo cambia dónde se dibuja el formulario.
+  const edicionProps = { modoFormulario, actividadEnEdicion, form, errores, handleChange, guardar, cerrarFormulario, loading };
 
   return (
     <DashboardLayout
@@ -175,8 +176,11 @@ export default function AsignarActividades() {
                 </div>
               )}
 
-              {/* Formulario — modo crear / editar / extender-fecha */}
-              {modoFormulario && (
+              {/* Formulario de "Nueva actividad" — único que se queda arriba
+                  de la columna (no tiene una fila propia a la cual
+                  pegarse). Editar/Extender fecha ahora viven inline, dentro
+                  de la fila correspondiente (ver ActividadRow.jsx). */}
+              {modoFormulario === "crear" && (
                 <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.accent}`, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
                     <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.accentText, letterSpacing: "0.06em", textTransform: "uppercase" }}>
@@ -189,98 +193,75 @@ export default function AsignarActividades() {
                     <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.danger }}>{errores.general}</p>
                   )}
 
-                  {modoFormulario === "extender-fecha" ? (
-                    <>
-                      <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.textMuted }}>
-                        Fecha límite actual: {new Date(actividadEnEdicion.fecha_limite).toLocaleDateString("es-MX", { timeZone: "UTC" })}
+                  {/* Título */}
+                  <div style={{ marginBottom: "1rem" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Título *
+                    </label>
+                    <input
+                      name="titulo"
+                      value={form.titulo}
+                      onChange={handleChange}
+                      placeholder="Ej. Desarrollo del módulo de login"
+                      style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.titulo ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                    />
+                    {errores.titulo && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.titulo}</p>}
+                  </div>
+
+                  {/* Descripción */}
+                  <div style={{ marginBottom: "1rem" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Descripción *
+                    </label>
+                    <textarea
+                      name="descripcion"
+                      value={form.descripcion}
+                      onChange={handleChange}
+                      placeholder="Describe detalladamente lo que el alumno debe realizar..."
+                      rows={3}
+                      style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.descripcion ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }}
+                    />
+                    {errores.descripcion && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.descripcion}</p>}
+                  </div>
+
+                  {/* Fecha límite */}
+                  <div style={{ marginBottom: "1rem" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em" }}>
+                      Fecha límite *
+                    </label>
+                    <input
+                      type="date"
+                      name="fecha_limite"
+                      value={form.fecha_limite}
+                      onChange={handleChange}
+                      style={{
+                        background: C.bgInput, border: `1px solid ${errores.fecha_limite ? C.danger : C.borderDefault}`, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
+                        width: "100%",
+                        padding: "10px",
+                        borderRadius: RADIUS.md
+                      }}
+                    />
+                    {errores.fecha_limite && (
+                      <p style={{ fontSize: 12, color: C.danger }}>
+                        {errores.fecha_limite}
                       </p>
-                      <div style={{ marginBottom: "1.25rem" }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-                          Nueva fecha límite *
-                        </label>
-                        <input
-                          type="date"
-                          name="fecha_limite"
-                          value={form.fecha_limite}
-                          onChange={handleChange}
-                          style={{ width: "100%", padding: "10px", background: C.bgInput, border: `1px solid ${errores.fecha_limite ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-                        />
-                        {errores.fecha_limite && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.fecha_limite}</p>}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* Título */}
-                      <div style={{ marginBottom: "1rem" }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-                          Título *
-                        </label>
-                        <input
-                          name="titulo"
-                          value={form.titulo}
-                          onChange={handleChange}
-                          placeholder="Ej. Desarrollo del módulo de login"
-                          style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.titulo ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-                        />
-                        {errores.titulo && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.titulo}</p>}
-                      </div>
+                    )}
+                  </div>
 
-                      {/* Descripción */}
-                      <div style={{ marginBottom: "1rem" }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-                          Descripción *
-                        </label>
-                        <textarea
-                          name="descripcion"
-                          value={form.descripcion}
-                          onChange={handleChange}
-                          placeholder="Describe detalladamente lo que el alumno debe realizar..."
-                          rows={3}
-                          style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.descripcion ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit", resize: "vertical", lineHeight: 1.5 }}
-                        />
-                        {errores.descripcion && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.descripcion}</p>}
-                      </div>
-
-                      {/* Fecha límite */}
-                      <div style={{ marginBottom: "1rem" }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em" }}>
-                          Fecha límite *
-                        </label>
-                        <input
-                          type="date"
-                          name="fecha_limite"
-                          value={form.fecha_limite}
-                          onChange={handleChange}
-                          style={{
-                            background: C.bgInput, border: `1px solid ${errores.fecha_limite ? C.danger : C.borderDefault}`, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit",
-                            width: "100%",
-                            padding: "10px",
-                            borderRadius: RADIUS.md
-                          }}
-                        />
-                        {errores.fecha_limite && (
-                          <p style={{ fontSize: 12, color: C.danger }}>
-                            {errores.fecha_limite}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Entregable esperado — ahora obligatorio */}
-                      <div style={{ marginBottom: "1.25rem" }}>
-                        <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
-                          Entregable esperado *
-                        </label>
-                        <input
-                          name="entregable_esperado"
-                          value={form.entregable_esperado}
-                          onChange={handleChange}
-                          placeholder="Ej. Documento PDF con el análisis completo"
-                          style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.entregable_esperado ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
-                        />
-                        {errores.entregable_esperado && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.entregable_esperado}</p>}
-                      </div>
-                    </>
-                  )}
+                  {/* Entregable esperado — ahora obligatorio */}
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Entregable esperado *
+                    </label>
+                    <input
+                      name="entregable_esperado"
+                      value={form.entregable_esperado}
+                      onChange={handleChange}
+                      placeholder="Ej. Documento PDF con el análisis completo"
+                      style={{ width: "100%", padding: "10px 14px", background: C.bgInput, border: `1px solid ${errores.entregable_esperado ? C.danger : C.borderDefault}`, borderRadius: RADIUS.md, color: C.textPrimary, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+                    />
+                    {errores.entregable_esperado && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.entregable_esperado}</p>}
+                  </div>
 
                   <div style={{ display: "flex", gap: "0.75rem" }}>
                     <button
@@ -323,6 +304,7 @@ export default function AsignarActividades() {
                       onEditar={abrirEditar}
                       onEliminar={eliminarActividad}
                       onExtenderFecha={abrirExtenderFecha}
+                      edicion={edicionProps}
                     />
                   ))
                 )}
@@ -349,6 +331,7 @@ export default function AsignarActividades() {
                           onEditar={abrirEditar}
                           onEliminar={eliminarActividad}
                           onExtenderFecha={abrirExtenderFecha}
+                          edicion={edicionProps}
                         />
                       ))}
                     </div>
@@ -378,6 +361,7 @@ export default function AsignarActividades() {
                           onEditar={abrirEditar}
                           onEliminar={eliminarActividad}
                           onExtenderFecha={abrirExtenderFecha}
+                          edicion={edicionProps}
                         />
                       ))}
                     </div>

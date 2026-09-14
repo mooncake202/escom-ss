@@ -5,10 +5,25 @@ import {
   crearActividad as crearActividadApi,
   editarActividad as editarActividadApi,
   eliminarActividad as eliminarActividadApi,
+  extenderFechaActividad as extenderFechaActividadApi,
 } from "@/services/ahProfesorService";
 import { calcularDiaMexicoUTC } from "@/utils/fechas";
 
 const FORM_INICIAL = { titulo: "", descripcion: "", entregable_esperado: "", fecha_limite: "" };
+
+// Chequeo client-side de mejor esfuerzo (sin llamada a red): detecta el caso
+// más común (el rango cae completo en fin de semana). NO reemplaza la
+// validación real del backend (validarAlMenosUnDiaHabilEnRango), que además
+// considera días Inhabil/Vacacional del calendario — esta pantalla no tiene
+// acceso a ese calendario hoy. El backend sigue siendo la fuente de verdad;
+// esto solo da feedback inmediato para el caso obvio.
+function hayAlMenosUnDiaEntreSemana(desde, hasta) {
+  for (let t = desde.getTime(); t <= hasta.getTime(); t += 86400000) {
+    const dow = new Date(t).getUTCDay();
+    if (dow !== 0 && dow !== 6) return true;
+  }
+  return false;
+}
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -96,7 +111,7 @@ export function useAsignarActividades() {
       titulo: actividad.titulo,
       descripcion: actividad.descripcion,
       entregable_esperado: actividad.entregable_esperado,
-      fecha_limite: String(actividad.fecha_limite).slice(0, 10),
+      fecha_limite: "",
     });
     setErrores({});
   };
@@ -114,7 +129,13 @@ export function useAsignarActividades() {
   const validar = () => {
     const errs = {};
 
-    if (modoFormulario === "extender-fecha") {
+    if (modoFormulario === "editar") {
+      // "Editar" ya nunca incluye fecha_limite — eso vive exclusivamente en
+      // "Extender fecha límite" (rama de abajo), disponible siempre.
+      if (!form.titulo.trim()) errs.titulo = "El título es obligatorio";
+      if (!form.descripcion.trim()) errs.descripcion = "La descripción es obligatoria";
+      if (!form.entregable_esperado.trim()) errs.entregable_esperado = "El entregable esperado es obligatorio";
+    } else if (modoFormulario === "extender-fecha") {
       if (!form.fecha_limite) {
         errs.fecha_limite = "La nueva fecha límite es obligatoria";
       } else {
@@ -124,6 +145,8 @@ export function useAsignarActividades() {
           errs.fecha_limite = "Debe ser posterior a la fecha límite actual";
         } else if (alumnoSeleccionado?.periodoInicio && nueva <= new Date(alumnoSeleccionado.periodoInicio)) {
           errs.fecha_limite = "Debe ser posterior al inicio del servicio social del alumno";
+        } else if (!hayAlMenosUnDiaEntreSemana(calcularDiaMexicoUTC(), nueva)) {
+          errs.fecha_limite = "Elige una fecha donde el alumno tenga al menos un día hábil para trabajar";
         }
       }
     } else {
@@ -140,9 +163,10 @@ export function useAsignarActividades() {
         const hoy = calcularDiaMexicoUTC();
         if (limite < hoy) {
           errs.fecha_limite = "No puede ser anterior a hoy";
-        } else if (alumnoSeleccionado?.periodoInicio) {
-          const inicio = new Date(alumnoSeleccionado.periodoInicio);
-          if (limite < inicio) errs.fecha_limite = "Debe ser posterior o igual al inicio del servicio social del alumno";
+        } else if (alumnoSeleccionado?.periodoInicio && limite < new Date(alumnoSeleccionado.periodoInicio)) {
+          errs.fecha_limite = "Debe ser posterior o igual al inicio del servicio social del alumno";
+        } else if (!hayAlMenosUnDiaEntreSemana(hoy, limite)) {
+          errs.fecha_limite = "Elige una fecha donde el alumno tenga al menos un día hábil para trabajar";
         }
       }
     }
@@ -159,9 +183,13 @@ export function useAsignarActividades() {
       if (modoFormulario === "crear") {
         await crearActividadApi(alumnoSeleccionado.solicitudId, form);
       } else if (modoFormulario === "editar") {
-        await editarActividadApi(actividadEnEdicion.id, form);
+        await editarActividadApi(actividadEnEdicion.id, {
+          titulo: form.titulo,
+          descripcion: form.descripcion,
+          entregable_esperado: form.entregable_esperado,
+        });
       } else if (modoFormulario === "extender-fecha") {
-        await editarActividadApi(actividadEnEdicion.id, { fecha_limite: form.fecha_limite });
+        await extenderFechaActividadApi(actividadEnEdicion.id, form.fecha_limite);
       }
       await refrescarAlumnoSeleccionado(alumnoSeleccionado.solicitudId);
       cerrarFormulario();

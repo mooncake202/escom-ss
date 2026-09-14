@@ -2,7 +2,7 @@
 // backend/src/lib/validators.js a propósito, ese archivo es solo para datos
 // personales/académicos de GR.
 
-const { calcularDiaMexicoUTC, ESTADOS_COMPLETADA } = require('./ah.shared');
+const { calcularDiaMexicoUTC, ESTADOS_COMPLETADA, esDiaLaborable, restarDias } = require('./ah.shared');
 
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
@@ -20,13 +20,26 @@ function formatearFecha(fecha) {
 /**
  * RN-AH-01/RN-AH-02: los 4 campos son obligatorios sin excepción.
  */
-function validarCamposActividad({ titulo, descripcion, entregable_esperado, fecha_limite }) {
+function validarCamposBasicosActividad({ titulo, descripcion, entregable_esperado }) {
   if (!titulo || !titulo.trim()) throw crearError('El título es obligatorio.');
   if (!descripcion || !descripcion.trim()) throw crearError('La descripción es obligatoria.');
   if (!entregable_esperado || !entregable_esperado.trim()) throw crearError('El entregable esperado es obligatorio.');
-  if (!fecha_limite || isNaN(new Date(fecha_limite).getTime())) {
+}
+
+function validarCamposActividad(datos) {
+  validarCamposBasicosActividad(datos);
+  if (!datos.fecha_limite || isNaN(new Date(datos.fecha_limite).getTime())) {
     throw crearError('La fecha límite es obligatoria y debe ser una fecha válida.');
   }
+}
+
+/**
+ * "Editar" ya no incluye fecha_limite en ningún caso (esa acción vive
+ * exclusivamente en "Extender fecha límite") — por eso no reutiliza
+ * validarCamposActividad, que exige fecha_limite.
+ */
+function validarCamposEdicionActividad(datos) {
+  validarCamposBasicosActividad(datos);
 }
 
 /**
@@ -79,6 +92,24 @@ function validarExtensionFecha(nuevaFecha, fechaActual, fechaInicioPeriodo) {
     throw crearError(`La nueva fecha límite debe ser posterior a la fecha límite actual (${formatearFecha(actual)}).`);
   }
   validarFechaLimiteContraInicio(nuevaFecha, fechaInicioPeriodo);
+}
+
+/**
+ * BLOQUEO DURO: al fijar o cambiar una fecha límite (crear, o extender),
+ * debe existir al menos un día hábil entre hoy (inclusive) y fecha_limite
+ * (inclusive) — si el rango completo cae en días no laborables (fin de
+ * semana, Inhabil, Vacacional), se rechaza. Mismo patrón de loop día por
+ * día ya usado en contarDiasHabilesTranscurridos (ah.shared.js) y
+ * contabilizarFaltasDiarias (ah.cron.js), reutilizando esDiaLaborable en
+ * vez de reimplementar el criterio de día laborable.
+ */
+async function validarAlMenosUnDiaHabilEnRango(fechaLimite) {
+  const hoy = calcularDiaMexicoUTC();
+  const limite = new Date(fechaLimite);
+  for (let d = hoy; d <= limite; d = restarDias(d, -1)) {
+    if (await esDiaLaborable(d)) return;
+  }
+  throw crearError('Elige una fecha límite donde el alumno tenga al menos un día hábil para trabajar entre hoy y esa fecha.');
 }
 
 /**
@@ -156,6 +187,8 @@ module.exports = {
   crearError,
   formatearFecha,
   validarCamposActividad,
+  validarCamposEdicionActividad,
+  validarAlMenosUnDiaHabilEnRango,
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
