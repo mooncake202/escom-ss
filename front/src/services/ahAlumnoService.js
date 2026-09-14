@@ -1,5 +1,16 @@
 import { apiFetch } from "./apiClient";
 
+// Mismo criterio ya usado en ahProfesorService.js (listarBitacorasPendientes):
+// solo agrega al query string los filtros con valor real.
+function construirQuery(filtros = {}) {
+  const params = new URLSearchParams();
+  Object.entries(filtros).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "" && v !== "todos") params.set(k, v);
+  });
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
 export async function getActividadesAlumno() {
   return apiFetch("/alumno/actividades");
 }
@@ -34,4 +45,9 @@ export async function confirmarBitacoraApi(avances) {
 // CU-AH-05 — consultar acumulado de horas.
 export async function getAcumuladoPropio() {
   return apiFetch("/alumno/horas");
+}
+
+// CU-AH-06 — consultar historial de actividades y bitácoras.
+export async function getHistorialPropio(filtros) {
+  return apiFetch(`/alumno/historial${construirQuery(filtros)}`);
 }

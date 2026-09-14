@@ -8,7 +8,7 @@ const {
   validarActividadNoCompletada,
   validarMotivoRechazo,
 } = require('./validators');
-const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas } = require('./ah.shared');
+const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas, limiteHorasAlcanzado } = require('./ah.shared');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
@@ -305,8 +305,32 @@ async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuev
     console.error('Error al emitir actividad:fecha_extendida:', err.message);
   }
   emitirResumenActualizadoProfesor(profesorUsuarioId);
+  await notificarFechaLimiteExtendida(actividad.solicitud_registro.alumno.usuario_id, actividad.id);
 
   return mapearActividad(actualizada, true);
+}
+
+/**
+ * RN-AH-28 (CU-AH-06): notificación Tipo B con enfoque a la actividad
+ * específica — ruta_relacionada lleva un query string (primer precedente
+ * del proyecto) para que el frontend pueda hacer scroll+resaltado a esa
+ * fila exacta del historial. Dedup por ruta EXACTA (incluye el id), mismo
+ * criterio que notificarBitacoraRevisada — no interfiere con esa porque
+ * las rutas nunca coinciden (una es plana, esta siempre lleva query).
+ */
+async function notificarFechaLimiteExtendida(alumnoUsuarioId, actividadId) {
+  const ruta = `/alumno/historial?actividad=${actividadId}`;
+  const yaExiste = await prisma.notificacion.findFirst({
+    where: { usuario_id: alumnoUsuarioId, ruta_relacionada: ruta, leida: false },
+  });
+  if (yaExiste) return;
+
+  await crearNotificacion({
+    usuarioId: alumnoUsuarioId,
+    tipo: 'info',
+    mensaje: 'Se amplió la fecha límite de una de tus actividades.',
+    rutaRelacionada: ruta,
+  });
 }
 
 /**
@@ -381,6 +405,197 @@ async function listarAcumuladoAlumnosDeProfesor(profesorUsuarioId) {
       sinBitacoras: (conteos.get(s.id) ?? 0) === 0,
     };
   });
+}
+
+// ─────────────────────────────────────────────────────────────
+// CU-AH-06: consultar historial de actividades y bitácoras (vista
+// profesor). Mismo criterio de no compartir código con
+// ah-alumno.service.js/ah-coordinador.service.js ya establecido en AH-05.
+// ─────────────────────────────────────────────────────────────
+
+function mapearActividadHistorial(a) {
+  return {
+    id: a.id,
+    tipo: 'actividad',
+    fecha: a.fecha_asignacion,
+    estado: a.estado,
+    titulo: a.titulo,
+    descripcion: a.descripcion,
+    entregable_esperado: a.entregable_esperado,
+    fecha_limite: a.fecha_limite,
+    fecha_limite_original: a.fecha_limite_original,
+    porcentaje_progreso: a.porcentaje_progreso,
+    fecha_completada: a.fecha_completada,
+  };
+}
+
+function mapearBitacoraHistorial(b) {
+  return {
+    id: b.id,
+    tipo: 'bitacora',
+    fecha: b.fecha_registro,
+    estado: b.estado,
+    hora_inicio: b.hora_inicio,
+    hora_fin: b.hora_fin,
+    horas_contabilizadas: b.horas_contabilizadas,
+    motivo_rechazo: b.motivo_rechazo,
+    fecha_revision: b.fecha_revision,
+    avances: b.registro_bitacora_actividades.map((r) => ({
+      actividad_id: r.actividad_id,
+      actividad: r.actividad.titulo,
+      progreso: r.porcentaje_avance_registrado,
+      descripcion: r.descripcion,
+      evidencia: r.evidencia,
+    })),
+  };
+}
+
+async function armarHistorial(solicitudId, filtros = {}) {
+  const { tipo = 'todos', estado, fechaDesde, fechaHasta } = filtros;
+
+  const rangoFecha = (campo) => {
+    const cond = {};
+    if (fechaDesde) cond.gte = new Date(fechaDesde);
+    if (fechaHasta) cond.lte = new Date(fechaHasta);
+    return Object.keys(cond).length ? { [campo]: cond } : {};
+  };
+
+  const [todasActividades, todasBitacoras] = await Promise.all([
+    prisma.actividad.count({ where: { solicitud_registro_id: solicitudId } }),
+    prisma.bitacora.count({ where: { solicitud_registro_id: solicitudId } }),
+  ]);
+
+  const [actividades, bitacoras] = await Promise.all([
+    tipo === 'bitacora'
+      ? []
+      : prisma.actividad.findMany({
+          where: {
+            solicitud_registro_id: solicitudId,
+            ...(tipo === 'actividad' && estado ? { estado } : {}),
+            ...rangoFecha('fecha_asignacion'),
+          },
+        }),
+    tipo === 'actividad'
+      ? []
+      : prisma.bitacora.findMany({
+          where: {
+            solicitud_registro_id: solicitudId,
+            ...(tipo === 'bitacora' && estado ? { estado } : {}),
+            ...rangoFecha('fecha_registro'),
+          },
+          include: { registro_bitacora_actividades: { include: { actividad: true } } },
+        }),
+  ]);
+
+  const registros = [
+    ...actividades.map(mapearActividadHistorial),
+    ...bitacoras.map(mapearBitacoraHistorial),
+  ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  return {
+    registros,
+    totales: { actividades: todasActividades, bitacoras: todasBitacoras },
+  };
+}
+
+/**
+ * RN-AH-25: mismo criterio de propiedad que listarAlumnosDeProfesor, ahora
+ * resolviendo por boleta (alumnoId) en vez de solicitudId. RF-AH-49: el
+ * profesor viendo a su PROPIO alumno no necesita ver su propio nombre —
+ * solo se devuelve oferta, sin profesorNombre (a diferencia del coordinador).
+ */
+async function obtenerHistorialAlumnoDeProfesor(profesorUsuarioId, alumnoBoleta, filtros) {
+  const profesor = await resolverProfesor(profesorUsuarioId);
+
+  const solicitud = await prisma.solicitud_registro.findFirst({
+    where: { estado_solicitud: 'alumno_asignado', alumno_id: alumnoBoleta, oferta: { profesor_id: profesor.id } },
+    include: {
+      alumno: { include: { usuario: true } },
+      oferta: true,
+      periodo_registro: { include: { evento_calendario: true } },
+    },
+  });
+  if (!solicitud) throw crearError('Alumno no encontrado.', 404);
+
+  const { registros, totales } = await armarHistorial(solicitud.id, filtros);
+
+  return {
+    alumno: {
+      nombre: `${solicitud.alumno.usuario.nombre} ${solicitud.alumno.usuario.apellidos}`,
+      boleta: solicitud.alumno.boleta,
+      carrera: solicitud.alumno.carrera,
+      oferta: solicitud.oferta?.nombre_proyecto ?? null,
+      fechaInicioPeriodo: solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
+      fechaFinPeriodo: solicitud.periodo_registro?.evento_calendario?.fecha_fin ?? null,
+    },
+    registros,
+    totales,
+  };
+}
+
+async function resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId) {
+  const profesor = await resolverProfesor(profesorUsuarioId);
+
+  const bitacora = await prisma.bitacora.findUnique({
+    where: { id: Number(bitacoraId) },
+    include: {
+      solicitud_registro: { include: { oferta: true, alumno: { include: { usuario: true } } } },
+    },
+  });
+
+  if (!bitacora || bitacora.solicitud_registro.oferta?.profesor_id !== profesor.id) {
+    throw crearError('Bitácora no encontrada.', 404);
+  }
+  if (bitacora.estado !== 'rechazada') {
+    throw crearError('Esta bitácora no está en estado rechazada.', 409);
+  }
+
+  return { profesor, bitacora };
+}
+
+/**
+ * RN-AH-26 corregida: al aprobar una bitácora rechazada desde el
+ * historial, horas_acumuladas NO cambia (ya se sumó en confirmarBitacora y
+ * nunca se restó ahí al rechazar) — solo se DECREMENTA horas_rechazadas
+ * por lo que esa jornada había sumado ahí. motivo_rechazo se limpia.
+ *
+ * Caso borde confirmado con el usuario: si las horas NETAS del alumno YA
+ * estaban en >=480 ANTES de este cambio, no se bloquea (no es un 409) —
+ * se regresa un aviso informativo (`requiereConfirmacion: true`) y el
+ * profesor puede forzar la confirmación pasando `confirmarSobrepasoHoras`.
+ */
+async function aprobarBitacoraRechazadaDesdeHistorial(profesorUsuarioId, bitacoraId, confirmarSobrepasoHoras = false) {
+  const { profesor, bitacora } = await resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId);
+
+  const alumnoBoleta = bitacora.solicitud_registro.alumno_id;
+  const cumuloAntes = await prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumnoBoleta } });
+
+  if (limiteHorasAlcanzado(cumuloAntes) && !confirmarSobrepasoHoras) {
+    return {
+      requiereConfirmacion: true,
+      mensaje: 'Este alumno ya había completado sus 480 horas de servicio antes de esta aprobación. ¿Deseas continuar de todos modos?',
+    };
+  }
+
+  const horasARestaurar = bitacora.horas_contabilizadas ?? HORAS_POR_JORNADA;
+
+  await prisma.$transaction([
+    prisma.bitacora.update({
+      where: { id: bitacora.id },
+      data: { estado: 'aprobada', motivo_rechazo: null, fecha_revision: new Date(), revisado_por_id: profesor.id },
+    }),
+    prisma.cumulo_horas_y_faltas.update({
+      where: { alumno_id: alumnoBoleta },
+      data: { horas_rechazadas: { decrement: horasARestaurar } },
+    }),
+  ]);
+
+  const alumnoUsuarioId = bitacora.solicitud_registro.alumno.usuario_id;
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+  emitirResumenActualizadoProfesor(profesorUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId);
+
+  return { estado: 'aprobada', requiereConfirmacion: false };
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -583,4 +798,6 @@ module.exports = {
   listarBitacorasPendientes,
   aprobarBitacora,
   rechazarBitacora,
+  obtenerHistorialAlumnoDeProfesor,
+  aprobarBitacoraRechazadaDesdeHistorial,
 };

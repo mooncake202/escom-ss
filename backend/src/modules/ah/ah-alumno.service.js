@@ -351,6 +351,109 @@ async function obtenerAcumuladoPropio(alumnoUsuarioId) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-AH-06: consultar historial de actividades y bitácoras (vista alumno).
+// ─────────────────────────────────────────────────────────────
+
+function mapearActividadHistorial(a) {
+  return {
+    id: a.id,
+    tipo: 'actividad',
+    fecha: a.fecha_asignacion,
+    estado: a.estado,
+    titulo: a.titulo,
+    descripcion: a.descripcion,
+    entregable_esperado: a.entregable_esperado,
+    fecha_limite: a.fecha_limite,
+    fecha_limite_original: a.fecha_limite_original,
+    porcentaje_progreso: a.porcentaje_progreso,
+    fecha_completada: a.fecha_completada,
+  };
+}
+
+function mapearBitacoraHistorial(b) {
+  return {
+    id: b.id,
+    tipo: 'bitacora',
+    fecha: b.fecha_registro,
+    estado: b.estado,
+    hora_inicio: b.hora_inicio,
+    hora_fin: b.hora_fin,
+    horas_contabilizadas: b.horas_contabilizadas,
+    motivo_rechazo: b.motivo_rechazo,
+    fecha_revision: b.fecha_revision,
+    avances: b.registro_bitacora_actividades.map((r) => ({
+      actividad_id: r.actividad_id,
+      actividad: r.actividad.titulo,
+      progreso: r.porcentaje_avance_registrado,
+      descripcion: r.descripcion,
+      evidencia: r.evidencia,
+    })),
+  };
+}
+
+/**
+ * RF-AH-46 a RF-AH-54: historial intercalado (actividades + bitácoras,
+ * ordenado por fecha descendente). `filtros.tipo` decide qué tabla(s)
+ * consultar; `filtros.estado` solo aplica dentro del tipo elegido (no tiene
+ * sentido mezclar espacios de estado de actividad y bitácora). `totales`
+ * se calcula SIEMPRE sobre el conjunto completo sin filtrar — el frontend
+ * lo usa para distinguir "no hay nada en absoluto" de "el filtro no
+ * encontró nada" (RF-AH-54).
+ */
+async function obtenerHistorialPropio(alumnoUsuarioId, filtros = {}) {
+  const { solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
+  return armarHistorial(solicitud.id, filtros);
+}
+
+async function armarHistorial(solicitudId, filtros = {}) {
+  const { tipo = 'todos', estado, fechaDesde, fechaHasta } = filtros;
+
+  const rangoFecha = (campo) => {
+    const cond = {};
+    if (fechaDesde) cond.gte = new Date(fechaDesde);
+    if (fechaHasta) cond.lte = new Date(fechaHasta);
+    return Object.keys(cond).length ? { [campo]: cond } : {};
+  };
+
+  const [todasActividades, todasBitacoras] = await Promise.all([
+    prisma.actividad.count({ where: { solicitud_registro_id: solicitudId } }),
+    prisma.bitacora.count({ where: { solicitud_registro_id: solicitudId } }),
+  ]);
+
+  const [actividades, bitacoras] = await Promise.all([
+    tipo === 'bitacora'
+      ? []
+      : prisma.actividad.findMany({
+          where: {
+            solicitud_registro_id: solicitudId,
+            ...(tipo === 'actividad' && estado ? { estado } : {}),
+            ...rangoFecha('fecha_asignacion'),
+          },
+        }),
+    tipo === 'actividad'
+      ? []
+      : prisma.bitacora.findMany({
+          where: {
+            solicitud_registro_id: solicitudId,
+            ...(tipo === 'bitacora' && estado ? { estado } : {}),
+            ...rangoFecha('fecha_registro'),
+          },
+          include: { registro_bitacora_actividades: { include: { actividad: true } } },
+        }),
+  ]);
+
+  const registros = [
+    ...actividades.map(mapearActividadHistorial),
+    ...bitacoras.map(mapearBitacoraHistorial),
+  ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  return {
+    registros,
+    totales: { actividades: todasActividades, bitacoras: todasBitacoras },
+  };
+}
+
 async function confirmarBitacora(alumnoUsuarioId, { avances }) {
   const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
 
@@ -436,4 +539,5 @@ module.exports = {
   cancelarJornada,
   confirmarBitacora,
   obtenerAcumuladoPropio,
+  obtenerHistorialPropio,
 };

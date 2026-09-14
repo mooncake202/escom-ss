@@ -83,6 +83,16 @@ async function getAcumuladoPropio(req, res) {
   }
 }
 
+async function getHistorialPropio(req, res) {
+  try {
+    const { tipo, estado, fechaDesde, fechaHasta } = req.query;
+    const historial = await ahAlumnoService.obtenerHistorialPropio(req.usuario.sub, { tipo, estado, fechaDesde, fechaHasta });
+    return res.status(200).json(historial);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener historial (alumno):');
+  }
+}
+
 module.exports = {
   getMisActividades,
   getDetalleActividad,
@@ -92,4 +102,5 @@ module.exports = {
   postCancelarJornada,
   postConfirmarBitacora,
   getAcumuladoPropio,
+  getHistorialPropio,
 };

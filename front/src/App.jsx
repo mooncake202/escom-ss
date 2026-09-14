@@ -199,13 +199,13 @@ function App() {
       
 
         <Route path="/alumno/historial" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><HistorialActividades rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><HistorialActividades /></RutaProtegida>
         } />
         <Route path="/profesor/historial" element={
-          <RutaProtegida roles={PROFESOR}><HistorialActividades rol="profesor" /></RutaProtegida>
+          <RutaProtegida roles={PROFESOR}><HistorialActividades /></RutaProtegida>
         } />
         <Route path="/coordinacion/historial" element={
-          <RutaProtegida roles={COORDINADOR}><HistorialActividades rol="coordinacion" /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><HistorialActividades /></RutaProtegida>
         } />
 
   {/* --  ADM-- */}

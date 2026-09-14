@@ -9,6 +9,7 @@ const {
   postCancelarJornada,
   postConfirmarBitacora,
   getAcumuladoPropio,
+  getHistorialPropio,
 } = require('./ah-alumno.controller');
 
 const router = express.Router();
@@ -26,5 +27,8 @@ router.post('/bitacora/confirmar', requireAuth, requireRole('alumno_asignado'), 
 
 // CU-AH-05 — consultar acumulado de horas.
 router.get('/horas', requireAuth, requireRole('alumno_asignado'), getAcumuladoPropio);
+
+// CU-AH-06 — consultar historial de actividades y bitácoras.
+router.get('/historial', requireAuth, requireRole('alumno_asignado'), getHistorialPropio);
 
 module.exports = router;

@@ -20,4 +20,14 @@ async function getAcumuladoProfesores(req, res) {
   }
 }
 
-module.exports = { getAcumuladoProfesores };
+async function getHistorialAlumno(req, res) {
+  try {
+    const { alumnoId, tipo, estado, fechaDesde, fechaHasta } = req.query;
+    const historial = await ahCoordinadorService.obtenerHistorialAlumnoParaCoordinador(alumnoId, { tipo, estado, fechaDesde, fechaHasta });
+    return res.status(200).json(historial);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener historial de alumno (coordinador):');
+  }
+}
+
+module.exports = { getAcumuladoProfesores, getHistorialAlumno };

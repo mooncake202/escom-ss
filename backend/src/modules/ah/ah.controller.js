@@ -93,8 +93,37 @@ async function getAcumuladoAlumnos(req, res) {
   }
 }
 
+async function getHistorialAlumno(req, res) {
+  try {
+    const { alumnoId, tipo, estado, fechaDesde, fechaHasta } = req.query;
+    const historial = await ahProfesorService.obtenerHistorialAlumnoDeProfesor(req.usuario.sub, alumnoId, { tipo, estado, fechaDesde, fechaHasta });
+    return res.status(200).json(historial);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener historial de alumno (profesor):');
+  }
+}
+
+async function postAprobarBitacoraDesdeHistorial(req, res) {
+  try {
+    const resultado = await ahProfesorService.aprobarBitacoraRechazadaDesdeHistorial(req.usuario.sub, req.params.id, !!req.body.confirmarSobrepasoHoras);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al aprobar bitácora desde historial:');
+  }
+}
+
+async function putExtenderFechaLimiteActividad(req, res) {
+  try {
+    const actividad = await ahProfesorService.extenderFechaLimiteActividad(req.usuario.sub, req.params.id, req.body.fecha_limite);
+    return res.status(200).json({ message: 'Fecha límite extendida correctamente.', actividad });
+  } catch (err) {
+    return manejarError(err, res, 'Error al extender fecha límite (historial):');
+  }
+}
+
 module.exports = {
   getAlumnos, getDetalleAlumno, postCrearActividad, putEditarActividad, deleteActividad,
   getBitacorasPendientes, postAprobarBitacora, postRechazarBitacora,
   getAcumuladoAlumnos,
+  getHistorialAlumno, postAprobarBitacoraDesdeHistorial, putExtenderFechaLimiteActividad,
 };
