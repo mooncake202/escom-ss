@@ -4,11 +4,13 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useOfertaIndividual } from "./hooks/useOfertaIndividual";
 import { ConfirmacionEnvio } from "./components/ConfirmacionEnvio";
 import { CarreraSelector } from "./components/CarreraSelector";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 export default function SolicitarOfertaIndividual() {
   const { C } = useTheme();
   const navigate = useNavigate();
-  const { form, perfilesDeseados, errores, enviado, handleChange, toggleCarrera, handleSubmit } = useOfertaIndividual();
+  const { usuario } = useSesion();
+  const { form, perfilesDeseados, errores, enviado, enviando, handleChange, toggleCarrera, handleSubmit } = useOfertaIndividual();
 
   const labelStyle = {
     display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
@@ -25,7 +27,7 @@ export default function SolicitarOfertaIndividual() {
 
   if (enviado) {
     return (
-      <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario="Dr. Torres Vega">
+      <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
         <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <ConfirmacionEnvio tipo="individual" onVolver={() => navigate("/profesor/proyectos")} />
         </div>
@@ -34,7 +36,7 @@ export default function SolicitarOfertaIndividual() {
   }
 
   return (
-    <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario="Dr. Torres Vega">
+    <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
       <div style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
 
         <button onClick={() => navigate("/profesor/proyectos")} style={{
@@ -57,6 +59,16 @@ export default function SolicitarOfertaIndividual() {
           <strong style={{ color: C.textPrimary }}>Oferta individual de servicio social.</strong>
         </div>
 
+        {errores.general && (
+          <div style={{
+            marginBottom: "1.5rem", padding: "12px 16px", borderRadius: RADIUS.md,
+            background: "rgba(220,38,38,0.1)", border: `1px solid ${C.danger}`,
+            color: C.danger, fontSize: 13,
+          }}>
+            {errores.general}
+          </div>
+        )}
+
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.xl,
           border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
@@ -77,49 +89,170 @@ export default function SolicitarOfertaIndividual() {
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
-            <label style={labelStyle}>Nombre de la oferta <span style={{ color: C.danger }}>*</span></label>
-            <input name="nombre" value={form.nombre} onChange={handleChange}
+            <label style={labelStyle}>
+              Nombre de la oferta <span style={{ color: C.danger }}>*</span>
+            </label>
+            <input
+              name="nombre"
+              value={form.nombre}
+              onChange={handleChange}
               placeholder="Ej. Desarrollo de módulo de reportes en Python"
-              style={inputStyle(!!errores.nombre)} />
-            {errores.nombre && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.nombre}</p>}
+              style={inputStyle(!!errores.nombre)}
+            />
+            {errores.nombre && (
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>
+                {errores.nombre}
+              </p>
+            )}
           </div>
 
           <div style={{ marginBottom: "1.25rem" }}>
-            <label style={labelStyle}>Título para plataforma SISS <span style={{ color: C.danger }}>*</span></label>
-            <input name="tituloSISS" value={form.tituloSISS} onChange={handleChange}
-              placeholder="Ej. Academia de Ciencia de Datos"
-              style={inputStyle(!!errores.tituloSISS)} />
-            {errores.tituloSISS && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.tituloSISS}</p>}
+            <label style={labelStyle}>
+              Programa SISS <span style={{ color: C.danger }}>*</span>
+            </label>
+
+            <select
+              name="programaSISS"
+              value={form.programaSISS}
+              onChange={handleChange}
+              style={inputStyle(!!errores.programaSISS)}
+            >
+              <option value="">Selecciona un programa</option>
+
+              <option value="ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL">
+                ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL
+              </option>
+
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA">
+                ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA
+              </option>
+
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA">
+                ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA
+              </option>
+
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN">
+                ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN
+              </option>
+
+              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL">
+                ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL
+              </option>
+
+              <option value="ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO">
+                ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO
+              </option>
+
+              <option value="TUTORÍA ENTRE PARES">
+                TUTORÍA ENTRE PARES
+              </option>
+
+              <option value="VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM">
+                VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM
+              </option>
+            </select>
+
+            {errores.programaSISS && (
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>
+                {errores.programaSISS}
+              </p>
+            )}
+          </div>
+
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={labelStyle}>
+              Actividad SISS <span style={{ color: C.danger }}>*</span>
+            </label>
+
+            <select
+              name="tituloSISS"
+              value={form.tituloSISS}
+              onChange={handleChange}
+              style={inputStyle(!!errores.tituloSISS)}
+            >
+              <option value="">Selecciona una actividad</option>
+              <option value="Opcion 1">Opción 1</option>
+              <option value="Opcion 2">Opción 2</option>
+              <option value="Opcion 3">Opción 3</option>
+            </select>
+
+            {errores.tituloSISS && (
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>
+                {errores.tituloSISS}
+              </p>
+            )}
           </div>
 
           <div style={{ marginBottom: "1.75rem" }}>
-            <label style={labelStyle}>Descripción y actividades a realizar <span style={{ color: C.danger }}>*</span></label>
-            <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
+            <label style={labelStyle}>
+              Descripción y actividades a realizar <span style={{ color: C.danger }}>*</span>
+            </label>
+            <textarea
+              name="descripcion"
+              value={form.descripcion}
+              onChange={handleChange}
               placeholder="Describe en qué consiste la oferta, su contexto y las actividades concretas que realizará el alumno durante el servicio social..."
-              rows={6} style={{ ...inputStyle(!!errores.descripcion), resize: "vertical", lineHeight: 1.6 }} />
-            {errores.descripcion && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.descripcion}</p>}
+              rows={6}
+              style={{
+                ...inputStyle(!!errores.descripcion),
+                resize: "vertical",
+                lineHeight: 1.6,
+              }}
+            />
+            {errores.descripcion && (
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>
+                {errores.descripcion}
+              </p>
+            )}
           </div>
 
           <div style={{
             marginBottom: "1.75rem", padding: "1.125rem",
             borderRadius: RADIUS.lg, background: C.bgInput, border: `1px solid ${C.borderDefault}`,
           }}>
-            <p style={{ ...labelStyle, marginBottom: 4 }}>Perfil de carrera deseado</p>
-            <CarreraSelector value={perfilesDeseados} onToggle={toggleCarrera} />
+            <p style={{ ...labelStyle, marginBottom: 4 }}>
+              Perfil de carrera deseado
+            </p>
+            <CarreraSelector
+              value={perfilesDeseados}
+              onToggle={toggleCarrera}
+              error={errores.carreras}
+            />
           </div>
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button onClick={() => navigate("/profesor/proyectos")} style={{
-              flex: 1, padding: "10px", borderRadius: RADIUS.md,
-              fontSize: 13, fontWeight: 500, cursor: "pointer",
-              background: "transparent", border: `1px solid ${C.borderDefault}`,
-              color: C.textMuted, fontFamily: "inherit",
-            }}>Cancelar</button>
-            <button onClick={handleSubmit} style={{
-              flex: 2, padding: "10px", borderRadius: RADIUS.md,
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-            }}>Enviar solicitud</button>
+            <button
+              onClick={() => navigate("/profesor/proyectos")}
+              disabled={enviando}
+              style={{
+                flex: 1, padding: "10px", borderRadius: RADIUS.md,
+                fontSize: 13, fontWeight: 500,
+                cursor: enviando ? "not-allowed" : "pointer",
+                background: "transparent",
+                border: `1px solid ${C.borderDefault}`,
+                color: C.textMuted,
+                fontFamily: "inherit",
+              }}
+            >
+              Cancelar
+            </button>
+
+            <button
+              onClick={handleSubmit}
+              disabled={enviando}
+              style={{
+                flex: 2, padding: "10px", borderRadius: RADIUS.md,
+                fontSize: 13, fontWeight: 700,
+                cursor: enviando ? "not-allowed" : "pointer",
+                background: C.accent,
+                border: "none",
+                color: "#fff",
+                fontFamily: "inherit",
+                opacity: enviando ? 0.6 : 1,
+              }}
+            >
+              {enviando ? "Enviando..." : "Enviar solicitud"}
+            </button>
           </div>
         </div>
       </div>
