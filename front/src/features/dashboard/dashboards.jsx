@@ -198,11 +198,16 @@ const T = {
 
 // ── Notificaciones posicionadas por ruta ──────────────────────────
 // Cada notificación real trae (o no) una `ruta_relacionada`. Si la trae,
-// aparece EXACTAMENTE en el slot de esa ruta (por eso no hay que adivinar
-// dónde ponerla — el dato mismo lo dice). Si no trae ruta (null), es una
+// aparece en el slot de esa ruta (por eso no hay que adivinar dónde
+// ponerla — el dato mismo lo dice). Si no trae ruta (null), es una
 // notificación general y aparece en el bloque de arriba del dashboard.
+//
+// Match por PREFIJO (no igualdad exacta): algunas rutas llevan query string
+// para apuntar a un registro específico (ej. '/alumno/historial?actividad=5'
+// o '/alumno/historial?bitacora=9') — el slot se declara con la ruta base
+// ('/alumno/historial') y así reconoce cualquier variante con query.
 function notificacionPorRuta(notificaciones, ruta) {
-  return notificaciones.find((n) => n.ruta_relacionada === ruta) || null;
+  return notificaciones.find((n) => n.ruta_relacionada?.startsWith(ruta)) || null;
 }
 
 function SlotNotificacion({ ruta, notificaciones, onLeer, navigate, C }) {

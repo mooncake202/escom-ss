@@ -78,7 +78,7 @@ function Breadcrumb({ items, C }) {
   );
 }
 // ── Panel de historial (filtros + lista) ─────────────────────
-function PanelHistorial({ registros, totales, cargando, tipoFiltro, setTipoFiltro, estadoFiltro, setEstadoFiltro, fechaDesde, setFechaDesde, fechaHasta, setFechaHasta, C, highlightId, onAprobar, onExtenderFecha }) {
+function PanelHistorial({ registros, totales, cargando, tipoFiltro, setTipoFiltro, estadoFiltro, setEstadoFiltro, fechaDesde, setFechaDesde, fechaHasta, setFechaHasta, C, highlightId, highlightBitacoraId, onAprobar, onExtenderFecha }) {
   const [expandido, setExpandido] = useState(null);
 
   const inputStyle = {
@@ -159,7 +159,10 @@ function PanelHistorial({ registros, totales, cargando, tipoFiltro, setTipoFiltr
                 registro={r}
                 expandido={expandido === claveCompuesta}
                 onToggle={() => setExpandido(expandido === claveCompuesta ? null : claveCompuesta)}
-                destacado={highlightId != null && r.tipo === "actividad" && r.id === highlightId}
+                destacado={
+                  (highlightId != null && r.tipo === "actividad" && r.id === highlightId) ||
+                  (highlightBitacoraId != null && r.tipo === "bitacora" && r.id === highlightBitacoraId)
+                }
                 onAprobar={onAprobar}
                 onExtenderFecha={onExtenderFecha}
                 C={C}
@@ -187,6 +190,7 @@ export default function HistorialActividades() {
   const [filtroProfesor, setFiltroProfesor] = useState("");
 
   const actividadId = new URLSearchParams(location.search).get("actividad");
+  const bitacoraIdParam = new URLSearchParams(location.search).get("bitacora");
 
   // Al entrar a su propio historial, el alumno "ve" cualquier bitácora
   // recién revisada (CU-AH-04) — marca esa notificación como leída
@@ -208,6 +212,15 @@ export default function HistorialActividades() {
       console.error("No se pudo marcar como leída la notificación de fecha extendida:", err);
     });
   }, [rolInterno, actividadId]);
+
+  // Mismo criterio que arriba, pero para la notificación de "bitácora
+  // revisada" cuando ya trae ?bitacora=<id> (enfoca la más reciente).
+  useEffect(() => {
+    if (rolInterno !== "alumno" || !bitacoraIdParam) return;
+    marcarLeidasPorRuta(`/alumno/historial?bitacora=${bitacoraIdParam}`).catch((err) => {
+      console.error("No se pudo marcar como leída la notificación de bitácora revisada:", err);
+    });
+  }, [rolInterno, bitacoraIdParam]);
 
   const toggleCarrera = (c) => {
     setFiltroCarrera(prev =>
@@ -249,11 +262,26 @@ export default function HistorialActividades() {
     return () => clearTimeout(timeout);
   }, [actividadId, cargando, registros]);
 
+  // Mismo mecanismo que arriba, en paralelo, para la fila de bitácora
+  // referenciada por ?bitacora=<id> (notificación de "bitácora revisada").
+  const [highlightBitacoraId, setHighlightBitacoraId] = useState(null);
+  const yaHizoScrollBitacora = useRef(false);
+  useEffect(() => {
+    if (!bitacoraIdParam || cargando || registros.length === 0 || yaHizoScrollBitacora.current) return;
+    const id = Number(bitacoraIdParam);
+    if (!registros.some(r => r.tipo === "bitacora" && r.id === id)) return;
+    yaHizoScrollBitacora.current = true;
+    setHighlightBitacoraId(id);
+    document.getElementById(`registro-bitacora-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timeout = setTimeout(() => setHighlightBitacoraId(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [bitacoraIdParam, cargando, registros]);
+
   const panelProps = {
     registros, totales, cargando,
     tipoFiltro, setTipoFiltro, estadoFiltro, setEstadoFiltro,
     fechaDesde, setFechaDesde, fechaHasta, setFechaHasta,
-    C, highlightId,
+    C, highlightId, highlightBitacoraId,
     // Las 2 acciones reales (aprobar bitácora rechazada, extender fecha)
     // son EXCLUSIVAS del profesor — el backend solo expone esas rutas bajo
     // requireRole('profesor'). Coordinación es de solo lectura aquí.

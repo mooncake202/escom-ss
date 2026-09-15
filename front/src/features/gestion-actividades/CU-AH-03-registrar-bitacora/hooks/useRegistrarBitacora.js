@@ -6,6 +6,7 @@ import {
   cancelarJornadaApi,
   confirmarBitacoraApi,
 } from "@/services/ahAlumnoService";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 function segundosAHHMM(seg) {
   const h = Math.floor(seg / 3600);
@@ -34,6 +35,7 @@ export function useRegistrarBitacora() {
   const [loading, setLoading]     = useState(false);
   const [errorEnvio, setErrorEnvio] = useState(null);
   const intervalRef = useRef(null);
+  const { socket } = useSocket();
 
   const limiteHoras = estado?.limiteHoras ?? 4;
   const limiteSeg = limiteHoras * 3600;
@@ -58,6 +60,20 @@ export function useRegistrarBitacora() {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  // Sin esto, un alumno bloqueado por "sinActividades" con esta pantalla
+  // abierta nunca se enteraba de que el profesor ya le asignó una actividad
+  // hasta recargar — crearActividad (ah-profesor.service.js) sí emite
+  // 'actividad:creada' al alumno, pero nadie lo escuchaba aquí. Mismo
+  // patrón de refetch completo ya usado en useConsultarActividades.js (AH-02).
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => cargar();
+    socket.on("actividad:creada", handler);
+    return () => socket.off("actividad:creada", handler);
+  }, [socket, cargar]);
+
+  useSocketReconectado(cargar);
 
   useEffect(() => {
     if (fase === "activa") {
@@ -155,9 +171,11 @@ export function useRegistrarBitacora() {
   };
 
   const horasContabilizadas = estado?.horasContabilizadas ?? limiteHoras;
-  // horas_contabilizadas es siempre fija (HORAS_POR_JORNADA) una vez que la
-  // jornada se finaliza (normal o por auto-cierre) — solo mientras el timer
-  // sigue corriendo en fase "activa" tiene sentido derivarlo de `segundos`.
+  // Una vez finalizada la jornada (normal o por auto-cierre por abandono),
+  // horas_contabilizadas ya viene calculada por el backend como las horas
+  // COMPLETAS realmente trabajadas (piso 1h, techo HORAS_POR_JORNADA) — no
+  // es un valor fijo. Solo mientras el timer sigue corriendo en fase
+  // "activa" tiene sentido derivarlo en vivo de `segundos` aquí.
   const horasTrabajadas = fase === "activa" ? Math.floor(segundos / 3600) : horasContabilizadas;
 
   const registrarBitacora = async () => {

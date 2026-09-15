@@ -43,22 +43,38 @@ function emitirResumenActualizadoAlumno(alumnoUsuarioId) {
 
 /**
  * Notificación Tipo B DEDUPLICADA: si el alumno ya tiene una notificación
- * sin leer de "bitácora revisada" (identificada únicamente por
- * ruta_relacionada='/alumno/historial' — ninguna otra notificación del
- * proyecto usa esa ruta), no crea otra. El mensaje es genérico a propósito
- * (no distingue aprobación de rechazo).
+ * sin leer de "bitácora revisada" (identificada por el prefijo
+ * ruta_relacionada='/alumno/historial?bitacora=' — ninguna otra
+ * notificación del proyecto usa ese prefijo), no crea otra — pero SÍ
+ * actualiza su ruta_relacionada para que apunte a la bitácora MÁS
+ * RECIENTE revisada (si el profesor revisó varias antes de que el alumno
+ * leyera la notificación, se acepta enfocar solo la última; trade-off
+ * confirmado). El mensaje es genérico a propósito (no distingue aprobación
+ * de rechazo).
  */
-async function notificarBitacoraRevisada(alumnoUsuarioId) {
-  const yaExiste = await prisma.notificacion.findFirst({
-    where: { usuario_id: alumnoUsuarioId, ruta_relacionada: '/alumno/historial', leida: false },
+async function notificarBitacoraRevisada(alumnoUsuarioId, bitacoraId) {
+  const ruta = `/alumno/historial?bitacora=${bitacoraId}`;
+
+  const existente = await prisma.notificacion.findFirst({
+    where: {
+      usuario_id: alumnoUsuarioId,
+      ruta_relacionada: { startsWith: '/alumno/historial?bitacora=' },
+      leida: false,
+    },
   });
-  if (yaExiste) return;
+
+  if (existente) {
+    if (existente.ruta_relacionada !== ruta) {
+      await prisma.notificacion.update({ where: { id: existente.id }, data: { ruta_relacionada: ruta } });
+    }
+    return;
+  }
 
   await crearNotificacion({
     usuarioId: alumnoUsuarioId,
     tipo: 'info',
     mensaje: 'Te han revisado una bitácora.',
-    rutaRelacionada: '/alumno/historial',
+    rutaRelacionada: ruta,
   });
 }
 
@@ -594,7 +610,7 @@ async function aprobarBitacoraRechazadaDesdeHistorial(profesorUsuarioId, bitacor
   const alumnoUsuarioId = bitacora.solicitud_registro.alumno.usuario_id;
   emitirResumenActualizadoAlumno(alumnoUsuarioId);
   emitirResumenActualizadoProfesor(profesorUsuarioId);
-  await notificarBitacoraRevisada(alumnoUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId, bitacora.id);
 
   return { estado: 'aprobada', requiereConfirmacion: false };
 }
@@ -740,7 +756,7 @@ async function aprobarBitacora(profesorUsuarioId, bitacoraId, actividadAdicional
   }
   emitirResumenActualizadoAlumno(alumnoUsuarioId);
   emitirResumenActualizadoProfesor(profesorUsuarioId);
-  await notificarBitacoraRevisada(alumnoUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId, bitacora.id);
 
   return { estado: 'aprobada', actividadCreada: actividadMapeada };
 }
@@ -783,7 +799,7 @@ async function rechazarBitacora(profesorUsuarioId, bitacoraId, motivoRechazo) {
 
   emitirResumenActualizadoAlumno(alumnoUsuarioId);
   emitirResumenActualizadoProfesor(profesorUsuarioId);
-  await notificarBitacoraRevisada(alumnoUsuarioId);
+  await notificarBitacoraRevisada(alumnoUsuarioId, bitacora.id);
 
   return { estado: 'rechazada' };
 }

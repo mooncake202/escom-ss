@@ -280,9 +280,15 @@ async function finalizarJornada(alumnoUsuarioId) {
     );
   }
 
+  // Horas COMPLETAS realmente trabajadas, redondeadas hacia abajo — nunca
+  // fracciones (ej. 1h30 -> 1, 2h45 -> 2). El piso de 1 ya está garantizado
+  // por el chequeo de arriba; el techo de HORAS_POR_JORNADA cubre el caso
+  // límite de finalizar justo al llegar a las 4h.
+  const horasCompletas = Math.min(Math.floor(transcurridoMs / 1000 / 3600), HORAS_POR_JORNADA);
+
   const actualizada = await prisma.bitacora.update({
     where: { id: bitacora.id },
-    data: { hora_fin: new Date(), horas_contabilizadas: HORAS_POR_JORNADA },
+    data: { hora_fin: new Date(), horas_contabilizadas: horasCompletas },
   });
 
   emitirResumenActualizado(alumnoUsuarioId);
