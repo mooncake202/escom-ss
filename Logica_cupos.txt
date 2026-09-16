@@ -1,0 +1,2953 @@
+LÓGICA PROPUESTA PARA EL MANEJO DE CUPOS
+Sistema de Servicio Social ESCOM
+
+============================================================
+1. PRINCIPIO GENERAL
+============================================================
+
+La lógica de cupos se basa en una idea principal:
+
+EL PROFESOR TIENE UN LÍMITE DE ALUMNOS, NO UN LÍMITE DE OFERTAS.
+
+Un profesor puede registrar todas las ofertas Individuales o de Proyecto que
+necesite y que Coordinación le apruebe.
+
+Crear una oferta no consume ni reserva automáticamente los cupos generales
+del profesor.
+
+Los cupos generales se consumen cuando el profesor acepta la solicitud de
+un alumno.
+
+Ejemplo:
+
+Profesor:
+cupos_totales = 5
+alumnos ocupando cupos normales = 0
+
+Puede tener:
+
+Oferta Individual A
+Oferta Individual B
+Oferta Individual C
+Oferta Individual D
+Oferta Individual E
+Oferta Individual F
+Oferta Individual G
+Oferta Individual H
+Oferta Individual I
+Oferta Individual J
+
+Aunque existan 10 ofertas, el profesor sigue teniendo:
+
+cupos_totales = 5
+cupos normales ocupados = 0
+cupos normales disponibles = 5
+
+Las ofertas representan distintas opciones para que los alumnos soliciten
+servicio social.
+
+Cuando el profesor vaya aceptando alumnos, sus cupos generales comenzarán
+a ocuparse.
+
+Por ejemplo:
+
+Alumno 1 aceptado → 1/5
+Alumno 2 aceptado → 2/5
+Alumno 3 aceptado → 3/5
+Alumno 4 aceptado → 4/5
+Alumno 5 aceptado → 5/5
+
+En ese momento:
+
+cupos normales disponibles = 0
+
+Las demás ofertas pueden seguir existiendo y conservar su estado aprobado,
+pero ya no podrán aceptar alumnos mediante capacidad normal mientras el
+profesor permanezca lleno.
+
+
+============================================================
+2. CUPOS TOTALES DEL PROFESOR
+============================================================
+
+En la base de datos ya existe:
+
+cupos_totales
+
+Representa la cantidad máxima de alumnos que el profesor puede tener
+ocupando su capacidad general al mismo tiempo.
+
+Ejemplo:
+
+cupos_totales = 5
+
+significa:
+
+El profesor puede tener hasta 5 alumnos utilizando cupos normales.
+
+
+============================================================
+3. CARACTERÍSTICAS DEL PROFESOR
+============================================================
+
+Las características institucionales pueden modificar la capacidad del
+profesor.
+
+Por ejemplo, según las reglas correspondientes:
+
+Profesor de base
+Presidente de academia
+Coordinador
+Jefe de departamento
+etc.
+
+Al aprobarse una modificación de característica que aumenta capacidad,
+se recalculan los cupos_totales del profesor.
+
+Estas características modifican la capacidad general de alumnos.
+
+
+============================================================
+4. CARACTERÍSTICA INVESTIGADOR
+============================================================
+
+Investigador funciona de manera especial.
+
+La característica Investigador no incrementa cupos_totales.
+
+Su beneficio consiste en permitir que el profesor registre ofertas tipo
+Proyecto que cuenten con una capacidad extraordinaria propia.
+
+Por ejemplo:
+
+Profesor:
+cupos_totales = 5
+característica = Investigador
+
+Su capacidad general continúa siendo:
+
+cupos_totales = 5
+
+Sin embargo, sus ofertas tipo Proyecto pueden contar con cupos
+extraordinarios autorizados específicamente para ellas.
+
+Estos cupos pertenecen a la oferta, no al profesor.
+
+Cuando el proyecto termina, esa capacidad extraordinaria termina junto
+con el proyecto.
+
+No se suma posteriormente a cupos_totales ni se transfiere a otra oferta.
+
+------------------------------------------------------------
+4.1 OFERTAS INDIVIDUALES DE UN PROFESOR INVESTIGADOR
+------------------------------------------------------------
+
+Tener la característica Investigador no limita al profesor únicamente
+a registrar ofertas tipo Proyecto.
+
+Un profesor Investigador puede registrar ofertas Individuales y
+Proyectos como cualquier otro profesor.
+
+La diferencia está en el tipo de capacidad que puede utilizar cada
+oferta.
+
+
+OFERTA INDIVIDUAL
+
+Una oferta Individual siempre utiliza capacidad NORMAL del profesor.
+
+La característica Investigador no proporciona cupos extraordinarios
+para ofertas Individuales.
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 3
+cupos normales ocupados = 0
+cupos normales disponibles = 3
+
+El profesor tiene tres ofertas Individuales y acepta un alumno en cada
+una:
+
+Individual A → Alumno 1 → NORMAL
+Individual B → Alumno 2 → NORMAL
+Individual C → Alumno 3 → NORMAL
+
+Ahora:
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+
+Si posteriormente intenta aceptar otro alumno en una oferta Individual:
+
+¿Hay cupo normal disponible?
+        ↓
+       NO
+        ↓
+¿Es oferta tipo Proyecto?
+        ↓
+       NO
+        ↓
+No puede utilizar respaldo INVESTIGADOR.
+
+
+OFERTA TIPO PROYECTO
+
+El respaldo extraordinario de Investigador solamente puede utilizarse
+en ofertas tipo Proyecto.
+
+Siguiendo el ejemplo anterior:
+
+Profesor Investigador:
+
+cupos_totales = 3
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+
+El profesor tiene un Proyecto con respaldo extraordinario autorizado.
+
+Llega una solicitud para ese Proyecto y el profesor quiere aceptarla:
+
+¿Hay cupo normal disponible?
+        ↓
+       NO
+        ↓
+¿Es oferta tipo Proyecto?
+        ↓
+       SÍ
+        ↓
+¿Profesor tiene característica Investigador?
+        ↓
+       SÍ
+        ↓
+¿Proyecto tiene respaldo investigador disponible?
+        ↓
+       SÍ
+        ↓
+Alumno → INVESTIGADOR
+
+
+------------------------------------------------------------
+PROYECTO CUANDO TODAVÍA EXISTEN CUPOS NORMALES
+------------------------------------------------------------
+
+La característica Investigador tampoco permite elegir utilizar un cupo
+extraordinario mientras todavía exista capacidad normal.
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 3
+cupos normales ocupados = 2
+cupos normales disponibles = 1
+
+Tiene un Proyecto de 4 lugares.
+
+Acepta al primer alumno del Proyecto.
+
+Como todavía existe un cupo normal:
+
+Alumno 1 → NORMAL
+
+Ahora:
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+
+Para las siguientes aceptaciones del Proyecto, si existe respaldo
+extraordinario autorizado:
+
+Alumno 2 → INVESTIGADOR
+Alumno 3 → INVESTIGADOR
+Alumno 4 → INVESTIGADOR
+
+
+REGLA GENERAL:
+
+La característica Investigador no sustituye la capacidad normal del
+profesor.
+
+El profesor siempre utiliza primero sus cupos normales.
+
+Las ofertas Individuales solamente pueden utilizar cupos NORMALES.
+
+Las ofertas tipo Proyecto también utilizan primero cupos NORMALES y,
+cuando éstos se agotan, pueden utilizar respaldo INVESTIGADOR si el
+profesor cuenta con dicha característica y el Proyecto tiene capacidad
+extraordinaria autorizada.
+
+============================================================
+5. TIPOS DE OFERTA
+============================================================
+
+El sistema continúa teniendo únicamente dos tipos de oferta:
+
+1. Individual
+2. Proyecto
+
+No existe un tipo de oferta llamado "Investigación".
+
+Investigador es una característica del profesor.
+
+Por lo tanto:
+
+Profesor normal
+    ↓
+Individual o Proyecto
+    ↓
+Utiliza capacidad normal
+
+Profesor con característica Investigador
+    ↓
+Individual
+    ↓
+Utiliza capacidad normal
+
+Profesor con característica Investigador
+    ↓
+Proyecto
+    ↓
+Puede utilizar capacidad normal
++
+respaldo extraordinario de investigador
+
+
+============================================================
+6. VARIABLES DE LA OFERTA
+============================================================
+
+Se mantienen las variables existentes:
+
+cupos_ofertados
+cupos_investigador
+cupos_disponibles
+
+
+------------------------------------------------------------
+6.1 cupos_ofertados
+------------------------------------------------------------
+
+Representa la capacidad máxima autorizada de esa oferta.
+
+Ejemplo:
+
+cupos_ofertados = 5
+
+La oferta puede recibir como máximo 5 alumnos.
+
+
+------------------------------------------------------------
+6.2 cupos_disponibles
+------------------------------------------------------------
+
+Representa cuántos lugares de la oferta todavía no han sido ocupados.
+
+Inicialmente:
+
+cupos_disponibles = cupos_ofertados
+
+Ejemplo:
+
+cupos_ofertados = 5
+cupos_disponibles = 5
+
+Profesor acepta un alumno:
+
+cupos_disponibles = 4
+
+Acepta otro:
+
+cupos_disponibles = 3
+
+Y así sucesivamente.
+
+------------------------------------------------------------
+6.3 cupos_investigador
+------------------------------------------------------------
+
+cupos_investigador ya existe en la oferta, pero cambiaremos ligeramente
+su interpretación para adaptarlo a la nueva lógica de cupos.
+
+ANTES:
+
+Se utilizaba principalmente cuando, al momento de registrar un Proyecto,
+los cupos solicitados superaban los cupos normales disponibles del
+profesor.
+
+Por ejemplo:
+
+Profesor Investigador:
+cupos normales disponibles = 2
+
+Proyecto solicitado = 5
+
+Se podía interpretar que:
+
+2 lugares serían normales
+3 lugares serían investigador
+
+El inconveniente de calcularlo de esta manera es que crear una oferta
+no reserva esos 2 cupos normales.
+
+Esos cupos siguen perteneciendo a la capacidad general del profesor
+hasta que realmente acepta alumnos.
+
+Por ello, la nueva interpretación será:
+
+cupos_investigador
+=
+máximo respaldo extraordinario autorizado para ese Proyecto.
+
+Si un profesor tiene la característica Investigador y Coordinación
+aprueba un Proyecto para 5 alumnos:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+Esto NO significa que los 5 alumnos utilizarán cupos de investigador.
+
+cupos_investigador representa únicamente hasta cuánto puede respaldar
+extraordinariamente ese Proyecto si la capacidad normal del profesor
+no está disponible cuando vaya aceptando alumnos.
+
+
+EJEMPLO 1: TODAVÍA HAY 3 CUPOS NORMALES
+
+Profesor Investigador:
+
+cupos normales disponibles = 3
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+Si los 3 cupos normales siguen disponibles cuando acepta alumnos:
+
+Alumno 1 → NORMAL
+Alumno 2 → NORMAL
+Alumno 3 → NORMAL
+Alumno 4 → INVESTIGADOR
+Alumno 5 → INVESTIGADOR
+
+Aunque:
+
+cupos_investigador = 5
+
+realmente solamente fue necesario utilizar 2.
+
+
+EJEMPLO 2: SOLO QUEDA 1 CUPO NORMAL
+
+Profesor Investigador:
+
+cupos normales disponibles = 1
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+Al aceptar alumnos:
+
+Alumno 1 → NORMAL
+Alumno 2 → INVESTIGADOR
+Alumno 3 → INVESTIGADOR
+Alumno 4 → INVESTIGADOR
+Alumno 5 → INVESTIGADOR
+
+Se utilizaron realmente:
+
+1 normal
+4 investigador
+
+
+EJEMPLO 3: EL PROFESOR YA ESTÁ LLENO
+
+Profesor Investigador:
+
+cupos normales disponibles = 0
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+Al aceptar alumnos:
+
+Alumno 1 → INVESTIGADOR
+Alumno 2 → INVESTIGADOR
+Alumno 3 → INVESTIGADOR
+Alumno 4 → INVESTIGADOR
+Alumno 5 → INVESTIGADOR
+
+
+CONCLUSIÓN:
+
+cupos_investigador NO representa cuántos cupos extraordinarios están
+siendo utilizados actualmente.
+
+Representa el máximo respaldo extraordinario autorizado para ese
+Proyecto.
+
+La cantidad realmente utilizada se conocerá mediante el tipo de cupo
+asociado a cada alumno.
+
+============================================================
+7. NUEVO MANEJO: CUPOS NORMALES Y TIPO DE CUPO
+============================================================
+
+Para aplicar correctamente la nueva lógica necesitamos distinguir qué
+tipo de capacidad está utilizando cada alumno aceptado por el profesor.
+
+Hasta ahora, cupos_totales permite conocer la capacidad general del
+profesor, pero no indica cuáles alumnos están utilizando esa capacidad
+normal y cuáles están utilizando el respaldo extraordinario de un
+Proyecto de Investigador.
+
+Por ello se manejarán dos tipos de cupo:
+
+NORMAL
+
+Representa un alumno que utiliza uno de los cupos generales establecidos
+en cupos_totales del profesor.
+
+
+INVESTIGADOR
+
+Representa un alumno que utiliza el respaldo extraordinario autorizado
+para un Proyecto de un profesor con característica Investigador.
+
+
+------------------------------------------------------------
+¿POR QUÉ NECESITAMOS ESTA DISTINCIÓN?
+------------------------------------------------------------
+
+Supongamos:
+
+Profesor Investigador:
+
+cupos_totales = 5
+
+Tiene actualmente:
+
+Juan   → NORMAL
+Pedro  → NORMAL
+Ana    → NORMAL
+María  → INVESTIGADOR
+Carlos → INVESTIGADOR
+
+El profesor tiene 5 alumnos, pero solamente 3 están utilizando su
+capacidad general.
+
+Por lo tanto:
+
+cupos normales ocupados = 3
+
+cupos normales disponibles =
+cupos_totales - cupos normales ocupados
+
+cupos normales disponibles =
+5 - 3
+
+cupos normales disponibles = 2
+
+María y Carlos no se cuentan dentro de esos 5 cupos generales porque
+están utilizando capacidad extraordinaria de un Proyecto.
+
+
+------------------------------------------------------------
+CAMBIO NECESARIO EN LOS DATOS
+------------------------------------------------------------
+
+Para poder realizar este cálculo de manera confiable, el sistema debe
+recordar qué tipo de cupo consumió cada alumno cuando fue aceptado.
+
+Por ello se propone agregar un dato a la relación/asignación que vincula
+al alumno con su oferta.
+
+Conceptualmente:
+
+tipo de cupo = NORMAL
+
+o:
+
+tipo de cupo = INVESTIGADOR
+
+El nombre definitivo del campo en la base de datos se decidirá durante
+la implementación.
+
+Este dato NO pertenece directamente al alumno ni al profesor.
+
+Pertenece a la participación/asignación del alumno dentro de esa oferta,
+porque describe qué capacidad utilizó específicamente para entrar a ella.
+
+
+------------------------------------------------------------
+CUPOS NORMALES OCUPADOS
+------------------------------------------------------------
+
+Se calcularán contando los alumnos que actualmente mantienen ocupado
+un cupo y cuyo:
+
+tipo de cupo = NORMAL
+
+
+------------------------------------------------------------
+CUPOS NORMALES DISPONIBLES
+------------------------------------------------------------
+
+Se calcularán mediante:
+
+cupos normales disponibles
+=
+cupos_totales - cupos normales ocupados
+
+
+EJEMPLO:
+
+Profesor:
+
+cupos_totales = 5
+
+Alumnos que mantienen cupo:
+
+Alumno A → NORMAL
+Alumno B → NORMAL
+Alumno C → NORMAL
+Alumno D → INVESTIGADOR
+
+Entonces:
+
+cupos normales ocupados = 3
+
+cupos normales disponibles = 5 - 3
+
+cupos normales disponibles = 2
+
+Por lo tanto, el profesor todavía puede aceptar 2 alumnos utilizando
+su capacidad normal.
+
+Después de consumir esos normales, solamente los Proyectos que tengan
+respaldo de Investigador podrán continuar aceptando alumnos mediante
+capacidad extraordinaria.
+
+============================================================
+8. CUÁNDO SE CONSUME UN CUPO
+============================================================
+
+Se conserva el momento que actualmente maneja el sistema.
+
+El cupo se consume cuando:
+
+EL PROFESOR ACEPTA LA SOLICITUD DEL ALUMNO.
+
+Es decir:
+
+Solicitud del alumno
+        ↓
+Profesor acepta
+        ↓
+estado_solicitud = aceptada_por_profesor
+        ↓
+SE CONSUME EL CUPO
+        ↓
+Registro en SISS
+        ↓
+Validación de Coordinación
+        ↓
+Carta compromiso
+        ↓
+Expediente
+        ↓
+Asignación formal
+
+No es necesario esperar hasta que el alumno llegue al rol
+alumno_asignado.
+
+La aceptación del profesor representa el momento en que ese lugar queda
+apartado para ese alumno.
+
+
+9. ASIGNACIÓN DEL TIPO DE CUPO
+============================================================
+
+El tipo de cupo se determina en el momento exacto en que el profesor
+acepta la solicitud inicial del alumno.
+
+Ese es también el momento en que actualmente el sistema disminuye:
+
+cupos_disponibles - 1
+
+La aceptación y la selección del tipo de cupo deben realizarse dentro
+de la misma transacción para mantener los conteos consistentes.
+
+
+------------------------------------------------------------
+REGLA PRINCIPAL
+------------------------------------------------------------
+
+El sistema siempre intenta utilizar primero la capacidad normal del
+profesor.
+
+Solamente utiliza capacidad de Investigador cuando se cumplen TODAS
+estas condiciones:
+
+1. Ya no existen cupos normales disponibles.
+
+2. La oferta es de tipo Proyecto.
+
+3. El profesor tiene la característica Investigador.
+
+4. Ese Proyecto todavía tiene respaldo extraordinario disponible.
+
+
+------------------------------------------------------------
+DIAGRAMA DE DECISIÓN
+------------------------------------------------------------
+
+Profesor acepta una solicitud
+        ↓
+¿La oferta tiene cupos_disponibles?
+        ↓
+      SÍ
+        ↓
+¿Profesor tiene cupos normales disponibles?
+        ↓
+     SÍ                  NO
+      ↓                   ↓
+Asignar NORMAL      ¿La oferta es Proyecto?
+                          ↓
+                        SÍ
+                          ↓
+                 ¿Profesor es Investigador?
+                          ↓
+                        SÍ
+                          ↓
+                ¿Queda respaldo extraordinario
+                    para ese Proyecto?
+                          ↓
+                      SÍ       NO
+                       ↓        ↓
+              INVESTIGADOR   No aceptar
+
+
+------------------------------------------------------------
+EJEMPLO A: OFERTA INDIVIDUAL CON CAPACIDAD NORMAL
+------------------------------------------------------------
+
+Profesor Investigador o no Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+cupos normales disponibles = 1
+
+Oferta Individual:
+
+cupos_disponibles = 1
+
+Profesor acepta al alumno.
+
+Existe capacidad normal.
+
+Resultado:
+
+Alumno → NORMAL
+
+cupos_disponibles:
+1 → 0
+
+cupos normales ocupados:
+4 → 5
+
+
+------------------------------------------------------------
+EJEMPLO B: OFERTA INDIVIDUAL SIN CAPACIDAD NORMAL
+------------------------------------------------------------
+
+Profesor Investigador:
+
+cupos normales disponibles = 0
+
+Oferta Individual:
+
+cupos_disponibles = 1
+
+Aunque el profesor tenga característica Investigador, el respaldo
+extraordinario solamente aplica a Proyectos.
+
+Por lo tanto:
+
+No se acepta al alumno en ese momento.
+
+
+------------------------------------------------------------
+EJEMPLO C: PROYECTO DE INVESTIGADOR CON UN NORMAL DISPONIBLE
+------------------------------------------------------------
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+cupos normales disponibles = 1
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_investigador = 3
+cupos_disponibles = 3
+
+Primera aceptación:
+
+Hay normal disponible.
+
+Alumno A → NORMAL
+
+Ahora:
+
+cupos normales disponibles = 0
+cupos_disponibles = 2
+
+
+Segunda aceptación:
+
+No hay normales.
+Es Proyecto.
+Profesor es Investigador.
+Existe respaldo extraordinario.
+
+Alumno B → INVESTIGADOR
+
+cupos_disponibles = 1
+
+
+Tercera aceptación:
+
+Alumno C → INVESTIGADOR
+
+cupos_disponibles = 0
+
+
+Resultado final:
+
+Alumno A → NORMAL
+Alumno B → INVESTIGADOR
+Alumno C → INVESTIGADOR
+
+
+------------------------------------------------------------
+EJEMPLO D: PROYECTO DE INVESTIGADOR SIN NORMALES
+------------------------------------------------------------
+
+Profesor Investigador:
+
+cupos normales disponibles = 0
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_investigador = 3
+cupos_disponibles = 3
+
+Aceptaciones:
+
+Alumno A → INVESTIGADOR
+Alumno B → INVESTIGADOR
+Alumno C → INVESTIGADOR
+
+El Proyecto alcanza sus 3 lugares autorizados sin modificar
+cupos_totales del profesor.
+
+
+------------------------------------------------------------
+CONCURRENCIA
+------------------------------------------------------------
+
+La comprobación debe realizarse dentro de una transacción atómica.
+
+Ejemplo:
+
+Solo queda:
+
+1 cupo normal
+
+Llegan dos aceptaciones casi simultáneamente.
+
+La primera transacción obtiene el normal:
+
+Alumno A → NORMAL
+
+La segunda vuelve a comprobar la capacidad.
+
+Ahora:
+
+cupos normales disponibles = 0
+
+Si la segunda solicitud pertenece a un Proyecto con respaldo
+Investigador:
+
+Alumno B → INVESTIGADOR
+
+Si pertenece a una oferta que solamente puede utilizar capacidad normal:
+
+la aceptación no procede y el backend responde de forma controlada,
+por ejemplo con 409.
+
+De esta manera nunca se asigna el mismo último cupo normal a dos alumnos.
+
+
+============================================================
+10. POR QUÉ EL TIPO DE CUPO QUEDA ASOCIADO AL ALUMNO
+============================================================
+
+Una vez que el profesor acepta la solicitud y el sistema determina:
+
+NORMAL
+
+o:
+
+INVESTIGADOR
+
+ese tipo se conserva durante todo el tiempo que ese alumno mantenga
+ocupado su lugar.
+
+El sistema no cambia automáticamente a un alumno de INVESTIGADOR a
+NORMAL si posteriormente se libera capacidad normal.
+
+Esto permite saber exactamente qué capacidad está utilizando cada
+alumno y qué debe liberarse si posteriormente ocurre una baja o una
+cancelación del proceso.
+
+
+------------------------------------------------------------
+EJEMPLO COMPLETO
+------------------------------------------------------------
+
+Profesor Investigador:
+
+cupos_totales = 3
+
+Proyecto:
+
+cupos_ofertados = 4
+cupos_investigador = 4
+cupos_disponibles = 4
+
+
+PRIMER ALUMNO
+
+Hay 3 normales disponibles.
+
+Juan → NORMAL
+
+Ahora:
+
+cupos normales ocupados = 1
+cupos normales disponibles = 2
+cupos_disponibles = 3
+
+
+SEGUNDO ALUMNO
+
+Hay normal.
+
+Ana → NORMAL
+
+Ahora:
+
+cupos normales ocupados = 2
+cupos normales disponibles = 1
+cupos_disponibles = 2
+
+
+TERCER ALUMNO
+
+Hay normal.
+
+Pedro → NORMAL
+
+Ahora:
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+cupos_disponibles = 1
+
+
+CUARTO ALUMNO
+
+No hay normal.
+Es Proyecto.
+Profesor es Investigador.
+Existe respaldo extraordinario.
+
+María → INVESTIGADOR
+
+Ahora:
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+cupos_disponibles = 0
+
+
+La asignación queda:
+
+Juan  → NORMAL
+Ana   → NORMAL
+Pedro → NORMAL
+María → INVESTIGADOR
+
+
+------------------------------------------------------------
+POSTERIORMENTE JUAN CAUSA BAJA
+------------------------------------------------------------
+
+Juan estaba utilizando:
+
+NORMAL
+
+Por lo tanto deja de contar dentro de los cupos normales ocupados.
+
+Antes:
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+
+Después:
+
+cupos normales ocupados = 2
+cupos normales disponibles = 1
+
+Además, por tratarse de una baja:
+
+cupos_disponibles:
+0 → 1
+
+
+María continúa siendo:
+
+INVESTIGADOR
+
+No se convierte automáticamente en NORMAL.
+
+
+------------------------------------------------------------
+LLEGA UN NUEVO ALUMNO
+------------------------------------------------------------
+
+Ahora existe:
+
+1 cupo normal disponible
+
+y la oferta volvió a tener:
+
+cupos_disponibles = 1
+
+El profesor acepta a Carlos.
+
+Como siempre se utiliza primero capacidad normal:
+
+Carlos → NORMAL
+
+
+La situación queda:
+
+Ana    → NORMAL
+Pedro  → NORMAL
+María  → INVESTIGADOR
+Carlos → NORMAL
+
+cupos normales ocupados = 3
+cupos normales disponibles = 0
+cupos_disponibles = 0
+
+
+------------------------------------------------------------
+¿POR QUÉ CONSERVAMOS EL TIPO?
+------------------------------------------------------------
+
+Porque permite que cada movimiento tenga un efecto claro.
+
+Si causa baja un alumno NORMAL:
+
+→ libera capacidad normal del profesor.
+
+Si causa baja un alumno INVESTIGADOR:
+
+→ libera capacidad extraordinaria dentro de ese Proyecto.
+
+Si posteriormente aparece un cupo normal:
+
+→ se utiliza para la siguiente aceptación.
+
+No es necesario reorganizar continuamente los tipos de cupo de alumnos
+que ya estaban dentro del servicio.
+
+Esto mantiene el historial y los cálculos simples y consistentes.
+
+============================================================
+11. PROYECTO DE INVESTIGADOR CON CUPOS NORMALES DISPONIBLES
+============================================================
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 2
+cupos normales disponibles = 3
+
+Registra un Proyecto para 5 alumnos.
+
+El proyecto queda autorizado para:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+Empiezan a entrar alumnos.
+
+Alumno 1:
+
+¿Hay normal?
+Sí.
+
+→ normal
+
+Alumno 2:
+
+¿Hay normal?
+Sí.
+
+→ normal
+
+Alumno 3:
+
+¿Hay normal?
+Sí.
+
+→ normal
+
+Ahora:
+
+cupos normales ocupados = 5
+cupos normales disponibles = 0
+
+Alumno 4:
+
+No hay normal.
+
+¿Hay respaldo investigador?
+Sí.
+
+→ investigador
+
+Alumno 5:
+
+→ investigador
+
+
+RESULTADO:
+
+3 alumnos normales
+2 alumnos investigador
+
+Aunque:
+
+cupos_investigador = 5
+
+solo se utilizaron realmente 2.
+
+Los demás simplemente quedaron como respaldo extraordinario autorizado
+que no fue necesario utilizar.
+
+
+============================================================
+12. PROYECTO CUANDO EL PROFESOR YA ESTÁ LLENO
+============================================================
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 5
+cupos normales disponibles = 0
+
+Registra un Proyecto para 4 alumnos.
+
+Coordinación lo aprueba.
+
+Oferta:
+
+cupos_ofertados = 4
+cupos_investigador = 4
+cupos_disponibles = 4
+
+Como el profesor está lleno normalmente:
+
+Alumno 1 → investigador
+Alumno 2 → investigador
+Alumno 3 → investigador
+Alumno 4 → investigador
+
+Los cuatro alumnos pertenecen exclusivamente a la capacidad
+extraordinaria de ese proyecto.
+
+cupos_totales continúa siendo 5.
+
+
+============================================================
+13. VARIAS OFERTAS COMPITIENDO POR CUPOS NORMALES
+============================================================
+
+Crear ofertas no reserva capacidad normal.
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+cupos normales disponibles = 1
+
+Tiene:
+
+Proyecto A
+cupos_ofertados = 3
+cupos_investigador = 3
+
+Proyecto B
+cupos_ofertados = 3
+cupos_investigador = 3
+
+Ambos proyectos pueden existir.
+
+Llega primero un alumno de A.
+
+Hay un normal disponible:
+
+Alumno A1 → normal
+
+Ahora:
+
+cupos normales ocupados = 5
+cupos normales disponibles = 0
+
+Después llegan alumnos de B.
+
+B1 → investigador
+B2 → investigador
+B3 → investigador
+
+Proyecto B puede alcanzar los 3 alumnos autorizados aunque el cupo normal
+que existía anteriormente haya sido ocupado por Proyecto A.
+
+Esto es posible porque el respaldo extraordinario quedó autorizado
+para Proyecto B desde su aprobación.
+
+
+============================================================
+14. RESPALDO DE INVESTIGADOR Y CUPOS NORMALES DEL PROFESOR
+============================================================
+
+Los cupos normales pertenecen a la capacidad general del profesor.
+
+No quedan apartados para una oferta cuando ésta se crea.
+
+Se asignan únicamente cuando el profesor acepta a un alumno.
+
+Por eso, un Proyecto de un profesor Investigador conserva respaldo
+extraordinario suficiente para alcanzar sus cupos_ofertados.
+
+
+EJEMPLO:
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+cupos normales disponibles = 1
+
+Se aprueba Proyecto B:
+
+cupos_ofertados = 3
+cupos_investigador = 3
+cupos_disponibles = 3
+
+
+CASO A: EL PRIMER ALUMNO DE PROYECTO B LLEGA ANTES
+
+El profesor acepta a B1.
+
+Hay 1 normal disponible.
+
+B1 → NORMAL
+
+Ahora:
+
+cupos normales disponibles = 0
+
+Después acepta:
+
+B2 → INVESTIGADOR
+B3 → INVESTIGADOR
+
+Proyecto B termina utilizando:
+
+1 normal
+2 investigador
+
+
+CASO B: OTRA OFERTA UTILIZA PRIMERO EL NORMAL
+
+Antes de aceptar alumnos de Proyecto B, el profesor acepta a un alumno
+de otra de sus ofertas.
+
+Como todavía había 1 normal:
+
+Ese alumno → NORMAL
+
+Ahora:
+
+cupos normales disponibles = 0
+
+Posteriormente llegan los alumnos de Proyecto B.
+
+B1 → INVESTIGADOR
+B2 → INVESTIGADOR
+B3 → INVESTIGADOR
+
+Proyecto B puede alcanzar igualmente sus 3 lugares autorizados.
+
+
+REGLA IMPORTANTE:
+
+"Normal primero" se evalúa cada vez que el profesor acepta a un alumno.
+
+No significa que los cupos normales que existían cuando se creó una
+oferta queden reservados para ella.
+
+Por eso:
+
+cupos_investigador = 3
+
+funciona como respaldo máximo para Proyecto B.
+
+Si existen normales cuando llegan sus alumnos, se utilizan primero.
+
+Si esos normales ya fueron utilizados por alumnos de otras ofertas,
+Proyecto B utiliza su respaldo extraordinario.
+
+
+============================================================
+15. PROFESOR SIN CARACTERÍSTICA INVESTIGADOR
+============================================================
+
+Un profesor sin característica Investigador puede crear las ofertas que
+necesite.
+
+Sus alumnos estarán sujetos a cupos_totales.
+
+Ejemplo:
+
+cupos_totales = 5
+
+Tiene 10 ofertas aprobadas.
+
+Ya aceptó:
+
+5 alumnos normales.
+
+Entonces:
+
+cupos normales disponibles = 0
+
+Sus demás ofertas pueden conservarse, pero temporalmente no admiten
+nuevas aceptaciones mientras no exista capacidad normal.
+
+Cuando vuelva a existir capacidad, podrán aceptar alumnos nuevamente.
+
+
+============================================================
+16. PROFESOR LLENO
+============================================================
+
+No es necesario cambiar permanentemente estado_oferta a algo como:
+
+"profesor_lleno"
+
+Puede manejarse como una condición calculada:
+
+profesor lleno
+=
+cupos normales disponibles = 0
+
+Esto permite mantener:
+
+estado_oferta = aprobada
+
+mientras el sistema sabe dinámicamente si puede recibir otro alumno.
+
+Ejemplo:
+
+Profesor:
+5/5 normales ocupados
+
+→ ofertas normales temporalmente sin capacidad efectiva
+
+Posteriormente ocurre una baja normal:
+
+4/5 normales ocupados
+
+→ vuelve a existir 1 cupo normal
+
+Las ofertas que todavía tengan lugares pueden volver automáticamente
+a aceptar un alumno.
+
+Así se evita cerrar y reabrir múltiples ofertas manualmente.
+
+
+============================================================
+17. DIFERENCIA ENTRE OFERTA LLENA Y PROFESOR LLENO
+============================================================
+
+Son dos situaciones distintas.
+
+
+OFERTA LLENA:
+
+cupos_disponibles = 0
+
+Significa:
+
+La propia oferta alcanzó su capacidad máxima.
+
+
+PROFESOR LLENO:
+
+cupos normales disponibles = 0
+
+Significa:
+
+La capacidad general del profesor está ocupada.
+
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_disponibles = 2
+
+Profesor normal:
+
+cupos normales disponibles = 0
+
+La oferta todavía tiene 2 lugares estructuralmente disponibles,
+pero actualmente el profesor no puede aceptar otro alumno normal.
+
+Si posteriormente se libera un cupo normal, podrá utilizarse uno de
+esos lugares.
+
+
+============================================================
+18. SOLICITUDES PENDIENTES CUANDO UNA OFERTA SE LLENA
+============================================================
+
+Se conserva el comportamiento actual.
+
+Cuando:
+
+cupos_disponibles = 0
+
+la oferta alcanzó su capacidad máxima.
+
+Las demás solicitudes pendientes de esa misma oferta pueden rechazarse
+automáticamente porque ya no existe lugar dentro de ella.
+
+
+Ejemplo:
+
+Proyecto:
+cupos_disponibles = 1
+
+Tiene tres solicitudes pendientes.
+
+Profesor acepta una:
+
+cupos_disponibles:
+1 → 0
+
+La oferta quedó llena.
+
+Las otras solicitudes pendientes pueden rechazarse automáticamente.
+
+
+============================================================
+19. PROFESOR LLENO CON SOLICITUDES PENDIENTES
+============================================================
+
+Si:
+
+cupos normales disponibles = 0
+
+pero:
+
+cupos_disponibles de una oferta > 0
+
+la oferta todavía conserva capacidad estructural.
+
+Las solicitudes no necesitan rechazarse únicamente porque el profesor
+esté lleno normalmente.
+
+Puede ocurrir posteriormente:
+
+- una baja normal;
+- liberación válida de capacidad;
+- o que la solicitud pertenezca a un Proyecto con respaldo investigador.
+
+Por ello se distingue:
+
+OFERTA LLENA
+→ no existe lugar dentro de la oferta.
+
+PROFESOR LLENO
+→ actualmente no existe capacidad normal.
+
+
+============================================================
+20. BAJAS
+============================================================
+
+Una baja aprobada vuelve a abrir el lugar dentro de la oferta.
+
+Se conserva:
+
+cupos_disponibles = cupos_disponibles + 1
+
+Además, el tipo de cupo asociado al alumno permite saber qué capacidad
+deja de utilizar.
+
+
+------------------------------------------------------------
+20.1 Baja de alumno NORMAL
+------------------------------------------------------------
+
+Ejemplo:
+
+Profesor:
+
+cupos_totales = 5
+cupos normales ocupados = 5
+
+Juan → tipo de cupo normal
+
+Juan causa baja.
+
+Entonces:
+
+cupos_disponibles de su oferta + 1
+
+y:
+
+cupos normales ocupados:
+5 → 4
+
+Por tanto:
+
+cupos normales disponibles:
+0 → 1
+
+Ese nuevo cupo normal puede ser utilizado por la siguiente aceptación
+válida del profesor.
+
+
+------------------------------------------------------------
+20.2 Baja de alumno INVESTIGADOR
+------------------------------------------------------------
+
+Ejemplo:
+
+María → tipo de cupo investigador
+
+María causa baja.
+
+Entonces:
+
+cupos_disponibles de su oferta + 1
+
+La capacidad normal del profesor permanece igual porque María nunca
+ocupó uno de sus cupos normales.
+
+El lugar extraordinario vuelve a quedar utilizable dentro de ese mismo
+Proyecto mientras la oferta continúe activa.
+
+------------------------------------------------------------
+20.3 RECHAZO O CANCELACIÓN DEFINITIVA ANTES DE LA ASIGNACIÓN FORMAL
+------------------------------------------------------------
+
+El cupo se consume desde el momento en que el profesor acepta la
+solicitud inicial del alumno.
+
+Después de esa aceptación todavía existen diferentes etapas:
+
+Profesor acepta
+        ↓
+Se consume el cupo
+        ↓
+Registro en SISS
+        ↓
+Validación de Coordinación
+        ↓
+Carta compromiso
+        ↓
+Expediente
+        ↓
+Asignación formal
+
+Durante todo este proceso el cupo permanece reservado para el alumno
+mientras su trámite continúe vigente.
+
+
+------------------------------------------------------------
+CORRECCIÓN O REENVÍO
+------------------------------------------------------------
+
+Una observación o rechazo que permita corregir y reenviar información
+no libera el cupo.
+
+Ejemplo:
+
+Profesor acepta a Pedro
+        ↓
+Pedro consume un cupo NORMAL
+        ↓
+Coordinación detecta una corrección necesaria
+        ↓
+Pedro corrige y reenvía
+        ↓
+El proceso continúa
+        ↓
+Pedro conserva su cupo NORMAL
+
+La regla es:
+
+PROCESO VIGENTE
+→ el cupo continúa reservado.
+
+
+------------------------------------------------------------
+RECHAZO O CANCELACIÓN DEFINITIVA
+------------------------------------------------------------
+
+Si el proceso termina definitivamente antes de que el alumno consolide
+su asignación formal, el sistema libera automáticamente el cupo que
+había reservado.
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_disponibles = 2
+
+El profesor acepta a Pedro como NORMAL.
+
+Entonces:
+
+cupos_disponibles:
+2 → 1
+
+Posteriormente el proceso de Pedro es rechazado definitivamente.
+
+Entonces:
+
+Pedro deja de ocupar un cupo NORMAL.
+
+cupos_disponibles:
+1 → 2
+
+El cupo normal vuelve a estar disponible para el profesor.
+
+
+Si Pedro hubiera sido aceptado como INVESTIGADOR:
+
+→ deja de utilizar respaldo extraordinario de ese Proyecto.
+→ cupos_disponibles + 1.
+
+Por ello, conservar el tipo de cupo permite saber exactamente qué
+capacidad debe liberarse.
+
+
+------------------------------------------------------------
+DIFERENCIA CON UNA BAJA
+------------------------------------------------------------
+
+El efecto sobre los cupos es similar, pero conceptualmente son eventos
+diferentes.
+
+RECHAZO DEFINITIVO PREVIO A ASIGNACIÓN:
+
+→ el alumno todavía no había consolidado su servicio social.
+→ el proceso termina.
+→ se devuelve el cupo reservado.
+→ no se registra como una baja.
+
+BAJA:
+
+→ el alumno ya estaba formalmente asignado.
+→ abandona posteriormente el servicio social.
+→ se devuelve el lugar correspondiente.
+
+Esta separación permite que los reportes y estadísticas distingan
+correctamente entre alumnos rechazados antes de su asignación y alumnos
+que causaron baja durante el servicio.
+
+
+------------------------------------------------------------
+PROTECCIÓN DE LA LIBERACIÓN
+------------------------------------------------------------
+
+La devolución del cupo debe realizarse dentro de una transacción
+atómica, de la misma manera que la aceptación.
+
+Conceptualmente:
+
+Proceso termina definitivamente
+        ↓
+Bloquear/verificar información necesaria
+        ↓
+Identificar tipo de cupo utilizado
+        ↓
+Liberar NORMAL o INVESTIGADOR
+        ↓
+cupos_disponibles + 1
+        ↓
+Confirmar transacción
+
+Esto permite mantener los conteos consistentes incluso si otra
+solicitud intenta utilizar capacidad del profesor prácticamente al
+mismo tiempo.
+
+
+REGLA GENERAL:
+
+El cupo se consume desde la aceptación del profesor y permanece
+reservado mientras el proceso siga vigente.
+
+Una corrección o reenvío conserva el cupo.
+
+Un rechazo o cancelación definitiva antes de la asignación formal
+libera automáticamente el cupo exacto que ese alumno había consumido.
+
+============================================================
+21. EL TIPO DE CUPO NO CAMBIA DINÁMICAMENTE
+============================================================
+
+Una vez que el alumno entra:
+
+Juan → normal
+María → investigador
+
+se conserva durante toda su estancia.
+
+Ejemplo:
+
+Profesor lleno:
+
+5 normales ocupados
+
+María entra:
+
+María → investigador
+
+Posteriormente Juan, que era normal, causa baja.
+
+Ahora:
+
+cupos normales disponibles = 1
+
+María continúa siendo:
+
+María → investigador
+
+El cupo normal recién liberado queda disponible para una futura
+aceptación.
+
+Esto simplifica los cálculos y permite que cada baja libere exactamente
+el tipo de capacidad que estaba utilizando.
+
+
+============================================================
+22. 480 HORAS
+============================================================
+
+Alcanzar 480 horas no libera el cupo.
+
+Las 480 horas permiten continuar/iniciar el proceso de Liberación.
+
+El alumno todavía pasa por etapas posteriores.
+
+Conceptualmente:
+
+480 horas
+    ↓
+Proceso de Liberación
+    ↓
+Evaluaciones/documentos
+    ↓
+Carta de término
+    ↓
+Expediente final
+    ↓
+constancia_disponible
+
+Durante este proceso el alumno continúa ocupando su cupo.
+
+
+============================================================
+23. FINALIZACIÓN NORMAL
+============================================================
+
+Se conserva la regla actual:
+
+Una finalización normal no incrementa cupos_disponibles de la oferta.
+
+Es decir:
+
+BAJA:
+cupos_disponibles + 1
+
+FINALIZACIÓN NORMAL:
+cupos_disponibles no cambia
+
+El lugar utilizado por un alumno que terminó correctamente su servicio
+no se reutiliza dentro de esa oferta.
+
+La finalización puede contribuir posteriormente a que toda la oferta
+cumpla las condiciones para concluir automáticamente.
+
+
+============================================================
+24. CIERRE/CONCLUSIÓN DE UNA OFERTA CON CUPOS INVESTIGADOR
+============================================================
+
+Los cupos de investigador pertenecen exclusivamente a esa oferta.
+
+Cuando la oferta termina:
+
+sus cupos extraordinarios dejan de existir.
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+
+Durante su funcionamiento realmente utilizó:
+
+3 normales
+2 investigador
+
+Cuando concluye el proyecto:
+
+los cupos extraordinarios asociados al proyecto dejan de estar
+disponibles.
+
+No ocurre:
+
+cupos_totales + 5
+
+ni se transfieren esos cupos a otro proyecto.
+
+Un futuro Proyecto tendrá su propia autorización.
+
+------------------------------------------------------------
+24.1 CONCLUSIÓN Y CIERRE DE UNA OFERTA TIPO PROYECTO
+------------------------------------------------------------
+
+La nueva lógica de cupos mantiene las condiciones existentes para
+concluir o cerrar una oferta tipo Proyecto.
+
+La diferencia es que ahora los alumnos que ocupan los lugares de un
+Proyecto pueden utilizar:
+
+- cupos NORMALES del profesor;
+- cupos INVESTIGADOR del Proyecto.
+
+El tipo de cupo utilizado por cada alumno no modifica las condiciones
+para concluir la oferta.
+
+NORMAL e INVESTIGADOR solamente indican qué capacidad utilizó el alumno
+para ingresar al Proyecto.
+
+Para determinar la conclusión del Proyecto se analiza la capacidad de
+la propia oferta y el resultado definitivo de los lugares que fueron
+ocupados.
+
+------------------------------------------------------------
+CONCLUSIÓN AUTOMÁTICA DEL PROYECTO
+------------------------------------------------------------
+Un Proyecto pasa automáticamente a:
+
+estado_oferta = concluida
+
+cuando se cumplen las dos condiciones siguientes:
+
+1. Todos los lugares de la oferta fueron cubiertos definitivamente.
+
+2. Los alumnos que representan la ocupación definitiva de esos lugares
+   concluyeron correctamente su servicio social.
+
+La primera condición puede identificarse mediante:
+
+cupos_disponibles = 0
+
+La segunda condición requiere comprobar que los alumnos que ocupan
+definitivamente esos lugares hayan alcanzado el estado terminal
+establecido para la finalización correcta del servicio social.
+
+IMPORTANTE:
+
+Para esta comprobación NO se consideran como ocupantes definitivos los
+alumnos cuyo lugar fue posteriormente liberado debido a:
+
+- una baja;
+- un rechazo o cancelación definitivo previo a la asignación formal;
+- cualquier otro evento definido por el sistema que devuelva
+  correctamente el lugar a la oferta.
+
+Estos alumnos permanecen en el historial de la oferta, pero ya no
+representan uno de sus lugares definitivamente ocupados.
+
+Esto se debe a que, cuando ocurre uno de estos eventos:
+
+cupos_disponibles + 1
+
+Por lo tanto, el lugar vuelve a quedar disponible y puede ser ocupado
+posteriormente por otro alumno.
+
+------------------------------------------------------------
+DIAGRAMA GENERAL
+------------------------------------------------------------
+
+Proyecto
+        ↓
+¿cupos_disponibles = 0?
+        ↓
+     SÍ        NO
+      ↓         ↓
+¿Los lugares   Permanece
+definitivos    APROBADA
+corresponden
+a alumnos que
+concluyeron
+correctamente?
+      ↓
+   SÍ    NO
+    ↓     ↓
+CONCLUIDA  Esperar
+
+
+------------------------------------------------------------
+EJEMPLO 1: PROYECTO CON CUPOS NORMALES E INVESTIGADOR
+------------------------------------------------------------
+
+Profesor Investigador.
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+cupos_disponibles = 5
+
+El profesor acepta:
+
+Alumno A → NORMAL
+Alumno B → NORMAL
+Alumno C → NORMAL
+Alumno D → INVESTIGADOR
+Alumno E → INVESTIGADOR
+
+Después de las cinco aceptaciones:
+
+cupos_disponibles = 0
+
+El Proyecto ya cubrió todos sus lugares, pero todavía permanece
+aprobado mientras los alumnos realizan su servicio social.
+
+Posteriormente:
+
+Alumno A → concluye correctamente
+Alumno B → concluye correctamente
+Alumno C → concluye correctamente
+Alumno D → concluye correctamente
+Alumno E → concluye correctamente
+
+Los cinco lugares definitivos corresponden a:
+
+Lugar 1 → A → concluido correctamente
+Lugar 2 → B → concluido correctamente
+Lugar 3 → C → concluido correctamente
+Lugar 4 → D → concluido correctamente
+Lugar 5 → E → concluido correctamente
+
+Entonces:
+
+cupos_disponibles = 0
++
+todos los lugares definitivos corresponden a alumnos que concluyeron
+correctamente
+        ↓
+estado_oferta = concluida
+
+Para esta validación no importa que algunos alumnos hayan utilizado
+NORMAL y otros INVESTIGADOR.
+
+El tipo de cupo solamente determina qué capacidad utilizó cada alumno,
+no la condición de conclusión del Proyecto.
+
+------------------------------------------------------------
+EFECTO DE UNA BAJA
+------------------------------------------------------------
+
+Una baja aprobada elimina a ese alumno de la ocupación definitiva del
+lugar y vuelve a abrirlo dentro de la oferta.
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_disponibles = 0
+
+Alumnos:
+
+A → concluyó correctamente
+B → concluyó correctamente
+C → causa baja
+
+La baja de C provoca:
+
+cupos_disponibles: 0 → 1
+
+C permanece registrado en el historial del Proyecto, pero ya no
+representa uno de los tres lugares definitivos necesarios para concluir
+la oferta.
+
+Por lo tanto:
+
+estado_oferta = aprobada
+
+y el Proyecto puede recibir otro alumno.
+
+Posteriormente entra D:
+
+cupos_disponibles: 1 → 0
+
+D ocupa el lugar que había sido liberado por C.
+
+Cuando D concluye correctamente, la ocupación definitiva queda:
+
+Lugar 1 → A → concluido correctamente
+Lugar 2 → B → concluido correctamente
+Lugar 3 → D → concluido correctamente
+
+C permanece en el historial: C → baja
+
+pero no forma parte de los tres lugares definitivos porque su lugar fue
+devuelto y posteriormente ocupado por D.
+
+Entonces:
+
+cupos_disponibles = 0
++
+los tres lugares definitivos corresponden a alumnos que concluyeron
+correctamente
+        ↓
+estado_oferta = concluida
+
+------------------------------------------------------------
+EFECTO DE UN RECHAZO O CANCELACIÓN DEFINITIVA PREVIO A LA
+ASIGNACIÓN FORMAL
+------------------------------------------------------------
+
+Si un alumno ya fue aceptado por el profesor, inicialmente consume un
+lugar de la oferta.
+
+Sin embargo, si posteriormente su proceso termina definitivamente antes
+de consolidar la asignación formal, ese lugar se devuelve.
+
+Por lo tanto:
+
+cupos_disponibles + 1
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_disponibles = 0
+
+A → concluyó correctamente
+B → concluyó correctamente
+C → su proceso termina definitivamente antes de consolidar la asignación
+
+El lugar de C se devuelve:
+
+cupos_disponibles: 0 → 1
+
+C permanece en el historial del Proyecto, pero deja de representar un
+lugar definitivamente ocupado.
+
+Por lo tanto:
+
+estado_oferta = aprobada
+
+El Proyecto puede recibir otro alumno para cubrir nuevamente ese lugar.
+
+Posteriormente entra D:
+
+cupos_disponibles: 1 → 0
+
+Si D concluye correctamente, los lugares definitivos serán:
+
+Lugar 1 → A → concluido correctamente
+Lugar 2 → B → concluido correctamente
+Lugar 3 → D → concluido correctamente
+
+Entonces el Proyecto puede pasar a:
+
+estado_oferta = concluida
+
+------------------------------------------------------------
+DIFERENCIA ENTRE HISTORIAL Y OCUPACIÓN DEFINITIVA
+------------------------------------------------------------
+
+Para determinar la conclusión de un Proyecto no debe interpretarse la
+regla como:
+
+"Todos los alumnos que alguna vez estuvieron relacionados con la oferta
+deben concluir correctamente."
+
+Esto sería incorrecto porque una oferta puede tener alumnos históricos
+que:
+
+- causaron baja;
+- fueron rechazados definitivamente después de la aceptación;
+- cancelaron definitivamente su proceso;
+- liberaron su lugar mediante algún otro flujo válido.
+
+Estos alumnos continúan formando parte del historial, pero su lugar fue
+devuelto mediante:
+
+cupos_disponibles + 1
+
+Por lo tanto, posteriormente otro alumno puede ocuparlo.
+
+Ejemplo:
+
+Proyecto de 3 lugares.
+
+Historial:
+
+A → concluyó correctamente
+B → concluyó correctamente
+C → baja
+D → concluyó correctamente
+
+Aunque existen 4 alumnos en el historial, la capacidad del Proyecto
+continúa siendo:
+
+cupos_ofertados = 3
+
+La ocupación definitiva es:
+
+Lugar 1 → A
+Lugar 2 → B
+Lugar 3 → D
+
+C no representa un cuarto lugar ni impide la conclusión porque su baja
+devolvió el lugar posteriormente ocupado por D.
+
+------------------------------------------------------------
+PROYECTO QUE NUNCA COMPLETÓ TODOS SUS CUPOS
+------------------------------------------------------------
+
+Si los alumnos que participaron concluyeron correctamente pero todavía
+existen lugares disponibles, el Proyecto no se concluye automáticamente.
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 5
+
+Solamente ingresaron:
+
+A
+B
+C
+
+Los tres concluyen correctamente.
+
+Entonces:
+
+cupos_disponibles = 2
+
+Como todavía existen dos lugares disponibles:
+
+estado_oferta = aprobada
+
+El profesor puede mantener el Proyecto abierto para recibir nuevos
+alumnos.
+
+------------------------------------------------------------
+CIERRE MANUAL
+------------------------------------------------------------
+
+Si el Proyecto no completó todos sus cupos y ya no existen alumnos
+activos, el profesor puede decidir terminar la oferta manualmente.
+
+Ejemplo:
+
+cupos_ofertados = 5
+cupos_disponibles = 2
+
+A → concluyó
+B → concluyó
+C → concluyó
+
+No existen alumnos activos.
+
+El profesor decide no recibir más alumnos.
+
+Entonces puede seleccionar:
+
+Cerrar oferta
+        ↓
+estado_oferta = cerrada
+
+Por lo tanto existen dos formas diferentes de terminar el ciclo de vida
+de un Proyecto:
+
+CONCLUIDA
+
+→ automática.
+→ se cubrieron definitivamente todos sus lugares.
+→ cupos_disponibles = 0.
+→ los alumnos que representan esos lugares concluyeron correctamente.
+
+CERRADA
+
+→ manual.
+→ todavía quedaron lugares disponibles.
+→ no existen alumnos activos.
+→ el profesor decide no continuar recibiendo alumnos.
+
+------------------------------------------------------------
+NO CONFUNDIR "NO HAY ALUMNOS ACTIVOS" CON "CONCLUIDA"
+------------------------------------------------------------
+
+La condición:
+
+no existen alumnos activos
+
+se utiliza para permitir el cierre manual de un Proyecto que todavía
+conserva lugares disponibles.
+
+Por el momento NO se utilizará por sí sola como equivalente a:
+
+"todos los lugares definitivos concluyeron correctamente".
+
+Por lo tanto, no se simplificará todavía la conclusión automática a:
+
+cupos_disponibles = 0
++
+no existen alumnos activos
+        ↓
+concluida
+
+Antes de realizar esa simplificación debe comprobarse, con los estados
+y reglas del CU-PRO-04, que no exista ningún estado terminal diferente
+de una finalización correcta que:
+
+- deje cupos_disponibles = 0;
+- elimine al alumno de los alumnos activos;
+- pero no represente una conclusión correcta del servicio social.
+
+Hasta realizar esa validación, se mantiene la condición más estricta:
+
+cupos_disponibles = 0
++
+los lugares definitivamente ocupados corresponden a alumnos que 
+concluyeron correctamente.
+
+------------------------------------------------------------
+RELACIÓN CON LA CAPACIDAD DEL PROFESOR
+------------------------------------------------------------
+
+Para determinar si un Proyecto debe concluir no se utilizan:
+
+cupos normales disponibles del profesor
+
+ni:
+
+el respaldo INVESTIGADOR como condición de conclusión.
+
+Estas variables se utilizan durante la aceptación para decidir:
+
+- si un alumno puede ser aceptado;
+- si utilizará NORMAL;
+- o si utilizará INVESTIGADOR.
+
+Una vez dentro del Proyecto, NORMAL e INVESTIGADOR no modifican las
+condiciones necesarias para que la oferta concluya.
+
+La conclusión se determina mediante información de la propia oferta:
+
+cupos_disponibles
++
+resultado definitivo de los lugares ocupados.
+
+------------------------------------------------------------
+RESUMEN 24.1
+------------------------------------------------------------
+
+PARA ACEPTAR UN ALUMNO:
+
+Se revisa:
+
+→ cupos_disponibles de la oferta.
+→ cupos normales disponibles del profesor.
+→ tipo de oferta.
+→ característica Investigador.
+→ respaldo investigador del Proyecto.
+
+PARA CONCLUIR AUTOMÁTICAMENTE UN PROYECTO:
+
+cupos_disponibles = 0
++
+todos los lugares definitivamente ocupados corresponden a alumnos que
+concluyeron correctamente su servicio social
+        ↓
+estado_oferta = concluida
+
+SI UN ALUMNO CAUSA BAJA O SU PROCESO TERMINA DEFINITIVAMENTE Y SU
+LUGAR DEBE DEVOLVERSE:
+
+cupos_disponibles + 1
+
+→ deja de representar un lugar definitivo.
+→ permanece únicamente como parte del historial.
+→ el Proyecto puede recibir un reemplazo.
+
+PARA CERRAR MANUALMENTE UN PROYECTO:
+
+cupos_disponibles > 0
++
+no existen alumnos activos
++
+el profesor decide cerrar
+        ↓
+estado_oferta = cerrada
+
+============================================================
+25. CUPOS INVESTIGADOR AUTORIZADOS PERO NO UTILIZADOS
+============================================================
+
+Es completamente válido que una oferta termine sin utilizar todo su
+respaldo extraordinario.
+
+Ejemplo:
+
+Proyecto:
+
+cupos_ofertados = 5
+cupos_investigador = 5
+
+Finalmente solo entraron:
+
+3 normales
+2 investigador
+
+Se utilizaron realmente:
+
+2 cupos investigador
+
+Los otros 3 simplemente fueron capacidad extraordinaria autorizada
+que nunca fue necesaria.
+
+También podría ocurrir:
+
+3 normales
+0 investigador
+
+si solamente participaron tres alumnos.
+
+Los cupos extraordinarios restantes no afectan cupos_totales ni otras
+ofertas.
+
+Cuando el proyecto termina, desaparecen junto con la autorización de
+esa oferta.
+
+
+============================================================
+26. ACEPTACIONES SIMULTÁNEAS
+============================================================
+
+Se conserva la protección mediante transacciones atómicas.
+
+Ejemplo:
+
+Profesor normal:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+
+Solo queda:
+
+1 cupo normal
+
+Dos solicitudes de diferentes ofertas son aceptadas casi al mismo tiempo.
+
+La primera transacción:
+
+comprueba capacidad
+    ↓
+encuentra 1 normal
+    ↓
+asigna NORMAL
+    ↓
+actualiza ocupación
+
+La segunda vuelve a comprobar:
+
+cupos normales disponibles = 0
+
+Si no tiene respaldo investigador:
+
+→ aceptación no procede
+→ respuesta controlada, por ejemplo 409
+
+Si pertenece a un Proyecto de un profesor Investigador y todavía tiene
+respaldo extraordinario disponible:
+
+→ asigna INVESTIGADOR
+
+Así se evita superar accidentalmente la capacidad.
+
+
+============================================================
+27. PROFESOR INVESTIGADOR CON VARIAS OFERTAS
+============================================================
+
+Cada Proyecto mantiene su propia autorización extraordinaria.
+
+Ejemplo:
+
+Profesor:
+
+cupos_totales = 5
+característica Investigador
+
+Proyecto A:
+
+cupos_ofertados = 3
+cupos_investigador = 3
+
+Proyecto B:
+
+cupos_ofertados = 4
+cupos_investigador = 4
+
+Proyecto C:
+
+cupos_ofertados = 2
+cupos_investigador = 2
+
+Esto no significa:
+
+cupos_totales = 14
+
+El profesor sigue teniendo:
+
+cupos_totales = 5
+
+Los normales se comparten globalmente entre todas sus ofertas.
+
+Los extraordinarios pertenecen exclusivamente al Proyecto para el que
+fueron autorizados.
+
+
+============================================================
+28. PRIORIDAD DE LOS CUPOS NORMALES
+============================================================
+
+La regla general para aceptar alumnos será:
+
+NORMAL PRIMERO.
+INVESTIGADOR COMO RESPALDO.
+
+Ejemplo:
+
+Profesor Investigador:
+
+cupos_totales = 5
+cupos normales ocupados = 4
+
+Proyecto:
+
+cupos_ofertados = 3
+cupos_investigador = 3
+
+Solicitud 1:
+
+queda 1 normal
+→ NORMAL
+
+Solicitud 2:
+
+quedan 0 normales
+→ INVESTIGADOR
+
+Solicitud 3:
+
+quedan 0 normales
+→ INVESTIGADOR
+
+Resultado:
+
+1 normal
+2 investigador
+
+De esta manera, ser investigador no hace que el profesor deje de
+utilizar su capacidad normal.
+
+El privilegio extraordinario entra cuando realmente hace falta.
+
+
+============================================================
+29. MODIFICACIÓN DE CARACTERÍSTICA
+============================================================
+
+Un profesor que no tiene característica Investigador sigue sujeto a su
+capacidad normal.
+
+Si necesita acceder al privilegio extraordinario:
+
+Solicita modificación de característica
+        ↓
+Coordinación revisa
+        ↓
+Aprueba Investigador
+        ↓
+El profesor obtiene el privilegio
+        ↓
+Puede registrar Proyectos con respaldo extraordinario
+
+La característica debe estar aprobada antes de registrar la oferta que
+utilizará este mecanismo.
+
+
+============================================================
+30. CARACTERÍSTICAS YA APROBADAS
+============================================================
+
+El modelo actual trabaja con características que se agregan/reconocen y
+no contempla un flujo para revocarlas.
+
+Por ello, una vez aprobada la característica Investigador, el sistema
+puede utilizarla para validar futuros Proyectos del profesor.
+
+No es necesario agregar por ahora lógica adicional de pérdida de
+característica.
+
+
+============================================================
+31. REENVÍO DE OFERTAS
+============================================================
+
+El reenvío conserva su propósito original.
+
+Se utiliza cuando:
+
+Oferta
+    ↓
+Coordinación rechaza
+    ↓
+Profesor corrige
+    ↓
+Profesor reenvía
+    ↓
+Coordinación vuelve a revisar
+
+La administración de cupos investigador no necesita reutilizar este
+mecanismo.
+
+Un Proyecto aprobado ya conserva el respaldo extraordinario que le fue
+autorizado.
+
+
+============================================================
+32. CAMBIO PRINCIPAL RESPECTO A LA LÓGICA ANTERIOR
+============================================================
+
+La lógica se centra ahora en ALUMNOS y no en la cantidad de ofertas.
+
+Anteriormente se podía interpretar la capacidad como si registrar una
+oferta comprometiera inmediatamente cupos normales.
+
+La nueva lógica establece:
+
+CREAR OFERTA
+→ no ocupa cupos generales
+
+ACEPTAR ALUMNO
+→ sí ocupa capacidad
+
+Esto representa mejor el funcionamiento real:
+
+El profesor puede publicar diferentes opciones y su límite se controla
+por la cantidad de alumnos que efectivamente acepta.
+
+
+============================================================
+33. CAMBIO EN LA INTERPRETACIÓN DE cupos_investigador
+============================================================
+
+Para soportar correctamente múltiples ofertas sin reservar capacidad
+normal, cupos_investigador se interpreta como:
+
+MÁXIMO RESPALDO EXTRAORDINARIO AUTORIZADO PARA ESE PROYECTO.
+
+Ejemplo:
+
+Proyecto:
+cupos_ofertados = 5
+cupos_investigador = 5
+
+No significa:
+
+"Actualmente existen 5 alumnos investigador."
+
+Significa:
+
+"Si fuera necesario, este proyecto tiene autorización para respaldar
+hasta 5 alumnos mediante la característica Investigador."
+
+La cantidad realmente utilizada se obtiene contando las asignaciones
+cuyo tipo de cupo sea investigador.
+
+
+============================================================
+34. VARIABLES CALCULADAS PRINCIPALES
+============================================================
+
+Sin definir todavía la implementación exacta, conceptualmente
+necesitaremos calcular:
+
+
+CUPOS NORMALES OCUPADOS
+
+cantidad de asignaciones vigentes que tienen:
+
+tipo de cupo = normal
+
+
+CUPOS NORMALES DISPONIBLES
+
+cupos_totales - cupos normales ocupados
+
+
+CUPOS INVESTIGADOR OCUPADOS EN UNA OFERTA
+
+cantidad de asignaciones vigentes de esa oferta que tienen:
+
+tipo de cupo = investigador
+
+
+CUPOS INVESTIGADOR RESTANTES
+
+cupos_investigador
+-
+cupos investigador ocupados
+
+
+PROFESOR LLENO NORMALMENTE
+
+cupos normales disponibles = 0
+
+
+Estas variables pueden calcularse a partir de los datos del sistema,
+sin necesidad de convertirlas necesariamente en nuevas columnas.
+
+
+============================================================
+35. REGLA GENERAL DE ACEPTACIÓN
+============================================================
+
+La decisión completa puede resumirse así:
+
+
+Profesor intenta aceptar alumno
+        ↓
+¿cupos_disponibles > 0?
+        ↓
+      SÍ
+        ↓
+¿Hay cupo normal disponible?
+        ↓
+   SÍ           NO
+    ↓             ↓
+NORMAL        ¿Oferta = Proyecto?
+                  ↓
+                 SÍ
+                  ↓
+          ¿Profesor = Investigador?
+                  ↓
+                 SÍ
+                  ↓
+       ¿Queda respaldo investigador
+          autorizado en esa oferta?
+                  ↓
+              SÍ      NO
+               ↓       ↓
+        INVESTIGADOR  NO ACEPTAR
+
+
+Cuando la aceptación procede:
+
+cupos_disponibles - 1
+
+y se registra:
+
+tipo de cupo = normal
+
+o:
+
+tipo de cupo = investigador
+
+
+============================================================
+36. EJEMPLO GENERAL COMPLETO
+============================================================
+
+Profesor:
+
+cupos_totales = 5
+característica = Investigador
+
+Tiene:
+
+10 ofertas individuales
+Proyecto A de 5
+Proyecto B de 3
+
+Crear estas ofertas no consume cupos generales.
+
+
+PASO 1
+
+Acepta 3 alumnos de diferentes ofertas individuales:
+
+Normales ocupados = 3
+Normales disponibles = 2
+
+
+PASO 2
+
+Acepta un alumno de Proyecto A:
+
+Hay normal.
+
+→ NORMAL
+
+Normales ocupados = 4
+Normales disponibles = 1
+
+
+PASO 3
+
+Acepta un alumno de Proyecto B:
+
+Hay normal.
+
+→ NORMAL
+
+Normales ocupados = 5
+Normales disponibles = 0
+
+
+PASO 4
+
+Quiere aceptar otro alumno de una oferta Individual:
+
+No hay normal.
+
+Individual no utiliza respaldo investigador.
+
+→ no se acepta en ese momento.
+
+
+PASO 5
+
+Quiere aceptar otro alumno de Proyecto A.
+
+No hay normal.
+
+Profesor = Investigador.
+Oferta = Proyecto.
+Proyecto A tiene respaldo extraordinario.
+
+→ INVESTIGADOR
+
+
+PASO 6
+
+Quiere aceptar otro de Proyecto B.
+
+→ INVESTIGADOR
+
+
+PASO 7
+
+Uno de los alumnos normales causa baja.
+
+Su oferta:
+
+cupos_disponibles + 1
+
+Profesor:
+
+normales ocupados:
+5 → 4
+
+normales disponibles:
+0 → 1
+
+
+PASO 8
+
+Llega una nueva solicitud válida.
+
+Si el profesor la acepta, aunque sea en un Proyecto Investigador:
+
+Existe un normal disponible.
+
+→ NORMAL
+
+Porque la capacidad normal siempre tiene prioridad.
+
+
+============================================================
+37. PRINCIPIOS FINALES DE LA PROPUESTA
+============================================================
+
+1. El profesor tiene límite de alumnos, no límite de ofertas.
+
+2. Crear una oferta no consume capacidad general.
+
+3. El cupo se consume cuando el profesor acepta la solicitud.
+
+4. cupos_totales representa únicamente capacidad general.
+
+5. Las características institucionales normales pueden incrementar
+   cupos_totales según sus reglas.
+
+6. Investigador no incrementa cupos_totales.
+
+7. Investigador permite respaldo extraordinario únicamente en ofertas
+   tipo Proyecto.
+
+8. Los cupos extraordinarios pertenecen exclusivamente a la oferta.
+
+9. cupos_investigador representa el máximo respaldo extraordinario
+   autorizado.
+
+10. Los alumnos utilizan primero cupos normales.
+
+11. Investigador se utiliza cuando no queda capacidad normal.
+
+12. Cada asignación conserva su tipo de cupo durante toda su estancia.
+
+13. Una baja libera exactamente el tipo de capacidad que utilizaba
+    ese alumno.
+
+14. Una baja incrementa cupos_disponibles.
+
+15. Una finalización normal no incrementa cupos_disponibles.
+
+16. Cumplir 480 horas no libera el cupo.
+
+17. Los cupos investigador no utilizados simplemente permanecen como
+    capacidad autorizada de esa oferta.
+
+18. Al terminar el Proyecto, sus cupos extraordinarios dejan de existir.
+
+19. Varias ofertas pueden competir por los mismos cupos normales.
+
+20. Las transacciones atómicas determinan quién obtiene el último cupo
+    cuando existen aceptaciones simultáneas.
+
+21. Un Proyecto con respaldo investigador puede continuar aceptando
+    alumnos extraordinarios cuando el profesor ya alcanzó su capacidad
+    normal.
+
+22. Las ofertas individuales siempre dependen de capacidad normal.
+
+23. El estado de una oferta y que el profesor esté lleno son conceptos
+    diferentes.
+
+24. "Profesor lleno" puede calcularse dinámicamente sin agregar
+    necesariamente un nuevo estado a la oferta.
+
+25. El reenvío continúa reservado para ofertas rechazadas que fueron
+    corregidas.
+26. Un profesor con característica Investigador puede registrar ofertas
+    Individuales, pero estas siempre consumen capacidad NORMAL.
+
+27. El respaldo extraordinario de Investigador solamente puede utilizarse
+    en ofertas tipo Proyecto y únicamente cuando ya no existen cupos
+    normales disponibles.
+
+28. Si una solicitud ya aceptada por el profesor termina definitivamente
+    antes de la asignación formal, se libera el cupo que había reservado y
+    se incrementa cupos_disponibles de la oferta.
+
+29. Una corrección, observación o reenvío que mantenga vigente el proceso
+    del alumno no libera el cupo reservado.
+
+30. El tipo de cupo NORMAL o INVESTIGADOR no modifica las condiciones de
+    conclusión de una oferta tipo Proyecto.
+
+31. Un Proyecto se concluye automáticamente cuando todos sus lugares
+    definitivos fueron cubiertos y los alumnos correspondientes concluyeron
+    correctamente su servicio social.
+
+32. Si un Proyecto conserva cupos_disponibles y ya no existen alumnos
+    activos, puede permanecer aprobado para recibir nuevos alumnos o ser
+    cerrado manualmente por el profesor.
+
+============================================================
+ACLARACIONES POSTERIORES A LA REVISIÓN COMPARTIDA
+============================================================
+Después de la revisión compartida se agregaron nuevas aclaraciones y
+casos a la lógica propuesta.
+Estas aclaraciones ya se encuentran desarrolladas dentro del documento
+y pueden consultarse en las siguientes secciones:
+
+→ Punto 4.1
+→ Punto 20.3
+→ Punto 24.1
+
+------------------------------------------------------------
+NUEVAS ACLARACIONES:
+------------------------------------------------------------
