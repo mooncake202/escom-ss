@@ -77,6 +77,9 @@ app.use('/profesor', require('./src/modules/ah/ah.routes'));
 //AH02
 app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
 
+//LSS01
+app.use('/alumno', require('./src/modules/lss/lss-alumno.routes'));
+
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');

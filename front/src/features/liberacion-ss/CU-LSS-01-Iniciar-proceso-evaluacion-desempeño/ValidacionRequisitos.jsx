@@ -1,32 +1,71 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "./components/ProcesoLSSLayout";
+import { calcularPasoActual } from "./utils/pasoLSS";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 import { useValidacionRequisitos } from "./hooks/useValidacionRequisitos";
-
-const MOCK_ALUMNO = { nombre: "García López Juan Carlos" };
 
 export default function ValidacionRequisitos() {
   const { C } = useTheme();
   const navigate = useNavigate();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
 
-  const { confirmado, solicitarValidacion, error, loading, enviado, toggleConfirmado, toggleSolicitud, confirmar, completo } =
-    useValidacionRequisitos();
+  const {
+    cargando, yaExiste, estadoExistente, requisitos, cumpleTodos,
+    confirmado, solicitarValidacion, error, loading, enviado,
+    toggleConfirmado, toggleSolicitud, confirmar, completo,
+  } = useValidacionRequisitos();
 
+  if (cargando) {
+    return (
+      <ProcesoLSSLayout
+        pasoActual={1}
+        titulo="Liberación de servicio social"
+        subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
+        rol="alumno"
+        usuario={nombreAlumno}
+      >
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </ProcesoLSSLayout>
+    );
+  }
 
-    // 🔧 PRUEBA — cambia a true/false para simular
-const tieneHoras = false;
-const tieneReportes = false;
+  // RN-LSS-01: ya existe un proceso — nunca se inicia un segundo. Las
+  // pantallas de destino (CU-LSS-02 en adelante) no están construidas
+  // todavía, así que por ahora solo se informa el estado actual.
+  if (yaExiste) {
+    return (
+      <ProcesoLSSLayout
+        pasoActual={calcularPasoActual(estadoExistente)}
+        titulo="Liberación de servicio social"
+        subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
+        rol="alumno"
+        usuario={nombreAlumno}
+      >
+        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
+          <div style={{ fontSize: 52, marginBottom: "1rem" }}>📋</div>
+          <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
+            Ya tienes un proceso de liberación en curso
+          </h2>
+          <p style={{ margin: 0, fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
+            Estado actual: <strong style={{ color: C.textPrimary }}>{estadoExistente}</strong>
+          </p>
+        </div>
+      </ProcesoLSSLayout>
+    );
+  }
 
   // ✅ MISMO patrón de éxito que tu ejemplo
   if (enviado) {
     return (
-      <ProcesoLSSLayout 
-        pasoActual={1} 
+      <ProcesoLSSLayout
+        pasoActual={2}
         titulo="Liberación de servicio social"
         subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
         rol="alumno"
-        usuario={MOCK_ALUMNO.nombre}>
+        usuario={nombreAlumno}>
         <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
           <div style={{ fontSize: 52, marginBottom: "1rem" }}>📋</div>
           <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.success }}>
@@ -62,13 +101,23 @@ const tieneReportes = false;
     );
   }
 
+  const tarjetaEstilo = (cumple) => ({
+    padding: "12px",
+    borderRadius: 10,
+    border: `1px solid ${cumple ? C.success : C.danger}`,
+    background: cumple ? C.successSoft : C.dangerSoft,
+    marginBottom: "1rem",
+    fontSize: 13,
+    color: cumple ? C.success : C.danger,
+  });
+
   return (
     <ProcesoLSSLayout
       pasoActual={1}
       titulo="Liberación de servicio social"
       subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
       rol="alumno"
-      usuario={MOCK_ALUMNO.nombre}
+      usuario={nombreAlumno}
      >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
 
@@ -105,30 +154,22 @@ const tieneReportes = false;
             Estado de tus requisitos
           </p>
 
-          {/* Auto validados */}
-          <div style={{
-  padding: "12px",
-  borderRadius: 10,
-  border: `1px solid ${tieneHoras ? C.success : C.danger}`,
-  background: tieneHoras ? C.successSoft : C.dangerSoft,
-  marginBottom: "1rem",
-  fontSize: 13,
-  color: tieneHoras ? C.success : C.danger
-}}>
-  {tieneHoras ? "✅" : "❌"} 480 horas completadas
-</div>
+          {/* Horas */}
+          <div style={tarjetaEstilo(requisitos.horas.cumple)}>
+            {requisitos.horas.cumple ? "✅" : "❌"} {requisitos.horas.horasNetas} / {requisitos.horas.requeridas} horas completadas
+          </div>
 
-<div style={{
-  padding: "12px",
-  borderRadius: 10,
-  border: `1px solid ${tieneReportes ? C.success : C.danger}`,
-  background: tieneReportes ? C.successSoft : C.dangerSoft,
-  marginBottom: "1.25rem",
-  fontSize: 13,
-  color: tieneReportes ? C.success : C.danger
-}}>
-  {tieneReportes ? "✅" : "❌"} Reportes mensuales y global registrados y aprobados
-</div>
+          {/* Reportes */}
+          <div style={tarjetaEstilo(requisitos.reportes.cumple)}>
+            {requisitos.reportes.cumple ? "✅" : "❌"} Reportes mensuales ({requisitos.reportes.totalMensualesEnviados}/6+) y global registrados y aprobados
+          </div>
+
+          {/* Oferta concluida — solo aplica a ofertas individuales (RN-LSS-02) */}
+          {requisitos.oferta.aplica && (
+            <div style={{ ...tarjetaEstilo(requisitos.oferta.cumple), marginBottom: "1.25rem" }}>
+              {requisitos.oferta.cumple ? "✅" : "❌"} Oferta de servicio social concluida
+            </div>
+          )}
 
           {/* Confirmación */}
           <div style={{
@@ -136,13 +177,15 @@ const tieneReportes = false;
             borderRadius: 12,
             padding: "1rem",
             background: C.bgInput,
-            marginBottom: "1rem"
+            marginBottom: "1rem",
+            opacity: cumpleTodos ? 1 : 0.5,
           }}>
-            <label style={{ display: "flex", gap: 10, cursor: "pointer" }}>
+            <label style={{ display: "flex", gap: 10, cursor: cumpleTodos ? "pointer" : "not-allowed" }}>
               <input
                 type="checkbox"
                 checked={confirmado}
                 onChange={toggleConfirmado}
+                disabled={!cumpleTodos}
               />
               <span style={{ fontSize: 13 }}>
                 Confirmo que mis reportes han sido validados en la plataforma SISS
@@ -159,12 +202,12 @@ const tieneReportes = false;
                 rel="noopener noreferrer"
                 style={{ color: C.accentText, fontWeight: 600 }}
             >
-              plataforma SISS? 
+              plataforma SISS?
             </a>
-              
+
           </p>
           <p style={{ margin: "0rem 0 1.25rem", fontSize: 13, color: C.textMuted, textAlign: "center" }}>
-            
+
               Marca la casilla de abajo para pedirle al profesor que lo haga.
           </p>
 
@@ -175,12 +218,14 @@ const tieneReportes = false;
             borderRadius: 12,
             padding: "1rem",
             background: C.bgInput,
+            opacity: cumpleTodos ? 1 : 0.5,
           }}>
-            <label style={{ display: "flex", gap: 10, cursor: "pointer" }}>
+            <label style={{ display: "flex", gap: 10, cursor: cumpleTodos ? "pointer" : "not-allowed" }}>
               <input
                 type="checkbox"
                 checked={solicitarValidacion}
                 onChange={toggleSolicitud}
+                disabled={!cumpleTodos}
               />
               <span style={{ fontSize: 13 }}>
                 Solicito que se validen mis reportes en la plataforma SISS
@@ -188,18 +233,24 @@ const tieneReportes = false;
             </label>
           </div>
 
+          {!cumpleTodos && (
+            <p style={{ marginTop: 10, fontSize: 12, color: C.textDisabled }}>
+              Debes cumplir todos los requisitos de arriba antes de poder confirmar o solicitar validación.
+            </p>
+          )}
+
           {error && (
             <p style={{ marginTop: 6, fontSize: 12, color: C.danger }}>
               {error}
             </p>
           )}
 
-            
 
 
-           
 
-          
+
+
+
         </div>
 
         {/* AVISO (mismo patrón visual) */}
@@ -221,19 +272,19 @@ const tieneReportes = false;
         {/* BOTÓN (idéntico comportamiento) */}
         <button
           onClick={confirmar}
-          disabled={!completo || loading}
+          disabled={!completo || loading || !cumpleTodos}
           style={{
             width: "100%",
             padding: "12px",
             borderRadius: RADIUS.md,
             fontSize: 14,
             fontWeight: 600,
-            cursor: !completo || loading ? "not-allowed" : "pointer",
-            background: !completo || loading ? C.borderDefault : GRADIENTS.primary,
+            cursor: !completo || loading || !cumpleTodos ? "not-allowed" : "pointer",
+            background: !completo || loading || !cumpleTodos ? C.borderDefault : GRADIENTS.primary,
             border: "none",
             color: "#fff",
             fontFamily: "inherit",
-            boxShadow: !completo || loading ? "none" : SHADOWS.accent,
+            boxShadow: !completo || loading || !cumpleTodos ? "none" : SHADOWS.accent,
             opacity: !completo ? 0.5 : 1,
           }}
         >

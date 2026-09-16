@@ -1,9 +1,8 @@
 const prisma = require('../../lib/prisma');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
-
-const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
-const ESTADO_LSS_EVALUACION_SOLICITADA = 'evaluacion_solicitada';
-const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // último estado del flujo LSS
+const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL } = require('../lss/lss.shared');
+const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
+const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
 
 const ESTADOS_ACTIVOS = ['sin_comenzar', 'en_progreso'];
 
@@ -97,12 +96,13 @@ async function resumenAlumno(usuarioId) {
       actividadesAsignadas: 0, reportesEnviados: 0,
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
+      cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false,
     };
   }
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar] = await Promise.all([
+  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion] = await Promise.all([
     // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
     // y ambas variantes de completada (antes contaba todo, bug reportado).
     prisma.actividad.count({ where: { solicitud_registro_id: solicitudId, estado: { in: ['sin_comenzar', 'en_progreso'] } } }),
@@ -110,6 +110,16 @@ async function resumenAlumno(usuarioId) {
     tieneActividadesPendientes(solicitudId),
     faltaBitacoraHoy(solicitudId),
     tieneJornadaPendienteDatos(solicitudId),
+    // Widget "Proceso de Liberación del Servicio Social" — reutiliza TAL
+    // CUAL la validación de RN-LSS-02 ya construida en CU-LSS-01, no la
+    // duplica. LIMITACIÓN CONOCIDA: los requisitos de reportes/oferta
+    // dependen de los módulos de Reportes/Ofertas, que todavía no existen y
+    // por lo tanto no emiten resumen:actualizado — si esos datos cambian
+    // por fuera del flujo actual (ej. ajuste manual en BD para pruebas), el
+    // widget no se refresca en vivo hasta recargar. No es un bug: en cuanto
+    // esos módulos existan y emitan el evento genérico, este widget ya
+    // reacciona solo (ya escucha resumen:actualizado), sin cambios aquí.
+    obtenerEstadoRequisitos(usuarioId),
   ]);
 
   return {
@@ -126,6 +136,8 @@ async function resumenAlumno(usuarioId) {
     jornadaSinTerminar,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
+    tieneProcesoLiberacionIniciado: estadoLiberacion.yaExiste,
+    cumpleRequisitosLiberacion: !estadoLiberacion.yaExiste && !!estadoLiberacion.cumpleTodos,
   };
 }
 
@@ -145,13 +157,14 @@ async function resumenProfesor(usuarioId) {
       alumnosAsignados: 0, cuposTotales: 0, ofertasActivas: 0,
       reportesPorRevisar: 0, bitacorasPorRevisar: 0, solicitudesPendientes: 0,
       alumnosConFaltasCriticas: 0,
+      alumnosConEvaluacionSolicitada: 0,
       actividadesProximasACaducar: false, alumnoSinActividades: false,
       bitacorasRevisionAtrasada: false,
       departamento: null, cubiculo: null, caracteristicas: [],
     };
   }
 
-const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades, bitacorasRevisionAtrasada] = await Promise.all([
+const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, alumnosConEvaluacionSolicitada, bitacorasPorRevisar, alertasActividades, bitacorasRevisionAtrasada] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
     // final del proceso GR.
@@ -177,6 +190,11 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
         alumno: { solicitud_registro: { oferta: { profesor_id: profesor.id } } },
       },
     }),
+    // RF-LSS-02/RF-LSS-04: notificación calculada — cuántos alumnos de este
+    // profesor tienen una evaluación de desempeño solicitada (CU-LSS-01)
+    // esperando a que el profesor la revise (CU-LSS-03, no construido
+    // todavía). Cálculo real vive en lss/lss-profesor.service.js.
+    contarAlumnosConEvaluacionSolicitada(profesor.id),
     // CU-AH-04 no está construido todavía (revisar/aprobar/rechazar sigue
     // mockeado en el frontend) — pero el CONTEO en sí ya es real: cuántas
     // bitácoras de sus alumnos están en 'pendiente_revision'.
@@ -196,6 +214,7 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     ofertasActivas,
     solicitudesPendientes,
     alumnosConFaltasCriticas,
+    alumnosConEvaluacionSolicitada,
     // TODO: requiere convención de estado de CU-REP — todavía no construido.
     reportesPorRevisar: 0,
     bitacorasPorRevisar,

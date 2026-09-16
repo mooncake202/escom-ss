@@ -1,52 +1,84 @@
-
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { getEstadoRequisitos, iniciarEvaluacion } from "@/services/lssAlumnoService";
 
 export function useValidacionRequisitos() {
-const [confirmado, setConfirmado] = useState(false);
-const [solicitarValidacion, setSolicitarValidacion] = useState(false);
-const [error, setError] = useState(null);
-const [loading, setLoading] = useState(false);
-const [enviado, setEnviado] = useState(false);
+  const [cargando, setCargando] = useState(true);
+  const [yaExiste, setYaExiste] = useState(false);
+  const [estadoExistente, setEstadoExistente] = useState(null);
+  const [requisitos, setRequisitos] = useState(null);
+  const [cumpleTodos, setCumpleTodos] = useState(false);
 
-const toggleConfirmado = () => {
-setConfirmado(prev => {
-    const nuevo = !prev;
+  const [confirmado, setConfirmado] = useState(false);
+  const [solicitarValidacion, setSolicitarValidacion] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [enviado, setEnviado] = useState(false);
 
-    // 🔴 si activas este → apaga el otro
-    if (nuevo) setSolicitarValidacion(false);
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    try {
+      const data = await getEstadoRequisitos();
+      if (data.yaExiste) {
+        setYaExiste(true);
+        setEstadoExistente(data.estado);
+      } else {
+        setYaExiste(false);
+        setRequisitos(data.requisitos);
+        setCumpleTodos(!!data.cumpleTodos);
+      }
+    } catch (err) {
+      setError(err.message || "No se pudo cargar el estado de tus requisitos.");
+    } finally {
+      setCargando(false);
+    }
+  }, []);
 
-    return nuevo;
-  });
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
 
-  setError(null);
-};
+  const toggleConfirmado = () => {
+    if (!cumpleTodos) return; // RN-LSS-02: bloqueado hasta cumplir requisitos duros
+    setConfirmado((prev) => {
+      const nuevo = !prev;
+      if (nuevo) setSolicitarValidacion(false);
+      return nuevo;
+    });
+    setError(null);
+  };
 
-const toggleSolicitud = () => {
-  setSolicitarValidacion(prev => {
-    const nuevo = !prev;
+  const toggleSolicitud = () => {
+    if (!cumpleTodos) return;
+    setSolicitarValidacion((prev) => {
+      const nuevo = !prev;
+      if (nuevo) setConfirmado(false);
+      return nuevo;
+    });
+    setError(null);
+  };
 
-    // 🔴 si activas este → apaga el otro
-    if (nuevo) setConfirmado(false);
-
-    return nuevo;
-  });
-
-  setError(null);
-};
   const confirmar = async () => {
-    // 🔴 regla: al menos uno debe cumplirse
+    if (!cumpleTodos) return;
+    // RN-LSS-03: uno de los dos checks es obligatorio (mutuamente excluyentes).
     if (!confirmado && !solicitarValidacion) {
       setError("Debes confirmar o solicitar validación");
       return;
     }
 
     setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setEnviado(true);
-    setLoading(false);
+    setError(null);
+    try {
+      await iniciarEvaluacion(confirmado);
+      setEnviado(true);
+    } catch (err) {
+      setError(err.message || "No se pudo enviar tu solicitud de evaluación.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
+    cargando, yaExiste, estadoExistente, requisitos, cumpleTodos,
     confirmado,
     solicitarValidacion,
     error,
@@ -55,6 +87,6 @@ const toggleSolicitud = () => {
     toggleConfirmado,
     toggleSolicitud,
     confirmar,
-    completo: confirmado || solicitarValidacion
+    completo: confirmado || solicitarValidacion,
   };
 }

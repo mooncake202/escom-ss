@@ -387,32 +387,53 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
 
         {/* CU-LSS */}
         <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C}>
-          <div style={{ padding: "10px 10px 4px" }}>
-            <div style={{
-              background: C.bgInput, borderRadius: RADIUS.md, padding: "12px 14px",
-              display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-              border: `1px dashed ${C.borderDefault}`,
-            }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: RADIUS.sm, background: C.bgPage,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Icon name="flag" size={17} color={C.textDisabled} />
+          {/* Widget de estado — desaparece por completo en cuanto el alumno
+              ya tiene un liberacion_proceso (CU-LSS-02 en adelante, que
+              mostraría su avance real, no está construido todavía). */}
+          {!resumen.tieneProcesoLiberacionIniciado && (
+              <div style={{ padding: "10px 10px 4px" }}>
+                <div style={{
+                  background: resumen.cumpleRequisitosLiberacion ? C.successSoft : C.bgInput,
+                  borderRadius: RADIUS.md, padding: "12px 14px",
+                  display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+                  border: `1px dashed ${resumen.cumpleRequisitosLiberacion ? C.success : C.borderDefault}`,
+                }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: RADIUS.sm, background: C.bgPage,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Icon name={resumen.cumpleRequisitosLiberacion ? "check" : "flag"} size={17} color={resumen.cumpleRequisitosLiberacion ? C.success : C.textDisabled} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: resumen.cumpleRequisitosLiberacion ? C.success : C.textMuted }}>
+                      {resumen.cumpleRequisitosLiberacion ? "¡Ya puedes iniciar tu proceso!" : "Proceso no iniciado"}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDisabled }}>
+                      {resumen.cumpleRequisitosLiberacion
+                        ? "Cumples todos los requisitos — continúa para solicitar tu evaluación de desempeño."
+                        : "Debes cumplir 480 hrs y tener tus reportes y oferta en regla."}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
+                    <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasNetas ?? 0}/480</span>
+                  </div>
+                  <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.textMuted }}>Proceso no iniciado</div>
-                <div style={{ fontSize: 12, color: C.textDisabled }}>Debes cumplir 480 hrs y tener 6 reportes aprobados</div>
-              </div>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
-                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasNetas ?? 0}/480</span>
-              </div>
-              <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
-            </div>
-          </div>
-          <ActionItem icon="arrow"  {...T.slate} label="Ver proceso de liberación" desc="Disponible al cumplir los requisitos" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
-          <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          )}
+          {/* Botón "Ver proceso" — INDEPENDIENTE del widget de arriba, con la
+              condición casi inversa a propósito: se muestra SIEMPRE que ya
+              exista un liberacion_proceso (sin importar su estado), para que
+              el alumno pueda consultarlo. Si no existe, no hay nada que ver
+              todavía — el widget de arriba ya cubre ese caso. */}
+          {resumen.tieneProcesoLiberacionIniciado && (
+            <>
+              <ActionItem icon="arrow" {...T.slate} label="Ver proceso de liberación" desc="Consulta el estado de tu evaluación de desempeño" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
+              <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+            </>
+          )}
           <ActionItem icon="folder" {...T.slate} label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/alumnoasignado-documentacion")} C={C} />
           <SlotNotificacion ruta="/alumnoasignado-documentacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
@@ -487,6 +508,16 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             mostrar: (resumen.alumnosConFaltasCriticas ?? 0) > 0,
             mensaje: `Tienes ${resumen.alumnosConFaltasCriticas} alumno(s) con faltas criticas`,
             ruta: "/profesor/solicitar-baja-alumno",
+            tipo: "urgente",
+          },
+          {
+            // RF-LSS-02/RF-LSS-04: notificación calculada (Tipo A) — mientras
+            // exista al menos un alumno con evaluación de desempeño
+            // solicitada (CU-LSS-01), esperando revisión del profesor
+            // (CU-LSS-03, todavía no construido).
+            mostrar: (resumen.alumnosConEvaluacionSolicitada ?? 0) > 0,
+            mensaje: "Tienes alumnos con evaluación de desempeño pendiente.",
+            ruta: "/profesor/liberacion",
             tipo: "urgente",
           },
           {
