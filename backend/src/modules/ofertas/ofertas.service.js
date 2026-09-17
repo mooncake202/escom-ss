@@ -1,6 +1,7 @@
 const prisma = require('../../lib/prisma');
 const redis = require('../../lib/redis');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
+const { construirContextoCupos, ofertaPuedeRecibirAlumno } = require('../../lib/cupos');
 
 const CACHE_KEY_OFERTAS = 'cache:ofertas';
 const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
@@ -28,7 +29,16 @@ async function listarOfertasDisponibles() {
     orderBy: { fecha_registro: 'desc' },
   });
 
-  const resultado = ofertas.map((o) => ({
+  // Filtra las ofertas cuyo profesor ya alcanzó su límite general de cupos
+  // (y sin respaldo de investigador disponible en ESA oferta). Batcheado
+  // en 3 consultas fijas (construirContextoCupos), no una por oferta.
+  const contexto = await construirContextoCupos(ofertas);
+  const permisos = await Promise.all(
+    ofertas.map((o) => ofertaPuedeRecibirAlumno(o, o.profesor, contexto))
+  );
+  const ofertasDisponibles = ofertas.filter((_, i) => permisos[i]);
+
+  const resultado = ofertasDisponibles.map((o) => ({
     id: o.id,
     titulo: o.nombre_proyecto,
     profesor: `${o.profesor.usuario.nombre} ${o.profesor.usuario.apellidos}`,

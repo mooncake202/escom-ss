@@ -28,18 +28,24 @@ export default function SolicitudesPendientes() {
       usuario={nombreProfesor}
     >
 
-      {/* Toast de resultado */}
+      {/* Toast de resultado — 3 estados reales posibles desde el backend:
+          aceptada_por_profesor, rechazada_por_profesor, rechazada_por_cupos
+          (esta última es un rechazo AUTOMÁTICO por límite de cupos del
+          profesor, no una decisión manual — mensaje propio para no
+          confundirlo con "rechacé a este alumno a propósito"). */}
       {resultado && (
         <div style={{
           marginBottom: "1.25rem", padding: "12px 16px",
           borderRadius: RADIUS.md,
-          background: resultado.tipo === "aceptar" ? C.successSoft : C.dangerSoft,
-          border: `1px solid ${resultado.tipo === "aceptar" ? C.success : C.danger}`,
-          color: resultado.tipo === "aceptar" ? C.success : C.danger,
+          background: resultado.tipo === "aceptada_por_profesor" ? C.successSoft : C.dangerSoft,
+          border: `1px solid ${resultado.tipo === "aceptada_por_profesor" ? C.success : C.danger}`,
+          color: resultado.tipo === "aceptada_por_profesor" ? C.success : C.danger,
           fontSize: 13, fontWeight: 500,
         }}>
-          {resultado.tipo === "aceptar"
+          {resultado.tipo === "aceptada_por_profesor"
             ? `✓ Solicitud de ${resultado.nombre} aceptada. El alumno lo verá reflejado en su proceso.`
+            : resultado.tipo === "rechazada_por_cupos"
+            ? `⚠ No se pudo aceptar a ${resultado.nombre}: alcanzaste tu límite de cupos disponibles. Se rechazó automáticamente.`
             : `✕ Solicitud de ${resultado.nombre} rechazada. El alumno lo verá reflejado en su proceso.`
           }
         </div>

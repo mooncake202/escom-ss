@@ -165,6 +165,7 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
         docs_iniciales: false,
         registro_siss: false,
         periodo_registro_id: null,
+        tipo_cupo: null,
       },
     });
     await tx.documento.deleteMany({ where: { id: { in: idsDocumentos } } });
