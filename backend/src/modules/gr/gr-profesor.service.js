@@ -1,6 +1,7 @@
 const prisma = require('../../lib/prisma');
 const { dictamenLabel } = require('./gr.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+const { determinarTipoCupoParaAceptar } = require('../../lib/cupos');
 
 const MOTIVO_RECHAZO_PROFESOR = 'Rechazado por profesor';
 const MOTIVO_RECHAZO_CUPOS = 'Cupos de la oferta cubiertos';
@@ -108,9 +109,47 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
   }
 
   // ── decision === 'aceptar' ────────────────────────────────────────────
-  // RN-GR-08: decremento atómico — si ya no hay cupo, count=0 y abortamos
-  // sin tocar nada (mismo patrón de update condicional que ya usamos en GR-01).
-  await prisma.$transaction(async (tx) => {
+  // Nuevo: ANTES de tocar cupos_disponibles de la oferta, se determina si
+  // el PROFESOR todavía tiene cupo (normal, o investigador de respaldo) —
+  // dentro de la misma transacción (mismo tx) para que la lectura del
+  // conteo y la escritura de tipo_cupo queden en el mismo snapshot.
+  //
+  // Condición de carrera conocida y aceptada por ahora (documentada, no
+  // resuelta): a diferencia de cupos_disponibles de la oferta (decremento
+  // atómico de una sola fila), el límite del profesor se deriva de un
+  // COUNT — 2 aceptaciones concurrentes sobre el mismo profesor en 2
+  // ofertas distintas podrían, en teoría, leer el mismo conteo antes de
+  // que cualquiera confirme su tipo_cupo. Mismo nivel de robustez que ya
+  // acepta el resto del código (ver E3 más abajo).
+  const resultadoTransaccion = await prisma.$transaction(async (tx) => {
+    let motivoRechazoPorCupos = null;
+    const tipoCupo = await determinarTipoCupoParaAceptar(solicitud.oferta, profesor, tx).catch((err) => {
+      if (err.code === 'PROFESOR_SIN_CUPOS') {
+        motivoRechazoPorCupos = err.message; // única fuente del texto — no se duplica
+        return null;
+      }
+      throw err;
+    });
+
+    if (tipoCupo === null) {
+      // El profesor ya no tiene cupo de ningún tipo para esta oferta — la
+      // solicitud se rechaza automáticamente (no es un error del backend,
+      // es un resultado válido: la BD sí cambió).
+      await tx.solicitud_registro.update({
+        where: { id: solicitud.id },
+        data: {
+          estado_solicitud: 'rechazada_por_cupos',
+          estado_anterior: 'espera_respuesta_de_profesor',
+          tipo_rechazo: 'corregible',
+          motivo_rechazo: motivoRechazoPorCupos,
+        },
+      });
+      return { estado_solicitud: 'rechazada_por_cupos', motivo: motivoRechazoPorCupos };
+    }
+
+    // RN-GR-08: decremento atómico — si ya no hay cupo DE LA OFERTA, count=0
+    // y abortamos sin tocar nada (mismo patrón de update condicional que
+    // ya usamos en GR-01). Esta guarda es independiente de la del profesor.
     const cupoDecrementado = await tx.oferta_servicio.updateMany({
       where: { id: solicitud.oferta_id, cupos_disponibles: { gt: 0 } },
       data: { cupos_disponibles: { decrement: 1 } },
@@ -125,9 +164,25 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
       data: {
         estado_solicitud: 'aceptada_por_profesor',
         estado_anterior: 'espera_respuesta_de_profesor',
+        tipo_cupo: tipoCupo,
       },
     });
+
+    return { estado_solicitud: 'aceptada_por_profesor' };
   });
+
+  if (resultadoTransaccion.estado_solicitud === 'rechazada_por_cupos') {
+    try {
+      emitirAUsuario(solicitud.alumno.usuario_id, 'solicitud:rechazada_por_cupos', {
+        solicitudId: solicitud.id,
+        estado_solicitud: 'rechazada_por_cupos',
+        motivo: resultadoTransaccion.motivo,
+      });
+    } catch (err) {
+      console.error('Error al emitir solicitud:rechazada_por_cupos:', err.message);
+    }
+    return { estado_solicitud: 'rechazada_por_cupos' };
+  }
 
   try {
     emitirAUsuario(solicitud.alumno.usuario_id, 'solicitud:aceptada', {

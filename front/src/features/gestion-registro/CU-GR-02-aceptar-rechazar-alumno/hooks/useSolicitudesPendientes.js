@@ -49,9 +49,12 @@ export function useSolicitudesPendientes() {
   const decidir = async (id, decision) => {
     setLoading(true);
     try {
-      await decidirSolicitud(id, decision);
+      const { estado_solicitud } = await decidirSolicitud(id, decision);
       const nombre = solicitudes.find(s => s.id === id)?.nombre ?? "";
-      setResultado({ tipo: decision, nombre });
+      // El backend puede rechazar automáticamente una aceptación (cupo del
+      // profesor agotado) sin que eso sea un error HTTP — el resultado real
+      // se lee de estado_solicitud, nunca se asume a partir de `decision`.
+      setResultado({ tipo: estado_solicitud, nombre });
       setSeleccionada(null);
       // RN-GR-11: si aceptar esta solicitud cubrió los cupos, el backend ya
       // rechazó automáticamente las demás pendientes de esa oferta — se

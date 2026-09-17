@@ -10,6 +10,8 @@ const {
 
 const { generarToken } = require('../../lib/jwt');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+const { ofertaPuedeRecibirAlumno } = require('../../lib/cupos');
+const { ESTADOS_CON_CUPO_CONSUMIDO } = require('./gr.shared');
 
 const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 
@@ -141,6 +143,10 @@ async function validarOfertaDisponibleYConCupo(ofertaId) {
 
   if (ofertaEncontrada.cupos_disponibles <= 0) {
     throw crearError('Lo sentimos, el cupo se acaba de llenar. Selecciona otra oferta.', 409, 'OFERTA_SIN_CUPOS');
+  }
+
+  if (!(await ofertaPuedeRecibirAlumno(ofertaEncontrada, ofertaEncontrada.profesor))) {
+    throw crearError('Lo sentimos, el profesor de esta oferta ya alcanzó su límite de cupos. Selecciona otra oferta.', 409, 'OFERTA_SIN_CUPOS');
   }
 
   return ofertaEncontrada;
@@ -311,25 +317,6 @@ const ESTADOS_SIN_RELOJ = [
 // el periodo arranque.
 const ESTADOS_RELOJ_2 = ['expediente_pendiente_revision', 'expediente_con_correcciones'];
 
-// Estados en los que el profesor YA aceptó al alumno (por lo tanto ya se
-// había decrementado cupos_disponibles en CU-GR-02) — si cualquiera de
-// los 2 relojes vence estando en cualquiera de estos, hay que liberar
-// ese cupo de vuelta.
-const ESTADOS_CON_CUPO_CONSUMIDO = [
-  'registro_SISS',
-  'adjuntar_documentacion_inicial',
-  'SISS_y_documentacion_pendiente',
-  'SISS_docs_aprobados',
-  'corregir_docsini',
-  'corregir_SISS',
-  'descargar_carta_compromiso',
-  'espera_confirmacion_carta_compromiso',
-  'carta_compromiso_confirmada',
-  'adjuntar_expediente',
-  'expediente_pendiente_revision',
-  'expediente_con_correcciones',
-];
-
 const MOTIVO_RECHAZO_VENCIMIENTO_EXPEDIENTE = 'Plazo de envío de expediente vencido';
 const MOTIVO_RECHAZO_VENCIMIENTO_INICIO = 'Tu periodo de servicio social inició sin que tu expediente quedara aprobado';
 
@@ -358,6 +345,7 @@ async function ejecutarBorradoParcial(solicitud, motivo) {
         docs_iniciales: false,
         carta_compromiso: false,
         expediente: false,
+        tipo_cupo: null,
       },
     }),
     prisma.documento.deleteMany({ where: { alumno_id: solicitud.alumno_id } }),
