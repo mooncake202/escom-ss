@@ -3,8 +3,6 @@ import { apiFetch } from "@/services/apiClient";
 
 const FORM_VACIO = {
   nombre: "",
-  tituloSISS: "",
-  programaSISS: "",
   descripcion: "",
 };
 
@@ -31,8 +29,6 @@ export function useOfertaIndividual() {
   function validar() {
     const e = {};
     if (!form.nombre.trim())      e.nombre      = "El nombre de la oferta es obligatorio.";
-    if (!form.tituloSISS.trim())  e.tituloSISS  = "La Actividad SISS es obligatorio.";
-    if (!form.programaSISS.trim()) e.programaSISS = "El programa SISS es obligatorio.";
     if (!form.descripcion.trim()) e.descripcion = "La descripción es obligatoria.";
     if (perfilesDeseados.length === 0) e.carreras = "Selecciona al menos una carrera.";
     return e;
@@ -48,8 +44,6 @@ export function useOfertaIndividual() {
         method: "POST",
         body: JSON.stringify({
           nombre_proyecto: form.nombre,
-          nombre_SISS: form.tituloSISS,
-          programa_SISS: form.programaSISS,
           descripcion_actividades: form.descripcion,
           tipo_oferta: "individual",
           carreras: perfilesDeseados,

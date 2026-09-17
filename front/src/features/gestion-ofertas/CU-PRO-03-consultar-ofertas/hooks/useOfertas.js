@@ -10,15 +10,17 @@ function adaptarOferta(o) {
     programaSISS: o.programaSISS,
     profesor: o.profesor,
     modalidad: o.modalidad,
-    estado: o.estado === "Pendiente_revision" ? "pendiente"
-          : o.estado === "Aprobada" ? "aprobado"
-          : o.estado === "Rechazada" ? "rechazado"
+    estado: o.estado === "pendiente_revision" ? "pendiente"
+          : o.estado === "aprobada" ? "aprobado"
+          : o.estado === "rechazada" ? "rechazado"
           : o.estado,
     descripcion: o.descripcion,
     actividades: o.actividades ? [o.actividades] : [],
     cuposRegistrados: o.cuposRegistrados,
     cuposDisponibles: o.cuposDisponibles,
     esInvestigador: o.esInvestigador,
+    cuposOcupadosProfesor: o.cuposOcupadosProfesor,
+    cuposTotalesProfesor: o.cuposTotalesProfesor,
     perfilDeseado: o.perfilCarrera,
     motivoRechazo: o.motivoRechazo,
   };
@@ -36,11 +38,11 @@ export function useOfertas() {
   const [toast, setToast]                         = useState(null);
 
   const [searchParams] = useSearchParams();
-  const [destacadoId, setDestacadoId] = useState(null);
+  const [destacadosIds, setDestacadosIds] = useState(new Set());
 
   useEffect(() => {
     const val = searchParams.get("destacar");
-    setDestacadoId(val ? parseInt(val, 10) : null);
+    setDestacadosIds(val ? new Set(val.split(",").map(Number)) : new Set());
   }, [searchParams]);
 
   useEffect(() => {
@@ -79,7 +81,13 @@ export function useOfertas() {
 
   function seleccionar(p) {
     setSeleccionado(seleccionado?.id === p.id ? null : p);
-    if (p.id === destacadoId) setDestacadoId(null);
+    if (destacadosIds.has(p.id)) {
+      setDestacadosIds((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+    }
   }
 
   function cambiarVista(v) {
@@ -128,7 +136,7 @@ export function useOfertas() {
   }
 
   return {
-    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadoId,
+    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadosIds,
     seleccionar, cambiarVista, setBusqueda, setFiltroModalidad, aprobar, rechazar,
   };
 }

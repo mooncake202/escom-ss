@@ -18,7 +18,7 @@ async function listarOfertasDisponibles() {
 
   const ofertas = await prisma.oferta_servicio.findMany({
     where: {
-      estado_oferta: 'Aprobada',
+      estado_oferta: 'aprobada',
       cupos_disponibles: { gt: 0 },
     },
     include: {
@@ -78,7 +78,7 @@ async function calcularCuposDisponibles(profesorId) {
   }
 
   const cupos_comprometidos_profesor = profesor.oferta_servicio
-    .filter((o) => o.estado_oferta !== 'Rechazada')
+    .filter((o) => o.estado_oferta !== 'rechazada')
     .reduce((sum, o) => {
       if (o.tipo_oferta === 'individual') return sum + 1;
       if (o.cupos_investigador) return sum;
@@ -107,7 +107,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
 
-  if (oferta.estado_oferta !== 'Pendiente_revision') {
+  if (oferta.estado_oferta !== 'pendiente_revision') {
     throw Object.assign(new Error('Esta oferta ya fue revisada anteriormente.'), { status: 400 });
   }
 
@@ -124,7 +124,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
     const actualizada = await prisma.oferta_servicio.update({
       where: { id: ofertaId },
       data: {
-        estado_oferta: 'Aprobada',
+        estado_oferta: 'aprobada',
         motivo_rechazo: null,
         programa_SISS: programaSISS,
         nombre_SISS: actividadSISS,
@@ -157,7 +157,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
 
     const actualizada = await prisma.oferta_servicio.update({
       where: { id: ofertaId },
-      data: { estado_oferta: 'Rechazada', motivo_rechazo: motivoRechazo },
+      data: { estado_oferta: 'rechazada', motivo_rechazo: motivoRechazo },
     });
 
     await crearNotificacion({
@@ -185,7 +185,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
 // CU-PRO-02 (parte de listado): ofertas pendientes de revisión
 async function listarOfertasPendientes() {
   const ofertas = await prisma.oferta_servicio.findMany({
-    where: { estado_oferta: 'Pendiente_revision' },
+    where: { estado_oferta: 'pendiente_revision' },
     include: {
       profesor: { include: { usuario: true } },
       deseo_de_carrera: { include: { carrera: true } },
@@ -215,11 +215,11 @@ async function listarOfertasPendientes() {
 
 // CU-PRO-05: Consultar historial de ofertas (profesor ve las suyas)
 const ESTATUS_POR_ESTADO = {
-  Pendiente_revision: 'en_revision',
-  Aprobada: 'activo',
-  Rechazada: 'rechazada',
-  Concluida: 'concluido',
-  Cerrada: 'cerrado',
+  pendiente_revision: 'en_revision',
+  aprobada: 'activo',
+  rechazada: 'rechazada',
+  concluida: 'concluido',
+  cerrada: 'cerrado',
 };
 
 async function listarMisOfertas(profesorId) {
@@ -264,11 +264,11 @@ async function listarMisOfertas(profesorId) {
 async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
   let estadoWhere;
   if (vista === 'pendientes') {
-    estadoWhere = 'Pendiente_revision';
+    estadoWhere = 'pendiente_revision';
   } else if (vista === 'historial') {
-    estadoWhere = (estadoOferta === 'Aprobada' || estadoOferta === 'Rechazada')
+    estadoWhere = (estadoOferta === 'aprobada' || estadoOferta === 'rechazada')
       ? estadoOferta
-      : { in: ['Aprobada', 'Rechazada'] };
+      : { in: ['aprobada', 'rechazada'] };
   } else {
     throw Object.assign(new Error("vista debe ser 'pendientes' o 'historial'."), { status: 400 });
   }
@@ -296,6 +296,24 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     orderBy: { fecha_registro: 'desc' },
   });
 
+  // Cupos ocupados del profesor: cuenta solicitud_registro con tipo_cupo ya
+  // asignado (alumno aceptado), a través de TODAS las ofertas del profesor
+  // (no solo la de esta fila), excluyendo estados que ya liberaron el lugar.
+  const profesorIds = [...new Set(ofertas.map((o) => o.profesor_id))];
+  const solicitudesOcupando = await prisma.solicitud_registro.findMany({
+    where: {
+      tipo_cupo: { not: null },
+      estado_solicitud: { notIn: ESTADOS_RECHAZO_SOLICITUD },
+      oferta: { profesor_id: { in: profesorIds } },
+    },
+    select: { oferta: { select: { profesor_id: true } } },
+  });
+  const cuposOcupadosPorProfesor = new Map();
+  for (const s of solicitudesOcupando) {
+    const id = s.oferta.profesor_id;
+    cuposOcupadosPorProfesor.set(id, (cuposOcupadosPorProfesor.get(id) || 0) + 1);
+  }
+
   return ofertas.map((o) => ({
     id: o.id,
     titulo: o.nombre_proyecto,
@@ -306,9 +324,11 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     estado: o.estado_oferta,
     descripcion: o.descripcion_actividades,
     actividades: o.descripcion_actividades,
-    cuposRegistrados: o.cupos_investigador ?? (o.tipo_oferta === 'individual' ? 1 : o.cupos_ofertados),
+    cuposRegistrados: o.tipo_oferta === 'individual' ? 1 : o.cupos_ofertados,
     cuposDisponibles: o.cupos_disponibles,
     esInvestigador: o.cupos_investigador !== null,
+    cuposOcupadosProfesor: cuposOcupadosPorProfesor.get(o.profesor_id) || 0,
+    cuposTotalesProfesor: o.profesor.cupos_totales,
     perfilCarrera: o.deseo_de_carrera.map((d) => d.carrera.nombre),
     motivoRechazo: o.motivo_rechazo,
     fechaRegistro: o.fecha_registro.toISOString().slice(0, 10),
@@ -323,15 +343,15 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
   if (oferta.profesor_id !== profesorId) {
-    throw Object.assign(new Error('No tienes permiso para modificar esta oferta.'), { status: 403 });
+    throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
-  if (oferta.estado_oferta !== 'Rechazada') {
+  if (oferta.estado_oferta !== 'rechazada') {
     throw Object.assign(new Error('Solo se pueden corregir y reenviar ofertas rechazadas.'), { status: 400 });
   }
 
-  const { nombre_proyecto, nombre_SISS, programa_SISS, descripcion_actividades, tipo_oferta, cupos_ofertados, carreras } = datos;
+  const { nombre_proyecto, descripcion_actividades, tipo_oferta, cupos_ofertados, carreras } = datos;
 
-  if (!nombre_proyecto || !nombre_SISS || !programa_SISS || !descripcion_actividades || !tipo_oferta) {
+  if (!nombre_proyecto || !descripcion_actividades || !tipo_oferta) {
     throw Object.assign(new Error('Faltan campos obligatorios.'), { status: 400 });
   }
   if (!['individual', 'proyecto'].includes(tipo_oferta)) {
@@ -341,42 +361,31 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     throw Object.assign(new Error('Debe seleccionar al menos un perfil de carrera.'), { status: 400 });
   }
 
-  const resultado = await calcularCuposDisponibles(profesorId);
-  const { cupos_disponibles_profesor, es_investigador } = resultado;
-
   let dataActualizada = {
-    nombre_SISS,
-    programa_SISS,
     nombre_proyecto,
     descripcion_actividades,
     tipo_oferta,
-    estado_oferta: 'Pendiente_revision',
+    estado_oferta: 'pendiente_revision',
     motivo_rechazo: null,
     cupos_ofertados: null,
     cupos_investigador: null,
   };
 
   if (tipo_oferta === 'individual') {
-    if (cupos_disponibles_profesor < 1) {
-      throw Object.assign(new Error('No tienes cupos disponibles. Solicita modificación de características en Gestión Administrativa.'), { status: 400 });
-    }
     dataActualizada.cupos_disponibles = 1;
   } else {
     const cupos = parseInt(cupos_ofertados, 10);
     if (!Number.isInteger(cupos) || cupos < 2) {
       throw Object.assign(new Error('Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.'), { status: 400 });
     }
-    if (cupos > cupos_disponibles_profesor) {
-      if (es_investigador) {
-        dataActualizada.cupos_ofertados = cupos;
-        dataActualizada.cupos_investigador = cupos;
-        dataActualizada.cupos_disponibles = cupos;
-      } else {
-        throw Object.assign(new Error('No tienes cupos disponibles suficientes. Solicita modificación de características en Gestión Administrativa.'), { status: 400 });
-      }
-    } else {
-      dataActualizada.cupos_ofertados = cupos;
-      dataActualizada.cupos_disponibles = cupos;
+    dataActualizada.cupos_ofertados = cupos;
+    dataActualizada.cupos_disponibles = cupos;
+
+    const esInvestigador = await prisma.solicitud_caracteristica.findFirst({
+      where: { profesor_id: profesorId, estado: 'aprobada', caracteristica: { nombre: 'Investigador' } },
+    });
+    if (esInvestigador) {
+      dataActualizada.cupos_investigador = cupos;
     }
   }
 
@@ -434,12 +443,12 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
   if (oferta.profesor_id !== profesorId) {
-    throw Object.assign(new Error('No tienes permiso para modificar esta oferta.'), { status: 403 });
+    throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
   if (oferta.tipo_oferta !== 'proyecto') {
     throw Object.assign(new Error('Las ofertas individuales no se pueden cerrar manualmente.'), { status: 400 });
   }
-  if (oferta.estado_oferta !== 'Aprobada') {
+  if (oferta.estado_oferta !== 'aprobada') {
     throw Object.assign(new Error('Solo se pueden cerrar ofertas que estén Aprobadas.'), { status: 400 });
   }
 
@@ -459,7 +468,7 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
 
   return prisma.oferta_servicio.update({
     where: { id: ofertaId },
-    data: { estado_oferta: 'Cerrada' },
+    data: { estado_oferta: 'cerrada' },
   });
 }
 // CU-PRO-04: Concluir ofertas automáticamente (RN-PRO-18/19/20)
@@ -467,7 +476,7 @@ const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // mismo valor que usa dash
 
 async function revisarConclusionAutomatica() {
   const ofertas = await prisma.oferta_servicio.findMany({
-    where: { estado_oferta: 'Aprobada' },
+    where: { estado_oferta: 'aprobada' },
     include: {
       profesor: { include: { usuario: true } },
       solicitud_registro: {
@@ -498,7 +507,7 @@ async function revisarConclusionAutomatica() {
     if (debeConcluir) {
       await prisma.oferta_servicio.update({
         where: { id: oferta.id },
-        data: { estado_oferta: 'Concluida' },
+        data: { estado_oferta: 'concluida' },
       });
 
       await crearNotificacion({

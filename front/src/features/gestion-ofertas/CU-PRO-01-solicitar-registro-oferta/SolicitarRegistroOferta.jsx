@@ -80,74 +80,13 @@ export default function SolicitarRegistroOferta() {
           </CampoFormulario>
 
           <CampoFormulario
-
-            label="Programa SISS"
-            required
-            hint="Selecciona el programa oficial de servicio social al que pertenece este proyecto."
-            error={errores.programaSISS}
-          >
-            <select
-              name="programaSISS"
-              value={form.programaSISS}
-              onChange={handleChange}
-              style={inputStyle(!!errores.programaSISS)}
-            >
-              <option value="">Selecciona un programa</option>
-              <option value="ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL">
-                ESCOM-APLICACIONES DE LA ING. EN SISTEMAS COMPUTACIONALES PARA EL SERVICIO SOCIAL
-              </option>
-              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA">
-                ESCOM-S. S. PARA APOYO AL ÁREA ACADÉMICA
-              </option>
-              <option value="ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA">
-                ESCOM-S. S. PARA APOYO AL ÁREA ADMINISTRATIVA
-              </option>
-              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN">
-                ESCOM-S. S. PARA APOYO AL ÁREA DE CIENCIAS E INGENIERÍA DE LA COMPUTACIÓN
-              </option>
-              <option value="ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL">
-                ESCOM-S. S. PARA APOYO AL ÁREA DE SERVICIOS EDUCATIVOS E INTEGRACIÓN SOCIAL
-              </option>
-              <option value="ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO">
-                ESCOM-S. S. PARA LA SECCIÓN DE ESTUDIOS DE POSGRADO
-              </option>
-              <option value="TUTORÍA ENTRE PARES">
-                TUTORÍA ENTRE PARES
-              </option>
-              <option value="VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM">
-                VINCULACION ACADEMICA Y SECTORIAL DE LA ESCOM
-              </option>
-            </select>
-          </CampoFormulario>
-
-          <CampoFormulario
-            label="Actividad SISS"
-            required
-            hint="Selecciona la actividad que corresponde al registro en la plataforma SISS."
-            error={errores.tituloSISS}
-          >
-            <select
-              name="tituloSISS"
-              value={form.tituloSISS}
-              onChange={handleChange}
-              style={inputStyle(!!errores.tituloSISS)}
-            >
-              <option value="">Selecciona una actividad</option>
-              <option value="Opcion 1">Opción 1</option>
-              <option value="Opcion 2">Opción 2</option>
-              <option value="Opcion 3">Opción 3</option>
-            </select>
-          </CampoFormulario>
-
-          <CampoFormulario
             label="Descripción y actividades a realizar" required
-            hint="Describe los objetivos, alcance, contexto del proyecto y las actividades que desarrollarán los alumnos durante el servicio social."
             error={errores.descripcion}
           >
-  <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
-    placeholder="Describe en qué consiste el proyecto, su contexto y las actividades concretas que realizarán los alumnos durante el servicio social..."
-    rows={6} style={{ ...inputStyle(!!errores.descripcion), resize: "vertical", lineHeight: 1.55 }} />
-</CampoFormulario>
+            <textarea name="descripcion" value={form.descripcion} onChange={handleChange}
+              placeholder="Describe en qué consiste el proyecto, su contexto y las actividades concretas que realizarán los alumnos durante el servicio social..."
+              rows={6} style={{ ...inputStyle(!!errores.descripcion), resize: "vertical", lineHeight: 1.55 }} />
+          </CampoFormulario>
 
           <div style={{ borderTop: `1px solid ${C.borderDefault}`, margin: "0.25rem 0 1.5rem" }} />
           <h3 style={{ margin: "0 0 1rem", fontSize: 15, fontWeight: 700, color: C.textPrimary }}>
@@ -156,7 +95,6 @@ export default function SolicitarRegistroOferta() {
 
           <CampoFormulario
             label="Total de cupos iniciales solicitados" required
-            hint="Número de alumnos que podría aceptar el proyecto. Mínimo 2. Sujeto a aprobación por coordinación."
             error={errores.cuposTotal}
           >
             <input type="number" name="cuposTotal" value={form.cuposTotal} onChange={handleChange}

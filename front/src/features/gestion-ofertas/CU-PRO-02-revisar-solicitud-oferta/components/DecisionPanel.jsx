@@ -69,7 +69,7 @@ export function DecisionPanel({ oferta, onAprobar, onRechazar }) {
         )}
       </div>
       <p style={{ margin: "8px 0 0", fontSize: 11, color: C.textDisabled, lineHeight: 1.5 }}>
-        Confirma o corrige el Programa y Actividad SISS según las características reales del profesor.
+        Selecciona el Programa y la Actividad SISS que correspondan a este profesor.
       </p>
     </div>
   );

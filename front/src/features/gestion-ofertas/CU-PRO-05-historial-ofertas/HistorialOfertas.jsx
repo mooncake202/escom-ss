@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 import { useHistorialOfertas } from "./hooks/useHistorialOfertas";
 import { EstatusBadge } from "./components/EstatusBadge";
-import { TipoBadge } from "./components/TipoBadge";
+import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 import { OfertaCard } from "./components/OfertaCard";
 import { FormCorreccion } from "./components/FormCorreccion";
 import { CerrarOfertaPanel } from "../CU-PRO-04-gestionar-estado-oferta/components/CerrarOfertaPanel";
@@ -15,10 +16,18 @@ export default function HistorialOfertas() {
   const navigate = useNavigate();
   const { usuario } = useSesion();
   const [searchParams] = useSearchParams();
-  const [destacadoId, setDestacadoId] = useState(() => {
+  const [destacadosIds, setDestacadosIds] = useState(new Set());
+
+  // Antes esto era un inicializador perezoso de useState (corría solo una
+  // vez, al primer montaje) — si el componente se reutilizaba entre dos
+  // navegaciones a esta misma ruta con distinto query string (o sin él),
+  // se quedaba pegado con el id de la primera vez, resaltando una oferta
+  // vieja que ya no correspondía. Con useEffect sobre [searchParams] se
+  // resincroniza siempre que cambie la URL, haya o no remount.
+  useEffect(() => {
     const val = searchParams.get("destacar");
-    return val ? parseInt(val, 10) : null;
-  });
+    setDestacadosIds(val ? new Set(val.split(",").map(Number)) : new Set());
+  }, [searchParams]);
 
   const {
     proyectos, ofertasFiltradas, seleccionada,
@@ -32,8 +41,30 @@ export default function HistorialOfertas() {
 
   function handleSelect(p) {
     seleccionar(p);
-    if (p.id === destacadoId) setDestacadoId(null);
+    if (destacadosIds.has(p.id)) {
+      setDestacadosIds((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
+    }
   }
+
+  // Pantalla "ver todas" a la que navega el contador de SlotNotificacion
+  // cuando hay 2+ notificaciones de ofertas sin leer. marcarLeidasPorRuta
+  // (BD) compara ruta_relacionada por IGUALDAD exacta, pero estas
+  // notificaciones siempre traen "?destacar=<id>" distinto por oferta, así
+  // que un match exacto contra la ruta base nunca encontraría ninguna —
+  // se filtran por prefijo en el cliente y se marcan una por una con su
+  // id real.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/profesor/proyectos"));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de ofertas:", err));
+  }, []);
 
   const panelAbierto = seleccionada !== null;
 
@@ -138,7 +169,7 @@ export default function HistorialOfertas() {
                     key={p.id}
                     oferta={p}
                     seleccionadaId={seleccionada?.id}
-                    destacado={p.id === destacadoId}
+                    destacado={destacadosIds.has(p.id)}
                     onSelect={handleSelect}
                   />
                 ))}
@@ -177,7 +208,7 @@ export default function HistorialOfertas() {
                         {!editando && (
                           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
                             <EstatusBadge estatus={seleccionada.estatus} />
-                            <TipoBadge tipo={seleccionada.tipo} />
+                            <ModalidadBadge modalidad={seleccionada.tipo} />
                             {seleccionada.fechaRegistro && (
                               <span style={{ fontSize: 12, color: C.textDisabled }}>
                                 {new Date(seleccionada.fechaRegistro + "T00:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
@@ -220,7 +251,7 @@ export default function HistorialOfertas() {
                           <p style={{ margin: "0 0 8px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>Cupos</p>
                           <div style={{ display: "flex", gap: "0.75rem" }}>
                             <div style={{ flex: 1, padding: "0.875rem 1rem", borderRadius: RADIUS.lg, background: C.bgInput, border: `1px solid ${C.borderDefault}` }}>
-                              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cupos registrados</p>
+                              <p style={{ margin: "0 0 4px", fontSize: 10, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.06em" }}>Cupos ofertados</p>
                               <p style={{ margin: 0, fontSize: 26, fontWeight: 800, color: C.textPrimary, lineHeight: 1 }}>{seleccionada.cupos ?? 1}</p>
                             </div>
                             <div style={{

@@ -1,6 +1,6 @@
 import { useTheme, RADIUS } from "@/themes/colors";
 import { EstatusBadge } from "./EstatusBadge";
-import { TipoBadge } from "./TipoBadge";
+import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 
 function formatFecha(iso) {
   if (!iso) return null;
@@ -13,7 +13,6 @@ export function OfertaCard({ oferta, seleccionadaId, onSelect, destacado }) {
   const { C } = useTheme();
   const isSelected  = seleccionadaId === oferta.id;
   const esFinal     = oferta.estatus === "concluido" || oferta.estatus === "cerrado";
-  const esRechazada = oferta.estatus === "rechazada";
 
   const colorDestacado = oferta.estatus === "rechazada"   ? C.danger
                         : oferta.estatus === "activo"      ? C.success
@@ -23,7 +22,7 @@ export function OfertaCard({ oferta, seleccionadaId, onSelect, destacado }) {
   return (
     <div onClick={() => onSelect(oferta)} style={{
       background: C.bgCard, borderRadius: RADIUS.xl,
-      border: `1px solid ${isSelected ? C.accent : destacado ? colorDestacado : esRechazada ? C.danger + "55" : C.borderDefault}`,
+      border: `1px solid ${isSelected ? C.accent : destacado ? colorDestacado : C.borderDefault}`,
       padding: "1rem 1.25rem", cursor: "pointer",
       opacity: esFinal ? 0.72 : 1,
       boxShadow: isSelected ? `0 0 0 2px ${C.accent}28` : destacado ? `0 0 0 2px ${colorDestacado}28` : "none",
@@ -39,7 +38,7 @@ export function OfertaCard({ oferta, seleccionadaId, onSelect, destacado }) {
               {formatFecha(oferta.fechaRegistro)}
             </p>
           )}
-          <TipoBadge tipo={oferta.tipo} />
+          <ModalidadBadge modalidad={oferta.tipo} />
         </div>
         <EstatusBadge estatus={oferta.estatus} />
       </div>

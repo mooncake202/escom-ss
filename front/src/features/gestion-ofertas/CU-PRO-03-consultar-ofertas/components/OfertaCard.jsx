@@ -1,6 +1,6 @@
 import { useTheme, RADIUS } from "@/themes/colors";
 import { EstatusBadge } from "./EstatusBadge";
-import { ModalidadBadge } from "./ModalidadBadge";
+import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 
 export function OfertaCard({ oferta, seleccionado, onSelect, destacado }) {
   const { C } = useTheme();

@@ -1,8 +1,11 @@
+import { useEffect } from "react";
 import { useTheme, RADIUS } from "@/themes/colors";
+import { formatearFechaUTC } from "@/utils/fechas";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 import { useOfertas } from "./hooks/useOfertas";
 import { EstatusBadge } from "./components/EstatusBadge";
-import { ModalidadBadge } from "./components/ModalidadBadge";
+import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 import { Section } from "./components/Section";
 import { OfertaCard } from "./components/OfertaCard";
 import { DecisionPanel } from "../CU-PRO-02-revisar-solicitud-oferta/components/DecisionPanel";
@@ -12,9 +15,25 @@ export default function ConsultarOfertas() {
   const { C } = useTheme();
   const { usuario } = useSesion();
   const {
-    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadoId,
+    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadosIds,
     seleccionar, cambiarVista, setBusqueda, setFiltroModalidad, aprobar, rechazar,
   } = useOfertas();
+
+  // Pantalla "ver todas" a la que navega el contador de SlotNotificacion
+  // cuando hay 2+ notificaciones de ofertas sin leer. marcarLeidasPorRuta
+  // (BD) compara ruta_relacionada por IGUALDAD exacta, pero estas
+  // notificaciones siempre traen "?destacar=<id>" distinto por oferta, así
+  // que un match exacto contra la ruta base nunca encontraría ninguna —
+  // se filtran por prefijo en el cliente y se marcan una por una con su
+  // id real.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/coordinacion/ofertas"));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de ofertas:", err));
+  }, []);
 
   const hayFiltros = busqueda || filtroModalidad !== "todos";
 
@@ -142,7 +161,7 @@ export default function ConsultarOfertas() {
                 {/* Lista */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                   {lista.map(p => (
-                    <OfertaCard key={p.id} oferta={p} seleccionado={seleccionado} onSelect={seleccionar} destacado={p.id === destacadoId} />
+                    <OfertaCard key={p.id} oferta={p} seleccionado={seleccionado} onSelect={seleccionar} destacado={destacadosIds.has(p.id)} />
                   ))}
                 </div>
 
@@ -165,6 +184,11 @@ export default function ConsultarOfertas() {
                         {seleccionado.tituloSISS && (
                           <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textDisabled }}>Actividad SISS: {seleccionado.tituloSISS}</p>
                         )}
+                        {seleccionado.fechaRegistro && (
+                          <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textDisabled }}>
+                            Registrada: {formatearFechaUTC(seleccionado.fechaRegistro, { day: "2-digit", month: "short", year: "numeric" })}
+                          </p>
+                        )}
                       </div>
                       <button onClick={() => seleccionar(seleccionado)}
                         style={{ background: "transparent", border: "none", color: C.textDisabled, cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
@@ -176,6 +200,22 @@ export default function ConsultarOfertas() {
                       <EstatusBadge estado={seleccionado.estado} />
                       <ModalidadBadge modalidad={seleccionado.modalidad} />
                       <span style={{ fontSize: 12, color: C.textMuted }}>{seleccionado.profesor}</span>
+                      {seleccionado.cuposTotalesProfesor != null && (
+                        <span style={{ fontSize: 12, color: C.textDisabled }}>
+                          {seleccionado.cuposOcupadosProfesor}/{seleccionado.cuposTotalesProfesor} cupos ocupados
+                        </span>
+                      )}
+                      {seleccionado.esInvestigador && (
+                        <span style={{
+                          display: "inline-flex", alignItems: "center",
+                          padding: "2px 9px", borderRadius: RADIUS.full,
+                          fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                          background: "rgba(217,119,6,0.12)", color: "#d97706",
+                          border: "1px solid rgba(217,119,6,0.3)",
+                        }}>
+                          Investigador
+                        </span>
+                      )}
                     </div>
 
                     <hr style={{ border: "none", borderTop: `1px solid ${C.borderDefault}`, margin: "0 0 1.25rem" }} />
@@ -191,7 +231,7 @@ export default function ConsultarOfertas() {
                           background: C.bgInput, border: `1px solid ${C.borderDefault}`, minWidth: 100,
                         }}>
                           <p style={{ margin: "0 0 2px", fontSize: 10, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                            {seleccionado.esInvestigador ? "Cupos investigador" : "Cupos registrados"}
+                            Cupos ofertados
                           </p>
                           <p style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPrimary }}>{seleccionado.cuposRegistrados}</p>
                         </div>

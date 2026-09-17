@@ -58,8 +58,6 @@ export function useHistorialOfertas() {
   function iniciarEdicion(p) {
     setFormEdicion({
       nombre:      p.titulo,
-      programaSISS: p.programaSISS || "",
-      tituloSISS:  p.tituloSISS  || "",
       descripcion: p.descripcion || "",
       carreras:    [...(p.carreras || [])],
       cupos:       String(p.cupos || 1),
@@ -87,8 +85,6 @@ export function useHistorialOfertas() {
   function validarEdicion(esIndividual) {
     const e = {};
     if (!formEdicion.nombre?.trim())       e.nombre       = "El nombre es obligatorio.";
-    if (!formEdicion.programaSISS?.trim()) e.programaSISS = "El Programa SISS es obligatorio.";
-    if (!formEdicion.tituloSISS?.trim())   e.tituloSISS   = "La Actividad SISS es obligatoria.";
     if (!formEdicion.descripcion?.trim()) e.descripcion = "La descripción es obligatoria.";
     if (!esIndividual) {
       const n = parseInt(formEdicion.cupos);
@@ -107,8 +103,6 @@ async function submitEdicion(p) {
       method: "POST",
       body: JSON.stringify({
         nombre_proyecto: formEdicion.nombre,
-        nombre_SISS: formEdicion.tituloSISS,
-        programa_SISS: formEdicion.programaSISS,
         descripcion_actividades: formEdicion.descripcion,
         tipo_oferta: p.tipo,
         cupos_ofertados: esIndividual ? undefined : parseInt(formEdicion.cupos, 10),

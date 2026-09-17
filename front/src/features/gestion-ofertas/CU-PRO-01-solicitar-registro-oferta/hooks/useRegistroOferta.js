@@ -3,8 +3,6 @@ import { apiFetch } from "@/services/apiClient";
 
 const FORM_VACIO = {
   nombre: "",
-  tituloSISS: "",
-  programaSISS: "",
   descripcion: "",
   cuposTotal: "",
   carreras: [],
@@ -35,8 +33,6 @@ export function useRegistroOferta() {
   function validar() {
     const e = {};
     if (!form.nombre.trim())      e.nombre      = "El nombre del proyecto es obligatorio.";
-    if (!form.tituloSISS.trim())  e.tituloSISS  = "El título para plataforma SISS es obligatorio.";
-    if (!form.programaSISS.trim()) e.programaSISS = "El programa SISS es obligatorio.";
     if (!form.descripcion.trim()) e.descripcion = "La descripción y actividades son obligatorias.";
     const total = parseInt(form.cuposTotal, 10);
     if (!form.cuposTotal || isNaN(total) || total < 2) e.cuposTotal = "Indica un número de cupos mayor o igual a 2.";
@@ -54,8 +50,6 @@ export function useRegistroOferta() {
         method: "POST",
         body: JSON.stringify({
           nombre_proyecto: form.nombre,
-          nombre_SISS: form.tituloSISS,
-          programa_SISS: form.programaSISS,
           descripcion_actividades: form.descripcion,
           tipo_oferta: "proyecto",
           cupos_ofertados: parseInt(form.cuposTotal, 10),

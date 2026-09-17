@@ -28,8 +28,6 @@ async function solicitarRegistroOferta(req, res) {
   try {
     const {
       nombre_proyecto,
-      nombre_SISS,
-      programa_SISS,
       descripcion_actividades,
       tipo_oferta,
       cupos_ofertados,
@@ -45,7 +43,7 @@ async function solicitarRegistroOferta(req, res) {
     }
     const profesor_id = profesor.id;
 
-    if (!nombre_proyecto || !nombre_SISS || !programa_SISS || !descripcion_actividades || !tipo_oferta) {
+    if (!nombre_proyecto || !descripcion_actividades || !tipo_oferta) {
       return res.status(400).json({ message: 'Faltan campos obligatorios.' });
     }
 
@@ -57,48 +55,33 @@ async function solicitarRegistroOferta(req, res) {
       return res.status(400).json({ message: 'Debe seleccionar al menos un perfil de carrera.' });
     }
 
-    const resultado = await ofertasService.calcularCuposDisponibles(profesor_id);
-    if (!resultado) {
-      return res.status(404).json({ message: 'Profesor no encontrado.' });
-    }
-    const { cupos_disponibles_profesor, es_investigador } = resultado;
-
     let dataOferta = {
-      nombre_SISS,
-      programa_SISS,
       nombre_proyecto,
       descripcion_actividades,
       tipo_oferta,
-      estado_oferta: 'Pendiente_revision',
+      estado_oferta: 'pendiente_revision',
       fecha_registro: new Date(),
     };
 
     if (tipo_oferta === 'individual') {
-      if (cupos_disponibles_profesor < 1) {
-        return res.status(400).json({
-          message: 'No tienes cupos disponibles. Solicita modificación de características en Gestión Administrativa.',
-        });
-      }
       dataOferta.cupos_disponibles = 1;
     } else {
       const cupos = parseInt(cupos_ofertados, 10);
       if (!Number.isInteger(cupos) || cupos < 2) {
         return res.status(400).json({ message: 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.' });
       }
+      dataOferta.cupos_ofertados = cupos;
+      dataOferta.cupos_disponibles = cupos;
 
-      if (cupos > cupos_disponibles_profesor) {
-        if (es_investigador) {
-          dataOferta.cupos_ofertados = cupos;
-          dataOferta.cupos_investigador = cupos;
-          dataOferta.cupos_disponibles = cupos;
-        } else {
-          return res.status(400).json({
-            message: 'No tienes cupos disponibles suficientes. Solicita modificación de características en Gestión Administrativa.',
-          });
-        }
-      } else {
-        dataOferta.cupos_ofertados = cupos;
-        dataOferta.cupos_disponibles = cupos;
+      const esInvestigador = await prisma.solicitud_caracteristica.findFirst({
+        where: {
+          profesor_id,
+          estado: 'aprobada',
+          caracteristica: { nombre: 'Investigador' },
+        },
+      });
+      if (esInvestigador) {
+        dataOferta.cupos_investigador = cupos;
       }
     }
 

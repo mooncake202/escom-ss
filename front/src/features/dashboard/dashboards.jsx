@@ -26,10 +26,12 @@ const EVENTOS_POR_ROL = {
   // transición real de estado_solicitud a 'alumno_asignado' (eso ocurre
   // después, cuando el alumno confirma el modal de bienvenida) — contarlo
   // aquí desincronizaría el widget alumnosAsignados de listarAlumnosDeProfesor.
-  profesor: ["solicitud:nueva", "resumen:actualizado"],
+  profesor: ["solicitud:nueva", "oferta:decidida", "oferta:concluida", "resumen:actualizado"],
   coordinador: [
     "documentacion:pendiente", "documentacion:decidida",
     "expediente:pendiente_revision", "expediente:decidido",
+    "oferta:nueva", "oferta:reenviada",
+    "resumen:actualizado", // genérico: red de seguridad, mismo criterio que alumno_asignado/profesor
   ],
 };
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
@@ -206,23 +208,58 @@ const T = {
 // para apuntar a un registro específico (ej. '/alumno/historial?actividad=5'
 // o '/alumno/historial?bitacora=9') — el slot se declara con la ruta base
 // ('/alumno/historial') y así reconoce cualquier variante con query.
-function notificacionPorRuta(notificaciones, ruta) {
-  return notificaciones.find((n) => n.ruta_relacionada?.startsWith(ruta)) || null;
+function notificacionesPorRuta(notificaciones, ruta) {
+  return notificaciones.filter((n) => n.ruta_relacionada?.startsWith(ruta));
 }
 
-function SlotNotificacion({ ruta, notificaciones, onLeer, navigate, C }) {
-  const n = notificacionPorRuta(notificaciones, ruta);
-  if (!n) return null;
+// Con 0 o 1 coincidencia, comportamiento idéntico al de siempre (mensaje
+// individual, clic marca leída + navega a la ruta propia de esa
+// notificación). Con 2+ coincidencias sin leer para la misma ruta base
+// (ej. un profesor con 2 ofertas decididas en la misma sesión), en vez de
+// tapar todas menos la más reciente, muestra un contador — el clic navega
+// a `rutaVerTodas` (por defecto la misma `ruta`) SIN marcarlas leídas aquí;
+// eso le toca a la pantalla destino al montar (mismo patrón que ya usa
+// HistorialActividades.jsx con marcarLeidasPorRuta).
+function SlotNotificacion({ ruta, rutaVerTodas = ruta, mensajeContador, notificaciones, onLeer, navigate, C }) {
+  const coincidencias = notificacionesPorRuta(notificaciones, ruta);
+  if (coincidencias.length === 0) return null;
+
+  if (coincidencias.length === 1) {
+    const n = coincidencias[0];
+    return (
+      <AlertBanner
+        tipo={n.tipo}
+        C={C}
+        onClick={() => {
+          onLeer(n.id);
+          if (n.ruta_relacionada) navigate(n.ruta_relacionada);
+        }}
+      >
+        {n.mensaje}
+      </AlertBanner>
+    );
+  }
+
+  const mensaje = mensajeContador
+    ? mensajeContador(coincidencias.length)
+    : `Tienes ${coincidencias.length} notificaciones sin leer.`;
+
+  // Cada notificación ya trae su propio id en `ruta_relacionada`
+  // (ej. "/profesor/proyectos?destacar=5") — se juntan todos para que la
+  // pantalla destino pueda resaltar TODAS las filas involucradas, no solo
+  // una. Si alguna coincidencia no trae `destacar` (no pasa en Ofertas,
+  // pero el slot es genérico), simplemente se omite de la lista.
+  const ids = coincidencias
+    .map((n) => {
+      const query = n.ruta_relacionada?.split("?")[1];
+      return query ? new URLSearchParams(query).get("destacar") : null;
+    })
+    .filter(Boolean);
+  const destino = ids.length > 0 ? `${rutaVerTodas}?destacar=${ids.join(",")}` : rutaVerTodas;
+
   return (
-    <AlertBanner
-      tipo={n.tipo}
-      C={C}
-      onClick={() => {
-        onLeer(n.id);
-        if (n.ruta_relacionada) navigate(n.ruta_relacionada);
-      }}
-    >
-      {n.mensaje}
+    <AlertBanner tipo={coincidencias[0].tipo} C={C} onClick={() => navigate(destino)}>
+      {mensaje}
     </AlertBanner>
   );
 }
@@ -558,8 +595,8 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
 
         {/* CU-PRO */}
         <Section title="Gestión de Ofertas" icon="folder" {...T.purple} C={C}>
-          <ActionItem icon="plus"   {...T.purple} label="Solicitar apertura de oferta" desc="Nueva oferta de proyecto o individual" onClick={() => navigate("/profesor/proyectos/registrar")} C={C} />
-          <SlotNotificacion ruta="/profesor/proyectos/registrar" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <ActionItem icon="plus"   {...T.purple} label="Solicitar apertura de oferta" desc="Nueva oferta de proyecto o individual" onClick={() => navigate("/profesor/proyectos")} C={C} />
+          <SlotNotificacion ruta="/profesor/proyectos" mensajeContador={(n) => `Tienes ${n} ofertas actualizadas.`} notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="folder" {...T.slate}  label="Historial de ofertas"         desc="Consultar ofertas anteriores y activas" onClick={() => navigate("/profesor/proyectos")} C={C} />
         </Section>
 
@@ -664,7 +701,7 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         {/* CU-PRO */}
         <Section title="Gestión de Ofertas" icon="star" {...T.warning} C={C} badge={resumen.ofertasPorValidar}>
           <ActionItem icon="check"  {...T.warning} label="Solicitudes de ofertas e historial"        desc="Solicitudes de profesores" onClick={() => navigate("/coordinacion/ofertas")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/ofertas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacion ruta="/coordinacion/ofertas" mensajeContador={(n) => `Tienes ${n} ofertas actualizadas.`} notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="cog"    {...T.purple}  label="Modificar características de profesor" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/solicitudes-caracteristicas")} C={C} />
           <SlotNotificacion ruta="/coordinacion/solicitudes-caracteristicas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           
