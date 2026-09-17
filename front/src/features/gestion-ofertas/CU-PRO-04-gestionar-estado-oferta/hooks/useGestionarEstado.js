@@ -3,7 +3,6 @@ import { useState } from "react";
 // RN-PRO-04: solo proyectos activos sin alumnos activos y con cupos sin completar
 export function puedesCerrarManual(oferta) {
   return (
-    oferta.tipo === "proyecto" &&
     oferta.estatus === "activo" &&
     oferta.alumnosActivos === 0 &&
     oferta.cuposOcupados < oferta.cupos

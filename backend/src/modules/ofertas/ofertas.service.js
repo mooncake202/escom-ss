@@ -445,9 +445,6 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
   if (oferta.profesor_id !== profesorId) {
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
-  if (oferta.tipo_oferta !== 'proyecto') {
-    throw Object.assign(new Error('Las ofertas individuales no se pueden cerrar manualmente.'), { status: 400 });
-  }
   if (oferta.estado_oferta !== 'aprobada') {
     throw Object.assign(new Error('Solo se pueden cerrar ofertas que estén Aprobadas.'), { status: 400 });
   }

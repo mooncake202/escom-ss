@@ -2359,6 +2359,102 @@ el profesor decide cerrar
         ↓
 estado_oferta = cerrada
 
+------------------------------------------------------------
+24.2 CONCLUSIÓN Y CIERRE DE UNA OFERTA TIPO INDIVIDUAL
+
+Una oferta Individual tiene un único lugar:
+
+cupos ofertados = 1
+cupos disponibles = 1
+
+Si un alumno ocupa definitivamente ese lugar y concluye correctamente su
+servicio social:
+
+cupos disponibles = 0
+        ↓
+Alumno concluye correctamente
+        ↓
+estado de oferta = concluida
+
+
+CIERRE MANUAL
+
+Si el lugar se encuentra disponible y no existe ningún alumno o proceso
+vigente que lo esté ocupando, el profesor puede cerrar manualmente la oferta.
+
+Oferta Individual aprobada
+        ↓
+¿Hay un alumno o proceso vigente
+ocupando el lugar?
+        │
+   ┌────┴────┐
+  SÍ         NO
+   │          │
+   ↓          ↓
+No puede    cupos disponibles = 1
+cerrarse          ↓
+             El profesor puede
+             cerrar la oferta
+                  ↓
+           estado = cerrada
+
+
+EJEMPLO
+
+Oferta Individual:
+
+cupos ofertados = 1
+cupos disponibles = 1
+
+Ningún alumno ocupa actualmente el lugar.
+
+El profesor puede mantener la oferta abierta para recibir solicitudes o
+cerrarla manualmente.
+
+Esto también aplica si anteriormente existió un alumno, pero una baja u otro
+evento definitivo válido devolvió el lugar:
+
+cupos disponibles = 0
+        ↓
+Se libera el lugar
+        ↓
+cupos disponibles = 1
+        ↓
+Sin alumno o proceso vigente
+        ↓
+Profesor puede cerrar la oferta
+
+
+IMPORTANTE
+
+Una baja no concluye ni cierra automáticamente la oferta.
+
+Si una baja devuelve el lugar, la oferta permanece aprobada y disponible.
+Posteriormente el profesor puede recibir otro alumno o cerrarla manualmente.
+------------------------------------------------------------
+DIAGRAMA
+------------------------------------------------------------
+
+                    OFERTA APROBADA
+                           │
+             ┌─────────────┴─────────────┐
+             │                           │
+        INDIVIDUAL                   PROYECTO
+             │                           │
+     ¿Lugar disponible?         ¿cupos disponibles = 0?
+        │          │                 │           │
+       SÍ          NO               SÍ           NO
+        │          │                 │           │
+ ¿Sin proceso?  Alumno en       ¿Todos los    ¿Sin alumnos/
+        │       proceso          lugares       procesos
+       SÍ                        definitivos    vigentes?
+        │                        concluyeron?       │
+ Puede cerrar                        │             SÍ
+        │                           SÍ              │
+     CERRADA                         │        Puede cerrar
+                              CONCLUIDA             │
+                                                 CERRADA
+
 ============================================================
 25. CUPOS INVESTIGADOR AUTORIZADOS PERO NO UTILIZADOS
 ============================================================

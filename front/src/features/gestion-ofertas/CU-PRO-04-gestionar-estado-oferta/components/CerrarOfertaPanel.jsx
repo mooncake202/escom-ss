@@ -17,7 +17,7 @@ export function CerrarOfertaPanel({ oferta, onCerrar }) {
   }
 
   // RN-PRO-04: proyecto activo con alumnos activos → no se puede cerrar aún
-  if (oferta.tipo === "proyecto" && oferta.estatus === "activo" && oferta.alumnosActivos > 0) {
+  if (oferta.estatus === "activo" && oferta.alumnosActivos > 0) {
     return (
       <p style={{ margin: 0, fontSize: 12, color: C.textDisabled, fontStyle: "italic" }}>
         Hay {oferta.alumnosActivos} alumno{oferta.alumnosActivos !== 1 ? "s" : ""} con servicio activo.
