@@ -65,10 +65,6 @@ enum EstadoRevision {
   rechazado
 }
 
-enum TipoCupo {
-  normal
-  investigador
-}
 
 // ─────────────────────────────────────────
 // 1. Tablas independientes / base
@@ -379,7 +375,7 @@ model solicitud_registro {
   carta_compromiso    Boolean  @default(false)
   fecha_carta_compromiso  DateTime? @db.DateTime(0)
   expediente          Boolean  @default(false)
-  tipo_cupo           TipoCupo?
+  tipo_cupo String? @db.VarChar(20) // 'normal' | 'investigador' — se llena SOLO al aceptar (CU-GR-02)
 
   alumno           alumno           @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
   carrera          carrera          @relation(fields: [carrera_id], references: [id], onDelete: Cascade)
