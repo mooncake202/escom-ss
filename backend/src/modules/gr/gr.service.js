@@ -137,11 +137,11 @@ async function validarOfertaDisponibleYConCupo(ofertaId) {
     include: { profesor: true },
   });
 
-  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'Aprobada') {
+  if (!ofertaEncontrada || ofertaEncontrada.estado_oferta !== 'aprobada') {
     throw crearError('La oferta seleccionada ya no está disponible.');
   }
 
-  if (ofertaEncontrada.cupos_disponibles <= 0) {
+  if (ofertaEncontrada.cupos_disponibles === 0) {
     throw crearError('Lo sentimos, el cupo se acaba de llenar. Selecciona otra oferta.', 409, 'OFERTA_SIN_CUPOS');
   }
 
@@ -321,19 +321,59 @@ const MOTIVO_RECHAZO_VENCIMIENTO_EXPEDIENTE = 'Plazo de envío de expediente ven
 const MOTIVO_RECHAZO_VENCIMIENTO_INICIO = 'Tu periodo de servicio social inició sin que tu expediente quedara aprobado';
 
 /**
+ * Devuelve UN lugar estructural a la oferta (cupos_disponibles + 1) sin pasar
+ * nunca de su máximo: Proyecto <= cupos_ofertados, Individual <= 1. El techo
+ * se evalúa en el MISMO UPDATE (una sola sentencia atómica), no en una lectura
+ * previa.
+ *
+ * Debe llamarse SOLO dentro de una transacción `tx` que ya confirmó, mediante
+ * una transición condicional de estado, que ESTA ejecución fue la que sacó a la
+ * solicitud de un estado que ocupaba lugar — de lo contrario dos ejecuciones
+ * concurrentes devolverían dos veces el mismo lugar. Si el techo ya estaba
+ * alcanzado (dato previo inconsistente) no incrementa y lo avisa en consola,
+ * sin abortar la transición que ya se hizo.
+ *
+ * @returns {Promise<boolean>} true si efectivamente devolvió el lugar.
+ */
+async function liberarLugarOferta(tx, ofertaId) {
+  const { count } = await tx.oferta_servicio.updateMany({
+    where: {
+      id: ofertaId,
+      OR: [
+        { tipo_oferta: 'individual', cupos_disponibles: { lt: 1 } },
+        { tipo_oferta: 'proyecto', cupos_disponibles: { lt: prisma.oferta_servicio.fields.cupos_ofertados } },
+      ],
+    },
+    data: { cupos_disponibles: { increment: 1 } },
+  });
+
+  if (count === 0) {
+    console.error(`🚨 liberarLugarOferta: la oferta id=${ofertaId} ya estaba en su máximo de cupos_disponibles; no se incrementó. Revisar posible inconsistencia previa.`);
+  }
+  return count === 1;
+}
+
+/**
  * Borrado parcial compartido por ambos relojes: transiciona a
  * rechazada_definitivamente, libera el cupo si aplica, y ELIMINA todos
  * los documentos del alumno (filas + archivos físicos), tal como pide la
  * ficha de GR-10 — antes esto solo se hacía en el rechazo manual de
  * Coordinador (GR-07), nunca en el vencimiento automático.
+ *
+ * Concurrencia: puede dispararse a la vez desde el cron, el login, el
+ * polling del alumno y decidirDocumentacion(rechazar_definitivo). La
+ * transición es CONDICIONAL al estado leído (compare-and-swap en una sola
+ * sentencia): si otro proceso ya sacó a la solicitud de ese estado, count=0 y
+ * esta ejecución NO toca documentos ni cupo — solo la ejecución que efectivamente
+ * hizo la transición devuelve el lugar. En ese caso devuelve la fila vigente.
  */
 async function ejecutarBorradoParcial(solicitud, motivo) {
   const cupoConsumido = ESTADOS_CON_CUPO_CONSUMIDO.includes(solicitud.estado_solicitud);
   const documentosDelAlumno = await prisma.documento.findMany({ where: { alumno_id: solicitud.alumno_id } });
 
-  const operaciones = [
-    prisma.solicitud_registro.update({
-      where: { id: solicitud.id },
+  const solicitudActualizada = await prisma.$transaction(async (tx) => {
+    const { count } = await tx.solicitud_registro.updateMany({
+      where: { id: solicitud.id, estado_solicitud: solicitud.estado_solicitud },
       data: {
         estado_solicitud: 'rechazada_definitivamente',
         estado_anterior: solicitud.estado_solicitud,
@@ -345,19 +385,24 @@ async function ejecutarBorradoParcial(solicitud, motivo) {
         docs_iniciales: false,
         carta_compromiso: false,
         expediente: false,
-        tipo_cupo: null,
       },
-    }),
-    prisma.documento.deleteMany({ where: { alumno_id: solicitud.alumno_id } }),
-  ];
+    });
 
-  if (cupoConsumido && solicitud.oferta_id) {
-    operaciones.push(
-      prisma.oferta_servicio.update({ where: { id: solicitud.oferta_id }, data: { cupos_disponibles: { increment: 1 } } })
-    );
+    if (count === 0) return null; // otro proceso ya la resolvió — no se toca nada más
+
+    await tx.documento.deleteMany({ where: { alumno_id: solicitud.alumno_id } });
+
+    if (cupoConsumido && solicitud.oferta_id) {
+      await liberarLugarOferta(tx, solicitud.oferta_id);
+    }
+
+    return tx.solicitud_registro.findUnique({ where: { id: solicitud.id } });
+  });
+
+  if (solicitudActualizada === null) {
+    // No fue esta ejecución: sin archivos que borrar, sin socket, sin cupo.
+    return prisma.solicitud_registro.findUnique({ where: { id: solicitud.id } });
   }
-
-  const [solicitudActualizada] = await prisma.$transaction(operaciones);
 
   // Archivos físicos DESPUÉS de que la BD confirmó — mismo orden seguro que en GR-07.
   documentosDelAlumno.forEach((d) => {
@@ -1233,6 +1278,7 @@ module.exports = {
   enviarSolicitudRegistro,
   verificarCorreoDisponible,
   verificarYAplicarVencimiento,
+  liberarLugarOferta,
   ESTADOS_SIN_RELOJ,
   ESTADOS_RELOJ_2,
   obtenerEstadoActualPorUsuarioId,

@@ -88,7 +88,7 @@ export function useHistorialOfertas() {
     if (!formEdicion.descripcion?.trim()) e.descripcion = "La descripción es obligatoria.";
     if (!esIndividual) {
       const n = parseInt(formEdicion.cupos);
-      if (!formEdicion.cupos || isNaN(n) || n < 1) e.cupos = "Ingresa un número de cupos válido.";
+      if (!formEdicion.cupos || isNaN(n) || n < 2) e.cupos = "Para modalidad proyecto, el mínimo es de 2 cupos.";
     }
     return e;
   }

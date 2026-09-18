@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const prisma = require('../../lib/prisma');
 const { descifrarBuffer } = require('../../lib/fileEncryption');
-const { dictamenLabel, RUTA_BASE_DOCUMENTOS } = require('./gr.service');
+const { dictamenLabel, RUTA_BASE_DOCUMENTOS, liberarLugarOferta } = require('./gr.service');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 
@@ -153,8 +153,13 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
 
   // decision === 'rechazar_definitivo'
   await prisma.$transaction(async (tx) => {
-    await tx.solicitud_registro.update({
-      where: { id: solicitud.id },
+    // Transición CONDICIONAL (compare-and-swap en una sola sentencia): solo
+    // procede si la solicitud SIGUE pendiente de revisión. Un doble clic, dos
+    // peticiones concurrentes o el vencimiento por reloj (ejecutarBorradoParcial)
+    // que ya la haya resuelto dejan count=0 — y entonces no se toca ningún
+    // documento ni se devuelve ningún lugar por segunda vez.
+    const { count } = await tx.solicitud_registro.updateMany({
+      where: { id: solicitud.id, estado_solicitud: 'SISS_y_documentacion_pendiente' },
       data: {
         estado_solicitud: 'rechazada_definitivamente',
         estado_anterior: 'SISS_y_documentacion_pendiente',
@@ -165,15 +170,17 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
         docs_iniciales: false,
         registro_siss: false,
         periodo_registro_id: null,
-        tipo_cupo: null,
       },
     });
+    if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+
     await tx.documento.deleteMany({ where: { id: { in: idsDocumentos } } });
 
     // Este estado solo se alcanza tras ser aceptado en CU-GR-02, así que el
-    // cupo siempre estaba consumido — se libera aquí mismo, no hasta CU-GR-13.
+    // cupo siempre estaba consumido — se libera aquí mismo (solo porque ESTA
+    // ejecución hizo la transición de arriba), no hasta CU-GR-13.
     if (solicitud.oferta_id) {
-      await tx.oferta_servicio.update({ where: { id: solicitud.oferta_id }, data: { cupos_disponibles: { increment: 1 } } });
+      await liberarLugarOferta(tx, solicitud.oferta_id);
     }
   });
   // La transacción ya eliminó las filas en BD; ahora sí se borran los

@@ -103,7 +103,7 @@ async function crearUsuario(datos, creadoPorId) {
             profesor_id: profesorCreado.id,
             caracteristica_id: c.id,
             justificacion: 'Asignada por el coordinador al momento de creación de cuenta.',
-            estado: 'aprobado',
+            estado: 'aprobada',
             fecha: ahora,
             fecha_respuesta: ahora,
           })),
@@ -185,7 +185,7 @@ async function listarUsuarios() {
       profesor: {
         include: {
           solicitud_caracteristica: {
-            where: { estado: 'aprobado' },
+            where: { estado: 'aprobada' },
             include: { caracteristica: true },
           },
         },
@@ -306,7 +306,7 @@ async function actualizarUsuario(id, datos) {
             profesor_id: usuario.profesor.id,
             caracteristica_id: c.id,
             justificacion: 'Actualizada por el coordinador al editar la cuenta.',
-            estado: 'aprobado',
+            estado: 'aprobada',
             fecha: ahora,
             fecha_respuesta: ahora,
           })),

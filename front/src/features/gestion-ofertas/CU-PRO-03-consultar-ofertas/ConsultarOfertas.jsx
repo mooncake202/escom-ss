@@ -205,17 +205,6 @@ export default function ConsultarOfertas() {
                           {seleccionado.cuposOcupadosProfesor}/{seleccionado.cuposTotalesProfesor} cupos ocupados
                         </span>
                       )}
-                      {seleccionado.esInvestigador && (
-                        <span style={{
-                          display: "inline-flex", alignItems: "center",
-                          padding: "2px 9px", borderRadius: RADIUS.full,
-                          fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
-                          background: "rgba(217,119,6,0.12)", color: "#d97706",
-                          border: "1px solid rgba(217,119,6,0.3)",
-                        }}>
-                          Investigador
-                        </span>
-                      )}
                     </div>
 
                     <hr style={{ border: "none", borderTop: `1px solid ${C.borderDefault}`, margin: "0 0 1.25rem" }} />

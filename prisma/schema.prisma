@@ -329,7 +329,6 @@ model oferta_servicio {
   tipo_oferta             TipoOfertaServicio
   descripcion_actividades String             @db.Text
   cupos_ofertados         Int?               @db.UnsignedTinyInt
-  cupos_investigador      Int?               @db.UnsignedTinyInt
   cupos_disponibles       Int                @db.UnsignedTinyInt
   estado_oferta           String             @db.VarChar(20)
   fecha_registro          DateTime           @db.DateTime(0)
@@ -375,7 +374,6 @@ model solicitud_registro {
   carta_compromiso    Boolean  @default(false)
   fecha_carta_compromiso  DateTime? @db.DateTime(0)
   expediente          Boolean  @default(false)
-  tipo_cupo           String?  @db.VarChar(20) // 'normal' | 'investigador' — se llena SOLO al aceptar (CU-GR-02)
 
   alumno           alumno           @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
   carrera          carrera          @relation(fields: [carrera_id], references: [id], onDelete: Cascade)

@@ -21,4 +21,10 @@ Se asigna una sola vez, al momento en que el profesor acepta al alumno. No cambi
 - `concluida`
 - `cerrada`
 
+
+## Módulo: Gestión Administrativa
+Solicitudes de modificación de característica
+- `pendiente`
+- `aprobada`
+- `rechazada`
 ---

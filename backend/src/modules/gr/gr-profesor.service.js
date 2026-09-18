@@ -1,7 +1,7 @@
 const prisma = require('../../lib/prisma');
 const { dictamenLabel } = require('./gr.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
-const { determinarTipoCupoParaAceptar } = require('../../lib/cupos');
+const { asegurarCapacidadProfesor, bloquearProfesor } = require('../../lib/cupos');
 
 const MOTIVO_RECHAZO_PROFESOR = 'Rechazado por profesor';
 const MOTIVO_RECHAZO_CUPOS = 'Cupos de la oferta cubiertos';
@@ -109,30 +109,34 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
   }
 
   // ── decision === 'aceptar' ────────────────────────────────────────────
-  // Nuevo: ANTES de tocar cupos_disponibles de la oferta, se determina si
-  // el PROFESOR todavía tiene cupo (normal, o investigador de respaldo) —
-  // dentro de la misma transacción (mismo tx) para que la lectura del
-  // conteo y la escritura de tipo_cupo queden en el mismo snapshot.
+  // ANTES de tocar cupos_disponibles de la oferta, se verifica que el
+  // PROFESOR todavía tenga capacidad global (ocupados < cupos_totales) —
+  // dentro de la misma transacción (mismo tx).
   //
-  // Condición de carrera conocida y aceptada por ahora (documentada, no
-  // resuelta): a diferencia de cupos_disponibles de la oferta (decremento
-  // atómico de una sola fila), el límite del profesor se deriva de un
-  // COUNT — 2 aceptaciones concurrentes sobre el mismo profesor en 2
-  // ofertas distintas podrían, en teoría, leer el mismo conteo antes de
-  // que cualquiera confirme su tipo_cupo. Mismo nivel de robustez que ya
-  // acepta el resto del código (ver E3 más abajo).
+  // Concurrencia: a diferencia de cupos_disponibles de la oferta (decremento
+  // atómico de una sola fila), el límite del profesor se deriva de un COUNT,
+  // así que 2 aceptaciones simultáneas del MISMO profesor (en ofertas
+  // distintas, o en la misma con 2+ lugares) podrían leer el mismo conteo
+  // viejo. Se serializa bloqueando su fila (SELECT ... FOR UPDATE) como
+  // PRIMERA sentencia de la transacción — antes de cualquier lectura, para
+  // que el COUNT posterior vea lo que la aceptación anterior ya confirmó — y
+  // la decisión usa el cupos_totales FRESCO de esa misma fila bloqueada, no
+  // el leído antes de abrir la transacción. Profesores distintos no se
+  // bloquean entre sí.
   const resultadoTransaccion = await prisma.$transaction(async (tx) => {
+    const profesorBloqueado = await bloquearProfesor(profesor.id, tx);
+
     let motivoRechazoPorCupos = null;
-    const tipoCupo = await determinarTipoCupoParaAceptar(solicitud.oferta, profesor, tx).catch((err) => {
+    await asegurarCapacidadProfesor(profesorBloqueado, tx).catch((err) => {
       if (err.code === 'PROFESOR_SIN_CUPOS') {
         motivoRechazoPorCupos = err.message; // única fuente del texto — no se duplica
-        return null;
+        return;
       }
       throw err;
     });
 
-    if (tipoCupo === null) {
-      // El profesor ya no tiene cupo de ningún tipo para esta oferta — la
+    if (motivoRechazoPorCupos !== null) {
+      // El profesor ya no tiene capacidad global para aceptar — la
       // solicitud se rechaza automáticamente (no es un error del backend,
       // es un resultado válido: la BD sí cambió).
       await tx.solicitud_registro.update({
@@ -164,7 +168,6 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
       data: {
         estado_solicitud: 'aceptada_por_profesor',
         estado_anterior: 'espera_respuesta_de_profesor',
-        tipo_cupo: tipoCupo,
       },
     });
 

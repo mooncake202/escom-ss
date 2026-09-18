@@ -134,7 +134,7 @@ async function resumenProfesor(usuarioId) {
     where: { usuario_id: usuarioId },
     include: {
       solicitud_caracteristica: {
-        where: { estado: 'aprobado' },
+        where: { estado: 'aprobada' },
         include: { caracteristica: true },
       },
     },
@@ -158,7 +158,7 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     prisma.solicitud_registro.count({
       where: { oferta: { profesor_id: profesor.id }, estado_solicitud: 'alumno_asignado' },
     }),
-    prisma.oferta_servicio.count({ where: { profesor_id: profesor.id, estado_oferta: 'Aprobada' } }),
+    prisma.oferta_servicio.count({ where: { profesor_id: profesor.id, estado_oferta: 'aprobada' } }),
     // Ya resuelto por CU-GR-02: coincide con RN-GR-06 (mismo criterio que usa
     // el propio profesor para ver su lista de solicitudes pendientes).
     prisma.solicitud_registro.count({

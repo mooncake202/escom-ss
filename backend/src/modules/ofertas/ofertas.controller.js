@@ -42,6 +42,14 @@ async function solicitarRegistroOferta(req, res) {
       return res.status(404).json({ message: 'Perfil de profesor no encontrado.' });
     }
     const profesor_id = profesor.id;
+    
+    try {
+      await ofertasService.validarCapacidadParaTramitarOferta(profesor_id, true);
+    } catch (err) {
+      return res.status(err.status || 500).json({
+        message: err.message,
+      });
+    }
 
     if (!nombre_proyecto || !descripcion_actividades || !tipo_oferta) {
       return res.status(400).json({ message: 'Faltan campos obligatorios.' });
@@ -64,25 +72,25 @@ async function solicitarRegistroOferta(req, res) {
     };
 
     if (tipo_oferta === 'individual') {
+      dataOferta.cupos_ofertados = null;
       dataOferta.cupos_disponibles = 1;
     } else {
       const cupos = parseInt(cupos_ofertados, 10);
+
       if (!Number.isInteger(cupos) || cupos < 2) {
-        return res.status(400).json({ message: 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.' });
+        return res.status(400).json({
+          message: 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.',
+        });
       }
+
+      if (cupos > profesor.cupos_totales) {
+        return res.status(400).json({
+          message: `La oferta no puede tener más de ${profesor.cupos_totales} cupos.`,
+        });
+      }
+
       dataOferta.cupos_ofertados = cupos;
       dataOferta.cupos_disponibles = cupos;
-
-      const esInvestigador = await prisma.solicitud_caracteristica.findFirst({
-        where: {
-          profesor_id,
-          estado: 'aprobada',
-          caracteristica: { nombre: 'Investigador' },
-        },
-      });
-      if (esInvestigador) {
-        dataOferta.cupos_investigador = cupos;
-      }
     }
 
     const carrerasEncontradas = await prisma.carrera.findMany({

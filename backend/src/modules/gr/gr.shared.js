@@ -32,9 +32,14 @@ const ESTADOS_CON_CUPO_CONSUMIDO = [
 // Superset para el límite de cupos del PROFESOR: a diferencia de
 // ESTADOS_CON_CUPO_CONSUMIDO (que solo importa mientras un reloj de
 // vencimiento puede aplicar todavía), aquí también deben contar los 2
-// estados terminales de éxito, donde el cupo del profesor queda ocupado
-// PARA SIEMPRE y ningún reloj los toca ya: expediente_aprobado y
-// alumno_asignado.
+// estados finales del registro, que ningún reloj toca ya: expediente_aprobado
+// y alumno_asignado. Estos alumnos siguen ocupando capacidad del profesor
+// mientras realizan su servicio social; dejan de ocuparla cuando lo concluyen
+// (filtro de liberación en lib/cupos.js, valor terminal pendiente de
+// confirmar con LSS) o cuando se les aprueba una baja (pendiente de
+// integración con ADM). Una conclusión normal libera capacidad del profesor
+// pero NO reabre cupos_disponibles de la oferta; una baja aprobada sí
+// devolverá el lugar.
 const ESTADOS_QUE_OCUPAN_CUPO_PROFESOR = [
   ...ESTADOS_CON_CUPO_CONSUMIDO,
   'expediente_aprobado',

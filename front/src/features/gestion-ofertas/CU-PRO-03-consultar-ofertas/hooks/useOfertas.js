@@ -18,7 +18,6 @@ function adaptarOferta(o) {
     actividades: o.actividades ? [o.actividades] : [],
     cuposRegistrados: o.cuposRegistrados,
     cuposDisponibles: o.cuposDisponibles,
-    esInvestigador: o.esInvestigador,
     cuposOcupadosProfesor: o.cuposOcupadosProfesor,
     cuposTotalesProfesor: o.cuposTotalesProfesor,
     perfilDeseado: o.perfilCarrera,

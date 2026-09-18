@@ -1,6 +1,13 @@
 const prisma = require('./prisma');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../modules/gr/gr.shared');
 
+// Estado terminal de la liberación del servicio social (módulo LSS, de Karen —
+// mismo literal que dashboard.service.js). Un alumno con este estado concluyó
+// correctamente y YA NO ocupa capacidad del profesor (NO reabre cupos_disponibles
+// de la oferta). LSS todavía no lo escribe: el filtro queda listo y no tiene
+// efecto hasta que exista alguna fila con este valor.
+const ESTADO_LSS_TERMINAL = 'constancia_disponible';
+
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
   err.status = status;
@@ -8,149 +15,117 @@ function crearError(mensaje, status = 400, code) {
   return err;
 }
 
-async function contarCuposNormalesOcupados(profesorId, tx = prisma) {
+// Fragmento `where` de "esta solicitud ocupa capacidad del profesor": está en
+// un estado que ocupa, Y no concluyó su liberación. `is: null` cubre las
+// solicitudes sin liberacion_proceso (la relación es 1:1 opcional).
+const WHERE_SOLICITUD_OCUPA_CUPO = {
+  estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
+  OR: [
+    { liberacion_proceso: { is: null } },
+    { liberacion_proceso: { is: { estado: { not: ESTADO_LSS_TERMINAL } } } },
+  ],
+};
+
+async function contarCuposOcupados(profesorId, tx = prisma) {
   return tx.solicitud_registro.count({
+    where: { ...WHERE_SOLICITUD_OCUPA_CUPO, oferta: { profesor_id: profesorId } },
+  });
+}
+
+// Obtiene las solicitudes que ocupan cupo en varias ofertas
+async function obtenerSolicitudesOcupandoOfertas(ofertaIds, tx = prisma) {
+  if (ofertaIds.length === 0) return [];
+
+  return tx.solicitud_registro.findMany({
     where: {
-      tipo_cupo: 'normal',
-      estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
-      oferta: { profesor_id: profesorId },
+      ...WHERE_SOLICITUD_OCUPA_CUPO,
+      oferta_id: { in: ofertaIds },
+    },
+    include: {
+      alumno: {
+        include: { usuario: true },
+      },
     },
   });
 }
 
-async function obtenerCuposNormalesDisponibles(profesor, tx = prisma) {
-  const ocupados = await contarCuposNormalesOcupados(profesor.id, tx);
+async function obtenerCuposDisponiblesProfesor(profesor, tx = prisma) {
+  const ocupados = await contarCuposOcupados(profesor.id, tx);
   return profesor.cupos_totales - ocupados;
 }
 
-async function profesorTieneCaracteristicaAprobada(profesorId, nombreCaracteristica, tx = prisma) {
-  const encontrada = await tx.solicitud_caracteristica.findFirst({
-    where: {
-      profesor_id: profesorId,
-      estado: 'aprobado',
-      caracteristica: { nombre: nombreCaracteristica },
-    },
-    select: { id: true },
-  });
-  return !!encontrada;
-}
-
-async function contarCuposInvestigadorOcupados(ofertaId, tx = prisma) {
-  return tx.solicitud_registro.count({
-    where: {
-      tipo_cupo: 'investigador',
-      estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
-      oferta_id: ofertaId,
-    },
-  });
-}
-
-// Helper de batching (no es una de las 6 funciones de negocio, es
-// infraestructura para ellas) — usado por ofertas.service.js (listado
-// público de ofertas) para filtrar una LISTA completa en 3 consultas fijas
-// en vez de N consultas (una por oferta) al llamar ofertaPuedeRecibirAlumno
-// en un loop.
+// Helper de batching (infraestructura, no regla de negocio) — usado por
+// ofertas.service.js (listado público) para filtrar una LISTA con 1 consulta
+// fija en vez de N (una por oferta).
 async function construirContextoCupos(ofertas, tx = prisma) {
   const profesorIds = [...new Set(ofertas.map((o) => o.profesor_id))];
-  const ofertaIds = ofertas.map((o) => o.id);
 
-  const [caracteristicasInvestigador, filasNormales, gruposInvestigador] = await Promise.all([
-    tx.solicitud_caracteristica.findMany({
-      where: { profesor_id: { in: profesorIds }, estado: 'aprobado', caracteristica: { nombre: 'Investigador' } },
-      select: { profesor_id: true },
-    }),
-    tx.solicitud_registro.findMany({
-      where: {
-        tipo_cupo: 'normal',
-        estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
-        oferta: { profesor_id: { in: profesorIds } },
-      },
-      select: { oferta: { select: { profesor_id: true } } },
-    }),
-    tx.solicitud_registro.groupBy({
-      by: ['oferta_id'],
-      where: {
-        tipo_cupo: 'investigador',
-        estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
-        oferta_id: { in: ofertaIds },
-      },
-      _count: { _all: true },
-    }),
-  ]);
+  const filas = await tx.solicitud_registro.findMany({
+    where: { ...WHERE_SOLICITUD_OCUPA_CUPO, oferta: { profesor_id: { in: profesorIds } } },
+    select: { oferta: { select: { profesor_id: true } } },
+  });
 
-  const investigadoresAprobados = new Set(caracteristicasInvestigador.map((c) => c.profesor_id));
-
-  const cuposNormalesOcupadosPorProfesor = new Map();
-  for (const fila of filasNormales) {
+  const cuposOcupadosPorProfesor = new Map();
+  for (const fila of filas) {
     const pid = fila.oferta.profesor_id;
-    cuposNormalesOcupadosPorProfesor.set(pid, (cuposNormalesOcupadosPorProfesor.get(pid) || 0) + 1);
+    cuposOcupadosPorProfesor.set(pid, (cuposOcupadosPorProfesor.get(pid) || 0) + 1);
   }
 
-  const ocupadosInvestigadorPorOferta = new Map(gruposInvestigador.map((g) => [g.oferta_id, g._count._all]));
-
-  return { investigadoresAprobados, cuposNormalesOcupadosPorProfesor, ocupadosInvestigadorPorOferta };
+  return { cuposOcupadosPorProfesor };
 }
 
 /**
- * @param {object} [contexto] - opcional, viene de construirContextoCupos()
- *   cuando se filtra una lista completa. Sin contexto, hace sus propias 3
- *   consultas (uso normal para validar 1 sola oferta).
+ * Los 2 límites independientes de la regla de aceptación:
+ *   A) la oferta tiene lugar estructural (cupos_disponibles > 0)
+ *   B) el profesor tiene capacidad global (ocupados < cupos_totales)
+ * @param {object} [contexto] - opcional, de construirContextoCupos() al
+ *   filtrar una lista completa. Sin contexto hace su propia consulta.
  */
 async function ofertaPuedeRecibirAlumno(oferta, profesor, contexto = null, tx = prisma) {
-  let cuposNormalesDisponibles;
-  let esInvestigadorAprobado;
-  let ocupadosInvestigador;
-
-  if (contexto) {
-    const ocupadosNormales = contexto.cuposNormalesOcupadosPorProfesor.get(profesor.id) || 0;
-    cuposNormalesDisponibles = profesor.cupos_totales - ocupadosNormales;
-    esInvestigadorAprobado = contexto.investigadoresAprobados.has(profesor.id);
-    ocupadosInvestigador = contexto.ocupadosInvestigadorPorOferta.get(oferta.id) || 0;
-  } else {
-    cuposNormalesDisponibles = await obtenerCuposNormalesDisponibles(profesor, tx);
-    esInvestigadorAprobado = await profesorTieneCaracteristicaAprobada(profesor.id, 'Investigador', tx);
-    ocupadosInvestigador = await contarCuposInvestigadorOcupados(oferta.id, tx);
-  }
-
-  if (cuposNormalesDisponibles > 0) return true;
-  if (oferta.tipo_oferta !== 'proyecto') return false;
-  if (!oferta.cupos_investigador) return false; // null o 0 -> sin respaldo
-  if (!esInvestigadorAprobado) return false;
-
-  return ocupadosInvestigador < oferta.cupos_investigador;
+  if (oferta.cupos_disponibles === 0) return false;
+  const ocupados = contexto
+    ? (contexto.cuposOcupadosPorProfesor.get(profesor.id) || 0)
+    : await contarCuposOcupados(profesor.id, tx);
+  return ocupados < profesor.cupos_totales;
 }
 
 /**
- * Regla de prioridad: SIEMPRE intenta cupo normal primero. Solo usa
- * investigador si no queda normal Y se cumplen las otras 3 condiciones.
- * Lanza PROFESOR_SIN_CUPOS si ninguno de los 2 tipos aplica — quien llama
- * (decidirSolicitud) decide qué hacer con ese error; err.message es la
- * única fuente del texto de este motivo de rechazo, no se duplica en
- * ningún otro archivo.
+ * Serializa las aceptaciones del MISMO profesor: toma un lock exclusivo sobre su
+ * fila y lo retiene hasta el COMMIT/ROLLBACK de `tx`, y devuelve `cupos_totales`
+ * FRESCO de esa misma fila (mismo SELECT, sin consulta extra).
+ *
+ * DEBE ser la PRIMERA sentencia de la transacción, ANTES de cualquier lectura
+ * normal (como el COUNT de asegurarCapacidadProfesor): en REPEATABLE READ el
+ * snapshot se fija en la primera lectura no bloqueante, y ese conteo debe ver lo
+ * ya confirmado por la aceptación anterior del mismo profesor. `tx` es
+ * obligatorio a propósito: fuera de una transacción el lock se liberaría al
+ * instante y no protegería nada.
+ *
+ * @returns {{ id: number, cupos_totales: number }} justo lo que necesita
+ *   asegurarCapacidadProfesor — la regla de capacidad sigue viviendo allí.
  */
-async function determinarTipoCupoParaAceptar(oferta, profesor, tx = prisma) {
-  const cuposNormalesDisponibles = await obtenerCuposNormalesDisponibles(profesor, tx);
-  if (cuposNormalesDisponibles > 0) return 'normal';
+async function bloquearProfesor(profesorId, tx) {
+  const filas = await tx.$queryRaw`SELECT id, cupos_totales FROM profesor WHERE id = ${profesorId} FOR UPDATE`;
+  if (filas.length === 0) throw crearError('No se encontró tu perfil de profesor.', 404);
+  return { id: Number(filas[0].id), cupos_totales: Number(filas[0].cupos_totales) };
+}
 
-  if (oferta.tipo_oferta === 'proyecto' && oferta.cupos_investigador) {
-    const esInvestigadorAprobado = await profesorTieneCaracteristicaAprobada(profesor.id, 'Investigador', tx);
-    if (esInvestigadorAprobado) {
-      const ocupadosInvestigador = await contarCuposInvestigadorOcupados(oferta.id, tx);
-      if (ocupadosInvestigador < oferta.cupos_investigador) {
-        return 'investigador';
-      }
-    }
+/**
+ * Lanza PROFESOR_SIN_CUPOS si el profesor ya no tiene capacidad global.
+ * err.message es la única fuente del texto de este motivo de rechazo.
+ */
+async function asegurarCapacidadProfesor(profesor, tx = prisma) {
+  if ((await obtenerCuposDisponiblesProfesor(profesor, tx)) <= 0) {
+    throw crearError('El profesor alcanzó su límite de cupos disponibles.', 409, 'PROFESOR_SIN_CUPOS');
   }
-
-  throw crearError('El profesor alcanzó su límite de cupos disponibles.', 409, 'PROFESOR_SIN_CUPOS');
 }
 
 module.exports = {
-  contarCuposNormalesOcupados,
-  obtenerCuposNormalesDisponibles,
-  profesorTieneCaracteristicaAprobada,
-  contarCuposInvestigadorOcupados,
+  contarCuposOcupados,
+  obtenerSolicitudesOcupandoOfertas,
+  obtenerCuposDisponiblesProfesor,
   ofertaPuedeRecibirAlumno,
-  determinarTipoCupoParaAceptar,
+  bloquearProfesor,
+  asegurarCapacidadProfesor,
   construirContextoCupos,
 };

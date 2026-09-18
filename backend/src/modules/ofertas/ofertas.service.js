@@ -1,7 +1,13 @@
 const prisma = require('../../lib/prisma');
 const redis = require('../../lib/redis');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
-const { construirContextoCupos, ofertaPuedeRecibirAlumno } = require('../../lib/cupos');
+const {
+  construirContextoCupos,
+  ofertaPuedeRecibirAlumno,
+  contarCuposOcupados,
+  obtenerSolicitudesOcupandoOfertas,
+} = require('../../lib/cupos');
+const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
 
 const CACHE_KEY_OFERTAS = 'cache:ofertas';
 const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
@@ -29,9 +35,9 @@ async function listarOfertasDisponibles() {
     orderBy: { fecha_registro: 'desc' },
   });
 
-  // Filtra las ofertas cuyo profesor ya alcanzó su límite general de cupos
-  // (y sin respaldo de investigador disponible en ESA oferta). Batcheado
-  // en 3 consultas fijas (construirContextoCupos), no una por oferta.
+  // Filtra las ofertas cuyo profesor ya alcanzó su capacidad global. El conteo
+  // de alumnos que ocupan capacidad se resuelve por lotes en UNA sola consulta
+  // (construirContextoCupos), no una por oferta.
   const contexto = await construirContextoCupos(ofertas);
   const permisos = await Promise.all(
     ofertas.map((o) => ofertaPuedeRecibirAlumno(o, o.profesor, contexto))
@@ -67,41 +73,59 @@ async function listarPerfilesDisponibles() {
 
 // CU-PRO-01: Solicitar registro
 
-/**
- * Calcula la capacidad disponible de un profesor y si tiene la
- * característica 'Investigador' aprobada.
- */
 async function calcularCuposDisponibles(profesorId) {
   const profesor = await prisma.profesor.findUnique({
     where: { id: profesorId },
-    include: {
-      solicitud_caracteristica: {
-        where: { estado: 'aprobada' },
-        include: { caracteristica: true },
-      },
-      oferta_servicio: true,
-    },
   });
 
   if (!profesor) {
     return null;
   }
 
-  const cupos_comprometidos_profesor = profesor.oferta_servicio
-    .filter((o) => o.estado_oferta !== 'rechazada')
-    .reduce((sum, o) => {
-      if (o.tipo_oferta === 'individual') return sum + 1;
-      if (o.cupos_investigador) return sum;
-      return sum + (o.cupos_ofertados || 0);
-    }, 0);
-
-  const cupos_disponibles_profesor = profesor.cupos_totales - cupos_comprometidos_profesor;
-
-  const es_investigador = profesor.solicitud_caracteristica.some(
-    (sc) => sc.caracteristica.nombre === 'Investigador'
+  const cuposOcupados = await contarCuposOcupados(profesorId);
+  const cuposDisponiblesProfesor = Math.max(
+    profesor.cupos_totales - cuposOcupados,
+    0
   );
 
-  return { profesor, cupos_disponibles_profesor, es_investigador };
+  return {
+    profesor,
+    cuposOcupados,
+    cuposDisponiblesProfesor,
+  };
+}
+
+// esAccionDelProfesor solo cambia la redacción del mensaje (profesor en 2ª persona, coordinador en 3ª).
+async function validarCapacidadParaTramitarOferta(profesorId, esAccionDelProfesor = false) {
+  const capacidad = await calcularCuposDisponibles(profesorId);
+
+  if (!capacidad) {
+    throw Object.assign(new Error('Profesor no encontrado.'), { status: 404 });
+  }
+
+  const { cuposOcupados, profesor } = capacidad;
+
+  // Un profesor nunca debe superar su capacidad institucional.
+  if (cuposOcupados > profesor.cupos_totales) {
+    throw Object.assign(
+      new Error('La capacidad actual del profesor presenta una inconsistencia.'),
+      { status: 409 }
+    );
+  }
+
+  // Si está lleno, no puede registrar, reenviar ni aprobar nuevas ofertas.
+  if (cuposOcupados === profesor.cupos_totales) {
+    throw Object.assign(
+      new Error(
+        esAccionDelProfesor
+          ? 'Has alcanzado tu capacidad máxima de alumnos.'
+          : 'El profesor ha alcanzado su capacidad máxima de alumnos.'
+      ),
+      { status: 409 }
+    );
+  }
+
+  return capacidad;
 }
 
 const { emitirAUsuario } = require('../../sockets/socket.server');
@@ -130,6 +154,8 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
     if (!actividadSISS || !actividadSISS.trim()) {
       throw Object.assign(new Error('Debes seleccionar la Actividad SISS antes de aprobar.'), { status: 400 });
     }
+
+    await validarCapacidadParaTramitarOferta(oferta.profesor_id);
 
     const actualizada = await prisma.oferta_servicio.update({
       where: { id: ofertaId },
@@ -216,8 +242,9 @@ async function listarOfertasPendientes() {
       descripcion: o.descripcion_actividades,
       actividades: o.descripcion_actividades,
       cuposSolicitados: o.tipo_oferta === 'individual' ? 1 : o.cupos_ofertados,
-      cuposDisponiblesProfesor: cuposInfo?.cupos_disponibles_profesor ?? null,
-      esInvestigador: cuposInfo?.es_investigador ?? false,
+      cuposOcupadosProfesor: cuposInfo?.cuposOcupados ?? 0,
+      cuposTotalesProfesor: cuposInfo?.profesor?.cupos_totales ?? null,
+      cuposDisponiblesProfesor: cuposInfo?.cuposDisponiblesProfesor ?? null,
       perfilDeseado: o.deseo_de_carrera.map((d) => d.carrera.nombre),
     };
   }));
@@ -237,18 +264,29 @@ async function listarMisOfertas(profesorId) {
     where: { profesor_id: profesorId },
     include: {
       deseo_de_carrera: { include: { carrera: true } },
-      solicitud_registro: {
-        include: { alumno: { include: { usuario: true } } },
-      },
     },
     orderBy: { fecha_registro: 'desc' },
   });
 
-  return ofertas.map((o) => {
-    const cuposTotales = o.tipo_oferta === 'individual' ? 1 : (o.cupos_investigador ?? o.cupos_ofertados ?? 0);
-    const alumnosVinculados = o.solicitud_registro.map(
-      (s) => `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`
+  // Alumnos que actualmente ocupan un lugar en estas ofertas
+  const solicitudesOcupando = await obtenerSolicitudesOcupandoOfertas(
+    ofertas.map((o) => o.id)
+  );
+
+  const alumnosPorOferta = new Map();
+
+  for (const s of solicitudesOcupando) {
+    const alumnos = alumnosPorOferta.get(s.oferta_id) || [];
+
+    alumnos.push(
+      `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`
     );
+
+    alumnosPorOferta.set(s.oferta_id, alumnos);
+  }
+  return ofertas.map((o) => {
+    const cuposTotales = o.tipo_oferta === 'individual' ? 1 : (o.cupos_ofertados ?? 0);
+    const alumnosVinculados = alumnosPorOferta.get(o.id) || [];
 
     return {
       id: o.id,
@@ -306,23 +344,8 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     orderBy: { fecha_registro: 'desc' },
   });
 
-  // Cupos ocupados del profesor: cuenta solicitud_registro con tipo_cupo ya
-  // asignado (alumno aceptado), a través de TODAS las ofertas del profesor
-  // (no solo la de esta fila), excluyendo estados que ya liberaron el lugar.
-  const profesorIds = [...new Set(ofertas.map((o) => o.profesor_id))];
-  const solicitudesOcupando = await prisma.solicitud_registro.findMany({
-    where: {
-      tipo_cupo: { not: null },
-      estado_solicitud: { notIn: ESTADOS_RECHAZO_SOLICITUD },
-      oferta: { profesor_id: { in: profesorIds } },
-    },
-    select: { oferta: { select: { profesor_id: true } } },
-  });
-  const cuposOcupadosPorProfesor = new Map();
-  for (const s of solicitudesOcupando) {
-    const id = s.oferta.profesor_id;
-    cuposOcupadosPorProfesor.set(id, (cuposOcupadosPorProfesor.get(id) || 0) + 1);
-  }
+  const { cuposOcupadosPorProfesor } = await construirContextoCupos(ofertas);
+
 
   return ofertas.map((o) => ({
     id: o.id,
@@ -336,7 +359,6 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     actividades: o.descripcion_actividades,
     cuposRegistrados: o.tipo_oferta === 'individual' ? 1 : o.cupos_ofertados,
     cuposDisponibles: o.cupos_disponibles,
-    esInvestigador: o.cupos_investigador !== null,
     cuposOcupadosProfesor: cuposOcupadosPorProfesor.get(o.profesor_id) || 0,
     cuposTotalesProfesor: o.profesor.cupos_totales,
     perfilCarrera: o.deseo_de_carrera.map((d) => d.carrera.nombre),
@@ -371,6 +393,18 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     throw Object.assign(new Error('Debe seleccionar al menos un perfil de carrera.'), { status: 400 });
   }
 
+  // Capacidad institucional actual del profesor
+  const profesor = await prisma.profesor.findUnique({
+    where: { id: profesorId },
+    select: { cupos_totales: true },
+  });
+
+  if (!profesor) {
+    throw Object.assign(new Error('Profesor no encontrado.'), { status: 404 });
+  }
+
+  await validarCapacidadParaTramitarOferta(profesorId, true);
+
   let dataActualizada = {
     nombre_proyecto,
     descripcion_actividades,
@@ -378,25 +412,30 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     estado_oferta: 'pendiente_revision',
     motivo_rechazo: null,
     cupos_ofertados: null,
-    cupos_investigador: null,
   };
 
   if (tipo_oferta === 'individual') {
     dataActualizada.cupos_disponibles = 1;
   } else {
     const cupos = parseInt(cupos_ofertados, 10);
+
     if (!Number.isInteger(cupos) || cupos < 2) {
-      throw Object.assign(new Error('Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.'), { status: 400 });
+      throw Object.assign(
+        new Error('Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.'),
+        { status: 400 }
+      );
     }
+
+    // Una oferta no puede superar la capacidad total del profesor
+    if (cupos > profesor.cupos_totales) {
+      throw Object.assign(
+        new Error(`La oferta no puede tener más de ${profesor.cupos_totales} cupos.`),
+        { status: 400 }
+      );
+    }
+
     dataActualizada.cupos_ofertados = cupos;
     dataActualizada.cupos_disponibles = cupos;
-
-    const esInvestigador = await prisma.solicitud_caracteristica.findFirst({
-      where: { profesor_id: profesorId, estado: 'aprobada', caracteristica: { nombre: 'Investigador' } },
-    });
-    if (esInvestigador) {
-      dataActualizada.cupos_investigador = cupos;
-    }
   }
 
   const carrerasEncontradas = await prisma.carrera.findMany({ where: { nombre: { in: carreras } } });
@@ -443,34 +482,52 @@ const ESTADOS_RECHAZO_SOLICITUD = [
   'rechazada_por_profesor',
 ];
 
+// TODO ADM/LSS: excluir bajas aprobadas y confirmar el estado terminal de liberación
 async function cerrarOfertaManual(ofertaId, profesorId) {
   const oferta = await prisma.oferta_servicio.findUnique({
     where: { id: ofertaId },
-    include: { solicitud_registro: true },
+    include: { solicitud_registro: { include: { liberacion_proceso: true } } },
   });
 
   if (!oferta) {
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
+
   if (oferta.profesor_id !== profesorId) {
     throw Object.assign(new Error('Oferta no encontrada.'), { status: 404 });
   }
+
   if (oferta.estado_oferta !== 'aprobada') {
-    throw Object.assign(new Error('Solo se pueden cerrar ofertas que estén Aprobadas.'), { status: 400 });
-  }
-
-  const alumnosActivos = oferta.solicitud_registro.filter(
-    (s) => !ESTADOS_RECHAZO_SOLICITUD.includes(s.estado_solicitud)
-  ).length;
-
-  if (alumnosActivos > 0) {
     throw Object.assign(
-      new Error(`No se puede cerrar: hay ${alumnosActivos} alumno(s) con servicio activo en esta oferta.`),
+      new Error('Solo se pueden cerrar ofertas que estén Aprobadas.'),
       { status: 400 }
     );
   }
-  if (oferta.cupos_disponibles <= 0) {
-    throw Object.assign(new Error('No se puede cerrar: la oferta ya tiene todos sus cupos ocupados.'), { status: 400 });
+
+  // Solicitudes o alumnos que todavía mantienen viva la oferta: no cuentan las
+  // rechazadas ni los alumnos que ya terminaron su servicio (estado terminal LSS).
+  const procesosActivos = oferta.solicitud_registro.filter(
+    (s) =>
+      !ESTADOS_RECHAZO_SOLICITUD.includes(s.estado_solicitud) &&
+      s.liberacion_proceso?.estado !== ESTADO_LSS_TERMINAL
+  ).length;
+
+  if (procesosActivos > 0) {
+    throw Object.assign(
+      new Error(
+        'No puedes cerrar esta oferta porque todavía tiene solicitudes o alumnos activos.'
+      ),
+      { status: 400 }
+    );
+  }
+
+  if (oferta.cupos_disponibles === 0) {
+    throw Object.assign(
+      new Error(
+        'No se puede cerrar: la oferta ya tiene todos sus cupos ocupados.'
+      ),
+      { status: 400 }
+    );
   }
 
   return prisma.oferta_servicio.update({
@@ -478,7 +535,9 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
     data: { estado_oferta: 'cerrada' },
   });
 }
+
 // CU-PRO-04: Concluir ofertas automáticamente (RN-PRO-18/19/20)
+// TODO ADM/LSS: excluir bajas aprobadas y confirmar el estado terminal de liberación
 const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // mismo valor que usa dashboard.service.js
 
 async function revisarConclusionAutomatica() {
@@ -495,17 +554,19 @@ async function revisarConclusionAutomatica() {
   let concluidas = 0;
 
   for (const oferta of ofertas) {
+    // Solo solicitudes que ya ocupan un lugar de la oferta (aceptadas por el profesor o posteriores).
     const alumnosActivos = oferta.solicitud_registro.filter(
-      (s) => !ESTADOS_RECHAZO_SOLICITUD.includes(s.estado_solicitud)
+      (s) => ESTADOS_QUE_OCUPAN_CUPO_PROFESOR.includes(s.estado_solicitud)
     );
 
     let debeConcluir = false;
 
     if (oferta.tipo_oferta === 'individual') {
-      debeConcluir = alumnosActivos.length === 1
+      debeConcluir = oferta.cupos_disponibles === 0
+        && alumnosActivos.length === 1
         && alumnosActivos[0].liberacion_proceso?.estado === ESTADO_LSS_TERMINAL;
     } else {
-      const cuposLlenos = oferta.cupos_disponibles <= 0;
+      const cuposLlenos = oferta.cupos_disponibles === 0;
       const todosTerminaron = alumnosActivos.length > 0 &&
         alumnosActivos.every((s) => s.liberacion_proceso?.estado === ESTADO_LSS_TERMINAL);
       debeConcluir = cuposLlenos && todosTerminaron;
@@ -541,6 +602,7 @@ module.exports = {
   listarOfertasDisponibles,
   listarPerfilesDisponibles,
   calcularCuposDisponibles,
+  validarCapacidadParaTramitarOferta,
   decidirOferta,
   listarOfertasPendientes,
   listarMisOfertas,

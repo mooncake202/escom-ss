@@ -19,7 +19,7 @@ const PASSWORD_PLANO = '12345678';
 const CARRERAS = ['ISC', 'LCD', 'IIA'];
 
 const CARACTERISTICAS = [
-  { nombre: 'Investigador', incremento_cupos: 0 },
+  { nombre: 'Investigador', incremento_cupos: 1 },
   { nombre: 'Coordinador', incremento_cupos: 2 },
 ];
 
@@ -164,7 +164,7 @@ async function main() {
   console.log('  coordinador.test@ipn.mx');
   console.log('  profesor.normal@ipn.mx           (3 cupos, sin características)');
   console.log('  profesor.sininvestigador@ipn.mx  (3 cupos, sin características)');
-  console.log('  profesor.investigador@ipn.mx     (3 cupos + Investigador aprobada)');
+  console.log('  profesor.investigador@ipn.mx     (3 base + 1 Investigador = 4 cupos)');
   console.log('  profesor.volumen@ipn.mx          (20 cupos, para pruebas de volumen)');
 }
 
