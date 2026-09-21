@@ -9,6 +9,7 @@ import {
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+import { ESTADO_LSS_A_RUTA, RUTA_LSS_FALLBACK } from "@/features/liberacion-ss/utils/estadoRutasLSS";
 
 // Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
 // revisado contra el catálogo completo de Parte 2. `carta:*` no tiene campo
@@ -430,7 +431,7 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
               todavía — el widget de arriba ya cubre ese caso. */}
           {resumen.tieneProcesoLiberacionIniciado && (
             <>
-              <ActionItem icon="arrow" {...T.slate} label="Ver proceso de liberación" desc="Consulta el estado de tu evaluación de desempeño" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
+              <ActionItem icon="arrow" {...T.slate} label="Ver proceso de liberación" desc="Consulta el estado de tu evaluación de desempeño" onClick={() => navigate(ESTADO_LSS_A_RUTA[resumen.estadoLiberacion] || RUTA_LSS_FALLBACK)} C={C} />
               <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
             </>
           )}

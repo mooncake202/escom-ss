@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "./components/ProcesoLSSLayout";
-import { calcularPasoActual } from "./utils/pasoLSS";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 import { useValidacionRequisitos } from "./hooks/useValidacionRequisitos";
@@ -13,7 +12,7 @@ export default function ValidacionRequisitos() {
   const nombreAlumno = nombreCompletoSesion(sesion);
 
   const {
-    cargando, yaExiste, estadoExistente, requisitos, cumpleTodos,
+    cargando, requisitos, cumpleTodos,
     confirmado, solicitarValidacion, error, loading, enviado,
     toggleConfirmado, toggleSolicitud, confirmar, completo,
   } = useValidacionRequisitos();
@@ -32,30 +31,11 @@ export default function ValidacionRequisitos() {
     );
   }
 
-  // RN-LSS-01: ya existe un proceso — nunca se inicia un segundo. Las
-  // pantallas de destino (CU-LSS-02 en adelante) no están construidas
-  // todavía, así que por ahora solo se informa el estado actual.
-  if (yaExiste) {
-    return (
-      <ProcesoLSSLayout
-        pasoActual={calcularPasoActual(estadoExistente)}
-        titulo="Liberación de servicio social"
-        subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
-        rol="alumno"
-        usuario={nombreAlumno}
-      >
-        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
-          <div style={{ fontSize: 52, marginBottom: "1rem" }}>📋</div>
-          <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
-            Ya tienes un proceso de liberación en curso
-          </h2>
-          <p style={{ margin: 0, fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-            Estado actual: <strong style={{ color: C.textPrimary }}>{estadoExistente}</strong>
-          </p>
-        </div>
-      </ProcesoLSSLayout>
-    );
-  }
+  // El mensaje "ya tienes un proceso en curso" que existía aquí se quitó:
+  // el guardia de ruta (RutaProtegida con guardaLSS, en App.jsx) ya
+  // redirige antes de que el alumno llegue a ver esta pantalla en
+  // absoluto si ya tiene un liberacion_proceso — así que ese caso ya no
+  // puede ocurrir aquí.
 
   // ✅ MISMO patrón de éxito que tu ejemplo
   if (enviado) {

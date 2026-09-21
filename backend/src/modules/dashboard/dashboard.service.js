@@ -96,7 +96,7 @@ async function resumenAlumno(usuarioId) {
       actividadesAsignadas: 0, reportesEnviados: 0,
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
-      cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false,
+      cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false, estadoLiberacion: null,
     };
   }
 
@@ -138,6 +138,10 @@ async function resumenAlumno(usuarioId) {
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
     tieneProcesoLiberacionIniciado: estadoLiberacion.yaExiste,
     cumpleRequisitosLiberacion: !estadoLiberacion.yaExiste && !!estadoLiberacion.cumpleTodos,
+    // Estado real de liberacion_proceso (null si aún no existe) — lo
+    // necesita el botón "Ver proceso de liberación" del dashboard para
+    // navegar a la ruta que corresponde al estado actual, no a una fija.
+    estadoLiberacion: estadoLiberacion.yaExiste ? estadoLiberacion.estado : null,
   };
 }
 

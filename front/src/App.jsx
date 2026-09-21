@@ -307,12 +307,15 @@ function App() {
 
 
         {/* --LSS-- */}
+        {/* guardaLSS: solo en las rutas del lado ALUMNO — profesor/coordinación
+            no tienen guardia de estado (mismo criterio que GR: el guardia por
+            estado solo aplica al actor cuyo progreso se está protegiendo). */}
         <Route path="/alumno/iniciar-proceso-evaluacion" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><IniciarProcesoEvaluacion rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><IniciarProcesoEvaluacion rol="alumno" /></RutaProtegida>
         } />
 
         <Route path="/alumno/seguimiento-evaluacion" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><SeguimientoEvaluacionAlumno rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><SeguimientoEvaluacionAlumno rol="alumno" /></RutaProtegida>
         } />
         <Route path="/profesor/evaluar-alumno" element={
           <RutaProtegida roles={PROFESOR}><EvaluarAlumnoProfesor rol="profesor" /></RutaProtegida>
@@ -322,26 +325,26 @@ function App() {
         } />
 
         <Route path="/alumno/seguimiento-carta-termino" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><SeguimientoCartaTerminoAlumno rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><SeguimientoCartaTerminoAlumno rol="alumno" /></RutaProtegida>
         } />
         <Route path="/coordinacion/estado-carta-termino" element={
           <RutaProtegida roles={COORDINADOR}><EstadoCartaTerminoCoordinacion rol="coordinacion" /></RutaProtegida>
         } />
 
         <Route path="/alumno/integracion-expediente" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><IntegracionExpediente rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><IntegracionExpediente rol="alumno" /></RutaProtegida>
         } />
 
 
         <Route path="/alumno/estado-resolucion" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><EstadoResolucion rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><EstadoResolucion rol="alumno" /></RutaProtegida>
         } />
         <Route path="/coordinacion/evaluacion-expediente" element={
           <RutaProtegida roles={COORDINADOR}><EvaluacionExpediente rol="coordinacion" /></RutaProtegida>
         } />
 
         <Route path="/alumno/consultar-constancia-termino" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><ConsultarEstadoConstanciaTermino rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO} guardaLSS><ConsultarEstadoConstanciaTermino rol="alumno" /></RutaProtegida>
         } />
         <Route path="/coordinacion/gestion-constancia-termino" element={
           <RutaProtegida roles={COORDINADOR}><GestionEstadoConstanciaTermino rol="coordinacion" /></RutaProtegida>
