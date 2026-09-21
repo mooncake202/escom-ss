@@ -1,30 +1,79 @@
+import { useEffect }                        from "react";
 import { useTheme, RADIUS }                from "@/themes/colors";
 import { DashboardLayout }                  from "@/components/layout/DashboardLayout";
 import { ReporteCard }                      from "./components/ReporteCard";
 import { ReporteDetalle }                   from "./components/ReporteDetalle";
-import { useRevisarReportes, PROFESOR }     from "./hooks/useRevisarReportes";
+import { claveReporte }                     from "./revisionReportes";
+import { useRevisarReportes }            from "./hooks/useRevisarReportes";
+import { useSesion, nombreCompletoSesion }  from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 
 export default function RevisarReportes() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
+  const nombreProfesor = nombreCompletoSesion(usuario);
   const {
-    tieneReportes, pendientes, procesados, reporte,
-    pendientesAgrupados, procesadosAgrupados,
+    carga, recargar,
+    tieneReportes, pendientes, procesados, reporte, detalle, reintentarDetalle,
+    pendientesAgrupados, procesadosAgrupados, estaDestacado,
     busqueda, setBusqueda,
     seleccionado, seleccionar, cerrar,
+    pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
-    rubricaGuardada, firmaFile, firmaUrl, errorFirma,
-    firmaConfirmada, handleFirmaChange, confirmarFirmaYVerPDF,
+    rubricaGuardada, rubrica, reintentarRubrica, firmaFile, firmaUrl, errorFirma, handleFirmaChange,
     comentario, handleComentarioChange, errorComentario,
     resultado, setResultado,
-    loading,
+    loading, errorAccion,
     confirmarAprobacion, confirmarRechazo,
-    blobRef, datosPDF,
   } = useRevisarReportes();
+
+  // Al entrar se marcan como leídas las notificaciones de reportes (mismo patrón que Ofertas): la ruta trae
+  // "?destacar=<id>", así que se filtran por prefijo y se marcan una por una.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/profesor/reportes"));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de reportes:", err));
+  }, []);
+
+  // ── Carga inicial y error ────────────────────────────────────
+  if (carga.estado !== "listo") {
+    return (
+      <DashboardLayout titulo="Reportes de alumnos" rol="profesor" usuario={nombreProfesor}>
+        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.xl,
+            border: `1px solid ${C.borderDefault}`,
+            padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando los reportes de tus alumnos...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button
+                  onClick={recargar}
+                  style={{
+                    padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                    color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  Reintentar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // ── Empty state ──────────────────────────────────────────────
   if (!tieneReportes) {
     return (
-      <DashboardLayout titulo="Reportes de alumnos" subtitulo="CU-REP-05 · Profesor" rol="profesor" usuario={PROFESOR.nombre}>
+      <DashboardLayout titulo="Reportes de alumnos" rol="profesor" usuario={nombreProfesor}>
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
@@ -54,7 +103,7 @@ export default function RevisarReportes() {
   }
 
   return (
-    <DashboardLayout titulo="Reportes de alumnos" subtitulo="CU-REP-05 · Profesor" rol="profesor" usuario={PROFESOR.nombre}>
+    <DashboardLayout titulo="Reportes de alumnos" subtitulo="Profesor" rol="profesor" usuario={nombreProfesor}>
       <div style={{ maxWidth: 900, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
 
         {/* ── Toast resultado ── */}
@@ -84,13 +133,13 @@ export default function RevisarReportes() {
               ) : (
                 <>
                   <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.danger }}>
-                    ✕ Reporte rechazado — firmas invalidadas
+                    ✕ Reporte rechazado
                   </p>
                   <p style={{ margin: "0 0 2px", fontSize: 12, color: C.textMuted }}>
                     {resultado.alumno} — {resultado.periodo}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
-                    El alumno fue notificado y deberá corregir y volver a firmar desde cero.
+                    El alumno fue notificado y deberá corregir.
                   </p>
                 </>
               )}
@@ -162,7 +211,7 @@ export default function RevisarReportes() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {pendientesAgrupados.map(grupo => (
-                    <div key={grupo.alumno}>
+                    <div key={grupo.boleta}>
                       {/* Nombre del alumno */}
                       <p style={{ margin: "0 0 0.375rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
                         {grupo.alumno}
@@ -170,10 +219,10 @@ export default function RevisarReportes() {
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
                         {grupo.reportes.map(r => (
                           <ReporteCard
-                            key={r.id} reporte={r}
-                            activo={seleccionado === r.id}
+                            key={claveReporte(r)} reporte={r}
+                            activo={seleccionado === claveReporte(r)}
                             onSeleccionar={seleccionar}
-                            esPendiente C={C}
+                            esPendiente destacado={estaDestacado(r)} C={C}
                           />
                         ))}
                       </div>
@@ -191,17 +240,17 @@ export default function RevisarReportes() {
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                   {procesadosAgrupados.map(grupo => (
-                    <div key={grupo.alumno}>
+                    <div key={grupo.boleta}>
                       <p style={{ margin: "0 0 0.375rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
                         {grupo.alumno}
                       </p>
                       <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
                         {grupo.reportes.map(r => (
                           <ReporteCard
-                            key={r.id} reporte={r}
-                            activo={seleccionado === r.id}
+                            key={claveReporte(r)} reporte={r}
+                            activo={seleccionado === claveReporte(r)}
                             onSeleccionar={seleccionar}
-                            esPendiente={false} C={C}
+                            esPendiente={false} destacado={estaDestacado(r)} C={C}
                           />
                         ))}
                       </div>
@@ -232,25 +281,29 @@ export default function RevisarReportes() {
       {reporte && (
         <ReporteDetalle
           reporte={reporte}
+          detalle={detalle}
+          onReintentar={reintentarDetalle}
           onCerrar={cerrar}
+          pdf={pdf}
+          onVerPdf={verPdf}
+          onCerrarPdf={cerrarPdf}
           modo={modo}
           irModo={irModo}
           resetModo={resetModo}
           rubricaGuardada={rubricaGuardada}
+          rubrica={rubrica}
+          onReintentarRubrica={reintentarRubrica}
           firmaFile={firmaFile}
           firmaUrl={firmaUrl}
           errorFirma={errorFirma}
-          firmaConfirmada={firmaConfirmada}
           handleFirmaChange={handleFirmaChange}
-          confirmarFirmaYVerPDF={confirmarFirmaYVerPDF}
           comentario={comentario}
           onComentarioChange={handleComentarioChange}
           errorComentario={errorComentario}
           loading={loading}
+          errorAccion={errorAccion}
           confirmarAprobacion={confirmarAprobacion}
           confirmarRechazo={confirmarRechazo}
-          blobRef={blobRef}
-          datosPDF={datosPDF}
           C={C}
         />
       )}

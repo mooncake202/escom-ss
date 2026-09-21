@@ -65,6 +65,7 @@ enum EstadoRevision {
   rechazado
 }
 
+
 // ─────────────────────────────────────────
 // 1. Tablas independientes / base
 // ─────────────────────────────────────────
@@ -322,13 +323,12 @@ model oferta_servicio {
   id                      Int                @id @default(autoincrement())
   profesor_id             Int
   coordinador_id          Int
-  nombre_SISS             String             @db.VarChar(100)
-  programa_SISS           String            @db.VarChar(150)
+  nombre_SISS             String?            @db.VarChar(100)
+  programa_SISS           String?            @db.VarChar(150)
   nombre_proyecto         String             @db.VarChar(150)
   tipo_oferta             TipoOfertaServicio
   descripcion_actividades String             @db.Text
   cupos_ofertados         Int?               @db.UnsignedTinyInt
-  cupos_investigador      Int?               @db.UnsignedTinyInt
   cupos_disponibles       Int                @db.UnsignedTinyInt
   estado_oferta           String             @db.VarChar(20)
   fecha_registro          DateTime           @db.DateTime(0)
@@ -485,6 +485,10 @@ model reporte_mensual {
   documento_id          Int    @unique
   num_reporte           Int    @db.UnsignedTinyInt
   actividades_mes       String @db.Text
+  // Snapshot del PRIMER envío (bitácoras aprobadas por AH dentro del periodo del reporte, por fecha_revision).
+  // Nunca se recalculan: ni al consultar ni al corregir y reenviar (CU-REP-04).
+  dias_laborados        Int    @db.UnsignedTinyInt
+  horas_reportadas      Int    @db.UnsignedSmallInt
   estado_reporte        String @db.VarChar(35)
 
   solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)

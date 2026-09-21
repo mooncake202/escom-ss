@@ -1,100 +1,37 @@
-import { useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  listarReportesCoordinacion, obtenerDetalleReporteCoordinacion, obtenerPdfReporteCoordinacion,
+  rechazarReporteCoordinacion, aprobarReporteCoordinacion,
+} from "@/services/reportesService";
+import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
+import { claveReporte, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
+import { CRITERIO, filtrarReportes } from "../validacionReportes";
 
-export const COORDINACION = { nombre: "Lic. Morales Vega" };
-
-export const MOCK_TIENE_REPORTES = true;
-
-const MOCK_REPORTES = [
-  {
-    id: 1,
-    numeroReporte:    2,
-    alumno:           "García López Ana",
-    matricula:        "2022630001",
-    carrera:          "Ingeniería en Sistemas Computacionales (ISC)",
-    profesor:         "Dr. Torres Vega",
-    periodo:          "Febrero 2026",
-    diasLaborados:    16,
-    horas:            64,
-    fechaAprobacion:  "02 de marzo de 2026",
-    estado:           "pendiente_validacion",
-    actividades:      "Durante el mes de febrero se realizaron las siguientes actividades: análisis de requerimientos del módulo de inventario, diseño de la base de datos relacional, implementación de endpoints REST con FastAPI y documentación técnica del sistema.",
-    comentarioProfesor: "Buen avance. Las actividades son coherentes con el proyecto asignado.",
-    firmaAlumno:   { firmante: "García López Ana", matricula: "2022630001", fecha: "28 de febrero de 2026", hora: "09:41:03" },
-    firmaProfesor: { firmante: "Dr. Torres Vega",  id: "PTC-2024-0187",    fecha: "02 de marzo de 2026",   hora: "11:05:22" },
-  },
-  {
-    id: 2,
-    numeroReporte:    7,
-    alumno:           "Martínez Ruiz Luis",
-    matricula:        "2022630002",
-    carrera:          "Ingeniería en Sistemas Computacionales (ISC)",
-    profesor:         "Dr. Torres Vega",
-    periodo:          "Febrero 2026",
-    diasLaborados:    16,
-    horas:            64,
-    fechaAprobacion:  "03 de marzo de 2026",
-    estado:           "pendiente_validacion",
-    actividades:      "Implementación de los módulos de autenticación y autorización con JWT. Se realizaron pruebas de integración y se corrigieron errores identificados durante la revisión de código.",
-    comentarioProfesor: "Continúa con el mismo ritmo. Se nota progreso en las actividades de desarrollo.",
-    firmaAlumno:   { firmante: "Martínez Ruiz Luis", matricula: "2022630002", fecha: "28 de febrero de 2026", hora: "14:22:51" },
-    firmaProfesor: { firmante: "Dr. Torres Vega",    id: "PTC-2024-0187",    fecha: "03 de marzo de 2026",   hora: "10:47:09" },
-  },
-  {
-    id: 3,
-    numeroReporte:    11,
-    alumno:           "Valdez Cruz Pedro",
-    matricula:        "2022630008",
-    carrera:          "Inteligencia Artificial (IA)",
-    profesor:         "Dra. Ramírez Gutiérrez",
-    periodo:          "Enero 2026",
-    diasLaborados:    20,
-    horas:            80,
-    fechaAprobacion:  "02 de febrero de 2026",
-    estado:           "validado",
-    actividades:      "Elaboración del documento de especificación funcional del sistema y participación en reuniones de seguimiento con el equipo de desarrollo.",
-    comentarioProfesor: "Cumplió con todos los objetivos del periodo.",
-    firmaAlumno:   { firmante: "Valdez Cruz Pedro",        matricula: "2022630008", fecha: "31 de enero de 2026",   hora: "08:15:44" },
-    firmaProfesor: { firmante: "Dra. Ramírez Gutiérrez",  id: "PTC-2024-0092",     fecha: "02 de febrero de 2026", hora: "09:33:17" },
-  },
-];
+export { CRITERIO };
 
 // ── Modos del panel ──────────────────────────────────────────
 export const MODO = {
   NORMAL:   "normal",
-  APROBAR:  "aprobar",
-  RECHAZAR: "rechazar",
+  APROBAR:  "aprobar",   // confirma la validación (el servidor agrega el sello del prototipo)
+  RECHAZAR: "rechazar",  // pide el motivo
 };
 
 // ── Filtros de estado ────────────────────────────────────────
 export const FILTRO_ESTADO = {
   PENDIENTES: "pendientes",
-  APROBADOS:  "aprobados",
+  PROCESADOS: "procesados", // validados o rechazados por Coordinación
 };
 
-// ── Criterios de búsqueda ────────────────────────────────────
-export const CRITERIO = {
-  TODOS:    "todos",
-  ALUMNO:   "alumno",
-  PROFESOR: "profesor",
-  CARRERA:  "carrera",
-};
-
-function generarHashMock() {
-  const chars = "0123456789abcdef";
-  return Array.from({ length: 64 }, () => chars[Math.floor(Math.random() * 16)]).join("");
-}
-
-function formatFechaHora(date) {
-  return {
-    fecha: date.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }),
-    hora:  date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
-  };
-}
-
+// Todo sale del backend: bandeja, detalle, PDF almacenado, rechazo y validación (que agrega el sello y aprueba).
+// Coordinación no sube rúbrica: el sello es fijo y lo agrega el servidor.
 export function useValidarReportes() {
-  const [reportes, setReportes]           = useState(MOCK_REPORTES);
-  const [seleccionado, setSeleccionado]   = useState(null);
-  const [modo, setModo]                   = useState(MODO.NORMAL);
+  const [carga, setCarga]               = useState({ estado: "cargando", error: null }); // cargando | listo | error
+  const [lista, setLista]               = useState({ pendientes: [], procesados: [] });
+  const [seleccionado, setSeleccionado] = useState(null); // clave "tipo:id"
+  const [detalle, setDetalle]           = useState({ estado: "inactivo", datos: null, error: null });
+  const [modo, setModo]                 = useState(MODO.NORMAL);
+  const { pdf, abrirPdf, cerrarPdf }    = usePdfAlmacenado();
 
   // ── Filtros ──────────────────────────────────────────────
   const [filtroEstado, setFiltroEstado]   = useState(FILTRO_ESTADO.PENDIENTES);
@@ -102,63 +39,102 @@ export function useValidarReportes() {
   const [busqueda, setBusqueda]           = useState("");
 
   // ── Rechazo ──────────────────────────────────────────────
-  const [comentario, setComentario]       = useState("");
+  const [comentario, setComentario]           = useState("");
   const [errorComentario, setErrorComentario] = useState(false);
 
   // ── Resultado y loading ──────────────────────────────────
-  const [resultado, setResultado]         = useState(null);
-  const [loading, setLoading]             = useState(false);
+  const [resultado, setResultado]     = useState(null);
+  const [loading, setLoading]         = useState(false);
+  const [errorAccion, setErrorAccion] = useState(null);
 
-  const blobRef = useRef(null);
+  // Reportes a resaltar por la notificación (?destacar=<id>); se apagan al abrirlos, como en Ofertas y CU-REP-05.
+  const [searchParams] = useSearchParams();
+  const destacarParam = searchParams.get("destacar") ?? "";
+  const [vistos, setVistos] = useState({ param: destacarParam, ids: new Set() });
+  const idsVistos = vistos.param === destacarParam ? vistos.ids : new Set();
+  const destacados = idsDestacados(destacarParam);
+  const tipoDestacado = tipoDeUrl(searchParams.get("tipo")); // los ids del mensual y del global se repiten
+  const estaDestacado = (r) => esDestacado(r, destacados, tipoDestacado) && !idsVistos.has(r.id);
 
-  // ── Reporte seleccionado ─────────────────────────────────
-  const reporte = seleccionado !== null
-    ? reportes.find(r => r.id === seleccionado) ?? null
-    : null;
+  const detalleRef = useRef(0);    // descarta respuestas de un detalle que ya no es el seleccionado
+  const accionRef = useRef(false); // evita el doble envío de aprobar/rechazar (el estado tarda un render en reflejarse)
 
-  // ── Filtrado por estado ──────────────────────────────────
-  const porEstado = reportes.filter(r =>
-    filtroEstado === FILTRO_ESTADO.PENDIENTES
-      ? r.estado === "pendiente_validacion"
-      : r.estado === "validado"
-  );
+  // `silencioso`: una actualización de fondo que falla no reemplaza la pantalla por el error.
+  const cargarLista = useCallback((silencioso = false) => listarReportesCoordinacion().then(
+    (respuesta) => {
+      setLista({ pendientes: respuesta.pendientes, procesados: respuesta.procesados });
+      setCarga({ estado: "listo", error: null });
+    },
+    (err) => { if (!silencioso) setCarga({ estado: "error", error: err.message }); },
+  ), []);
 
-  // ── Filtrado por criterio + búsqueda ─────────────────────
-  const reportesFiltrados = porEstado.filter(r => {
-    if (!busqueda.trim()) return true;
-    const q = busqueda.toLowerCase().trim();
-    if (criterio === CRITERIO.ALUMNO)   return r.alumno.toLowerCase().includes(q);
-    if (criterio === CRITERIO.PROFESOR) return r.profesor.toLowerCase().includes(q);
-    if (criterio === CRITERIO.CARRERA)  return r.carrera.toLowerCase().includes(q);
-    // TODOS — busca en los tres campos
-    return (
-      r.alumno.toLowerCase().includes(q) ||
-      r.profesor.toLowerCase().includes(q) ||
-      r.carrera.toLowerCase().includes(q)
-    );
-  });
+  useEffect(() => { cargarLista(); }, [cargarLista]);
 
-  function seleccionar(id) {
-    setSeleccionado(id);
-    resetModo();
-    setResultado(null);
+  function recargar() {
+    setCarga({ estado: "cargando", error: null });
+    return cargarLista();
   }
 
-  function cerrar() {
-    setSeleccionado(null);
-    resetModo();
-  }
+  const cargarDetalle = useCallback(async (item) => {
+    const id = ++detalleRef.current;
+    setDetalle({ estado: "cargando", datos: null, error: null });
+    try {
+      const datos = await obtenerDetalleReporteCoordinacion(item.tipoReporte, item.id);
+      if (id === detalleRef.current) setDetalle({ estado: "listo", datos, error: null });
+    } catch (err) {
+      if (id === detalleRef.current) setDetalle({ estado: "error", datos: null, error: err.message });
+    }
+  }, []);
+
+  const todos = [...lista.pendientes, ...lista.procesados];
+  const reporte = seleccionado === null ? null : todos.find((r) => claveReporte(r) === seleccionado) ?? null;
+
+  const porEstado = filtroEstado === FILTRO_ESTADO.PENDIENTES ? lista.pendientes : lista.procesados;
+  const reportesFiltrados = filtrarReportes(porEstado, criterio, busqueda);
 
   function resetModo() {
     setModo(MODO.NORMAL);
     setComentario("");
     setErrorComentario(false);
+    setErrorAccion(null);
   }
 
   function irModo(m) {
     setModo(m);
     setComentario("");
     setErrorComentario(false);
+    setErrorAccion(null);
+  }
+
+  // PDF exacto almacenado del reporte seleccionado (alumno + profesor, y el sello si ya se validó).
+  function verPdf() {
+    if (!reporte || pdf.estado === "cargando") return;
+    abrirPdf(() => obtenerPdfReporteCoordinacion(reporte.tipoReporte, reporte.id));
+  }
+
+  function seleccionar(clave) {
+    resetModo();
+    setResultado(null);
+    cerrarPdf();
+    if (clave === null) {
+      detalleRef.current += 1;
+      setSeleccionado(null);
+      setDetalle({ estado: "inactivo", datos: null, error: null });
+      return;
+    }
+    const item = todos.find((r) => claveReporte(r) === clave);
+    if (!item) return;
+    setSeleccionado(clave);
+    if (esDestacado(item, destacados, tipoDestacado)) setVistos({ param: destacarParam, ids: new Set(idsVistos).add(item.id) });
+    cargarDetalle(item);
+  }
+
+  function cerrar() {
+    seleccionar(null);
+  }
+
+  function reintentarDetalle() {
+    if (reporte) cargarDetalle(reporte);
   }
 
   function handleComentarioChange(e) {
@@ -166,84 +142,66 @@ export function useValidarReportes() {
     if (errorComentario) setErrorComentario(false);
   }
 
-  // CU-REP-06 — Aprobar con sello institucional
+  // Tras validar o rechazar: se actualiza la lista (el reporte pasa a "procesados"), se cierra el panel y se avisa.
+  async function terminarRevision(tipo) {
+    const aviso = describirResultado(reporte, tipo);
+    await cargarLista(true);
+    cerrar();
+    setResultado(aviso);
+  }
+
+  // Ejecuta una acción del servidor una sola vez a la vez; un fallo se muestra y el reporte no cambia de estado.
+  async function ejecutarAccion(accion) {
+    if (!reporte || accionRef.current) return;
+    accionRef.current = true;
+    setLoading(true);
+    setErrorAccion(null);
+    try {
+      await accion();
+    } catch (err) {
+      setErrorAccion(err.message);
+      // Otro coordinador se adelantó: se actualiza la lista para que deje de aparecer como pendiente.
+      if (err.status === 409 && err.code === "REPORTE_NO_PENDIENTE") cargarLista(true);
+    } finally {
+      accionRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  // CU-REP-06 — Aprobar: el servidor agrega el sello de validación del prototipo al PDF vigente, lo sella en el tiempo y
+  // avisa al alumno y al profesor.
   async function confirmarAprobacion() {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-
-    const { fecha, hora } = formatFechaHora(new Date());
-    const hash = generarHashMock();
-
-    setReportes(prev => prev.map(r =>
-      r.id === seleccionado ? { ...r, estado: "validado" } : r
-    ));
-    setResultado({
-      tipo:    "aprobado",
-      alumno:  reporte.alumno,
-      periodo: reporte.periodo,
-      sello:   { coordinacion: COORDINACION.nombre, fecha, hora },
-      hash,
+    await ejecutarAccion(async () => {
+      await aprobarReporteCoordinacion(reporte.tipoReporte, reporte.id);
+      await terminarRevision("aprobado");
     });
-    setLoading(false);
-    cerrar();
   }
 
-  // CU-REP-06 — Rechazar con comentarios
+  // CU-REP-06 — Rechazar con motivo obligatorio.
   async function confirmarRechazo() {
-    if (!comentario.trim()) { setErrorComentario(true); return; }
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-
-    setReportes(prev => prev.map(r =>
-      r.id === seleccionado
-        ? { ...r, estado: "rechazado_coordinacion", comentario: comentario.trim() }
-        : r
-    ));
-    setResultado({
-      tipo:      "rechazado",
-      alumno:    reporte.alumno,
-      periodo:   reporte.periodo,
-      comentario: comentario.trim(),
+    if (!comentario.trim()) {
+      setErrorComentario(true);
+      return;
+    }
+    await ejecutarAccion(async () => {
+      await rechazarReporteCoordinacion(reporte.tipoReporte, reporte.id, comentario.trim());
+      await terminarRevision("rechazado");
     });
-    setLoading(false);
-    cerrar();
-  }
-
-  // Shape para ReportePDF
-  function datosPDF(r) {
-    if (!r) return null;
-    return {
-      numeroReporte:   r.numeroReporte,
-      fechaGeneracion: r.fechaAprobacion,
-      periodoTexto:    r.periodoTexto ?? `del periodo ${r.periodo}`,
-      alumno: {
-        nombre:   r.alumno,
-        boleta:   r.matricula,
-        carrera:  r.carrera,
-        semestre: "Octavo",
-        telefono: "—",
-        correo:   "—",
-      },
-      actividades:      r.actividades,
-      firmaUrl:         null, // en producción: rúbrica del alumno desde BD
-      firmaProfesorUrl: null, // en producción: rúbrica del profesor desde BD
-      // selloUrl se agrega solo cuando coordinación aprueba
-      selloUrl: r.estado === "validado" ? "SELLO_INSTITUCIONAL_MOCK" : null,
-    };
   }
 
   return {
-    tieneReportes: MOCK_TIENE_REPORTES,
-    reportesFiltrados, reporte,
+    carga, recargar,
+    tieneReportes: todos.length > 0,
+    reportesFiltrados, reporte, detalle, reintentarDetalle, estaDestacado,
     seleccionado, seleccionar, cerrar,
+    pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
     filtroEstado, setFiltroEstado,
     criterio, setCriterio,
     busqueda, setBusqueda,
     comentario, handleComentarioChange, errorComentario,
     resultado, setResultado,
-    loading,
+    loading, errorAccion,
     confirmarAprobacion, confirmarRechazo,
-    blobRef, datosPDF,
   };
 }

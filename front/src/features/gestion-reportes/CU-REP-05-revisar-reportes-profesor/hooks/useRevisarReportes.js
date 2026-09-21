@@ -1,186 +1,157 @@
-import { useState, useRef } from "react";
-
-export const PROFESOR = {
-  nombre: "Dr. Torres Vega",
-  id:     "PTC-2024-0187",
-};
-
-export const MOCK_TIENE_REPORTES = true;
-
-// Simula si el profesor ya tiene rúbrica registrada
-// null = primera vez, string = ya tiene (URL de la imagen)
-export const RUBRICA_PROFESOR_GUARDADA = null;
-
-const MOCK_REPORTES = [
-  {
-    id: 1,
-    numeroReporte: 2,
-    alumno:        "García López Ana",
-    matricula:     "2022630001",
-    periodo:       "Febrero 2026",
-    diasLaborados: 16,
-    horas:         64,
-    fechaEnvio:    "28 de febrero de 2026",
-    estado:        "pendiente_revision",
-    actividades:   "Durante el mes de febrero se realizaron las siguientes actividades: análisis de requerimientos del módulo de inventario, diseño de la base de datos relacional, implementación de endpoints REST con FastAPI y documentación técnica del sistema.",
-    firma: { firmante: "García López Ana", matricula: "2022630001", fecha: "28 de febrero de 2026", hora: "09:41:03" },
-    comentario: "",
-  },
-  {
-    id: 2,
-    numeroReporte: 7,
-    alumno:        "Martínez Ruiz Luis",
-    matricula:     "2022630002",
-    periodo:       "Febrero 2026",
-    diasLaborados: 14,
-    horas:         56,
-    fechaEnvio:    "28 de febrero de 2026",
-    estado:        "rechazado_profesor",
-    actividades:   "Implementación de los módulos de autenticación y autorización con JWT.",
-    firma: { firmante: "Martínez Ruiz Luis", matricula: "2022630002", fecha: "28 de febrero de 2026", hora: "14:22:51" },
-    comentario: "El reporte incluye días que corresponden a un periodo vacacional o inhábil.",
-  },
-  {
-    id: 3,
-    numeroReporte: 1,
-    alumno:        "García López Ana",
-    matricula:     "2022630001",
-    periodo:       "Enero 2026",
-    diasLaborados: 20,
-    horas:         80,
-    fechaEnvio:    "31 de enero de 2026",
-    estado:        "aprobado",
-    actividades:   "Levantamiento de requerimientos y elaboración del documento de especificación funcional.",
-    firma: { firmante: "García López Ana", matricula: "2022630001", fecha: "31 de enero de 2026", hora: "08:15:44" },
-    comentario: "Buen arranque. Las actividades son coherentes con el proyecto asignado.",
-  },
-  {
-    id: 4,
-    numeroReporte: 6,
-    alumno:        "Martínez Ruiz Luis",
-    matricula:     "2022630002",
-    periodo:       "Enero 2026",
-    diasLaborados: 20,
-    horas:         80,
-    fechaEnvio:    "31 de enero de 2026",
-    estado:        "aprobado",
-    actividades:   "Actividades de desarrollo backend, revisión de código y documentación técnica.",
-    firma: { firmante: "Martínez Ruiz Luis", matricula: "2022630002", fecha: "31 de enero de 2026", hora: "11:03:27" },
-    comentario: "Continúa con el mismo ritmo.",
-  },
-  {
-    id: 5,
-    numeroReporte: 11,
-    alumno:        "Hernández Díaz Sofía",
-    matricula:     "2022630003",
-    periodo:       "Enero 2026",
-    diasLaborados: 20,
-    horas:         80,
-    fechaEnvio:    "31 de enero de 2026",
-    estado:        "aprobado",
-    actividades:   "Elaboración del plan de pruebas y ejecución de casos de prueba funcionales.",
-    firma: { firmante: "Hernández Díaz Sofía", matricula: "2022630003", fecha: "31 de enero de 2026", hora: "10:05:18" },
-    comentario: "Cumplió con todos los objetivos del periodo.",
-  },
-];
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import {
+  listarReportesProfesor, obtenerDetalleReporteProfesor, obtenerPdfReporteProfesor,
+  obtenerEstadoRubricaProfesor, subirRubricaProfesor, rechazarReporteProfesor, aprobarReporteProfesor,
+} from "@/services/reportesService";
+import { validarArchivoFirma } from "../../CU-REP-01-generar-reporte/reportesGeneracion";
+import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
+import { claveReporte, filtrarPorAlumno, agruparPorAlumno, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../revisionReportes";
 
 // ── Modos del panel ──────────────────────────────────────────
 export const MODO = {
   NORMAL:    "normal",
-  APROBAR:   "aprobar",   // muestra subida de rúbrica o confirmación
-  RECHAZAR:  "rechazar",  // muestra textarea de comentarios
+  APROBAR:   "aprobar",   // sube la rúbrica la primera vez (o usa la guardada) y confirma
+  RECHAZAR:  "rechazar",  // pide el motivo
 };
 
-function generarHashMock() {
-  const chars = "0123456789abcdef";
-  return Array.from({ length: 64 }, () => chars[Math.floor(Math.random() * 16)]).join("");
-}
-
-function formatFechaHora(date) {
-  return {
-    fecha: date.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }),
-    hora:  date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }),
-  };
-}
-
+// Todo sale del backend: listado, detalle, PDF, rúbrica del profesor, rechazo y aprobación (que firma y envía a Coordinación).
 export function useRevisarReportes() {
-  const [reportes, setReportes]               = useState(MOCK_REPORTES);
-  const [seleccionado, setSeleccionado]       = useState(null);
-  const [modo, setModo]                       = useState(MODO.NORMAL);
+  const [carga, setCarga]               = useState({ estado: "cargando", error: null }); // cargando | listo | error
+  const [lista, setLista]               = useState({ pendientes: [], procesados: [] });
+  const [seleccionado, setSeleccionado] = useState(null); // clave "tipo:id"
+  const [detalle, setDetalle]           = useState({ estado: "inactivo", datos: null, error: null });
+  const [modo, setModo]                 = useState(MODO.NORMAL);
+  const { pdf, abrirPdf, cerrarPdf }    = usePdfAlmacenado();
 
   // ── Estado de firma del profesor ─────────────────────────
-  const [rubricaGuardada, setRubricaGuardada] = useState(RUBRICA_PROFESOR_GUARDADA);
+  // El backend solo dice si ya existe su rúbrica (nunca la imagen): la primera vez se sube, después se reutiliza.
+  const [rubrica, setRubrica]                 = useState({ estado: "inactivo", tiene: false, error: null }); // inactivo | cargando | listo | error
   const [firmaFile, setFirmaFile]             = useState(null);
-  const [firmaUrl, setFirmaUrl]               = useState(RUBRICA_PROFESOR_GUARDADA);
+  const [firmaUrl, setFirmaUrl]               = useState(null);
   const [errorFirma, setErrorFirma]           = useState(null);
-  const [firmaConfirmada, setFirmaConfirmada] = useState(false);
 
   // ── Estado de rechazo ────────────────────────────────────
   const [comentario, setComentario]           = useState("");
   const [errorComentario, setErrorComentario] = useState(false);
 
-  // ── Resultado y loading ──────────────────────────────────
   const [resultado, setResultado]             = useState(null);
   const [loading, setLoading]                 = useState(false);
-
-  // ── Búsqueda por nombre de alumno ────────────────────────
+  const [errorAccion, setErrorAccion]         = useState(null);
   const [busqueda, setBusqueda]               = useState("");
 
-  // Ref para el blob del PDF
-  const blobRef = useRef(null);
+  // Reportes a resaltar por la notificación (?destacar=<id>); se apagan al abrirlos, como en Ofertas.
+  const [searchParams] = useSearchParams();
+  const destacarParam = searchParams.get("destacar") ?? "";
+  const [vistos, setVistos] = useState({ param: destacarParam, ids: new Set() });
+  const idsVistos = vistos.param === destacarParam ? vistos.ids : new Set();
+  const destacados = idsDestacados(destacarParam);
+  const tipoDestacado = tipoDeUrl(searchParams.get("tipo")); // los ids del mensual y del global se repiten
+  const estaDestacado = (r) => esDestacado(r, destacados, tipoDestacado) && !idsVistos.has(r.id);
 
-  const reporte = seleccionado !== null ? reportes.find(r => r.id === seleccionado) ?? null : null;
+  const detalleRef = useRef(0); // descarta respuestas de un detalle que ya no es el seleccionado
+  const rubricaRef = useRef(0);  // ídem para el estado de la rúbrica
+  const accionRef = useRef(false); // evita el doble envío de aprobar/rechazar (el estado tarda un render en reflejarse)
+  const firmaUrlRef = useRef(null); // vista previa local de la firma elegida; se libera al cambiarla, cancelar y desmontar
+  useEffect(() => () => {
+    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
+  }, []);
 
-  // Filtra por búsqueda (nombre de alumno, insensible a mayúsculas)
-  const reportesFiltrados = reportes.filter(r =>
-    r.alumno.toLowerCase().includes(busqueda.toLowerCase().trim())
-  );
+  // `silencioso`: una actualización de fondo que falla no reemplaza la pantalla por el error.
+  const cargarLista = useCallback((silencioso = false) => listarReportesProfesor().then(
+    (respuesta) => {
+      setLista({ pendientes: respuesta.pendientes, procesados: respuesta.procesados });
+      setCarga({ estado: "listo", error: null });
+    },
+    (err) => { if (!silencioso) setCarga({ estado: "error", error: err.message }); },
+  ), []);
 
-  const pendientes = reportesFiltrados.filter(r => r.estado === "pendiente_revision");
-  const procesados = reportesFiltrados.filter(r => r.estado !== "pendiente_revision");
+  useEffect(() => { cargarLista(); }, [cargarLista]);
 
-  // Agrupa reportes por alumno — mantiene el orden de aparición
-  function agruparPorAlumno(lista) {
-    const mapa = new Map();
-    lista.forEach(r => {
-      if (!mapa.has(r.alumno)) mapa.set(r.alumno, { alumno: r.alumno, matricula: r.matricula, reportes: [] });
-      mapa.get(r.alumno).reportes.push(r);
-    });
-    return Array.from(mapa.values());
+  function recargar() {
+    setCarga({ estado: "cargando", error: null });
+    return cargarLista();
   }
 
+  const cargarDetalle = useCallback(async (item) => {
+    const id = ++detalleRef.current;
+    setDetalle({ estado: "cargando", datos: null, error: null });
+    try {
+      const datos = await obtenerDetalleReporteProfesor(item.tipoReporte, item.id);
+      if (id === detalleRef.current) setDetalle({ estado: "listo", datos, error: null });
+    } catch (err) {
+      if (id === detalleRef.current) setDetalle({ estado: "error", datos: null, error: err.message });
+    }
+  }, []);
+
+  const todos = [...lista.pendientes, ...lista.procesados];
+  const reporte = seleccionado === null ? null : todos.find((r) => claveReporte(r) === seleccionado) ?? null;
+
+  const pendientes = filtrarPorAlumno(lista.pendientes, busqueda);
+  const procesados = filtrarPorAlumno(lista.procesados, busqueda);
   const pendientesAgrupados = agruparPorAlumno(pendientes);
   const procesadosAgrupados = agruparPorAlumno(procesados);
 
-  function seleccionar(id) {
-    setSeleccionado(id);
-    resetModo();
-    setResultado(null);
-  }
-
-  function cerrar() {
-    setSeleccionado(null);
-    resetModo();
+  function limpiarFormularios() {
+    setComentario("");
+    setErrorComentario(false);
+    setFirmaFile(null);
+    setFirmaUrl(null);
+    setErrorFirma(null);
+    setErrorAccion(null);
+    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
+    firmaUrlRef.current = null;
   }
 
   function resetModo() {
     setModo(MODO.NORMAL);
-    setComentario("");
-    setErrorComentario(false);
-    setFirmaFile(null);
-    setFirmaUrl(rubricaGuardada);
-    setErrorFirma(null);
-    setFirmaConfirmada(false);
+    limpiarFormularios();
+  }
+
+  const cargarRubrica = useCallback(() => {
+    const id = ++rubricaRef.current;
+    setRubrica((r) => ({ ...r, estado: "cargando", error: null }));
+    return obtenerEstadoRubricaProfesor().then(
+      (estado) => { if (id === rubricaRef.current) setRubrica({ estado: "listo", tiene: estado.tieneRubrica === true, error: null }); },
+      (err) => { if (id === rubricaRef.current) setRubrica({ estado: "error", tiene: false, error: err.message }); },
+    );
+  }, []);
+
+  // PDF exacto almacenado del reporte seleccionado (el que firmó el alumno).
+  function verPdf() {
+    if (!reporte || pdf.estado === "cargando") return;
+    abrirPdf(() => obtenerPdfReporteProfesor(reporte.tipoReporte, reporte.id));
+  }
+
+  function seleccionar(clave) {
+    resetModo();
+    setResultado(null);
+    cerrarPdf();
+    if (clave === null) {
+      detalleRef.current += 1;
+      setSeleccionado(null);
+      setDetalle({ estado: "inactivo", datos: null, error: null });
+      return;
+    }
+    const item = todos.find((r) => claveReporte(r) === clave);
+    if (!item) return;
+    setSeleccionado(clave);
+    if (esDestacado(item, destacados, tipoDestacado)) setVistos({ param: destacarParam, ids: new Set(idsVistos).add(item.id) });
+    cargarDetalle(item);
+  }
+
+  function cerrar() {
+    seleccionar(null);
+  }
+
+  function reintentarDetalle() {
+    if (reporte) cargarDetalle(reporte);
   }
 
   function irModo(m) {
     setModo(m);
-    setComentario("");
-    setErrorComentario(false);
-    setFirmaFile(null);
-    setFirmaUrl(rubricaGuardada);
-    setErrorFirma(null);
-    setFirmaConfirmada(false);
+    limpiarFormularios();
+    if (m === MODO.APROBAR && !rubrica.tiene) cargarRubrica();
   }
 
   function handleComentarioChange(e) {
@@ -188,116 +159,105 @@ export function useRevisarReportes() {
     if (errorComentario) setErrorComentario(false);
   }
 
-  // Manejo de subida de rúbrica del profesor
+  // Firma elegida por el profesor (solo la primera vez): validación previa; el servidor valida de verdad.
   function handleFirmaChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-      setErrorFirma("Solo se aceptan imágenes PNG o JPG.");
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const problema = validarArchivoFirma(archivo);
+    if (problema) {
+      setErrorFirma(problema);
       return;
     }
-    setFirmaFile(file);
-    setFirmaUrl(URL.createObjectURL(file));
+    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
+    firmaUrlRef.current = URL.createObjectURL(archivo);
+    setFirmaFile(archivo);
+    setFirmaUrl(firmaUrlRef.current);
     setErrorFirma(null);
-    setFirmaConfirmada(false);
   }
 
-  // Confirmar firma — abre PDF en nueva pestaña con la firma aplicada
-  function confirmarFirmaYVerPDF() {
-    if (!firmaUrl) {
-      setErrorFirma("La firma es obligatoria para aprobar el reporte.");
+  // Tras aprobar o rechazar: se actualiza la lista (el reporte pasa a "procesados"), se cierra el panel y se avisa.
+  async function terminarRevision(tipo) {
+    const aviso = describirResultado(reporte, tipo);
+    await cargarLista(true);
+    cerrar();
+    setResultado(aviso);
+  }
+
+  // Ejecuta una acción del servidor una sola vez a la vez; un fallo se muestra y el reporte no cambia de estado.
+  async function ejecutarAccion(accion) {
+    if (!reporte || accionRef.current) return;
+    accionRef.current = true;
+    setLoading(true);
+    setErrorAccion(null);
+    try {
+      await accion();
+    } catch (err) {
+      setErrorAccion(err.message);
+      // Otra revisión se adelantó: se actualiza la lista para que deje de aparecer como pendiente.
+      if (err.status === 409 && err.code === "REPORTE_NO_PENDIENTE") cargarLista(true);
+    } finally {
+      accionRef.current = false;
+      setLoading(false);
+    }
+  }
+
+  // Aprobar y firmar: la primera vez sube la rúbrica; luego el servidor agrega esa firma al PDF que envió el alumno,
+  // lo sella y lo envía a Coordinación. No hay segunda vista previa.
+  async function confirmarAprobacion() {
+    if (rubrica.estado !== "listo") return;
+    if (!rubrica.tiene) {
+      const problema = validarArchivoFirma(firmaFile);
+      if (problema) {
+        setErrorFirma(problema);
+        return;
+      }
+    }
+    await ejecutarAccion(async () => {
+      if (!rubrica.tiene) {
+        try {
+          await subirRubricaProfesor(firmaFile);
+        } catch (err) {
+          // Si ya estaba registrada (p. ej. otra pestaña), se reutiliza y se sigue.
+          if (err.code !== "RUBRICA_YA_REGISTRADA") {
+            setErrorFirma(err.message);
+            return;
+          }
+        }
+        setRubrica({ estado: "listo", tiene: true, error: null });
+      }
+      await aprobarReporteProfesor(reporte.tipoReporte, reporte.id);
+      await terminarRevision("aprobado");
+    });
+  }
+
+  async function confirmarRechazo() {
+    if (!comentario.trim()) {
+      setErrorComentario(true);
       return;
     }
-    // Si es primera vez, guardamos la rúbrica
-    if (!rubricaGuardada && firmaUrl) {
-      setRubricaGuardada(firmaUrl);
-    }
-    setFirmaConfirmada(true);
-    // Abrir PDF en nueva pestaña
-    if (!blobRef.current) return;
-    const url = URL.createObjectURL(blobRef.current);
-    window.open(url, "_blank");
-  }
-
-  // CU-REP-05 — Aprobar y firmar (tras ver PDF)
-  async function confirmarAprobacion() {
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-
-    const { fecha, hora } = formatFechaHora(new Date());
-    const hash = generarHashMock();
-
-    setReportes(prev => prev.map(r =>
-      r.id === seleccionado ? { ...r, estado: "aprobado" } : r
-    ));
-    setResultado({
-      tipo:    "aprobado",
-      alumno:  reporte.alumno,
-      periodo: reporte.periodo,
-      firma:   { profesor: PROFESOR.nombre, id: PROFESOR.id, fecha, hora },
-      hash,
+    await ejecutarAccion(async () => {
+      await rechazarReporteProfesor(reporte.tipoReporte, reporte.id, comentario.trim());
+      await terminarRevision("rechazado");
     });
-    setLoading(false);
-    cerrar();
-  }
-
-  // CU-REP-05 — Rechazar con comentarios
-  async function confirmarRechazo() {
-    if (!comentario.trim()) { setErrorComentario(true); return; }
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 600));
-
-    setReportes(prev => prev.map(r =>
-      r.id === seleccionado
-        ? { ...r, estado: "rechazado_profesor", comentario: comentario.trim() }
-        : r
-    ));
-    setResultado({
-      tipo:      "rechazado",
-      alumno:    reporte.alumno,
-      periodo:   reporte.periodo,
-      comentario: comentario.trim(),
-    });
-    setLoading(false);
-    cerrar();
-  }
-
-  // Shape para ReportePDF — incluye firmaUrl del profesor si ya está confirmada
-  function datosPDF(r) {
-    if (!r) return null;
-    return {
-      numeroReporte:   r.numeroReporte,
-      fechaGeneracion: r.fechaEnvio,
-      periodoTexto:    `del periodo ${r.periodo}`,
-      alumno: {
-        nombre:   r.alumno,
-        boleta:   r.matricula,
-        carrera:  "Ingeniería en Sistemas Computacionales (ISC)",
-        semestre: "Octavo",
-        telefono: "—",
-        correo:   "—",
-      },
-      actividades: r.actividades,
-      firmaUrl:    r.firma ? firmaUrl : null,
-    };
   }
 
   return {
-    tieneReportes: MOCK_TIENE_REPORTES,
-    pendientes, procesados, reporte,
-    pendientesAgrupados, procesadosAgrupados,
+    carga, recargar,
+    tieneReportes: lista.pendientes.length + lista.procesados.length > 0,
+    pendientes, procesados, reporte, detalle, reintentarDetalle,
+    pendientesAgrupados, procesadosAgrupados, estaDestacado,
     busqueda, setBusqueda,
     seleccionado, seleccionar, cerrar,
+    pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
     // firma profesor
-    rubricaGuardada, firmaFile, firmaUrl, errorFirma,
-    firmaConfirmada, handleFirmaChange, confirmarFirmaYVerPDF,
+    rubricaGuardada: rubrica.tiene, rubrica, reintentarRubrica: cargarRubrica, firmaFile, firmaUrl, errorFirma,
+    handleFirmaChange,
     // rechazo
     comentario, handleComentarioChange, errorComentario,
     // resultado
     resultado, setResultado,
-    loading,
+    loading, errorAccion,
     confirmarAprobacion, confirmarRechazo,
-    blobRef, datosPDF,
   };
 }

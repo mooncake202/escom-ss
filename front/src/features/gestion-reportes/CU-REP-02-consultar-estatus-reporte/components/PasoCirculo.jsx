@@ -1,4 +1,5 @@
-export function PasoCirculo({ completado, activo, rechazado, numero, C }) {
+// `simbolo` reemplaza el contenido (✓, ✕ o el número) cuando hace falta otro, p. ej. "•".
+export function PasoCirculo({ completado, activo, rechazado, numero, simbolo, C }) {
   let bg, border, color;
   if (rechazado) {
     bg = "rgba(239,68,68,0.1)"; border = C.danger; color = C.danger;
@@ -17,7 +18,7 @@ export function PasoCirculo({ completado, activo, rechazado, numero, C }) {
       display: "flex", alignItems: "center", justifyContent: "center",
       flexShrink: 0, zIndex: 1, fontSize: 13, fontWeight: 700, color,
     }}>
-      {rechazado ? "✕" : completado ? "✓" : numero}
+      {simbolo ?? (rechazado ? "✕" : completado ? "✓" : numero)}
     </div>
   );
 }

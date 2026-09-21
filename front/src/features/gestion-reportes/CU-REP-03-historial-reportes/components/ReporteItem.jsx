@@ -1,10 +1,11 @@
 import { RADIUS } from "@/themes/colors";
-import { EstatusBadge, ESTADO_MAP } from "./EstatusBadge";
+import { EstatusBadge } from "./EstatusBadge";
+import { estadoAlumnoDe, nombreEtapa } from "../../CU-REP-02-consultar-estatus-reporte/seguimientoReportes";
+import { etiquetaReporte, textoPeriodo, textoFechaCorta, textoFechaEnvio } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
 
-export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, onEditar, onDescargar, C }) {
-  const s = ESTADO_MAP[r.estado] || ESTADO_MAP.pendiente_firma;
-  const esRechazado = r.estado === "rechazado_profesor";
-  const esAprobado  = r.estado === "aprobado";
+export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, onEditar, onVerPdf, onDescargar, pdf, C }) {
+  const s = estadoAlumnoDe(r.estadoReporte);
+  const esRechazado = r.puedeCorregir;
 
   return (
     <div
@@ -12,7 +13,6 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
         background: C.bgCard,
         borderRadius: RADIUS.xl,
         border: `1px solid ${abierto ? s.color(C) : C.borderDefault}`,
-        borderLeft: `3px solid ${s.color(C)}`,
         overflow: "hidden",
         transition: "border-color 0.15s",
       }}
@@ -31,14 +31,14 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
       >
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ margin: "0 0 3px", fontSize: 13, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {r.titulo}
+            {etiquetaReporte(r)}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
-            {r.periodo} · Enviado el {r.fechaEnvio}
+            {textoPeriodo(r) ? `${textoPeriodo(r)} · ` : ""}Enviado el {textoFechaCorta(r.fechaEnvio)}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
-          <EstatusBadge estado={r.estado} C={C} />
+          <EstatusBadge estado={r.estadoReporte} C={C} />
           <svg
             width={14} height={14} viewBox="0 0 24 24" fill="none"
             stroke={C.textDisabled} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
@@ -55,9 +55,10 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
           {/* Métricas */}
           <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
             {[
-              { label: "Días laborados",   valor: `${r.diasLaborados} días` },
-              { label: "Horas reportadas", valor: `${r.horas} h` },
-              { label: "Revisor",          valor: r.profesor },
+              // El reporte global no guarda días ni horas (solo el mensual tiene ese snapshot).
+              ...(r.diasLaborados != null ? [{ label: "Días laborados", valor: `${r.diasLaborados} días` }] : []),
+              ...(r.horasReportadas != null ? [{ label: "Horas reportadas", valor: `${r.horasReportadas} h` }] : []),
+              { label: "Revisor",          valor: r.revisor?.nombreCompleto ?? "—" },
             ].map(({ label, valor }) => (
               <div key={label}>
                 <p style={{ margin: "0 0 2px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>{label}</p>
@@ -66,24 +67,22 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
             ))}
           </div>
 
-          {/* Retroalimentación */}
-          {r.comentario ? (
+          {/* Motivo del último rechazo (solo si el estado actual es rechazado) */}
+          {esRechazado && (
             <div style={{
-              padding: "10px 14px", borderRadius: RADIUS.md, marginBottom: esRechazado ? "1rem" : 0,
-              background: esRechazado ? "rgba(239,68,68,0.05)" : C.bgInput,
-              border: `1px solid ${esRechazado ? C.danger : C.borderDefault}`,
+              padding: "10px 14px", borderRadius: RADIUS.md,
+              background: "rgba(239,68,68,0.05)", border: `1px solid ${C.danger}`,
             }}>
-              <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: esRechazado ? C.danger : C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                Retroalimentación
+              <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.danger, textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                Motivo del rechazo{r.ultimoRechazo ? ` · ${nombreEtapa(r.ultimoRechazo.etapa)}` : ""}
               </p>
               <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.65 }}>
-                {r.comentario}
+                {r.ultimoRechazo?.motivo ?? "No se registró un motivo."}
               </p>
+              {r.ultimoRechazo?.fecha && (
+                <p style={{ margin: "6px 0 0", fontSize: 11, color: C.textDisabled }}>{textoFechaEnvio(r.ultimoRechazo.fecha)}</p>
+              )}
             </div>
-          ) : (
-            <p style={{ margin: esRechazado ? "0 0 1rem" : 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
-              Sin retroalimentación registrada.
-            </p>
           )}
 
           {/* Acciones */}
@@ -108,7 +107,7 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
               Ver seguimiento
             </button>
 
-            {/* Editar — solo rechazados */}
+            {/* Editar — solo rechazados (por el profesor o por coordinación) */}
             {esRechazado && (
               <button
                 onClick={onEditar}
@@ -122,15 +121,28 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
               </button>
             )}
 
-            {/* Descargar — solo aprobados */}
-            {esAprobado && (
+            {/* Ver PDF: la última versión almacenada. Descargar: solo cuando ya está aprobado por coordinación */}
+            <button
+              onClick={onVerPdf}
+              disabled={pdf.viendo}
+              style={{
+                padding: "8px 16px", borderRadius: RADIUS.md,
+                background: "transparent", border: `1px solid ${C.borderDefault}`,
+                color: C.textMuted, fontSize: 13, fontWeight: 600,
+                cursor: pdf.viendo ? "wait" : "pointer", opacity: pdf.viendo ? 0.6 : 1, fontFamily: "inherit",
+              }}
+            >
+              {pdf.viendo ? "Cargando PDF..." : "Ver PDF"}
+            </button>
+            {r.estadoReporte === "aprobado_coordinador" && (
               <button
                 onClick={onDescargar}
+                disabled={pdf.descargando}
                 style={{
                   padding: "8px 16px", borderRadius: RADIUS.md,
                   background: "transparent", border: `1px solid ${C.success}`,
                   color: C.success, fontSize: 13, fontWeight: 700,
-                  cursor: "pointer", fontFamily: "inherit",
+                  cursor: pdf.descargando ? "wait" : "pointer", opacity: pdf.descargando ? 0.6 : 1, fontFamily: "inherit",
                   display: "inline-flex", alignItems: "center", gap: 5,
                 }}
               >
@@ -140,11 +152,12 @@ export function ReporteItem({ reporte: r, abierto, onToggle, onVerSeguimiento, o
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                Descargar
+                {pdf.descargando ? "Descargando..." : "Descargar"}
               </button>
             )}
 
           </div>
+          {pdf.error && <p role="alert" style={{ margin: "8px 0 0", fontSize: 12, color: C.danger }}>{pdf.error}</p>}
         </div>
       )}
     </div>

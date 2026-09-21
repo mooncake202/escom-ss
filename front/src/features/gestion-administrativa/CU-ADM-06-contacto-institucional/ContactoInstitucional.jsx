@@ -73,6 +73,8 @@ function BtnAgregar({ onClick, label, C }) {
   );
 }
 
+const SUBTITULO_POR_ROL = { alumno: "Alumno", alumno_asignado: "Alumno", profesor: "Profesor", coordinacion: "Coordinación" };
+
 export default function ContactoInstitucional({ rol = "alumno" }) {
   const { C } = useTheme();
   const {
@@ -84,11 +86,12 @@ export default function ContactoInstitucional({ rol = "alumno" }) {
   } = useContactoInstitucional();
   const usuario = usuarios[rol] ?? usuarios.alumno;
   const esCoord = rol === "coordinacion";
+  const subtitulo = SUBTITULO_POR_ROL[rol] ?? "";
 
   // ── Estado vacío ─────────────────────────────────────────────
   if (!tieneInfo) {
     return (
-      <DashboardLayout titulo="Contacto institucional" subtitulo={`CU-ADM-06 · ${rol}`} rol={rol} usuario={usuario}>
+      <DashboardLayout titulo="Contacto institucional" subtitulo={subtitulo} rol={rol} usuario={usuario}>
         <div style={{ maxWidth: 520, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
@@ -119,7 +122,7 @@ export default function ContactoInstitucional({ rol = "alumno" }) {
 
   // ── Flujo principal ───────────────────────────────────────────
   return (
-    <DashboardLayout titulo="Contacto institucional" subtitulo={`CU-ADM-06 · ${rol}`} rol={rol} usuario={usuario}>
+    <DashboardLayout titulo="Contacto institucional" subtitulo={subtitulo} rol={rol} usuario={usuario}>
       <div style={{ maxWidth: 560, margin: "0 auto", width: "100%" }}>
 
         {/* Encabezado del departamento */}

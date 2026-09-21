@@ -1,88 +1,82 @@
-import { useState, useMemo } from "react";
+import { useEffect, useRef, useState } from "react";
+import { obtenerSiguienteReporteGlobal, obtenerVistaPreviaGlobal, enviarReporteGlobal } from "@/services/reportesService";
+import { describirError } from "../../CU-REP-01-generar-reporte/reportesGeneracion";
+import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
 
-const ALUMNO = {
-  nombre:   "García López Ana",
-  boleta:   "2022630001",
-  carrera:  "Ingeniería en Sistemas Computacionales (ISC)",
-  semestre: "Octavo",
-  telefono: "55 1234 5678",
-  correo:   "agarcia0001@alumno.ipn.mx",
-};
-
-const PROFESOR_ASIGNADO        = "Dr. Torres Vega";
-const FECHA_INICIO_SS          = "16 de mayo de 2025";
-const TOTAL_HORAS_ACUMULADAS   = 480;
-const YA_EXISTE_REPORTE_GLOBAL = false;
-
-// La rúbrica fue registrada desde el primer reporte mensual (RN-REP-06)
-const FIRMA_GUARDADA_URL = null; // null = sin vista previa (mock); en producción vendría del backend
-
-const TITULO_AUTO = "Reporte Global de Actividades";
-
+// Reporte global: todo sale del backend (horas acumuladas, periodo completo del servicio, si ya existe uno, datos que faltan,
+// rúbrica). Aquí no se calcula ni se valida nada de negocio: la regla de las 480 h la vuelve a exigir el servidor al enviar.
+// Flujo de 2 pasos porque el alumno ya tiene su rúbrica: actividades → "Firmar y ver vista previa" → vista previa y envío.
 export function useGenerarReporteGlobal() {
-  const tieneHorasSuficientes = TOTAL_HORAS_ACUMULADAS >= 480;
-  const yaExisteReporteGlobal = YA_EXISTE_REPORTE_GLOBAL;
+  const [intento, setIntento] = useState(0);
+  const [carga, setCarga] = useState({ intento: -1, estado: "cargando", datos: null, error: null });
+  const { pdf: vistaPrevia, abrirPdf, cerrarPdf } = usePdfAlmacenado();
 
-  const fechaGeneracion = new Date().toLocaleDateString("es-MX", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
-
-  const periodoTexto = `del ${FECHA_INICIO_SS} al ${fechaGeneracion}`;
-
-  const [paso, setPaso]               = useState(1);
-  const [enviado, setEnviado]         = useState(false);
+  const [paso, setPaso]             = useState(1); // 1 actividades · 2 vista previa y envío
   const [actividades, setActividades] = useState("");
-  const [errores, setErrores]         = useState({});
+  const [errores, setErrores]       = useState({});
+  const [enviando, setEnviando]     = useState(false);
+  const [errorEnvio, setErrorEnvio] = useState(null);
+  const [resultado, setResultado]   = useState(null);
+  const enviandoRef = useRef(false); // evita el doble envío (el estado tarda un render en reflejarse)
 
-  function handleActividadesChange(e) {
-    setActividades(e.target.value);
-    if (errores.actividades) setErrores(prev => ({ ...prev, actividades: null }));
+  useEffect(() => {
+    let vigente = true;
+    obtenerSiguienteReporteGlobal().then(
+      (datos) => { if (vigente) setCarga({ intento, estado: "listo", datos, error: null }); },
+      (err) => { if (vigente) setCarga({ intento, estado: "error", datos: null, error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [intento]);
+
+  const actual = carga.intento === intento ? carga : { estado: "cargando", datos: null, error: null };
+
+  function pedirVistaPrevia() {
+    abrirPdf(() => obtenerVistaPreviaGlobal(actividades));
   }
 
-  function irPaso2() {
+  function continuarDesdeActividades() {
     if (!actividades.trim()) {
-      setErrores({ actividades: "El texto narrativo de actividades es obligatorio." });
+      setErrores({ actividades: "El resumen de actividades es obligatorio." });
       return;
     }
     setErrores({});
     setPaso(2);
+    pedirVistaPrevia();
   }
 
-  function irPaso3() {
-    setPaso(3);
+  function handleActividadesChange(e) {
+    setActividades(e.target.value);
+    if (errores.actividades) setErrores({});
   }
 
-  function datosPDF() {
-    return {
-      titulo:        TITULO_AUTO,
-      fechaGeneracion,
-      periodoTexto,
-      alumno:        ALUMNO,
-      actividades,
-      firmaUrl:      FIRMA_GUARDADA_URL,
-      totalHoras:    TOTAL_HORAS_ACUMULADAS,
-      profesorNombre: PROFESOR_ASIGNADO,
-    };
+  function volverAEditar() {
+    cerrarPdf();
+    setErrorEnvio(null);
+    setPaso(1);
   }
 
-  function handleEnviar() {
-    setEnviado(true);
+  async function enviar() {
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const respuesta = await enviarReporteGlobal(actividades);
+      cerrarPdf();
+      setResultado(respuesta);
+    } catch (err) {
+      setErrorEnvio(describirError(err));
+    } finally {
+      enviandoRef.current = false;
+      setEnviando(false);
+    }
   }
 
   return {
-    alumno:        ALUMNO,
-    profesorNombre: PROFESOR_ASIGNADO,
-    tituloAuto:    TITULO_AUTO,
-    periodoTexto,
-    fechaInicioSS: FECHA_INICIO_SS,
-    fechaGeneracion,
-    totalHoras:    TOTAL_HORAS_ACUMULADAS,
-    tieneHorasSuficientes,
-    yaExisteReporteGlobal,
-    firmaUrl:      FIRMA_GUARDADA_URL,
-    paso, setPaso,
-    enviado, handleEnviar,
-    actividades, handleActividadesChange,
-    errores, irPaso2, irPaso3, datosPDF,
+    estado: actual.estado, error: actual.error, datos: actual.datos,
+    recargar: () => setIntento((n) => n + 1),
+    paso, actividades, handleActividadesChange, errores,
+    continuarDesdeActividades, volverAEditar, vistaPrevia, pedirVistaPrevia,
+    enviando, errorEnvio, enviar, resultado,
   };
 }

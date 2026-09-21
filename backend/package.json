@@ -12,6 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "@react-pdf/renderer": "^4.4.0",
+    "@xevolab/timestamping-token": "^1.1.1",
+    "asn1js": "^3.0.10",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",

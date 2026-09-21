@@ -1,13 +1,8 @@
 import { RADIUS } from "@/themes/colors";
-
-export const ESTADO_MAP = {
-  pendiente_validacion:   { bg: (C) => C.warningSoft,              color: (C) => C.warning, label: "Pendiente de validación"    },
-  validado:               { bg: (C) => C.successSoft,              color: (C) => C.success, label: "Validado por coordinación"  },
-  rechazado_coordinacion: { bg: () => "rgba(239,68,68,0.1)",       color: (C) => C.danger,  label: "Rechazado por coordinación" },
-};
+import { estadoDe } from "../validacionReportes";
 
 export function EstatusBadge({ estado, C }) {
-  const s = ESTADO_MAP[estado] ?? ESTADO_MAP.pendiente_validacion;
+  const s = estadoDe(estado);
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,

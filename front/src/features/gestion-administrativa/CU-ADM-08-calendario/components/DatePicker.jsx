@@ -5,7 +5,7 @@ const DP_MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
                   "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 const DP_DIAS  = ["D","L","M","M","J","V","S"];
 
-export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasError = false, small = false, minDate = "" }) {
+export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasError = false, small = false, minDate = "", maxDate = "", vistaInicial = "", hoy = "" }) {
   const { C } = useTheme();
   const [open, setOpen]                 = useState(false);
   const [vm, setVm]                     = useState(() => {
@@ -27,6 +27,12 @@ export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasErr
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  // Sin valor, al abrir se posiciona en `vistaInicial` (p. ej. el primer mes del ciclo elegido).
+  function alternar() {
+    if (!open && !value && vistaInicial) { const [y, m] = vistaInicial.split("-"); setVm({ y: +y, m: +m - 1 }); }
+    setOpen(o => !o);
+  }
+
   function prevMes() { setVm(v => v.m === 0  ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }); }
   function nextMes() { setVm(v => v.m === 11 ? { y: v.y + 1, m: 0  } : { y: v.y, m: v.m + 1 }); }
 
@@ -47,7 +53,7 @@ export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasErr
   return (
     <div ref={ref} style={{ position: "relative", width: "100%" }}>
       <div
-        onClick={() => setOpen(o => !o)}
+        onClick={alternar}
         style={{
           ...pad,
           background: C.bgInput,
@@ -112,7 +118,7 @@ export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasErr
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 1 }}>
             {(() => {
-              const hoyISO = new Date().toISOString().slice(0, 10);
+              const hoyISO = hoy || new Date().toISOString().slice(0, 10);
               return Array.from({ length: total }, (_, idx) => {
                 const d = idx - offset + 1;
                 if (d < 1 || d > diasEnMes) return <div key={idx} />;
@@ -120,9 +126,10 @@ export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasErr
                 const sel     = iso === value;
                 const esHoy   = iso === hoyISO && !sel;
                 const pasado  = minDate ? iso < minDate : false;
+                const excede  = maxDate ? iso > maxDate : false;
                 const col     = idx % 7;
                 const esFS    = col === 0 || col === 6;
-                const disabled = pasado || esFS;
+                const disabled = pasado || excede || esFS;
                 return (
                   <div
                     key={idx}
@@ -132,7 +139,7 @@ export function DatePicker({ value, onChange, placeholder = "dd/mm/aaaa", hasErr
                       borderRadius: RADIUS.sm,
                       cursor: disabled ? "default" : "pointer",
                       background: sel ? C.accent : esHoy ? "rgba(99,102,241,0.18)" : "transparent",
-                      color: sel ? "#fff" : pasado ? C.textDisabled : esHoy ? C.accentText : esFS ? C.textDisabled : C.textPrimary,
+                      color: sel ? "#fff" : pasado || excede ? C.textDisabled : esHoy ? C.accentText : esFS ? C.textDisabled : C.textPrimary,
                       opacity: disabled ? 0.35 : 1,
                       fontWeight: sel || esHoy ? 700 : 400,
                       outline: esHoy ? `1px solid ${C.accent}` : "none",

@@ -12,7 +12,7 @@ export default function AnunciosSistema() {
     <DashboardLayout
       titulo="Anuncios del sistema"
       subtitulo="CU-ADM-02 · Alumno"
-      rol="alumno"
+      rol="alumno_asignado"
       usuario={alumno.nombre}
     >
       <div style={{ maxWidth: 960, margin: "0 auto", width: "100%" }}>

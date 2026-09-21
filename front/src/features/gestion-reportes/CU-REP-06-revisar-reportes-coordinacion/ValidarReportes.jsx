@@ -1,32 +1,82 @@
+import { useEffect }                                          from "react";
 import { useTheme, RADIUS }                                    from "@/themes/colors";
 import { DashboardLayout }                                       from "@/components/layout/DashboardLayout";
 import { ReporteCard }                                           from "./components/ReporteCard";
 import { ReporteDetalle }                                        from "./components/ReporteDetalle";
+import { claveReporte }                                          from "../CU-REP-05-revisar-reportes-profesor/revisionReportes";
 import {
-  useValidarReportes, COORDINACION,
+  useValidarReportes,
   FILTRO_ESTADO, CRITERIO,
 }                                                                from "./hooks/useValidarReportes";
+import { useSesion, nombreCompletoSesion }                       from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 
 export default function ValidarReportes() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
+  const nombreCoordinacion = nombreCompletoSesion(usuario);
   const {
-    tieneReportes, reportesFiltrados, reporte,
+    carga, recargar,
+    tieneReportes, reportesFiltrados, reporte, detalle, reintentarDetalle, estaDestacado,
     seleccionado, seleccionar, cerrar,
+    pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
     filtroEstado, setFiltroEstado,
     criterio, setCriterio,
     busqueda, setBusqueda,
     comentario, handleComentarioChange, errorComentario,
     resultado, setResultado,
-    loading,
+    loading, errorAccion,
     confirmarAprobacion, confirmarRechazo,
-    blobRef, datosPDF,
   } = useValidarReportes();
+
+  // Al entrar se marcan como leídas las notificaciones de reportes (mismo patrón que Ofertas y CU-REP-05): la ruta trae
+  // "?destacar=<id>", así que se filtran por prefijo y se marcan una por una.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/coordinacion/reportes"));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de reportes:", err));
+  }, []);
+
+  // ── Carga inicial y error ────────────────────────────────────
+  if (carga.estado !== "listo") {
+    return (
+      <DashboardLayout titulo="Reportes de validación" subtitulo="Coordinación" rol="coordinacion" usuario={nombreCoordinacion}>
+        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.xl,
+            border: `1px solid ${C.borderDefault}`,
+            padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando los reportes de validación...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button
+                  onClick={recargar}
+                  style={{
+                    padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                    color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                  }}
+                >
+                  Reintentar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   // ── Empty state ──────────────────────────────────────────────
   if (!tieneReportes) {
     return (
-      <DashboardLayout titulo="Reportes de validación" subtitulo="CU-REP-06 · Coordinación" rol="coordinacion" usuario={COORDINACION.nombre}>
+      <DashboardLayout titulo="Reportes de validación" subtitulo="Coordinación" rol="coordinacion" usuario={nombreCoordinacion}>
         <div style={{ maxWidth: 560, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.xl,
@@ -56,7 +106,7 @@ export default function ValidarReportes() {
   }
 
   return (
-    <DashboardLayout titulo="Reportes de validación" subtitulo="CU-REP-06 · Coordinación" rol="coordinacion" usuario={COORDINACION.nombre}>
+    <DashboardLayout titulo="Reportes de validación" subtitulo="Coordinación" rol="coordinacion" usuario={nombreCoordinacion}>
       <div style={{ maxWidth: 980, margin: "0 auto", width: "100%", padding: "0 1rem" }}>
 
         {/* ── Toast resultado ── */}
@@ -71,13 +121,10 @@ export default function ValidarReportes() {
               {resultado.tipo === "aprobado" ? (
                 <>
                   <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.success }}>
-                    ✓ Reporte aprobado — PDF final generado con sello institucional
+                    ✓ Reporte aprobado — PDF final con el sello de validación del prototipo
                   </p>
                   <p style={{ margin: "0 0 2px", fontSize: 12, color: C.textMuted }}>
                     {resultado.alumno} — {resultado.periodo}
-                  </p>
-                  <p style={{ margin: "0 0 4px", fontSize: 11, fontFamily: "monospace", color: C.textDisabled, wordBreak: "break-all" }}>
-                    SHA-256: {resultado.hash}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
                     El alumno y el profesor fueron notificados.
@@ -86,13 +133,13 @@ export default function ValidarReportes() {
               ) : (
                 <>
                   <p style={{ margin: "0 0 2px", fontSize: 13, fontWeight: 700, color: C.danger }}>
-                    ✕ Reporte rechazado — todas las firmas invalidadas
+                    ✕ Reporte rechazado por coordinación
                   </p>
                   <p style={{ margin: "0 0 2px", fontSize: 12, color: C.textMuted }}>
                     {resultado.alumno} — {resultado.periodo}
                   </p>
                   <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
-                    El alumno fue notificado y deberá corregir y volver a firmar desde cero.
+                    El alumno y el profesor fueron notificados. El alumno deberá corregir y volver a firmar el reporte.
                   </p>
                 </>
               )}
@@ -117,7 +164,7 @@ export default function ValidarReportes() {
           }}>
             {[
               { key: FILTRO_ESTADO.PENDIENTES, label: "Pendientes" },
-              { key: FILTRO_ESTADO.APROBADOS,  label: "Aprobados"  },
+              { key: FILTRO_ESTADO.PROCESADOS, label: "Procesados" },
             ].map(({ key, label }) => (
               <button
                 key={key}
@@ -197,7 +244,7 @@ export default function ValidarReportes() {
           {/* ── Lista izquierda ── */}
           <div style={{ flex: "0 0 310px", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
             <p style={{ margin: "0 0 0.625rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {filtroEstado === FILTRO_ESTADO.PENDIENTES ? "Pendientes de validación" : "Aprobados"} ({reportesFiltrados.length})
+              {filtroEstado === FILTRO_ESTADO.PENDIENTES ? "Pendientes de validación" : "Procesados"} ({reportesFiltrados.length})
             </p>
 
             {reportesFiltrados.length === 0 ? (
@@ -213,10 +260,11 @@ export default function ValidarReportes() {
             ) : (
               reportesFiltrados.map(r => (
                 <ReporteCard
-                  key={r.id}
+                  key={claveReporte(r)}
                   reporte={r}
-                  activo={seleccionado === r.id}
+                  activo={seleccionado === claveReporte(r)}
                   onSeleccionar={seleccionar}
+                  destacado={estaDestacado(r)}
                   C={C}
                 />
               ))
@@ -243,7 +291,12 @@ export default function ValidarReportes() {
       {reporte && (
         <ReporteDetalle
           reporte={reporte}
+          detalle={detalle}
+          onReintentar={reintentarDetalle}
           onCerrar={cerrar}
+          pdf={pdf}
+          onVerPdf={verPdf}
+          onCerrarPdf={cerrarPdf}
           modo={modo}
           irModo={irModo}
           resetModo={resetModo}
@@ -251,10 +304,9 @@ export default function ValidarReportes() {
           onComentarioChange={handleComentarioChange}
           errorComentario={errorComentario}
           loading={loading}
+          errorAccion={errorAccion}
           confirmarAprobacion={confirmarAprobacion}
           confirmarRechazo={confirmarRechazo}
-          blobRef={blobRef}
-          datosPDF={datosPDF}
           C={C}
         />
       )}

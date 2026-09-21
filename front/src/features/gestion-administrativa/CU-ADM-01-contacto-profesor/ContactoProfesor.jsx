@@ -15,7 +15,7 @@ export default function ContactoProfesor() {
       <DashboardLayout
         titulo="Información de contacto"
         subtitulo="CU-ADM-01 · Alumno"
-        rol="alumno"
+        rol="alumno_asignado"
         usuario={alumno.nombre}
         enProyecto={enProyecto}
       >
@@ -45,7 +45,7 @@ export default function ContactoProfesor() {
       <DashboardLayout
         titulo="Información de contacto"
         subtitulo="CU-ADM-01 · Alumno"
-        rol="alumno"
+        rol="alumno_asignado"
         usuario={alumno.nombre}
         enProyecto={enProyecto}
       >
@@ -73,7 +73,7 @@ export default function ContactoProfesor() {
     <DashboardLayout
       titulo="Información de contacto"
       subtitulo="CU-ADM-01 · Alumno"
-      rol="alumno"
+      rol="alumno_asignado"
       usuario={alumno.nombre}
       enProyecto={enProyecto}
     >
