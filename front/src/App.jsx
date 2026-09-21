@@ -230,6 +230,12 @@ function App() {
         <Route path="/coordinacion/calendario" element={
           <RutaProtegida roles={COORDINADOR}><CalendarioInstitucional /></RutaProtegida>
         } />
+        <Route path="/profesor/calendario" element={
+          <RutaProtegida roles={PROFESOR}><CalendarioInstitucional /></RutaProtegida>
+        } />
+        <Route path="/alumno/calendario" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><CalendarioInstitucional /></RutaProtegida>
+        } />
         <Route path="/profesor/solicitar-baja-alumno" element={
           <RutaProtegida roles={PROFESOR}><SolicitarBajaAlumno /></RutaProtegida>
         } />
@@ -243,7 +249,7 @@ function App() {
           <RutaProtegida roles={PROFESOR}><RevisarReportes /></RutaProtegida>
         } />
         <Route path="/alumno/contacto-institucional" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoInstitucional rol="alumno" /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoInstitucional rol="alumno_asignado" /></RutaProtegida>
         } />
         <Route path="/profesor/contacto-institucional" element={
           <RutaProtegida roles={PROFESOR}><ContactoInstitucional rol="profesor" /></RutaProtegida>

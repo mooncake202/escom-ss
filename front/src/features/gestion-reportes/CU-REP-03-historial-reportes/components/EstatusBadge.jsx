@@ -1,14 +1,8 @@
 import { RADIUS } from "@/themes/colors";
-
-export const ESTADO_MAP = {
-  aprobado:           { bg: (C) => C.successSoft,                color: (C) => C.success,    label: "Aprobado" },
-  rechazado_profesor: { bg: () => "rgba(239,68,68,0.1)",         color: (C) => C.danger,     label: "Rechazado" },
-  pendiente_revision: { bg: (C) => C.warningSoft,               color: (C) => C.warning,    label: "Pendiente de revisión" },
-  pendiente_firma:    { bg: (C) => C.accentSoft,                color: (C) => C.accentText, label: "Pendiente de firma" },
-};
+import { estadoAlumnoDe } from "../../CU-REP-02-consultar-estatus-reporte/seguimientoReportes";
 
 export function EstatusBadge({ estado, C }) {
-  const s = ESTADO_MAP[estado] || ESTADO_MAP.pendiente_firma;
+  const s = estadoAlumnoDe(estado);
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,

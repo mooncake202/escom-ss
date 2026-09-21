@@ -16,7 +16,7 @@ export default function ActualizarDatos() {
     <DashboardLayout
       titulo="Datos personales"
       subtitulo="CU-ADM-04 · Alumno"
-      rol="alumno"
+      rol="alumno_asignado"
       usuario={datosInstitucionales.nombre}
     >
       <div style={{ maxWidth: 540, margin: "0 auto", width: "100%" }}>

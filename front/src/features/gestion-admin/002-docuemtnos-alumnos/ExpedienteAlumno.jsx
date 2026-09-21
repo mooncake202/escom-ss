@@ -361,7 +361,7 @@ export default function ExpedienteAlumno() {
     <DashboardLayout
       titulo="Mi expediente"
       subtitulo="CU-AL-03 · Alumno"
-      rol="alumno"
+      rol="alumno_asignado"
       usuario="García López Juan Carlos"
     >
       <PanelExpedienteAlumno alumno={alumno} C={C} />

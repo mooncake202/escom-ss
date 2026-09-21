@@ -25,7 +25,7 @@ export default function BajaServicioSocial() {
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
         subtitulo="CU-ADM-11 · Alumno"
-        rol="alumno"
+        rol="alumno_asignado"
         usuario={alumno.nombre}
       >
         <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
@@ -74,7 +74,7 @@ export default function BajaServicioSocial() {
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
         subtitulo="CU-ADM-11 · Alumno"
-        rol="alumno"
+        rol="alumno_asignado"
         usuario={alumno.nombre}
       >
         <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
@@ -134,7 +134,7 @@ export default function BajaServicioSocial() {
     <DashboardLayout
       titulo="Solicitar baja del servicio social"
       subtitulo="CU-ADM-11 · Alumno"
-      rol="alumno"
+      rol="alumno_asignado"
       usuario={alumno.nombre}
     >
       <div style={{ maxWidth: 620, margin: "0 auto", width: "100%" }}>

@@ -4,26 +4,29 @@ import { DatePicker }                    from "./components/DatePicker";
 import { TipoBadge, TIPO_CONFIG }        from "./components/TipoBadge";
 import { EventoForm }                    from "./components/EventoForm";
 import { EventoRow, formatFechaDisplay } from "./components/EventoRow";
+import { textoHoraInhabil }              from "./hooks/calendarioAdaptador";
+import { nombreCompletoSesion }              from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import {
   useCalendarioInstitucional,
-  COORDINACION, TIPOS, MESES, DIAS_SEM, ANIOS_DISPONIBLES,
-  CICLOS_DISPONIBLES, rangoSemestre,
-  getDiasEnMes, getPrimerDia, toISO, esFinDeSemana,
+  MESES, DIAS_SEM, rangoSemestre,
+  getDiasEnMes, getPrimerDia, toISO,
 } from "./hooks/useCalendarioInstitucional";
 
 export default function CalendarioInstitucional() {
   const { C } = useTheme();
   const {
-    hoy, eventosFiltrados, evsPorFecha, periodosPorFecha,
-    mes, setMes, anio, setAnio, diaSelec,
+    sesion, puedeAdministrar, tiposVisibles,
+    hoy, minFechaFutura, eventosFiltrados, evsPorFecha, periodosPorFecha,
+    cargando, errorCarga, recargar, guardando, confirmando, resaltadoId,
+    mes, anio, cambiarAnio, ciclosDisponibles, diaSelec,
     modo, evActivo, form, errores, toast, ultimaMod, tooltip, setTooltip,
-    filtroTipo, setFiltroTipo, filtroDesde, setFiltroDesde, filtroHasta, setFiltroHasta,
+    filtroTipo, setFiltroTipo,
     filtroCiclo, setFiltroCiclo,
     filtroPeriodo, setFiltroPeriodo,
     hayFiltroActivo, limpiarFiltros,
     irMesAnterior, irMesSiguiente,
     handleChange, handleClickDia, handleGuardar, handleEliminar,
-    abrirNuevo, abrirEditar, abrirEliminar, cancelar,
+    abrirNuevo, abrirEditar, abrirEliminar, cancelar, volverAEditar,
   } = useCalendarioInstitucional();
 
   const diasEnMes    = getDiasEnMes(anio, mes);
@@ -34,9 +37,9 @@ export default function CalendarioInstitucional() {
   return (
     <DashboardLayout
       titulo="Calendario institucional"
-      subtitulo="CU-ADM-08 · Coordinación"
-      rol="coordinacion"
-      usuario={COORDINACION.nombre}
+      subtitulo={puedeAdministrar ? "CU-ADM-08 · Coordinación" : "CU-ADM-08 · Solo lectura"}
+      rol={sesion?.rol ?? "coordinacion"}
+      usuario={nombreCompletoSesion(sesion)}
     >
       <div style={{ maxWidth: 860, margin: "0 auto", width: "100%" }}>
 
@@ -50,6 +53,21 @@ export default function CalendarioInstitucional() {
             fontSize: 13, fontWeight: 500,
           }}>
             {toast.msg}
+          </div>
+        )}
+
+        {errorCarga && (
+          <div style={{
+            marginBottom: "1.25rem", padding: "11px 16px", borderRadius: RADIUS.md,
+            background: "rgba(239,68,68,0.1)", border: `1px solid ${C.danger}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap",
+          }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: C.danger }}>{errorCarga}</span>
+            <button onClick={recargar} style={{
+              padding: "5px 12px", borderRadius: RADIUS.md, fontSize: 12, fontWeight: 600,
+              cursor: "pointer", background: "transparent",
+              border: `1px solid ${C.danger}`, color: C.danger, fontFamily: "inherit",
+            }}>Reintentar</button>
           </div>
         )}
 
@@ -85,17 +103,23 @@ export default function CalendarioInstitucional() {
 
             {/* Selector año + última mod */}
             <div style={{ textAlign: "center" }}>
-              <select value={anio} onChange={e => setAnio(Number(e.target.value))} style={{
+              <select value={anio} onChange={e => cambiarAnio(Number(e.target.value))} style={{
                 padding: "5px 10px", borderRadius: RADIUS.md,
                 background: C.bgCard, border: `1px solid ${C.borderDefault}`,
                 color: C.textPrimary, fontSize: 14, fontWeight: 700,
                 cursor: "pointer", fontFamily: "inherit", outline: "none",
                 display: "block", margin: "0 auto 3px",
               }}>
-                {ANIOS_DISPONIBLES.map(a => <option key={a} value={a}>{a}</option>)}
+                {/* Si el año visible no es un ciclo (p. ej. ago 2025), se muestra sin agregarlo a la lista. */}
+                {!ciclosDisponibles.includes(anio) && <option value={anio} hidden>{anio}</option>}
+                {ciclosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
               <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
-                Última mod.: <strong style={{ color: C.textMuted }}>{ultimaMod}</strong>
+                {ultimaMod
+                  ? <>Última mod.: <strong style={{ color: C.textMuted }}>{ultimaMod}</strong></>
+                  : cargando ? "Cargando…"
+                  : errorCarga ? "—"
+                  : "Sin información de última actualización"}
               </p>
             </div>
           </div>
@@ -184,7 +208,7 @@ export default function CalendarioInstitucional() {
             }
             tHoy.filter(e => e.tipo !== "Periodo de prestación").forEach(ev => {
               const cfg   = TIPO_CONFIG[ev.tipo];
-              const extra = ev.tipo === "Día inhábil" && ev.hora ? ` · ${ev.hora} hrs` : "";
+              const extra = ev.tipo === "Día inhábil" ? ` · ${textoHoraInhabil(ev)}` : "";
               lineas.push({ label: `${ev.nombre}${extra}`, color: cfg?.dot || "#6b7280" });
             });
             if (lineas.length === 0) return null;
@@ -205,19 +229,23 @@ export default function CalendarioInstitucional() {
 
           {/* Leyenda */}
           <div style={{ padding: "8px 1.25rem", borderTop: `1px solid ${C.borderDefault}`, display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-            {TIPOS.map(tipo => (
+            {tiposVisibles.map(tipo => (
               <div key={tipo} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div style={{ width: tipo === "Periodo de prestación" ? 18 : 8, height: tipo === "Periodo de prestación" ? 4 : 8, borderRadius: tipo === "Periodo de prestación" ? 2 : "50%", background: TIPO_CONFIG[tipo].dot }} />
                 <span style={{ fontSize: 11, color: C.textDisabled }}>{tipo}</span>
               </div>
             ))}
-            <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <div style={{ width: 18, height: 4, borderRadius: 2, background: "#f59e0b" }} />
-              <span style={{ fontSize: 11, color: C.textDisabled }}>Límite expediente</span>
-            </div>
-            <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>
-              Clic en un día hábil vacío para agregar un evento
-            </span>
+            {tiposVisibles.includes("Periodo de prestación") && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 18, height: 4, borderRadius: 2, background: "#f59e0b" }} />
+                <span style={{ fontSize: 11, color: C.textDisabled }}>Límite expediente</span>
+              </div>
+            )}
+            {puedeAdministrar && (
+              <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>
+                Clic en un día hábil para agregar un evento
+              </span>
+            )}
           </div>
         </div>
 
@@ -231,7 +259,7 @@ export default function CalendarioInstitucional() {
 
           {/* Botones de tipo */}
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {["Todas", "Periodo de prestación", "Día inhábil", "Periodo vacacional"].map(t => (
+            {["Todas", ...tiposVisibles].map(t => (
               <button
                 key={t} onClick={() => setFiltroTipo(t)}
                 style={{
@@ -256,7 +284,7 @@ export default function CalendarioInstitucional() {
             <span style={{ fontSize: 12, color: C.textDisabled, whiteSpace: "nowrap" }}>Ciclo:</span>
             <select
               value={filtroCiclo}
-              onChange={e => { setFiltroCiclo(e.target.value); setFiltroPeriodo(""); }}
+              onChange={e => setFiltroCiclo(e.target.value)}
               style={{
                 padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
                 background: C.bgInput, border: `1px solid ${filtroCiclo ? C.accent : C.borderDefault}`,
@@ -265,7 +293,7 @@ export default function CalendarioInstitucional() {
               }}
             >
               <option value="">Año...</option>
-              {CICLOS_DISPONIBLES.map(c => <option key={c} value={c}>{c}</option>)}
+              {ciclosDisponibles.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
 
             <select
@@ -315,17 +343,20 @@ export default function CalendarioInstitucional() {
         </div>
 
         {/* Botón agregar */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.25rem" }}>
-          <button onClick={() => abrirNuevo()} disabled={modoActivo} style={{ padding: "8px 18px", borderRadius: RADIUS.md, background: modoActivo ? C.bgInput : C.accent, border: "none", color: modoActivo ? C.textDisabled : "#fff", fontSize: 13, fontWeight: 700, cursor: modoActivo ? "default" : "pointer", fontFamily: "inherit" }}>
-            + Agregar evento
-          </button>
-        </div>
+        {puedeAdministrar && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "1.25rem" }}>
+            <button onClick={() => abrirNuevo()} disabled={modoActivo || !hoy} style={{ padding: "8px 18px", borderRadius: RADIUS.md, background: modoActivo || !hoy ? C.bgInput : C.accent, border: "none", color: modoActivo || !hoy ? C.textDisabled : "#fff", fontSize: 13, fontWeight: 700, cursor: modoActivo || !hoy ? "default" : "pointer", fontFamily: "inherit" }}>
+              + Agregar evento
+            </button>
+          </div>
+        )}
 
         {/* Formulario */}
         {(modo === "agregar" || modo === "editar") && (
           <EventoForm
-            modo={modo} form={form} errores={errores} hoy={hoy}
-            onChange={handleChange} onGuardar={handleGuardar} onCancelar={cancelar}
+            modo={modo} form={form} errores={errores} hoy={hoy} minFechaFutura={minFechaFutura}
+            guardando={guardando} confirmando={confirmando} ciclosDisponibles={ciclosDisponibles}
+            onChange={handleChange} onGuardar={handleGuardar} onCancelar={cancelar} onVolver={volverAEditar}
             C={C}
           />
         )}
@@ -341,7 +372,9 @@ export default function CalendarioInstitucional() {
           {eventosFiltrados.length === 0 && (
             <div style={{ padding: "2rem", textAlign: "center" }}>
               <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
-                {hayFiltroActivo ? "No hay eventos que coincidan con el filtro." : "No hay eventos en el calendario."}
+                {cargando ? "Cargando calendario…"
+                  : errorCarga ? "No se pudo cargar el calendario."
+                  : hayFiltroActivo ? "No hay eventos que coincidan con el filtro." : "No hay eventos en el calendario."}
               </p>
             </div>
           )}
@@ -352,6 +385,7 @@ export default function CalendarioInstitucional() {
               ev={ev} index={i} total={eventosFiltrados.length}
               hoy={hoy} diaSelec={diaSelec}
               modo={modo} evActivoId={evActivo?.id}
+              puedeAdministrar={puedeAdministrar} guardando={guardando} recienCreado={ev.id === resaltadoId}
               onEditar={abrirEditar} onEliminar={abrirEliminar}
               onCancelar={cancelar} onConfirmarEliminar={handleEliminar}
               C={C}

@@ -485,6 +485,10 @@ model reporte_mensual {
   documento_id          Int    @unique
   num_reporte           Int    @db.UnsignedTinyInt
   actividades_mes       String @db.Text
+  // Snapshot del PRIMER envío (bitácoras aprobadas por AH dentro del periodo del reporte, por fecha_revision).
+  // Nunca se recalculan: ni al consultar ni al corregir y reenviar (CU-REP-04).
+  dias_laborados        Int    @db.UnsignedTinyInt
+  horas_reportadas      Int    @db.UnsignedSmallInt
   estado_reporte        String @db.VarChar(35)
 
   solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)

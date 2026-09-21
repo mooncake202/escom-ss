@@ -1,29 +1,29 @@
 import { useTheme, RADIUS }                    from "@/themes/colors";
 import { DashboardLayout }                      from "@/components/layout/DashboardLayout";
 import { useNavigate }                          from "react-router-dom";
-import { BlobProvider }                         from "@react-pdf/renderer";
+import { useSesion, nombreCompletoSesion }      from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { CalendarioReporte }                    from "./components/CalendarioReporte";
 import { AvanceActividades }                    from "./components/AvanceActividades";
 import { FirmaUpload }                          from "./components/FirmaUpload";
-import { ReportePDF }                           from "./components/ReportePDF";
-import { useGenerarReporte, DIAS_INHABILES }    from "./hooks/useGenerarReporte";
+import { useGenerarReporte }                    from "./hooks/useGenerarReporte";
+import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico } from "./reportesGeneracion";
 
-const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
-               "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+// Fuera del componente para que React no lo remonte (y el textarea pierda el foco) en cada render.
+function Layout({ usuario, ancho = 580, children }) {
+  return (
+    <DashboardLayout titulo="Generar reporte mensual" subtitulo="Alumno" rol="alumno_asignado" usuario={usuario}>
+      <div style={{ maxWidth: ancho, margin: "0 auto", width: "100%" }}>{children}</div>
+    </DashboardLayout>
+  );
+}
+
+const ETIQUETA = { fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" };
 
 export default function GenerarReporte() {
   const { C }    = useTheme();
   const navigate = useNavigate();
-  const {
-    alumno, periodo, mesActivo, setMesActivo,
-    diasConBitacoraPorMes, totalDiasLaborados, totalHoras,
-    tituloAuto, avances, esPrimerReporte,
-    paso, setPaso,
-    actividades, handleActividadesChange,
-    firma, firmaUrl, handleFirmaChange,
-    errores, irPaso2, irPaso3, datosPDF,
-    enviado, handleEnviar,
-  } = useGenerarReporte();
+  const { usuario } = useSesion();
+  const g = useGenerarReporte();
 
   const inputBase = (hasError) => ({
     width: "100%", padding: "10px 14px", background: C.bgInput,
@@ -32,7 +32,22 @@ export default function GenerarReporte() {
     outline: "none", boxSizing: "border-box", fontFamily: "inherit",
   });
 
-  const mesData = periodo.meses[mesActivo];
+  const botonSecundario = (extra = {}) => ({
+    flex: 1, padding: "10px", borderRadius: RADIUS.md,
+    fontSize: 13, fontWeight: 500, cursor: "pointer",
+    background: "transparent", border: `1px solid ${C.borderDefault}`,
+    color: C.textMuted, fontFamily: "inherit", ...extra,
+  });
+  const botonPrimario = (deshabilitado = false, extra = {}) => ({
+    flex: 2, padding: "10px", borderRadius: RADIUS.md,
+    fontSize: 13, fontWeight: 700, cursor: deshabilitado ? "not-allowed" : "pointer",
+    background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
+    opacity: deshabilitado ? 0.6 : 1, ...extra,
+  });
+
+  const nombreUsuario = nombreCompletoSesion(usuario);
+
+  const tarjeta = { background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderDefault}`, padding: "1.75rem" };
 
   const flechaAtras = (
     <button
@@ -52,8 +67,96 @@ export default function GenerarReporte() {
     </button>
   );
 
-  // ── Franja resumen ───────────────────────────────────────────
-  const franjaResumen = (
+  // ── Carga inicial ────────────────────────────────────────────
+  if (g.estadoCarga === "cargando") {
+    return (
+      <Layout usuario={nombreUsuario}>
+        {flechaAtras}
+        <div style={{ ...tarjeta, textAlign: "center" }}>
+          <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando los datos de tu reporte...</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (g.estadoCarga === "error") {
+    return (
+      <Layout usuario={nombreUsuario}>
+        {flechaAtras}
+        <div style={{ ...tarjeta, textAlign: "center" }}>
+          <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{g.errorCarga}</p>
+          <button onClick={g.recargar} style={botonPrimario(false, { flex: "none", padding: "10px 24px" })}>Reintentar</button>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Confirmación de envío (datos reales de la respuesta) ─────
+  if (g.resultado) {
+    const { reporte, fechaEnvio } = g.resultado;
+    const envio = formatearFechaHoraMexico(fechaEnvio);
+    return (
+      <Layout usuario={nombreUsuario}>
+        <div style={{
+          background: C.bgCard, borderRadius: RADIUS.lg,
+          border: `1px solid ${C.success}`,
+          padding: "2.5rem 2rem", textAlign: "center",
+        }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: "50%",
+            background: C.successSoft,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 1.25rem",
+          }}>
+            <svg width={28} height={28} viewBox="0 0 24 24" fill="none"
+              stroke={C.success} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h3 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
+            Reporte enviado correctamente
+          </h3>
+          <p style={{ margin: "0 0 0.75rem", fontSize: 14, color: C.textMuted }}>
+            Tu reporte mensual No. {reporte.numero} fue firmado y enviado
+            {g.profesor?.nombreCompleto ? <> a <strong>{g.profesor.nombreCompleto}</strong></> : ""} con estado:
+          </p>
+          <span style={{
+            display: "inline-block", margin: "0 0 1rem",
+            padding: "4px 14px", borderRadius: RADIUS.full,
+            background: C.warningSoft, color: C.warning,
+            fontSize: 13, fontWeight: 700, border: `1px solid ${C.warning}`,
+          }}>
+            {etiquetaEstadoReporte(reporte.estadoReporte)}
+          </span>
+          {envio && (
+            <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled }}>
+              Enviado el {envio.fecha} a las {envio.hora} h (hora de México).
+            </p>
+          )}
+          <button
+            onClick={() => navigate("/alumno/reportes")}
+            style={{
+              padding: "10px 28px", borderRadius: RADIUS.md,
+              background: C.accent, border: "none", color: "#fff",
+              fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Ver mis reportes
+          </button>
+        </div>
+      </Layout>
+    );
+  }
+
+  const periodo = g.reporte?.periodo ?? null;
+  const textoPeriodo = periodo ? `${periodo.inicioTexto} — ${periodo.finTexto}` : null;
+  const titulo = g.reporte?.titulo ?? "Reporte mensual de actividades";
+  const encabezadoPaso = (
+    <p style={{ margin: "0 0 4px", ...ETIQUETA, color: C.textDisabled }}>Paso {g.numeroPaso} de {g.totalPasos}</p>
+  );
+
+  // ── Franja resumen (valores del backend) ─────────────────────
+  const franjaResumen = periodo && (
     <div style={{
       background: C.bgInput, borderRadius: RADIUS.md,
       border: `1px solid ${C.borderDefault}`,
@@ -62,374 +165,260 @@ export default function GenerarReporte() {
       alignItems: "center", flexWrap: "wrap", gap: "0.5rem",
     }}>
       <div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>Periodo</span>
-        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.textPrimary }}>
-          {periodo.fechaInicio} — {periodo.fechaFin}
-        </p>
+        <span style={{ ...ETIQUETA, color: C.textDisabled }}>Periodo</span>
+        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.textPrimary }}>{textoPeriodo}</p>
       </div>
       <div style={{ textAlign: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>Días laborados</span>
-        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.accentText }}>{totalDiasLaborados}</p>
+        <span style={{ ...ETIQUETA, color: C.textDisabled }}>Días laborados</span>
+        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.accentText }}>{g.resumen.diasLaborados}</p>
       </div>
       <div style={{ textAlign: "center" }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>Total horas</span>
-        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.accentText }}>{totalHoras} h</p>
+        <span style={{ ...ETIQUETA, color: C.textDisabled }}>Horas reportadas</span>
+        <p style={{ margin: "2px 0 0", fontSize: 14, fontWeight: 700, color: C.accentText }}>{g.resumen.horas} h</p>
       </div>
     </div>
   );
 
   // ── Paso 1: Calendario ───────────────────────────────────────
-  if (paso === 1) {
+  if (g.pasoActual === "calendario") {
+    const mesData = g.meses[g.mesActivo];
     return (
-      <DashboardLayout titulo="Generar reporte mensual" subtitulo="CU-REP-01 · Alumno" rol="alumno" usuario={alumno.nombre}>
-        <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
-          {flechaAtras}
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
-          }}>
-            <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-              Paso 1 de {esPrimerReporte ? 4 : 3}
-            </p>
-            <h3 style={{ margin: "0 0 0.25rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-              {tituloAuto}
-            </h3>
-            <p style={{ margin: "0 0 1.5rem", fontSize: 12, color: C.textMuted }}>
-              Periodo: {periodo.fechaInicio} — {periodo.fechaFin}
-            </p>
+      <Layout usuario={nombreUsuario}>
+        {flechaAtras}
+        <div style={tarjeta}>
+          {encabezadoPaso}
+          <h3 style={{ margin: "0 0 0.25rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>{titulo}</h3>
+          {textoPeriodo && (
+            <p style={{ margin: "0 0 1.5rem", fontSize: 12, color: C.textMuted }}>Periodo: {textoPeriodo}</p>
+          )}
 
-            {/* Selector de mes (solo dos meses) */}
-            {periodo.tipo === "dos-meses" && (
-              <div style={{ display: "flex", gap: 6, marginBottom: "1rem" }}>
-                {periodo.meses.map(({ year, month }, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setMesActivo(idx)}
-                    style={{
-                      padding: "6px 14px", borderRadius: RADIUS.full,
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
-                      fontFamily: "inherit",
-                      background: mesActivo === idx ? C.accent : "transparent",
-                      border: `1px solid ${mesActivo === idx ? C.accent : C.borderDefault}`,
-                      color: mesActivo === idx ? "#fff" : C.textMuted,
-                    }}
-                  >
-                    {MESES[month]} {year}
-                  </button>
-                ))}
+          {/* Bloqueos: el backend decide si se puede generar */}
+          {!g.puedeGenerar && (
+            <div style={{
+              margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
+              background: C.warningSoft, border: `1px solid ${C.warning}`,
+            }}>
+              <p style={{ margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: C.warning }}>
+                Todavía no puedes generar este reporte
+              </p>
+              <ul style={{ margin: 0, paddingLeft: "1.1rem", fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+                {g.motivosBloqueo.map((m) => <li key={m.codigo}>{m.mensaje}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {mesData && (
+            <>
+              {/* Selector de mes (cuando el periodo abarca dos meses) */}
+              {g.meses.length > 1 && (
+                <div style={{ display: "flex", gap: 6, marginBottom: "1rem" }}>
+                  {g.meses.map(({ anio, mes }, idx) => (
+                    <button
+                      key={`${anio}-${mes}`}
+                      onClick={() => g.setMesActivo(idx)}
+                      style={{
+                        padding: "6px 14px", borderRadius: RADIUS.full,
+                        fontSize: 12, fontWeight: 600, cursor: "pointer",
+                        fontFamily: "inherit",
+                        background: g.mesActivo === idx ? C.accent : "transparent",
+                        border: `1px solid ${g.mesActivo === idx ? C.accent : C.borderDefault}`,
+                        color: g.mesActivo === idx ? "#fff" : C.textMuted,
+                      }}
+                    >
+                      {nombreMes(mes)} {anio}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.accentText, lineHeight: 1.6 }}>
+                Los días y horas son de tus bitácoras aprobadas.
+              </p>
+
+              <div style={{
+                background: C.bgInput, borderRadius: RADIUS.lg,
+                border: `1px solid ${C.borderDefault}`,
+                padding: "1rem", marginBottom: "0.75rem",
+              }}>
+                <CalendarioReporte anio={mesData.anio} mes={mesData.mes} dias={mesData.dias} C={C} />
               </div>
-            )}
 
-            {/* Aviso */}
-            <div style={{
-              marginBottom: "1rem", padding: "10px 14px", borderRadius: RADIUS.md,
-              background: "rgba(0,58,143,0.08)", border: "1px solid rgba(0,58,143,0.2)",
-              fontSize: 12, color: C.accentText, lineHeight: 1.6,
-            }}>
-              Los días laborados se determinan automáticamente con base en tus
-              bitácoras registradas. Cada día con bitácora equivale a <strong>4 horas</strong>.
-            </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                <span style={{ fontSize: 13, color: C.textMuted }}>
+                  {g.resumen.diasLaborados} día{g.resumen.diasLaborados !== 1 ? "s" : ""} laborado{g.resumen.diasLaborados !== 1 ? "s" : ""}
+                </span>
+                <span style={{
+                  padding: "2px 10px", borderRadius: RADIUS.full,
+                  background: C.accentSoft, color: C.accentText, fontSize: 12, fontWeight: 700,
+                }}>
+                  Total: {g.resumen.horas} h
+                </span>
+              </div>
+            </>
+          )}
 
-            {/* Calendario */}
-            <div style={{
-              background: C.bgInput, borderRadius: RADIUS.lg,
-              border: `1px solid ${C.borderDefault}`,
-              padding: "1rem", marginBottom: "0.75rem",
-            }}>
-              <CalendarioReporte
-                year={mesData.year}
-                month={mesData.month}
-                diasSeleccionados={diasConBitacoraPorMes[mesActivo]}
-                diasInhabiles={DIAS_INHABILES}
-                C={C}
-              />
-            </div>
-
-            {/* Resumen días */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-              <span style={{ fontSize: 13, color: C.textMuted }}>
-                {totalDiasLaborados} día{totalDiasLaborados !== 1 ? "s" : ""} laborado{totalDiasLaborados !== 1 ? "s" : ""}
-              </span>
-              <span style={{
-                padding: "2px 10px", borderRadius: RADIUS.full,
-                background: C.accentSoft, color: C.accentText, fontSize: 12, fontWeight: 700,
-              }}>
-                Total: {totalHoras} h
-              </span>
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button onClick={() => navigate("/alumno/reportes")} style={{
-                flex: 1, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                background: "transparent", border: `1px solid ${C.borderDefault}`,
-                color: C.textMuted, fontFamily: "inherit",
-              }}>
-                Cancelar
-              </button>
-              <button onClick={() => setPaso(2)} style={{
-                flex: 2, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-              }}>
-                Continuar →
-              </button>
-            </div>
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <button onClick={() => navigate("/alumno/reportes")} style={botonSecundario()}>Cancelar</button>
+            <button onClick={g.continuarDesdeCalendario} disabled={!g.puedeGenerar} style={botonPrimario(!g.puedeGenerar)}>
+              Continuar →
+            </button>
           </div>
         </div>
-      </DashboardLayout>
+      </Layout>
     );
   }
 
   // ── Paso 2: Detalle + avance ─────────────────────────────────
-  if (paso === 2) {
+  if (g.pasoActual === "actividades") {
     return (
-      <DashboardLayout titulo="Generar reporte mensual" subtitulo="CU-REP-01 · Alumno" rol="alumno" usuario={alumno.nombre}>
-        <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
-          {flechaAtras}
-          {franjaResumen}
-          <AvanceActividades avances={avances} C={C} />
-
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
-          }}>
-            <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-              Paso 2 de {esPrimerReporte ? 4 : 3}
-            </p>
-            <h3 style={{ margin: "0 0 1.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-              Detalle del reporte
-            </h3>
-
-            <div style={{ marginBottom: "1.25rem" }}>
-              <label style={{
-                display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
-                textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6,
-              }}>
-                Actividades realizadas <span style={{ color: C.danger }}>*</span>
-              </label>
-              <textarea
-                value={actividades}
-                onChange={handleActividadesChange}
-                rows={6}
-                placeholder="Describe las actividades realizadas durante el periodo, una por línea..."
-                style={{ ...inputBase(!!errores.actividades), resize: "vertical", lineHeight: 1.6 }}
-              />
-              {errores.actividades && (
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: C.danger }}>{errores.actividades}</p>
-              )}
-              {!errores.actividades && (
-                <p style={{ margin: "6px 0 0", fontSize: 12, color: C.textDisabled }}>
-                  Escribe cada actividad en una línea. Se numerarán automáticamente en el PDF.
-                </p>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button onClick={() => setPaso(1)} style={{
-                flex: 1, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                background: "transparent", border: `1px solid ${C.borderDefault}`,
-                color: C.textMuted, fontFamily: "inherit",
-              }}>
-                ← Atrás
-              </button>
-              <button onClick={irPaso2} style={{
-                flex: 2, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-              }}>
-                {esPrimerReporte ? "Continuar → Firma" : "Ver vista previa →"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // ── Paso 3: Firma (solo primer reporte) ──────────────────────
-  if (paso === 3 && esPrimerReporte) {
-    return (
-      <DashboardLayout titulo="Generar reporte mensual" subtitulo="CU-REP-01 · Alumno" rol="alumno" usuario={alumno.nombre}>
-        <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
-          {flechaAtras}
-          {franjaResumen}
-
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
-          }}>
-            <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-              Paso 3 de 4
-            </p>
-            <h3 style={{ margin: "0 0 1.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-              Sube tu firma
-            </h3>
-
-            <FirmaUpload
-              firma={firma}
-              firmaUrl={firmaUrl}
-              error={errores.firma}
-              onChange={handleFirmaChange}
-              C={C}
-            />
-
-            <div style={{ display: "flex", gap: "0.75rem" }}>
-              <button onClick={() => setPaso(2)} style={{
-                flex: 1, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                background: "transparent", border: `1px solid ${C.borderDefault}`,
-                color: C.textMuted, fontFamily: "inherit",
-              }}>
-                ← Atrás
-              </button>
-              <button onClick={irPaso3} style={{
-                flex: 2, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-              }}>
-                Ver vista previa →
-              </button>
-            </div>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // ── Confirmación de envío ────────────────────────────────────
-  if (enviado) {
-    return (
-      <DashboardLayout titulo="Generar reporte mensual" subtitulo="CU-REP-01 · Alumno" rol="alumno" usuario={alumno.nombre}>
-        <div style={{ maxWidth: 580, margin: "0 auto", width: "100%" }}>
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.success}`,
-            padding: "2.5rem 2rem", textAlign: "center",
-          }}>
-            <div style={{
-              width: 56, height: 56, borderRadius: "50%",
-              background: C.successSoft,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              margin: "0 auto 1.25rem",
-            }}>
-              <svg width={28} height={28} viewBox="0 0 24 24" fill="none"
-                stroke={C.success} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-            </div>
-            <h3 style={{ margin: "0 0 0.5rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
-              Reporte enviado correctamente
-            </h3>
-            <p style={{ margin: "0 0 0.75rem", fontSize: 14, color: C.textMuted }}>
-              Tu reporte fue enviado a <strong>Dr. Torres Vega</strong> con estado:
-            </p>
-            <span style={{
-              display: "inline-block", margin: "0 0 1.5rem",
-              padding: "4px 14px", borderRadius: RADIUS.full,
-              background: C.warningSoft, color: C.warning,
-              fontSize: 13, fontWeight: 700, border: `1px solid ${C.warning}`,
-            }}>
-              Pendiente de revisión por profesor
-            </span>
-            <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled, lineHeight: 1.6 }}>
-              El profesor recibirá una notificación y podrá revisar tu reporte desde su panel.
-            </p>
-            <button
-              onClick={() => navigate("/alumno/reportes")}
-              style={{
-                padding: "10px 28px", borderRadius: RADIUS.md,
-                background: C.accent, border: "none", color: "#fff",
-                fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-              }}
-            >
-              Ver mis reportes
-            </button>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  // ── Paso 4 (o 3): Vista previa PDF + envío ───────────────────
-  const pasoPDF = esPrimerReporte ? 4 : 3;
-  return (
-    <DashboardLayout titulo="Generar reporte mensual" subtitulo="CU-REP-01 · Alumno" rol="alumno" usuario={alumno.nombre}>
-      <div style={{ maxWidth: 780, margin: "0 auto", width: "100%" }}>
+      <Layout usuario={nombreUsuario}>
         {flechaAtras}
         {franjaResumen}
+        {g.avances.length > 0 && <AvanceActividades avances={g.avances} descripcion={false} C={C} />}
 
-        <div style={{
-          background: C.bgCard, borderRadius: RADIUS.lg,
-          border: `1px solid ${C.borderDefault}`, padding: "1.75rem",
-          marginBottom: "1.25rem",
-        }}>
-          <p style={{ margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-            Paso {pasoPDF} de {esPrimerReporte ? 4 : 3}
-          </p>
-          <h3 style={{ margin: "0 0 1.25rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-            Vista previa del reporte
-          </h3>
+        <div style={tarjeta}>
+          {encabezadoPaso}
+          <h3 style={{ margin: "0 0 1.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Detalle del reporte</h3>
 
-          {/* PDF con BlobProvider + iframe */}
-          <BlobProvider document={<ReportePDF datos={datosPDF()} />}>
-            {({ url, loading, error }) => (
-              <div style={{
-                height: 600, marginBottom: "1.25rem",
-                borderRadius: RADIUS.md, overflow: "hidden",
-                border: `1px solid ${C.borderDefault}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: C.bgInput,
-              }}>
-                {loading && (
-                  <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>
-                    Generando vista previa...
-                  </p>
-                )}
-                {error && (
-                  <p style={{ margin: 0, fontSize: 13, color: C.danger }}>
-                    Error al generar el PDF. Intenta de nuevo.
-                  </p>
-                )}
-                {!loading && !error && url && (
-                  <iframe
-                    src={url}
-                    width="100%"
-                    height="100%"
-                    style={{ border: "none" }}
-                    title="Vista previa del reporte"
-                  />
-                )}
-              </div>
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{
+              display: "block", ...ETIQUETA, color: C.textMuted, fontSize: 12, marginBottom: 6,
+            }}>
+              Actividades realizadas <span style={{ color: C.danger }}>*</span>
+            </label>
+            <textarea
+              value={g.actividades}
+              onChange={g.handleActividadesChange}
+              rows={6}
+              placeholder="Describe las actividades realizadas durante el periodo, una por línea..."
+              style={{ ...inputBase(!!g.errores.actividades), resize: "vertical", lineHeight: 1.6 }}
+            />
+            {g.errores.actividades && (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: C.danger }}>{g.errores.actividades}</p>
             )}
-          </BlobProvider>
+          </div>
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
-            <button
-              onClick={() => setPaso(esPrimerReporte ? 3 : 2)}
-              style={{
-                flex: 1, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
-                background: "transparent", border: `1px solid ${C.borderDefault}`,
-                color: C.textMuted, fontFamily: "inherit",
-              }}
-            >
-              ← Editar
-            </button>
-            <button
-              onClick={handleEnviar}
-              style={{
-                flex: 2, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
-                background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
-              }}
-            >
-              Enviar al profesor →
+            <button onClick={g.atras} style={botonSecundario()}>← Atrás</button>
+            <button onClick={g.continuarDesdeActividades} style={botonPrimario()}>
+              {g.totalPasos === 4 && !g.firmaSubida ? "Continuar → Firma" : "Firmar y ver vista previa →"}
             </button>
           </div>
         </div>
+      </Layout>
+    );
+  }
+
+  // ── Paso 3: Firma (solo si el backend no la tiene) ───────────
+  if (g.pasoActual === "firma") {
+    return (
+      <Layout usuario={nombreUsuario}>
+        {flechaAtras}
+        {franjaResumen}
+        <div style={tarjeta}>
+          {encabezadoPaso}
+          <h3 style={{ margin: "0 0 1.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Sube tu firma</h3>
+
+          {g.firmaSubida ? (
+            <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.success }}>
+              Tu firma ya quedó registrada y se usará en este y en tus próximos reportes.
+            </p>
+          ) : (
+            <FirmaUpload
+              firma={g.firma}
+              firmaUrl={g.firmaUrl}
+              error={g.errores.firma}
+              onChange={g.handleFirmaChange}
+              C={C}
+            />
+          )}
+
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            <button onClick={g.atras} disabled={g.subiendoFirma} style={botonSecundario()}>← Atrás</button>
+            <button onClick={g.continuarDesdeFirma} disabled={g.subiendoFirma} style={botonPrimario(g.subiendoFirma)}>
+              {g.subiendoFirma ? "Guardando firma..." : "Ver vista previa →"}
+            </button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Último paso: vista previa (PDF del servidor) y envío ─────
+  const { vistaPrevia, errorEnvio } = g;
+  const accionesError = (e) => (
+    <div style={{ display: "flex", gap: "0.5rem", marginTop: 8, flexWrap: "wrap" }}>
+      {e.accion === "actividades" && (
+        <button onClick={g.irAActividades} style={botonSecundario({ flex: "none", padding: "6px 14px" })}>Corregir actividades</button>
+      )}
+      {e.accion === "recargar" && (
+        <button onClick={g.recargar} style={botonSecundario({ flex: "none", padding: "6px 14px" })}>Actualizar datos</button>
+      )}
+      {e.accion === "reintentar" && (
+        <button onClick={g.enviar} disabled={g.enviando} style={botonSecundario({ flex: "none", padding: "6px 14px" })}>Reintentar envío</button>
+      )}
+      {e.accion === "lista" && (
+        <button onClick={() => navigate("/alumno/reportes")} style={botonSecundario({ flex: "none", padding: "6px 14px" })}>Ver mis reportes</button>
+      )}
+    </div>
+  );
+
+  return (
+    <Layout usuario={nombreUsuario} ancho={780}>
+      {flechaAtras}
+      {franjaResumen}
+
+      <div style={{ ...tarjeta, marginBottom: "1.25rem" }}>
+        {encabezadoPaso}
+        <h3 style={{ margin: "0 0 1.25rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Vista previa del reporte</h3>
+
+        <div style={{
+          height: 600, marginBottom: "1.25rem",
+          borderRadius: RADIUS.md, overflow: "hidden",
+          border: `1px solid ${C.borderDefault}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          background: C.bgInput,
+        }}>
+          {vistaPrevia.estado === "cargando" && (
+            <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Generando vista previa...</p>
+          )}
+          {vistaPrevia.estado === "error" && (
+            <div style={{ padding: "1rem 1.5rem", textAlign: "center" }}>
+              <p style={{ margin: 0, fontSize: 13, color: C.danger }}>{vistaPrevia.error.mensaje}</p>
+              {accionesError(vistaPrevia.error)}
+              {vistaPrevia.error.accion === "ninguna" && (
+                <div style={{ marginTop: 8 }}>
+                  <button onClick={g.reintentarVistaPrevia} style={botonSecundario({ flex: "none", padding: "6px 14px" })}>Reintentar</button>
+                </div>
+              )}
+            </div>
+          )}
+          {vistaPrevia.estado === "listo" && (
+            <iframe src={vistaPrevia.url} width="100%" height="100%" style={{ border: "none" }} title="Vista previa del reporte" />
+          )}
+        </div>
+
+        {errorEnvio && (
+          <div style={{
+            margin: "0 0 1rem", padding: "10px 14px", borderRadius: RADIUS.md,
+            background: C.dangerSoft, border: `1px solid ${C.danger}`,
+          }}>
+            <p style={{ margin: 0, fontSize: 13, color: C.danger }}>{errorEnvio.mensaje}</p>
+            {accionesError(errorEnvio)}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "0.75rem" }}>
+          <button onClick={g.atras} disabled={g.enviando} style={botonSecundario()}>← Editar</button>
+          <button
+            onClick={g.enviar}
+            disabled={g.enviando || vistaPrevia.estado !== "listo"}
+            style={botonPrimario(g.enviando || vistaPrevia.estado !== "listo")}
+          >
+            {g.enviando ? "Enviando... (puede tardar unos segundos)" : "Enviar al profesor →"}
+          </button>
+        </div>
       </div>
-    </DashboardLayout>
+    </Layout>
   );
 }

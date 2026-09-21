@@ -1,212 +1,217 @@
-import { useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  obtenerSiguienteReporte, subirRubrica, obtenerVistaPrevia, enviarReporteMensual,
+} from "@/services/reportesService";
+import { agruparDiasPorMes, validarArchivoFirma, describirError } from "../reportesGeneracion";
 
-const ALUMNO = {
-  nombre:   "García López Ana",
-  boleta:   "2022630001",
-  carrera:  "Ingeniería en Sistemas Computacionales (ISC)",
-  semestre: "Octavo",
-  telefono: "55 1234 5678",
-  correo:   "agarcia0001@alumno.ipn.mx",
-};
-
-// Día de inicio del servicio social (del CU-REG-01)
-// Día 1-5  → un solo mes
-// Día 6+   → dos meses
-const DIA_INICIO_SERVICIO  = 16;
-const MES_INICIO_SERVICIO  = 4;  // 4 = Mayo
-const ANIO_INICIO_SERVICIO = 2025;
-
-// Número del último reporte generado (0 = ninguno aún)
-const ULTIMO_NUMERO_REPORTE = 4;
-
-// Periodos ya reportados — el siguiente será Mayo 2025
-const PERIODOS_CON_REPORTE = ["2025-01", "2025-02", "2025-03", "2025-04"];
-
-// Firma guardada (null = primer reporte, string = ya tiene firma)
-const FIRMA_GUARDADA = null;
-
-// ── Mock días inhábiles (de CU-ADM-10) ──────────────────────
-export const DIAS_INHABILES = new Set([
-  "01-01", "02-05", "03-21", "05-01", "09-16", "11-02", "11-20", "12-25",
-  "2025-04-17", "2025-04-18",
-]);
-
-// ── Mock bitácoras registradas — deben coincidir con mayo/junio 2025 ──
-const BITACORAS_REGISTRADAS = new Set([
-  // Mayo 2025 — desde día 1 (para probar regla un-mes)
-  "2025-05-02", "2025-05-05", "2025-05-06", "2025-05-07", "2025-05-08", "2025-05-09",
-  "2025-05-12", "2025-05-13", "2025-05-14", "2025-05-15", "2025-05-16",
-  "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23",
-  "2025-05-26", "2025-05-27", "2025-05-28", "2025-05-29", "2025-05-30",
-  // Junio 2025 — primeros 15 días (para probar regla dos-meses)
-  "2025-06-02", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06",
-  "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13",
-]);
-
-const AVANCES_ACTIVIDADES = [
-  { titulo: "Análisis de requerimientos",  porcentaje: 60 },
-  { titulo: "Diseño de base de datos",     porcentaje: 60 },
-  { titulo: "Investigación de frameworks", porcentaje: 65 },
-];
-
-const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
-               "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-
-export function esInhabil(year, month, day, inhabiles) {
-  const dow = new Date(year, month, day).getDay();
-  if (dow === 0 || dow === 6) return true;
-  const mm = String(month + 1).padStart(2, "0");
-  const dd = String(day).padStart(2, "0");
-  if (inhabiles.has(`${mm}-${dd}`)) return true;
-  if (inhabiles.has(`${year}-${mm}-${dd}`)) return true;
-  return false;
-}
-
-
-function calcularDiasConBitacora(year, month, bitacoras, diaDesde = 1, diaHasta = null) {
-  const totalDias = new Date(year, month + 1, 0).getDate();
-  const limite    = diaHasta ?? totalDias;
-  const dias      = new Set();
-
-  bitacoras.forEach(fecha => {
-    const [y, m, d] = fecha.split("-").map(Number);
-    if (y === year && m - 1 === month && d >= diaDesde && d <= limite) {
-      dias.add(d);
-    }
-  });
-  return dias;
-}
-
-function calcularPeriodo() {
-  const diaInicio = DIA_INICIO_SERVICIO;
-  const esUnMes   = diaInicio >= 1 && diaInicio <= 5;
-
-  const ultimoPeriodo = PERIODOS_CON_REPORTE[PERIODOS_CON_REPORTE.length - 1];
-  const [uy, um]      = ultimoPeriodo.split("-").map(Number);
-  const siguienteMes  = um === 12 ? 0 : um;
-  const siguienteAnio = um === 12 ? uy + 1 : uy;
-
-  if (esUnMes) {
-    return {
-      tipo: "un-mes",
-      meses: [{ year: siguienteAnio, month: siguienteMes }],
-      fechaInicio: `1 de ${MESES[siguienteMes]} de ${siguienteAnio}`,
-      fechaFin:    `${new Date(siguienteAnio, siguienteMes + 1, 0).getDate()} de ${MESES[siguienteMes]} de ${siguienteAnio}`,
-    };
-  }
-
-  const mes2  = siguienteMes === 11 ? 0 : siguienteMes + 1;
-  const anio2 = siguienteMes === 11 ? siguienteAnio + 1 : siguienteAnio;
-
-  return {
-    tipo: "dos-meses",
-    meses: [
-      { year: siguienteAnio, month: siguienteMes },
-      { year: anio2,         month: mes2 },
-    ],
-    fechaInicio: `${diaInicio} de ${MESES[siguienteMes]} de ${siguienteAnio}`,
-    fechaFin:    `15 de ${MESES[mes2]} de ${anio2}`,
-    diaInicioServicio: diaInicio,
-    dia15SegundoMes:   15,
-  };
-}
-
+// Toda la información sale de GET /reportes/mensual/siguiente; aquí no se calculan periodos ni horas.
 export function useGenerarReporte() {
-  const periodo         = useMemo(() => calcularPeriodo(), []);
-  const numeroReporte   = ULTIMO_NUMERO_REPORTE + 1;
-  const tituloAuto      = `Reporte mensual de actividades No. ${numeroReporte}`;
-  const esPrimerReporte = !FIRMA_GUARDADA;
+  const [estadoCarga, setEstadoCarga] = useState("cargando"); // cargando | listo | error
+  const [datos, setDatos]             = useState(null);
+  const [errorCarga, setErrorCarga]   = useState(null);
 
-  const [paso, setPaso]               = useState(1);
-  const [enviado, setEnviado]         = useState(false);
+  const [indice, setIndice]           = useState(0);
   const [mesActivo, setMesActivo]     = useState(0);
   const [actividades, setActividades] = useState("");
-  const [firma, setFirma]             = useState(null);
-  const [firmaUrl, setFirmaUrl]       = useState(FIRMA_GUARDADA);
   const [errores, setErrores]         = useState({});
 
-  const diasConBitacoraPorMes = useMemo(() =>
-  periodo.meses.map(({ year, month }, idx) => {
-    if (periodo.tipo === "un-mes") {
-      return calcularDiasConBitacora(year, month, BITACORAS_REGISTRADAS, 1);
+  const [firma, setFirma]               = useState(null);
+  const [firmaUrl, setFirmaUrl]         = useState(null);
+  const [firmaSubida, setFirmaSubida]   = useState(false);
+  const [subiendoFirma, setSubiendoFirma] = useState(false);
+
+  const [vistaPrevia, setVistaPrevia] = useState({ estado: "inactiva", url: null, error: null });
+  const [enviando, setEnviando]       = useState(false);
+  const [errorEnvio, setErrorEnvio]   = useState(null);
+  const [resultado, setResultado]     = useState(null);
+
+  // La vista previa es un Blob del servidor: se libera su URL al reemplazarla, al salir del paso y al desmontar.
+  const vistaRef = useRef({ url: null, id: 0 });
+  const firmaUrlRef = useRef(null);
+
+  const liberarVista = useCallback(() => {
+    if (vistaRef.current.url) URL.revokeObjectURL(vistaRef.current.url);
+    vistaRef.current.url = null;
+  }, []);
+
+  const cargar = useCallback(async () => {
+    setEstadoCarga("cargando");
+    try {
+      const respuesta = await obtenerSiguienteReporte();
+      setDatos(respuesta);
+      setMesActivo(0);
+      setErrorCarga(null);
+      setEstadoCarga("listo");
+    } catch (err) {
+      setErrorCarga(err.message);
+      setEstadoCarga("error");
     }
-    // Dos meses: primer mes desde diaInicio, segundo mes hasta día 15
-    if (idx === 0) return calcularDiasConBitacora(year, month, BITACORAS_REGISTRADAS, periodo.diaInicioServicio);
-    return calcularDiasConBitacora(year, month, BITACORAS_REGISTRADAS, 1, periodo.dia15SegundoMes);
-  }),
-[periodo]);
+  }, []);
 
-  const totalDiasLaborados = useMemo(() =>
-    diasConBitacoraPorMes.reduce((acc, dias) => acc + dias.size, 0),
-  [diasConBitacoraPorMes]);
+  useEffect(() => { cargar(); }, [cargar]);
 
-  const totalHoras = totalDiasLaborados * 4;
+  useEffect(() => () => {
+    vistaRef.current.id += 1;
+    liberarVista();
+    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
+  }, [liberarVista]);
 
-  const fechaGeneracion = new Date().toLocaleDateString("es-MX", {
-    day: "2-digit", month: "long", year: "numeric",
-  });
+  // ── Datos ya calculados por el backend ──────────────────────
+  const meses = useMemo(() => agruparDiasPorMes(datos?.calendario?.dias), [datos]);
+  const avances = useMemo(
+    () => (datos?.actividades ?? []).map((a) => ({ titulo: a.titulo, porcentaje: a.avance.alCierre })),
+    [datos],
+  );
+
+  // La firma solo se pide si el backend no la tiene; una vez subida en esta sesión el paso sigue existiendo.
+  const incluyeFirma = Boolean(datos?.firma?.requiereSubirRubrica) || firmaSubida;
+  const pasos = incluyeFirma ? ["calendario", "actividades", "firma", "vista"] : ["calendario", "actividades", "vista"];
+  const pasoActual = pasos[Math.min(indice, pasos.length - 1)];
+
+  const cargarVistaPrevia = useCallback(async (texto) => {
+    const id = ++vistaRef.current.id;
+    liberarVista();
+    setVistaPrevia({ estado: "cargando", url: null, error: null });
+    try {
+      const pdf = await obtenerVistaPrevia(texto);
+      if (id !== vistaRef.current.id) return;
+      const url = URL.createObjectURL(pdf);
+      vistaRef.current.url = url;
+      setVistaPrevia({ estado: "listo", url, error: null });
+    } catch (err) {
+      if (id !== vistaRef.current.id) return;
+      setVistaPrevia({ estado: "error", url: null, error: describirError(err) });
+    }
+  }, [liberarVista]);
+
+  const irAVista = useCallback((texto) => {
+    setIndice(pasos.length - 1);
+    cargarVistaPrevia(texto);
+  }, [pasos.length, cargarVistaPrevia]);
+
+  function salirDeVista() {
+    vistaRef.current.id += 1;
+    liberarVista();
+    setVistaPrevia({ estado: "inactiva", url: null, error: null });
+    setErrorEnvio(null);
+  }
+
+  // ── Navegación ──────────────────────────────────────────────
+  function continuarDesdeCalendario() {
+    if (datos?.puedeGenerar !== true) return;
+    setIndice(1);
+  }
 
   function handleActividadesChange(e) {
     setActividades(e.target.value);
-    if (errores.actividades) setErrores(prev => ({ ...prev, actividades: null }));
+    if (errores.actividades) setErrores((prev) => ({ ...prev, actividades: null }));
   }
 
-  function handleFirmaChange(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-      setErrores(prev => ({ ...prev, firma: "Solo se aceptan imágenes PNG o JPG." }));
-      return;
-    }
-    setFirma(file);
-    setFirmaUrl(URL.createObjectURL(file));
-    setErrores(prev => ({ ...prev, firma: null }));
-  }
-
-  function irPaso2() {
+  function continuarDesdeActividades() {
     if (!actividades.trim()) {
       setErrores({ actividades: "Las actividades realizadas son obligatorias." });
       return;
     }
     setErrores({});
-    setPaso(3);
+    if (incluyeFirma && !firmaSubida) setIndice(2);
+    else irAVista(actividades);
   }
 
-  function irPaso3() {
-    if (!firmaUrl) {
-      setErrores({ firma: "La firma es obligatoria para el primer reporte." });
+  function handleFirmaChange(e) {
+    const archivo = e.target.files[0];
+    if (!archivo) return;
+    const problema = validarArchivoFirma(archivo);
+    if (problema) {
+      setErrores((prev) => ({ ...prev, firma: problema }));
       return;
     }
+    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
+    firmaUrlRef.current = URL.createObjectURL(archivo);
+    setFirma(archivo);
+    setFirmaUrl(firmaUrlRef.current);
+    setErrores((prev) => ({ ...prev, firma: null }));
+  }
+
+  async function continuarDesdeFirma() {
+    if (subiendoFirma) return;
+    if (firmaSubida) {
+      irAVista(actividades);
+      return;
+    }
+    const problema = validarArchivoFirma(firma);
+    if (problema) {
+      setErrores({ firma: problema });
+      return;
+    }
+    setSubiendoFirma(true);
+    try {
+      await subirRubrica(firma);
+    } catch (err) {
+      // Si ya estaba registrada (p. ej. otra pestaña), se reutiliza y se sigue.
+      if (err.code !== "RUBRICA_YA_REGISTRADA") {
+        setErrores({ firma: describirError(err).mensaje });
+        setSubiendoFirma(false);
+        return;
+      }
+    }
+    setFirmaSubida(true);
     setErrores({});
-    setPaso(4);
+    setSubiendoFirma(false);
+    irAVista(actividades);
   }
 
-  function datosPDF() {
-    return {
-      numeroReporte,
-      fechaGeneracion,
-      periodoTexto: `del ${periodo.fechaInicio} al ${periodo.fechaFin}`,
-      alumno:       ALUMNO,
-      actividades,
-      firmaUrl,
-    };
+  function atras() {
+    if (pasoActual === "vista") salirDeVista();
+    setErrores({});
+    setIndice((i) => Math.max(i - 1, 0));
   }
 
-  function handleEnviar() {
-    setEnviado(true);
+  function irAActividades() {
+    if (pasoActual === "vista") salirDeVista();
+    setErrores({});
+    setIndice(1);
+  }
+
+  async function recargar() {
+    if (pasoActual === "vista") salirDeVista();
+    setIndice(0);
+    await cargar();
+  }
+
+  function reintentarVistaPrevia() {
+    cargarVistaPrevia(actividades);
+  }
+
+  async function enviar() {
+    if (enviando) return;
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const respuesta = await enviarReporteMensual(actividades);
+      liberarVista();
+      setResultado(respuesta);
+    } catch (err) {
+      setErrorEnvio(describirError(err));
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return {
-    alumno: ALUMNO, periodo, mesActivo, setMesActivo,
-    diasConBitacoraPorMes, totalDiasLaborados, totalHoras,
-    tituloAuto, numeroReporte,
-    avances: AVANCES_ACTIVIDADES,
-    esPrimerReporte,
-    paso, setPaso,
-    enviado, handleEnviar,
-    actividades, handleActividadesChange,
-    firma, firmaUrl, handleFirmaChange,
-    errores, irPaso2, irPaso3, datosPDF,
-    fechaGeneracion,
+    estadoCarga, errorCarga, recargar,
+    reporte: datos?.reporte ?? null,
+    alumno: datos?.alumno ?? null,
+    profesor: datos?.profesor ?? null,
+    resumen: datos?.resumen ?? { diasLaborados: 0, horas: 0, bitacorasAprobadas: 0 },
+    puedeGenerar: datos?.puedeGenerar === true,
+    motivosBloqueo: datos?.motivosBloqueo ?? [],
+    meses, mesActivo, setMesActivo, avances,
+    pasoActual, numeroPaso: Math.min(indice, pasos.length - 1) + 1, totalPasos: pasos.length,
+    actividades, handleActividadesChange, errores,
+    firma, firmaUrl, firmaSubida, subiendoFirma, handleFirmaChange,
+    continuarDesdeCalendario, continuarDesdeActividades, continuarDesdeFirma,
+    atras, irAActividades,
+    vistaPrevia, reintentarVistaPrevia,
+    enviando, errorEnvio, enviar, resultado,
   };
 }

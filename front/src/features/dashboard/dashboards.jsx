@@ -19,6 +19,7 @@ const EVENTOS_POR_ROL = {
     "actividad:eliminada", "actividad:vencida",
     "expediente:decidido", // dispara la notificación real de bienvenida
     "resumen:actualizado", // genérico: bitácora/faltas/jornada abandonada
+    "reporte:actualizado", // su profesor rechazó un reporte (REP-05)
   ],
   // 'solicitud:aceptada'/'rechazada'/'rechazada_por_cupos' NO se emiten al
   // profesor (solo al alumno). 'expediente:decidido' NO se agrega aquí:
@@ -26,12 +27,24 @@ const EVENTOS_POR_ROL = {
   // transición real de estado_solicitud a 'alumno_asignado' (eso ocurre
   // después, cuando el alumno confirma el modal de bienvenida) — contarlo
   // aquí desincronizaría el widget alumnosAsignados de listarAlumnosDeProfesor.
-  profesor: ["solicitud:nueva", "oferta:decidida", "oferta:concluida", "resumen:actualizado"],
+    profesor: [
+    "solicitud:nueva",
+    "oferta:decidida",
+    "oferta:concluida",
+    "resumen:actualizado",
+    "reporte:nuevo",
+    "reporte:actualizado",
+  ],
+
   coordinador: [
-    "documentacion:pendiente", "documentacion:decidida",
-    "expediente:pendiente_revision", "expediente:decidido",
-    "oferta:nueva", "oferta:reenviada",
-    "resumen:actualizado", // genérico: red de seguridad, mismo criterio que alumno_asignado/profesor
+    "documentacion:pendiente",
+    "documentacion:decidida",
+    "expediente:pendiente_revision",
+    "expediente:decidido",
+    "oferta:nueva",
+    "oferta:reenviada",
+    "reporte:nuevo",
+    "resumen:actualizado",
   ],
 };
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
@@ -332,7 +345,7 @@ function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalc
 const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   const stats = [
     { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasNetas ?? 0,             ...T.blue  },
-    { icon: "document", label: "Reportes enviados",   value: resumen.reportesEnviados ?? 0,      ...T.teal  },
+    { icon: "document", label: "Reportes aprobados",  value: resumen.reportesAprobados ?? 0,     ...T.teal  },
     { icon: "check",    label: "Actividades activas", value: resumen.actividadesAsignadas ?? 0,  ...T.green },
     { icon: "flag",     label: "Faltas totales",      value: resumen.faltasAcumuladas ?? 0,      ...T.slate },
   ];
@@ -411,6 +424,8 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
           <ActionItem icon="check"  {...T.blue} label="Consultar estado de reportes" desc="Ver el estado de tus reportes activos" onClick={() => navigate("/alumno/reportes/estatus")} C={C} />
           <SlotNotificacion ruta="/alumno/reportes/estatus" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="folder" {...T.slate} label="Historial de reportes"       desc="Todos los reportes enviados" onClick={() => navigate("/alumno/reportes")} C={C} />
+          {/* Avisos de rechazo o validación: llevan a Mis reportes (?destacar=<id>[&tipo=global]) y ahí se abre la tarjeta. */}
+          <SlotNotificacion ruta="/alumno/reportes?" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
 
         {/* CU-ADM */}

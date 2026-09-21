@@ -1,152 +1,104 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { obtenerSeguimientoReporte, obtenerVistaPreviaCorreccion, reenviarReporteCorregido } from "@/services/reportesService";
+import { describirError } from "../../CU-REP-01-generar-reporte/reportesGeneracion";
+import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
+import { idsDestacados, tipoDeUrl } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
+import { hayCambioReal } from "../correccionReportes";
 
-// ── Días inhábiles (misma fuente que CU-REP-01) ───────────────
-const INHABILES = new Set([
-  "01-01", "02-05", "03-21", "05-01", "09-16", "11-02", "11-20", "12-25",
-  "2025-04-14","2025-04-15","2025-04-16","2025-04-17","2025-04-18",
-  "2025-07-21","2025-07-22","2025-07-23","2025-07-24","2025-07-25",
-  "2025-07-28","2025-07-29","2025-07-30","2025-07-31","2025-08-01",
-  "2025-12-22","2025-12-23","2025-12-24","2025-12-26","2025-12-29",
-  "2025-12-30","2025-12-31","2026-01-02",
-  "2026-04-02","2026-04-03","2026-04-06",
-  "2025-02-03","2025-11-17","2025-05-12",
-]);
+const primerId = (valor) => [...idsDestacados(valor)][0] ?? null;
 
-export function esDiaInhabil(year, month, day) {
-  const dow = new Date(year, month, day).getDay();
-  if (dow === 0 || dow === 6) return true;
-  const mm = String(month + 1).padStart(2, "0");
-  const dd = String(day).padStart(2, "0");
-  if (INHABILES.has(`${mm}-${dd}`)) return true;
-  if (INHABILES.has(`${year}-${mm}-${dd}`)) return true;
-  return false;
-}
-
-export function diasEnMes(year, month) {
-  return new Date(year, month + 1, 0).getDate();
-}
-
-export function primerDiaSemana(year, month) {
-  return new Date(year, month, 1).getDay();
-}
-
-export function calcularDiasValidos(year, month) {
-  const total = diasEnMes(year, month);
-  const validos = new Set();
-  for (let d = 1; d <= total; d++) {
-    if (!esDiaInhabil(year, month, d)) validos.add(d);
-  }
-  return validos;
-}
-
-export const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio",
-               "Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-export const DIAS_SEMANA = ["Do","Lu","Ma","Mi","Ju","Vi","Sa"];
-
-export const ALUMNO = {
-  nombre:   "García López Ana",
-  boleta:   "2022630001",
-  carrera:  "Ingeniería en Sistemas Computacionales (ISC)",
-  semestre: "Octavo",
-  telefono: "55 1234 5678",
-  correo:   "agarcia0001@alumno.ipn.mx",
-};
-
-// ── Mock del reporte rechazado (pre-carga del formulario) ─────
-export const REPORTE_RECHAZADO = {
-  id: 4,
-  titulo: "Reporte Mensual de Actividades No. 4",
-  periodoStr: "2025-05",  // año-mes
-  actividades: "Se realizaron actividades de análisis de requerimientos y diseño de la base de datos del módulo de inventario.",
-  observaciones: "Se presentaron contratiempos por la configuración del entorno de desarrollo.",
-  comentarioRechazo: "Se detectó una actividad registrada que no está completa. Por favor revisa y corrige la descripción de actividades antes de reenviar el reporte.",
-};
-
-// ── Avances de actividades (mismo origen que CU-REP-01 mock) ──
-export const AVANCES_MES = [
-  { titulo: "Análisis de requerimientos", porcentaje: 60 },
-  { titulo: "Diseño de base de datos",    porcentaje: 60 },
-  { titulo: "Investigación de frameworks", porcentaje: 65 },
-];
-
+// Corrección de UN reporte propio rechazado, mensual o global (?reporte=<id>, con &tipo=global para el global). Solo se editan las actividades: número, periodo, días y horas
+// son el snapshot del envío original y aquí solo se muestran. El backend valida propietario y estado, y firma con la rúbrica
+// ya registrada; nada de eso se pide ni se decide aquí.
 export function useModificarReenviarReporte() {
-  const [y, m] = REPORTE_RECHAZADO.periodoStr.split("-").map(Number);
-  const year  = y;
-  const month = m - 1;
+  const [params] = useSearchParams();
+  const id = primerId(params.get("reporte"));
+  const tipo = tipoDeUrl(params.get("tipo"));
 
-  const [paso, setPaso]                   = useState(1);
-  const [seleccionados, setSeleccionados] = useState(() => calcularDiasValidos(year, month));
-  const [form, setForm]                   = useState({
-    titulo:        REPORTE_RECHAZADO.titulo,
-    actividades:   REPORTE_RECHAZADO.actividades,
-    observaciones: REPORTE_RECHAZADO.observaciones,
-  });
-  const [errores, setErrores]   = useState({});
-  const [enviado, setEnviado]   = useState(false);
+  const [intento, setIntento] = useState(0);
+  const clave = `${id === null ? "sin-id" : `${tipo}:${id}`}|${intento}`;
+  const [resultadoCarga, setResultadoCarga] = useState({ clave: null, estado: "cargando", datos: null, error: null });
+  const { pdf: vistaPrevia, abrirPdf, cerrarPdf } = usePdfAlmacenado();
 
-  const horasCalculadas = seleccionados.size * 4;
+  const [paso, setPaso]               = useState(1); // 1 editar · 2 vista previa y reenvío
+  const [edicion, setEdicion]         = useState(null); // texto editado; null = sin tocar (se muestra el actual)
+  const [errores, setErrores]         = useState({});
+  const [enviando, setEnviando]       = useState(false);
+  const [errorEnvio, setErrorEnvio]   = useState(null);
+  const [resultado, setResultado]     = useState(null);
+  const enviandoRef = useRef(false); // evita el doble envío (el estado tarda un render en reflejarse)
 
-  function toggleDia(day) {
-    setSeleccionados(prev => {
-      const next = new Set(prev);
-      next.has(day) ? next.delete(day) : next.add(day);
-      return next;
-    });
-  }
+  useEffect(() => {
+    let vigente = true; // una respuesta de una consulta anterior no pisa a la actual
+    const consulta = id === null ? Promise.resolve(null) : obtenerSeguimientoReporte(tipo, id);
+    consulta.then(
+      (datos) => { if (vigente) setResultadoCarga({ clave, estado: datos === null ? "sin_reporte" : "listo", datos, error: null }); },
+      (err) => { if (vigente) setResultadoCarga({ clave, estado: "error", datos: null, error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [id, tipo, clave]);
+
+  const carga = resultadoCarga.clave === clave ? resultadoCarga : { estado: "cargando", datos: null, error: null };
+  const reporte = carga.datos;
+  // Solo los rechazados por el profesor o por coordinación se corrigen (el backend lo vuelve a exigir).
+  const estado = carga.estado === "listo" && !reporte.puedeCorregir ? "no_corregible" : carga.estado;
+
+  const original = reporte?.actividades ?? "";
+  const actividades = edicion ?? original;
+  const cambioReal = hayCambioReal(original, actividades);
 
   function handleChange(e) {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (errores[name]) setErrores(prev => ({ ...prev, [name]: null }));
+    setEdicion(e.target.value);
+    if (errores.actividades) setErrores({});
   }
 
-  function irAPaso2() {
-    if (seleccionados.size === 0) { setErrores({ dias: "Selecciona al menos un día laborado." }); return; }
+  function pedirVistaPrevia() {
+    abrirPdf(() => obtenerVistaPreviaCorreccion(reporte.tipoReporte, reporte.id, actividades));
+  }
+
+  function irAVistaPrevia() {
+    if (!actividades.trim()) {
+      setErrores({ actividades: "Las actividades realizadas son obligatorias." });
+      return;
+    }
+    if (!cambioReal) {
+      setErrores({ actividades: "Modifica las actividades antes de continuar." });
+      return;
+    }
     setErrores({});
     setPaso(2);
+    pedirVistaPrevia();
   }
 
-  function validarPaso2() {
-    const e = {};
-    if (!form.actividades.trim()) e.actividades = "Las actividades son obligatorias.";
-    return e;
+  function volverAEditar() {
+    cerrarPdf();
+    setErrorEnvio(null);
+    setPaso(1);
   }
 
-  function irAPaso3() {
-    const e = validarPaso2();
-    if (Object.keys(e).length > 0) { setErrores(e); return; }
-    setErrores({});
-    setPaso(3);
-  }
-
-  function confirmarReenvio() {
-    setEnviado(true);
-  }
-
-  function datosPDF() {
-    const ultimoDia = diasEnMes(year, month);
-    return {
-      numeroReporte:   REPORTE_RECHAZADO.id,
-      fechaGeneracion: new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }),
-      periodoTexto:    `del 1 de ${MESES[month]} de ${year} al ${ultimoDia} de ${MESES[month]} de ${year}`,
-      alumno:          ALUMNO,
-      actividades:     form.actividades,
-      firmaUrl:        null,
-    };
+  async function confirmarReenvio() {
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+    setEnviando(true);
+    setErrorEnvio(null);
+    try {
+      const respuesta = await reenviarReporteCorregido(reporte.tipoReporte, reporte.id, actividades);
+      cerrarPdf();
+      setResultado(respuesta);
+    } catch (err) {
+      setErrorEnvio(describirError(err));
+    } finally {
+      enviandoRef.current = false;
+      setEnviando(false);
+    }
   }
 
   return {
-    alumno: ALUMNO,
-    reporteRechazado: REPORTE_RECHAZADO,
-    avancesMes: AVANCES_MES,
-    year, month,
-    paso, setPaso,
-    seleccionados, toggleDia,
-    form, handleChange,
-    errores, setErrores,
-    enviado,
-    horasCalculadas,
-    irAPaso2, irAPaso3,
-    confirmarReenvio, datosPDF,
+    estado, error: carga.error, reporte,
+    recargar: () => setIntento((n) => n + 1),
+    paso, actividades, handleChange, errores, cambioReal,
+    irAVistaPrevia, volverAEditar, vistaPrevia, pedirVistaPrevia,
+    enviando, errorEnvio, confirmarReenvio, resultado,
   };
 }

@@ -77,6 +77,18 @@ app.use('/profesor', require('./src/modules/ah/ah.routes'));
 //AH02
 app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
 
+//REP01 — Reportes mensuales (alumno_asignado)
+app.use('/reportes', require('./src/modules/reportes/reportes-alumno.routes'));
+
+//REP05 — Reportes (profesor): listado, detalle, PDF, rechazar, aprobar y rúbrica
+app.use('/profesor', require('./src/modules/reportes/reportes-profesor.routes'));
+
+//REP06 — Reportes (coordinador): listado, detalle, PDF, rechazar y aprobar (validación con sello del prototipo)
+app.use('/coordinador', require('./src/modules/reportes/reportes-coordinacion.routes'));
+
+//ADM08 — Calendario institucional (lectura: todos los roles; escritura: coordinador)
+app.use('/calendario', require('./src/modules/administrativa/calendario/calendario.routes'));
+
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');

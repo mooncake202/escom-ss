@@ -1,13 +1,8 @@
 import { RADIUS } from "@/themes/colors";
-
-export const ESTADO_MAP = {
-  pendiente_revision: { bg: (C) => C.warningSoft,        color: (C) => C.warning, label: "Pendiente de revisión" },
-  aprobado:           { bg: (C) => C.successSoft,        color: (C) => C.success, label: "Aprobado"              },
-  rechazado_profesor: { bg: () => "rgba(239,68,68,0.1)", color: (C) => C.danger,  label: "Rechazado"             },
-};
+import { estadoDe } from "../revisionReportes";
 
 export function EstatusBadge({ estado, C }) {
-  const s = ESTADO_MAP[estado] ?? ESTADO_MAP.pendiente_revision;
+  const s = estadoDe(estado);
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,

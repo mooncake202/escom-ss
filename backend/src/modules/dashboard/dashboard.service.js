@@ -1,4 +1,5 @@
 const prisma = require('../../lib/prisma');
+const { ESTADOS_REPORTE } = require('../reportes/reportes.shared');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
 
 const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
@@ -94,7 +95,7 @@ async function resumenAlumno(usuarioId) {
   if (!alumno || !alumno.solicitud_registro) {
     return {
       horasAcumuladas: 0, horasNetas: 0, faltasAcumuladas: 0, faltasConsecutivas: 0,
-      actividadesAsignadas: 0, reportesEnviados: 0,
+      actividadesAsignadas: 0, reportesAprobados: 0,
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
     };
@@ -102,11 +103,12 @@ async function resumenAlumno(usuarioId) {
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar] = await Promise.all([
+  const [actividadesAsignadas, reportesAprobados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar] = await Promise.all([
     // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
     // y ambas variantes de completada (antes contaba todo, bug reportado).
     prisma.actividad.count({ where: { solicitud_registro_id: solicitudId, estado: { in: ['sin_comenzar', 'en_progreso'] } } }),
-    prisma.reporte_mensual.count({ where: { solicitud_registro_id: solicitudId } }),
+    // Solo los aprobados por coordinación (aprobación final); no cuenta pendientes ni rechazados.
+    prisma.reporte_mensual.count({ where: { solicitud_registro_id: solicitudId, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR } }),
     tieneActividadesPendientes(solicitudId),
     faltaBitacoraHoy(solicitudId),
     tieneJornadaPendienteDatos(solicitudId),
@@ -120,7 +122,7 @@ async function resumenAlumno(usuarioId) {
     faltasAcumuladas: alumno.cumulo_horas_y_faltas?.faltas_acumuladas ?? 0,
     faltasConsecutivas: alumno.cumulo_horas_y_faltas?.faltas_consecutivas ?? 0,
     actividadesAsignadas,
-    reportesEnviados,
+    reportesAprobados,
     actividadesPendientes,
     bitacoraHoyPendiente,
     jornadaSinTerminar,

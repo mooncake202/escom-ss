@@ -1,75 +1,27 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import {
+  getEventosCalendario, crearEventoCalendario, actualizarInhabilCalendario, eliminarEventoCalendario,
+} from "@/services/calendarioService";
+import {
+  eventoDeApi, coincideConSemestre, construirPayload, erroresDeApi, textoUltimaModificacion, diaSiguiente,
+} from "./calendarioAdaptador";
+import {
+  rangoSemestre, ciclosDesdeHoy, limitesNavegacion, moverMes, mesInicial, acotarMes, ventanaInicioPeriodo,
+} from "./calendarioNavegacion";
 
-const DIAS_INHABILES_INICIALES = [
-  { nombre: "Año Nuevo",                           fecha: "2026-01-01" },
-  { nombre: "Día de la Constitución",              fecha: "2026-02-02" },
-  { nombre: "Natalicio de Benito Juárez",          fecha: "2026-03-16" },
-  { nombre: "Jueves Santo",                        fecha: "2026-04-02" },
-  { nombre: "Viernes Santo",                       fecha: "2026-04-03" },
-  { nombre: "Día del Trabajo",                     fecha: "2026-05-01" },
-  { nombre: "Aniversario de la Batalla de Puebla", fecha: "2026-05-05" },
-  { nombre: "Día de la Independencia",             fecha: "2026-09-16" },
-  { nombre: "Día de Muertos",                      fecha: "2026-11-02" },
-  { nombre: "Revolución Mexicana",                 fecha: "2026-11-16" },
-  { nombre: "Navidad",                             fecha: "2026-12-25" },
-];
+export { rangoSemestre, ciclosDesdeHoy, limitesNavegacion, moverMes, mesInicial, acotarMes, ventanaInicioPeriodo };
 
-export const COORDINACION     = { nombre: "Lic. Morales Vega" };
 export const TIPOS            = ["Periodo de prestación", "Día inhábil", "Periodo vacacional"];
 export const MESES            = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
 export const DIAS_SEM         = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-
-const HOY_ANIO = new Date().getFullYear();
-export const ANIOS_DISPONIBLES = [HOY_ANIO - 1, HOY_ANIO, HOY_ANIO + 1];
-
-// Ciclos disponibles para el filtro — centrados en el año actual
-export const CICLOS_DISPONIBLES = [HOY_ANIO - 1, HOY_ANIO, HOY_ANIO + 1];
-
-// Dado un ciclo y periodo calcula el rango ISO de fechas
-
-export function rangoSemestre(ciclo, periodo) {
-  if (periodo === "01") {
-    // Semestre 1: Ago(ciclo-1) – Ene(ciclo)
-    return {
-      desde: `${ciclo - 1}-08-01`,
-      hasta: `${ciclo}-01-31`,
-      label: `Ago ${ciclo - 1} – Ene ${ciclo}`,
-    };
-  }
-  // Semestre 2: Ene(ciclo) – Jul(ciclo)
-  return {
-    desde: `${ciclo}-01-01`,
-    hasta: `${ciclo}-07-31`,
-    label: `Ene ${ciclo} – Jul ${ciclo}`,
-  };
-}
-
-
-let nextId = 10;
-
-const EVENTOS_INICIALES = [
-  {
-    id: 1,
-    tipo: "Periodo de prestación",
-    nombre: "Periodo Ene–Jun 2026",
-    fechaInicio: "2026-01-12",
-    fechaTermino: "2026-06-30",
-    fechaLimiteExpediente: "2026-06-15",
-  },
-  ...DIAS_INHABILES_INICIALES.map((d, i) => ({
-    id: 100 + i,
-    tipo: "Día inhábil",
-    nombre: d.nombre,
-    fecha: d.fecha,
-    hora: "",
-  })),
-];
 
 export const FORM_VACIO = {
   nombre: "", tipo: "",
   fecha: "", hora: "",
   fechaInicio: "", fechaTermino: "", fechaLimiteExpediente: "",
   fechaInicioVac: "", fechaFinVac: "",
+  anio: "", semestre: "",
 };
 
 export function getDiasEnMes(y, m) { return new Date(y, m + 1, 0).getDate(); }
@@ -79,12 +31,6 @@ export function toISO(y, m, d)     { return `${y}-${String(m+1).padStart(2,"0")}
 export function esFinDeSemana(fechaISO) {
   const d = new Date(fechaISO + "T12:00:00");
   return d.getDay() === 0 || d.getDay() === 6;
-}
-
-export function fechaPrincipal(ev) {
-  if (ev.tipo === "Día inhábil")        return ev.fecha;
-  if (ev.tipo === "Periodo vacacional") return ev.fechaInicioVac;
-  return ev.fechaInicio;
 }
 
 export function fechasDeEvento(ev) {
@@ -101,18 +47,30 @@ export function fechasDeEvento(ev) {
   return [];
 }
 
-export function formatFechaHoraActual() {
-  const now = new Date();
-  return now.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
-    + ", " + now.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+// Filtra por tipo y, si hay ciclo+semestre, por la semántica de coincideConSemestre.
+export function filtrarEventos(eventos, { tipo, ciclo, periodo }) {
+  const ventana = ciclo && periodo ? rangoSemestre(parseInt(ciclo), periodo) : null;
+  return eventos.filter(ev => {
+    if (tipo !== "Todas" && ev.tipo !== tipo) return false;
+    if (!ventana) return true;
+    return coincideConSemestre(ev, { ciclo, periodo, desde: ventana.desde, hasta: ventana.hasta });
+  });
 }
 
 export function useCalendarioInstitucional() {
-  const hoy = new Date().toISOString().slice(0, 10);
+  const { usuario: sesion } = useSesion();
+  // Solo el coordinador administra; el resto ve el calendario en solo lectura (el backend también lo exige).
+  const puedeAdministrar = sesion?.rol === "coordinador";
+  // El alumno asignado no recibe Periodos del backend: tampoco se le ofrece como filtro ni en la leyenda.
+  const tiposVisibles = sesion?.rol === "alumno_asignado" ? TIPOS.filter(t => t !== "Periodo de prestación") : TIPOS;
 
-  const [eventos, setEventos]     = useState(
-    [...EVENTOS_INICIALES].sort((a, b) => fechaPrincipal(a).localeCompare(fechaPrincipal(b)))
-  );
+  const [eventos, setEventos]     = useState([]);
+  const [contexto, setContexto]   = useState(null);   // { hoy, horaActual } de México, según el backend
+  const [ultimaModIso, setUltimaModIso] = useState(null);
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(null);
+  const [guardando, setGuardando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [mes, setMes]             = useState(new Date().getMonth());
   const [anio, setAnio]           = useState(new Date().getFullYear());
   const [diaSelec, setDiaSelec]   = useState(null);
@@ -121,28 +79,76 @@ export function useCalendarioInstitucional() {
   const [form, setForm]           = useState(FORM_VACIO);
   const [errores, setErrores]     = useState({});
   const [toast, setToast]         = useState(null);
-  const [ultimaMod, setUltimaMod] = useState("15 de enero de 2026, 10:00");
   const [tooltip, setTooltip]     = useState(null);
+  const primeraCarga = useRef(true);
+  const [resaltadoId, setResaltadoId] = useState(null);
+  const temporizadorResaltado = useRef(null);
+
+  // La fecha de negocio es la del backend (México); mientras no llega, "" no habilita ni marca nada.
+  const hoy = contexto?.hoy ?? "";
+  const cargando = cargandoDatos && !contexto;
+  const ultimaMod = textoUltimaModificacion(ultimaModIso);
+  // Periodos y vacaciones deben empezar después de hoy: se usa como fecha mínima del selector.
+  const minFechaFutura = diaSiguiente(hoy);
+  const ciclosDisponibles = useMemo(() => ciclosDesdeHoy(hoy), [hoy]);
+
+  const cargar = useCallback(async () => {
+    setCargandoDatos(true);
+    setErrorCarga(null);
+    try {
+      const datos = await getEventosCalendario();
+      setEventos(datos.eventos.map(eventoDeApi).filter(Boolean));
+      setUltimaModIso(datos.ultimaModificacion ?? null);
+      setContexto(datos.contexto);
+      if (primeraCarga.current) {
+        primeraCarga.current = false;
+        const [y, m] = datos.contexto.hoy.split("-").map(Number);
+        setAnio(y); setMes(m - 1);
+      }
+    } catch (err) {
+      setErrorCarga(err.message);
+    } finally {
+      setCargandoDatos(false);
+    }
+  }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  // Resalta ~3 s la fila recién creada de la lista y la acerca a la vista si no está visible.
+  function resaltarEvento(id) {
+    clearTimeout(temporizadorResaltado.current);
+    setResaltadoId(id);
+    temporizadorResaltado.current = setTimeout(() => setResaltadoId(null), 3000);
+  }
+  useEffect(() => {
+    if (resaltadoId === null) return;
+    document.getElementById(`evento-${resaltadoId}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [resaltadoId]);
+  useEffect(() => () => clearTimeout(temporizadorResaltado.current), []);
 
   // ── Filtros ─────────────────────────────────────────────────
   const [filtroTipo,   setFiltroTipo]   = useState("Todas");
-  const [filtroCiclo,  setFiltroCiclo]  = useState("");   // "2025" | ""
+  const [filtroCiclo,  setFiltroCiclo]  = useState("");   // "2027" | ""
   const [filtroPeriodo, setFiltroPeriodo] = useState(""); // "01" | "02" | ""
-
-  // Rango derivado del filtro de semestre
-  const { filtroDesde, filtroHasta } = useMemo(() => {
-    if (!filtroCiclo || !filtroPeriodo) return { filtroDesde: "", filtroHasta: "" };
-    const { desde, hasta } = rangoSemestre(parseInt(filtroCiclo), filtroPeriodo);
-    return { filtroDesde: desde, filtroHasta: hasta };
-  }, [filtroCiclo, filtroPeriodo]);
 
   const hayFiltroActivo = filtroTipo !== "Todas" || (filtroCiclo && filtroPeriodo);
 
-  function limpiarFiltros() {
-    setFiltroTipo("Todas");
-    setFiltroCiclo("");
-    setFiltroPeriodo("");
+  // Cambiar filtros reposiciona el calendario dentro del nuevo rango navegable (si lo hay).
+  function aplicarFiltros(cambios) {
+    const f = { tipo: filtroTipo, ciclo: filtroCiclo, periodo: filtroPeriodo, ...cambios };
+    setFiltroTipo(f.tipo); setFiltroCiclo(f.ciclo); setFiltroPeriodo(f.periodo);
+    const activo = f.tipo !== "Todas" || (f.ciclo && f.periodo);
+    if (!activo) return;
+    const nuevos = limitesNavegacion({
+      ciclo: f.ciclo, periodo: f.periodo, hoy, hayFiltroActivo: activo,
+      eventosFiltrados: filtrarEventos(eventos, f),
+    });
+    irMes(mesInicial(nuevos, hoy));
   }
+  const cambiarFiltroTipo    = (tipo) => aplicarFiltros({ tipo });
+  const cambiarFiltroCiclo   = (ciclo) => aplicarFiltros({ ciclo, periodo: "" });
+  const cambiarFiltroPeriodo = (periodo) => aplicarFiltros({ periodo });
+  const limpiarFiltros       = () => aplicarFiltros({ tipo: "Todas", ciclo: "", periodo: "" });
 
   // ── Derivados ────────────────────────────────────────────────
   const evsPorFecha = useMemo(() => {
@@ -177,69 +183,41 @@ export function useCalendarioInstitucional() {
     return info;
   }, [eventos, filtroTipo]);
 
-  const eventosFiltrados = useMemo(() => {
-    return eventos.filter(ev => {
-      if (filtroTipo !== "Todas" && ev.tipo !== filtroTipo) return false;
-      if (!filtroDesde && !filtroHasta) return true;
-      if (ev.tipo === "Periodo de prestación") {
-        const pIn = ev.fechaInicio || ""; const pFin = ev.fechaTermino || "";
-        if (filtroDesde && pFin && pFin < filtroDesde) return false;
-        if (filtroHasta && pIn  && pIn  > filtroHasta) return false;
-        return true;
-      }
-      const fp = fechaPrincipal(ev);
-      if (filtroDesde && fp < filtroDesde) return false;
-      if (filtroHasta && fp > filtroHasta) return false;
-      return true;
-    });
-  }, [eventos, filtroTipo, filtroDesde, filtroHasta]);
+  const eventosFiltrados = useMemo(
+    () => filtrarEventos(eventos, { tipo: filtroTipo, ciclo: filtroCiclo, periodo: filtroPeriodo }),
+    [eventos, filtroTipo, filtroCiclo, filtroPeriodo],
+  );
 
-  const { mesMin, anioMin, mesMax, anioMax } = useMemo(() => {
-    if (!hayFiltroActivo || eventosFiltrados.length === 0)
-      return { mesMin: null, anioMin: null, mesMax: null, anioMax: null };
-    const fechas = [];
-    eventosFiltrados.forEach(ev => {
-      if (ev.tipo === "Periodo de prestación") {
-        if (ev.fechaInicio)           fechas.push(ev.fechaInicio);
-        if (ev.fechaTermino)          fechas.push(ev.fechaTermino);
-        if (ev.fechaLimiteExpediente) fechas.push(ev.fechaLimiteExpediente);
-      } else if (ev.tipo === "Periodo vacacional") {
-        if (ev.fechaInicioVac) fechas.push(ev.fechaInicioVac);
-        if (ev.fechaFinVac)    fechas.push(ev.fechaFinVac);
-      } else { if (ev.fecha) fechas.push(ev.fecha); }
-    });
-    if (fechas.length === 0) return { mesMin: null, anioMin: null, mesMax: null, anioMax: null };
-    const sorted = [...fechas].sort();
-    const [yMin, mMin] = sorted[0].split("-").map(Number);
-    const [yMax, mMax] = sorted[sorted.length - 1].split("-").map(Number);
-    return { anioMin: yMin, mesMin: mMin - 1, anioMax: yMax, mesMax: mMax - 1 };
-  }, [hayFiltroActivo, eventosFiltrados]);
-
-  // Al cambiar filtro de semestre, saltar al primer mes con eventos
-  useEffect(() => {
-    if (!filtroDesde) return;
-    const [y, m] = filtroDesde.split("-").map(Number);
-    setAnio(y); setMes(m - 1);
-  }, [filtroDesde]);
+  const limites = useMemo(
+    () => limitesNavegacion({ ciclo: filtroCiclo, periodo: filtroPeriodo, hayFiltroActivo, eventosFiltrados, hoy }),
+    [filtroCiclo, filtroPeriodo, hayFiltroActivo, eventosFiltrados, hoy],
+  );
 
   // ── Navegación ───────────────────────────────────────────────
-  function irMesAnterior() {
-    const dA = mes === 0 ? anio - 1 : anio; const dM = mes === 0 ? 11 : mes - 1;
-    if (mesMin !== null && (dA < anioMin || (dA === anioMin && dM < mesMin))) return;
-    setAnio(dA); setMes(dM);
+  function irMes(destino) {
+    if (!destino) return;
+    setAnio(destino.anio); setMes(destino.mes);
   }
-  function irMesSiguiente() {
-    const dA = mes === 11 ? anio + 1 : anio; const dM = mes === 11 ? 0 : mes + 1;
-    if (mesMax !== null && (dA > anioMax || (dA === anioMax && dM > mesMax))) return;
-    setAnio(dA); setMes(dM);
-  }
+  function irMesAnterior()  { irMes(moverMes(anio, mes, -1, limites)); }
+  function irMesSiguiente() { irMes(moverMes(anio, mes, 1, limites)); }
+  function cambiarAnio(nuevo) { irMes(acotarMes(nuevo, mes, limites)); }
 
   // ── Form ─────────────────────────────────────────────────────
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    setForm(prev => {
+      const next = { ...prev, [name]: value };
+      if (name === "anio" || name === "semestre") {
+        const v = ventanaInicioPeriodo({ anio: next.anio, semestre: next.semestre, minFechaFutura });
+        if (v && next.fechaInicio && (next.fechaInicio < v.minDate || next.fechaInicio > v.maxDate)) next.fechaInicio = "";
+      }
+      if ((name === "fechaInicio" || name === "anio" || name === "semestre") && next.fechaInicio && next.fechaTermino
+        && next.fechaTermino <= next.fechaInicio) next.fechaTermino = "";
+      return next;
+    });
     if (errores[name])     setErrores(prev => ({ ...prev, [name]: null }));
     if (errores.conflicto) setErrores(prev => ({ ...prev, conflicto: null }));
+    setConfirmando(false);
   }
 
   function validar() {
@@ -252,29 +230,37 @@ export function useCalendarioInstitucional() {
       if (!form.hora) e.hora = "La hora es obligatoria.";
     }
     if (form.tipo === "Periodo de prestación") {
+      if (!/^\d{4}$/.test(form.anio)) e.anio = "El ciclo es obligatorio.";
+      if (!form.semestre)     e.semestre     = "El semestre es obligatorio.";
       if (!form.fechaInicio)  e.fechaInicio  = "La fecha de inicio es obligatoria.";
       if (!form.fechaTermino) e.fechaTermino = "La fecha de término es obligatoria.";
-      if (form.fechaInicio && form.fechaTermino && form.fechaTermino < form.fechaInicio)
+      if (form.fechaInicio && form.fechaTermino && form.fechaTermino <= form.fechaInicio)
         e.fechaTermino = "La fecha de término debe ser posterior a la de inicio.";
+      if (!form.fechaLimiteExpediente) e.fechaLimiteExpediente = "El límite de entrega de expediente es obligatorio.";
     }
     if (form.tipo === "Periodo vacacional") {
       if (!form.fechaInicioVac) e.fechaInicioVac = "La fecha de inicio es obligatoria.";
       if (!form.fechaFinVac)    e.fechaFinVac    = "La fecha de fin es obligatoria.";
-      if (form.fechaInicioVac && form.fechaFinVac && form.fechaFinVac < form.fechaInicioVac)
+      if (form.fechaInicioVac && form.fechaFinVac && form.fechaFinVac <= form.fechaInicioVac)
         e.fechaFinVac = "La fecha de fin debe ser posterior a la de inicio.";
     }
     return e;
   }
 
-  function cancelar() { setModo(null); setEvActivo(null); setForm(FORM_VACIO); setErrores({}); }
+  function volverAEditar() { setConfirmando(false); }
+
+  function cancelar() { setModo(null); setEvActivo(null); setForm(FORM_VACIO); setErrores({}); setConfirmando(false); }
 
   function abrirNuevo(fechaInicial = "") {
+    if (!puedeAdministrar || !contexto) return;
     setForm({ ...FORM_VACIO, fecha: fechaInicial });
     setErrores({}); setEvActivo(null); setModo("agregar");
   }
 
   function abrirEditar(ev) {
+    if (!puedeAdministrar || !ev.editable) return;
     setForm({
+      ...FORM_VACIO,
       nombre: ev.nombre, tipo: ev.tipo,
       fecha: ev.fecha || "", hora: ev.hora || "",
       fechaInicio: ev.fechaInicio || "", fechaTermino: ev.fechaTermino || "",
@@ -285,66 +271,87 @@ export function useCalendarioInstitucional() {
     setDiaSelec(ev.tipo === "Día inhábil" ? ev.fecha : ev.fechaInicio);
   }
 
-  function abrirEliminar(ev) { setEvActivo(ev); setModo("eliminar"); }
-
-  function handleGuardar() {
-    const e = validar();
-    if (Object.keys(e).length > 0) { setErrores(e); return; }
-    const nuevoEv =
-      form.tipo === "Periodo de prestación"
-        ? { tipo: form.tipo, nombre: form.nombre.trim(), fechaInicio: form.fechaInicio, fechaTermino: form.fechaTermino, fechaLimiteExpediente: form.fechaLimiteExpediente }
-      : form.tipo === "Periodo vacacional"
-        ? { tipo: form.tipo, nombre: form.nombre.trim(), fechaInicioVac: form.fechaInicioVac, fechaFinVac: form.fechaFinVac }
-      : { tipo: form.tipo, nombre: form.nombre.trim(), fecha: form.fecha, hora: form.hora };
-
-    if (modo === "agregar") {
-      setEventos(prev => [...prev, { ...nuevoEv, id: nextId++ }].sort((a, b) => fechaPrincipal(a).localeCompare(fechaPrincipal(b))));
-      mostrarToast("Evento agregado al calendario.");
-    } else {
-      setEventos(prev => prev.map(ev => ev.id === evActivo.id ? { ...nuevoEv, id: evActivo.id } : ev).sort((a, b) => fechaPrincipal(a).localeCompare(fechaPrincipal(b))));
-      mostrarToast("Evento actualizado correctamente.");
-    }
-    setUltimaMod(formatFechaHoraActual());
-    const fechaNav = form.tipo === "Día inhábil" ? form.fecha : form.tipo === "Periodo vacacional" ? form.fechaInicioVac : form.fechaInicio;
-    setDiaSelec(fechaNav);
-    if (fechaNav) { const [y, m] = fechaNav.split("-").map(Number); setAnio(y); setMes(m - 1); }
-    cancelar();
+  function abrirEliminar(ev) {
+    if (!puedeAdministrar || !ev.eliminable) return;
+    setEvActivo(ev); setModo("eliminar");
   }
 
-  function handleEliminar() {
-    setEventos(prev => prev.filter(ev => ev.id !== evActivo.id));
-    setUltimaMod(formatFechaHoraActual());
-    mostrarToast(`"${evActivo.nombre}" eliminado.`, "danger");
-    setDiaSelec(null); cancelar();
+  // Periodo y vacacional se publican con una confirmación previa; el día inhábil se guarda directo.
+  async function handleGuardar() {
+    const e = validar();
+    if (Object.keys(e).length > 0) { setErrores(e); return; }
+    if (modo === "agregar" && form.tipo !== "Día inhábil" && !confirmando) { setConfirmando(true); return; }
+
+    setGuardando(true);
+    try {
+      let idNuevo = null;
+      if (modo === "agregar") idNuevo = (await crearEventoCalendario(construirPayload(form, true))).evento.id;
+      else await actualizarInhabilCalendario(evActivo.id, construirPayload(form));
+
+      mostrarToast(modo === "agregar" ? "Evento agregado al calendario." : "Evento actualizado correctamente.");
+      const fechaNav = form.tipo === "Día inhábil" ? form.fecha : form.tipo === "Periodo vacacional" ? form.fechaInicioVac : form.fechaInicio;
+      setDiaSelec(fechaNav);
+      if (fechaNav) { const [y, m] = fechaNav.split("-").map(Number); irMes(acotarMes(y, m - 1, limites)); }
+      cancelar();
+      await cargar();
+      if (idNuevo !== null) resaltarEvento(idNuevo);
+    } catch (err) {
+      setErrores(erroresDeApi(err, form.tipo));
+      setConfirmando(false);
+      if (err.status === 404 || err.status === 409) cargar();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function handleEliminar() {
+    setGuardando(true);
+    try {
+      await eliminarEventoCalendario(evActivo.id);
+      mostrarToast(`"${evActivo.nombre}" eliminado.`, "danger");
+      setDiaSelec(null); cancelar();
+      await cargar();
+    } catch (err) {
+      mostrarToast(err.message, "danger");
+      cancelar();
+      if (err.status === 404 || err.status === 409) cargar();
+    } finally {
+      setGuardando(false);
+    }
   }
 
   function mostrarToast(msg, tipo = "success") {
     setToast({ msg, tipo });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 6000);
   }
 
+  // Un día anterior a la fecha de negocio del backend no inicia ni cambia un alta; sí puede seleccionarse.
   function handleClickDia(fechaISO) {
     if (modo === "eliminar") return;
     if (esFinDeSemana(fechaISO)) return;
+    const esPasado = hoy !== "" && fechaISO < hoy;
     if (modo === "agregar" || modo === "editar") {
+      if (esPasado) return;
       setForm(prev => ({ ...prev, fecha: fechaISO }));
       if (errores.fecha) setErrores(prev => ({ ...prev, fecha: null }));
       return;
     }
     setDiaSelec(fechaISO);
-    if (!evsPorFecha[fechaISO]) abrirNuevo(fechaISO);
+    if (!esPasado) abrirNuevo(fechaISO);
   }
 
   return {
-    hoy, eventos, eventosFiltrados, evsPorFecha, periodosPorFecha,
-    mes, setMes, anio, setAnio, diaSelec,
+    sesion, puedeAdministrar, tiposVisibles,
+    hoy, minFechaFutura, eventos, eventosFiltrados, evsPorFecha, periodosPorFecha,
+    cargando, errorCarga, recargar: cargar, guardando, confirmando, resaltadoId,
+    mes, anio, cambiarAnio, ciclosDisponibles, diaSelec,
     modo, evActivo, form, errores, toast, ultimaMod, tooltip, setTooltip,
-    filtroTipo, setFiltroTipo,
-    filtroCiclo, setFiltroCiclo,
-    filtroPeriodo, setFiltroPeriodo,
+    filtroTipo, setFiltroTipo: cambiarFiltroTipo,
+    filtroCiclo, setFiltroCiclo: cambiarFiltroCiclo,
+    filtroPeriodo, setFiltroPeriodo: cambiarFiltroPeriodo,
     hayFiltroActivo, limpiarFiltros,
     irMesAnterior, irMesSiguiente,
     handleChange, handleClickDia, handleGuardar, handleEliminar,
-    abrirNuevo, abrirEditar, abrirEliminar, cancelar,
+    abrirNuevo, abrirEditar, abrirEliminar, cancelar, volverAEditar,
   };
 }
