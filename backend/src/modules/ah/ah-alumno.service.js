@@ -223,7 +223,7 @@ async function iniciarJornada(alumnoUsuarioId) {
 
   const cumulo = await prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumno.boleta } });
   if (limiteHorasAlcanzado(cumulo)) {
-    throw crearError('Ya alcanzaste las 480 horas del servicio social.');
+    throw crearError('Ya completaste tus 480 horas de servicio social. No necesitas seguir registrando bitácoras.');
   }
 
   const actividades = await listarActividadesReportables(solicitud.id);

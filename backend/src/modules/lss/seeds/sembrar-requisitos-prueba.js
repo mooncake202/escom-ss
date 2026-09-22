@@ -1,18 +1,34 @@
 // sembrar-requisitos-prueba.js
 //
 // Script de prueba MANUAL (no seed automático de CI) para poder probar
-// CU-LSS-01 sin depender de los módulos reales de Reportes ni Ofertas
-// (ninguno de los dos existe todavía — las tablas sí, pero ningún
-// service/lógica real las usa hoy). NO construye ninguna lógica de
-// negocio de reportes ni de cambio de estado de oferta — solo inserta
-// filas de prueba directamente, con datos plausibles.
+// CU-LSS-01 sin depender del módulo real de Reportes (que existe en la
+// rama feature/reportes, todavía no fusionada aquí) ni de Ofertas. NO
+// construye ninguna lógica de negocio de reportes ni de cambio de estado
+// de oferta — solo inserta filas de prueba directamente, con datos
+// plausibles.
+//
+// Corregido: antes este script creaba filas en revision_reporte_mensual/
+// revision_reporte_global con estado='aprobado' para simular la
+// aprobación — eso ya NO es lo que calcularRequisitos (lss-alumno.service.js)
+// evalúa. El estado real de un reporte vive directo en
+// reporte_mensual.estado_reporte / reporte_global.estado_reporte (valor
+// 'aprobado_coordinador' cuando Coordinación aprobó definitivamente,
+// confirmado contra la documentación real del módulo Reportes) — así que
+// ahora este script escribe ESE campo directo y ya no crea ninguna fila
+// de revisión (no hace falta para que LSS los reconozca como aprobados).
+//
+// NOTA para cuando se fusione feature/reportes: ese módulo agrega 2
+// columnas NOT NULL a reporte_mensual (dias_laborados, horas_reportadas)
+// que esta rama todavía no tiene — este script no las llena porque hoy no
+// existen en el schema de esta rama; habrá que agregarlas aquí en cuanto
+// se haga el merge, o el INSERT fallará contra el schema fusionado.
 //
 // Qué hace, para la solicitud_registro indicada en SOLICITUD_REGISTRO_ID:
-//   1. Crea reporte_mensual (num_reporte 1..6) con su documento y su
-//      revision_reporte_mensual en estado 'aprobado' — idempotente, si ya
-//      existen 6 o más reportes aprobados para esa solicitud, los omite.
-//   2. Crea (si no existe) 1 reporte_global con su documento y su
-//      revision_reporte_global en estado 'aprobado'.
+//   1. Crea reporte_mensual (num_reporte 1..6) con su documento y
+//      estado_reporte='aprobado_coordinador' — idempotente, si ya existen
+//      6 o más reportes aprobados para esa solicitud, los omite.
+//   2. Crea (si no existe) 1 reporte_global con su documento y
+//      estado_reporte='aprobado_coordinador'.
 //   3. Si MARCAR_OFERTA_CONCLUIDA=true, actualiza
 //      oferta_servicio.estado_oferta = 'Concluida' para la oferta de esa
 //      solicitud (solo aplica de verdad a ofertas tipo_oferta='individual'
@@ -30,6 +46,12 @@
 
 const prisma = require('../../../lib/prisma');
 
+// Confirmado contra la documentación real del módulo Reportes (rama
+// feature/reportes) — mismo valor que ESTADOS_REPORTE.APROBADO_COORDINADOR
+// ahí. Duplicado aquí (no se importa: ese módulo no existe en esta rama
+// todavía) — mismo criterio ya aplicado en lss.shared.js.
+const ESTADO_REPORTE_APROBADO_COORDINADOR = 'aprobado_coordinador';
+
 const SOLICITUD_REGISTRO_ID = 1; // <-- edita este valor antes de correr
 const MARCAR_OFERTA_CONCLUIDA = false; // <-- true solo si quieres probar el requisito de oferta concluida
 
@@ -45,23 +67,15 @@ async function crearReporteMensualAprobado(solicitud, numReporte) {
     },
   });
 
+  // Ya NO se crea ninguna fila en revision_reporte_mensual — calcularRequisitos
+  // ya no la lee. El estado real y único que importa es este.
   const reporte = await prisma.reporte_mensual.create({
     data: {
       solicitud_registro_id: solicitud.id,
       documento_id: documento.id,
       num_reporte: numReporte,
       actividades_mes: `[PRUEBA] Actividades del mes ${numReporte}.`,
-      estado_reporte: 'aprobado',
-    },
-  });
-
-  await prisma.revision_reporte_mensual.create({
-    data: {
-      reporte_mensual_id: reporte.id,
-      usuario_id: solicitud.oferta.profesor.usuario_id,
-      tipo_revisor: 'profesor',
-      estado: 'aprobado',
-      fecha: new Date(),
+      estado_reporte: ESTADO_REPORTE_APROBADO_COORDINADOR,
     },
   });
 
@@ -85,17 +99,7 @@ async function crearReporteGlobalAprobado(solicitud) {
       solicitud_registro_id: solicitud.id,
       documento_id: documento.id,
       actividades_resumen: '[PRUEBA] Resumen global de actividades del servicio social.',
-      estado_reporte: 'aprobado',
-    },
-  });
-
-  await prisma.revision_reporte_global.create({
-    data: {
-      reporte_global_id: reporte.id,
-      usuario_id: solicitud.oferta.profesor.usuario_id,
-      tipo_revisor: 'profesor',
-      estado: 'aprobado',
-      fecha: new Date(),
+      estado_reporte: ESTADO_REPORTE_APROBADO_COORDINADOR,
     },
   });
 
@@ -125,10 +129,10 @@ async function main() {
   // 1. Reportes mensuales (6, idempotente por num_reporte).
   const existentes = await prisma.reporte_mensual.findMany({
     where: { solicitud_registro_id: solicitud.id },
-    include: { revision_reporte_mensual: { orderBy: { fecha: 'desc' } } },
+    select: { num_reporte: true, estado_reporte: true },
   });
   const numsExistentesAprobados = new Set(
-    existentes.filter((r) => r.revision_reporte_mensual[0]?.estado === 'aprobado').map((r) => r.num_reporte),
+    existentes.filter((r) => r.estado_reporte === ESTADO_REPORTE_APROBADO_COORDINADOR).map((r) => r.num_reporte),
   );
 
   const creados = [];
@@ -145,9 +149,9 @@ async function main() {
   // 2. Reporte global (1, idempotente).
   const globalExistente = await prisma.reporte_global.findFirst({
     where: { solicitud_registro_id: solicitud.id },
-    include: { revision_reporte_global: { orderBy: { fecha: 'desc' } } },
+    select: { id: true, estado_reporte: true },
   });
-  if (globalExistente?.revision_reporte_global[0]?.estado === 'aprobado') {
+  if (globalExistente?.estado_reporte === ESTADO_REPORTE_APROBADO_COORDINADOR) {
     console.log(`↷ Ya existe reporte_global id=${globalExistente.id} aprobado — se omite.`);
   } else {
     const global = await crearReporteGlobalAprobado(solicitud);
@@ -171,7 +175,7 @@ async function main() {
 
   console.log('\n--- Verificación en BD ---');
   const totalMensualesAprobados = await prisma.reporte_mensual.count({
-    where: { solicitud_registro_id: solicitud.id, revision_reporte_mensual: { some: { estado: 'aprobado' } } },
+    where: { solicitud_registro_id: solicitud.id, estado_reporte: ESTADO_REPORTE_APROBADO_COORDINADOR },
   });
   console.log(`reporte_mensual aprobados para esta solicitud: ${totalMensualesAprobados}`);
   const ofertaActual = await prisma.oferta_servicio.findUnique({ where: { id: solicitud.oferta.id } });
@@ -180,9 +184,7 @@ async function main() {
   console.log('\nRecuerda: este script NO toca cumulo_horas_y_faltas. Para simular las 480h netas, ajusta');
   console.log('manualmente esa fila (horas_acumuladas - horas_rechazadas >= 480) o regístralas con datos');
   console.log('reales de AH-03. Para revertir manualmente lo que creó este script:');
-  console.log(`  DELETE FROM revision_reporte_mensual WHERE reporte_mensual_id IN (SELECT id FROM reporte_mensual WHERE solicitud_registro_id=${solicitud.id});`);
   console.log(`  DELETE FROM reporte_mensual WHERE solicitud_registro_id=${solicitud.id};`);
-  console.log(`  DELETE FROM revision_reporte_global WHERE reporte_global_id IN (SELECT id FROM reporte_global WHERE solicitud_registro_id=${solicitud.id});`);
   console.log(`  DELETE FROM reporte_global WHERE solicitud_registro_id=${solicitud.id};`);
   console.log(`  DELETE FROM documento WHERE ruta_archivo LIKE '/seed/reporte-%-${solicitud.id}%';`);
 

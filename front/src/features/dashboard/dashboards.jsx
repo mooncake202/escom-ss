@@ -9,7 +9,7 @@ import {
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
-import { ESTADO_LSS_A_RUTA, RUTA_LSS_FALLBACK } from "@/features/liberacion-ss/utils/estadoRutasLSS";
+import { ESTADO_LSS_A_RUTA, RUTA_LSS_FALLBACK, RUTA_LSS_SIN_PROCESO } from "@/features/liberacion-ss/utils/estadoRutasLSS";
 
 // Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
 // revisado contra el catálogo completo de Parte 2. `carta:*` no tiene campo
@@ -423,6 +423,16 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
                   <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
                 </div>
               </div>
+          )}
+          {/* Botón del estado 2 — cumple requisitos pero AÚN no existe
+              liberacion_proceso: lleva a CREAR uno (CU-LSS-01). Distinto del
+              botón de "Ver proceso" de abajo (ese es para cuando ya existe
+              un proceso que consultar). */}
+          {resumen.cumpleRequisitosLiberacion && (
+            <>
+              <ActionItem icon="arrow" {...T.slate} label="Iniciar proceso de liberación" desc="Solicita tu evaluación de desempeño y comienza tu proceso" onClick={() => navigate(RUTA_LSS_SIN_PROCESO)} C={C} />
+              <SlotNotificacion ruta={RUTA_LSS_SIN_PROCESO} notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+            </>
           )}
           {/* Botón "Ver proceso" — INDEPENDIENTE del widget de arriba, con la
               condición casi inversa a propósito: se muestra SIEMPRE que ya

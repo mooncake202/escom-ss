@@ -18,8 +18,8 @@ function segundosAHHMM(seg) {
 const AVANCE_VACIO = { actividadId: "", progreso: 0, descripcion: "", evidencia: "" };
 
 const MENSAJES_BLOQUEO = {
+  limiteHorasAlcanzado: "Ya completaste tus 480 horas de servicio social. No necesitas seguir registrando bitácoras.",
   sinActividades: "No tienes actividades asignadas. Tu profesor debe asignarte al menos una antes de que puedas registrar bitácora.",
-  limiteHorasAlcanzado: "Ya completaste las 480 horas de tu servicio social.",
   noEsDiaLaborable: "Hoy no es día laborable (fin de semana, día inhábil o periodo vacacional). No puedes iniciar una jornada.",
   yaRegistroHoy: "Ya registraste tu bitácora de hoy. Vuelve mañana para registrar tu siguiente jornada.",
 };
@@ -202,9 +202,14 @@ export function useRegistrarBitacora() {
   const tiempoRestante = Math.max(limiteSeg - segundos, 0);
 
   const bloqueos = estado?.bloqueos ?? {};
+  // Prioridad: el límite de 480h va PRIMERO — un alumno que ya terminó su
+  // servicio casi siempre también completó (o le quedan sin asignar) todas
+  // sus actividades reportables, así que sinActividades suele ser true al
+  // mismo tiempo; sin esta prioridad se mostraba el mensaje equivocado
+  // ("sin actividades" en vez de "ya completaste tus horas").
   const mensajeBloqueo =
-    (bloqueos.sinActividades && MENSAJES_BLOQUEO.sinActividades) ||
     (bloqueos.limiteHorasAlcanzado && MENSAJES_BLOQUEO.limiteHorasAlcanzado) ||
+    (bloqueos.sinActividades && MENSAJES_BLOQUEO.sinActividades) ||
     (bloqueos.noEsDiaLaborable && MENSAJES_BLOQUEO.noEsDiaLaborable) ||
     (bloqueos.yaRegistroHoy && MENSAJES_BLOQUEO.yaRegistroHoy) ||
     null;

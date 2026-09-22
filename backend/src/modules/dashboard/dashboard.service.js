@@ -132,7 +132,12 @@ async function resumenAlumno(usuarioId) {
     actividadesAsignadas,
     reportesEnviados,
     actividadesPendientes,
-    bitacoraHoyPendiente,
+    // No tiene sentido pedirle al alumno su bitácora del día si ya completó
+    // sus 480h netas — mismo criterio ya usado en iniciarJornada y en el
+    // cron de faltas (limiteHorasAlcanzado sobre el cumulo ya cargado
+    // arriba, sin queries nuevas). jornadaSinTerminar NO se toca: sigue
+    // siendo un pendiente real sin importar el total acumulado.
+    bitacoraHoyPendiente: bitacoraHoyPendiente && !limiteHorasAlcanzado(alumno.cumulo_horas_y_faltas),
     jornadaSinTerminar,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),

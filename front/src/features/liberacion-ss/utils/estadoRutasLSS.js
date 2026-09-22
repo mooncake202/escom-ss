@@ -19,12 +19,17 @@ export const RUTA_LSS_FALLBACK = RUTA_LSS_SIN_PROCESO;
 
 export const ESTADO_LSS_A_RUTA = {
   // CU-LSS-02 — real: lo escribe iniciarEvaluacion (CU-LSS-01, ya construido).
+  // Los 4 alternos de CU-LSS-02 (sin evaluar / rechazado / pendiente
+  // coordinación / ambas firmas) viven DENTRO de esta misma ruta — no
+  // cambian liberacion_proceso.estado, solo evaluacion_desempeno.
   evaluacion_solicitada: "/alumno/seguimiento-evaluacion",
 
-  // TODO(LSS-03/04): agregar aquí el/los estado(s) reales que produzca la
-  // evaluación de desempeño (profesor/coordinación) cuando ese CU exista.
-  // TODO(LSS-05/06): agregar aquí el/los estado(s) reales de carta término
-  // cuando ese CU exista.
+  // CU-LSS-02 (esta tarea) — real: lo escribe solicitarCartaTermino, al
+  // completar el Alterno D (descargó + subió a SISS + solicitó).
+  solicitud_carta_termino: "/alumno/seguimiento-carta-termino",
+
+  // TODO(LSS-06): agregar aquí el/los estado(s) reales de carta término
+  // (una vez entregada) cuando ese CU exista.
   // TODO(LSS-07): agregar aquí el/los estado(s) reales de integración de
   // expediente cuando ese CU exista.
   // TODO(LSS-08/09): agregar aquí el/los estado(s) reales de evaluación de
