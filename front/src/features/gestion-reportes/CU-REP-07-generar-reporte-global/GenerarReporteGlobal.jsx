@@ -143,32 +143,17 @@ export default function GenerarReporteGlobal() {
     );
   }
 
-  // ── Horas insuficientes: se muestran las acumuladas (en el PDF nunca) ─
+  // ── Horas insuficientes: solo el aviso de las horas requeridas (no se muestra el avance del alumno) ─
   if (!horas.suficientes) {
-    const porcentaje = Math.min(Math.round((horas.acumuladas / horas.requeridas) * 100), 100);
     return (
       <Layout usuario={nombreAlumno}>
         {flechaAtras}
-        <div style={{ ...tarjeta, textAlign: "left", padding: "2rem 1.75rem" }}>
+        <div style={tarjeta}>
           {icono(C.warningSoft, C.warning, <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>)}
-          <h3 style={{ margin: "0 0 0.5rem", fontSize: 17, fontWeight: 700, color: C.textPrimary, textAlign: "center" }}>Horas insuficientes</h3>
-          <p style={{ margin: "0 0 1.5rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6, textAlign: "center" }}>
+          <h3 style={{ margin: "0 0 0.5rem", fontSize: 17, fontWeight: 700, color: C.textPrimary }}>Horas insuficientes</h3>
+          <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
             Para generar el reporte global debes acumular <strong style={{ color: C.textPrimary }}>{horas.requeridas} horas</strong> de bitácoras aprobadas.
-            Actualmente llevas <strong style={{ color: C.warning }}>{horas.acumuladas} horas</strong>.
           </p>
-          <div>
-            <div style={{
-              display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 700, color: C.textDisabled,
-              textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6,
-            }}>
-              <span>Progreso</span>
-              <span>{horas.acumuladas} / {horas.requeridas} h</span>
-            </div>
-            <div style={{ height: 8, borderRadius: RADIUS.full, background: C.bgInput, border: `1px solid ${C.borderDefault}`, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${porcentaje}%`, background: C.warning, borderRadius: RADIUS.full, transition: "width 0.4s ease" }} />
-            </div>
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: C.textDisabled, textAlign: "right" }}>{porcentaje}% completado</p>
-          </div>
         </div>
       </Layout>
     );

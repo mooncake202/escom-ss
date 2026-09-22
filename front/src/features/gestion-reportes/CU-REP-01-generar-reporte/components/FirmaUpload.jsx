@@ -12,7 +12,7 @@ export function FirmaUpload({ firma, firmaUrl, error, onChange, C }) {
       </p>
       <p style={{ margin: "0 0 1.25rem", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
         Sube una imagen de tu firma en formato PNG o JPG. Esta firma se guardará
-        y se usará automáticamente en tus reportes futuros; solo se registra una vez.
+        y se usará automáticamente en tus reportes futuros.
       </p>
 
       {/* Preview de firma */}

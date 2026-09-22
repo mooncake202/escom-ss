@@ -124,7 +124,6 @@ export function ReporteDetalle({
             <h2 style={{ margin: "4px 0 0", fontSize: 17, color: C.textPrimary, fontWeight: 700 }}>
               {reporte.alumno.nombreCompleto}
             </h2>
-            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textMuted }}>{etiquetaReporte(reporte)}</p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <EstatusBadge estado={reporte.estadoReporte} C={C} />
