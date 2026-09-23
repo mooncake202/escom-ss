@@ -645,12 +645,16 @@ function FormularioUsuario({
               </Campo>
             </div>
 
+            {/* Un profesor tiene 0 o 1 característica. Al dar de alta se elige aquí (selección
+                excluyente); después ya no se cambia desde CRED, solo por CU-ADM-15/16, así que
+                en edición esta lista queda como información de solo lectura. */}
             <div style={{ gridColumn: "span 2" }}>
-              <Campo label="Característica">
+              <Campo label={esEditar ? "Característica (solo lectura)" : "Característica"}>
                 <div style={{
                   border: `1px solid ${C.borderDefault}`,
                   borderRadius: RADIUS.md,
                   overflow: "hidden",
+                  opacity: esEditar ? 0.75 : 1,
                 }}>
                   <div style={{
                     padding: "8px 12px",
@@ -681,14 +685,11 @@ function FormularioUsuario({
                     return (
                       <div
                         key={nombre}
-                        onClick={() => {
-                          const nuevas = activa
-                            ? form.caracteristicas.filter((c) => c !== nombre)
-                            : [...form.caracteristicas, nombre];
-                          set("caracteristicas", nuevas);
-                        }}
+                        // Excluyente: elegir otra reemplaza a la actual y volver a tocar la
+                        // activa la retira (profesor de base, solo los 3 cupos).
+                        onClick={esEditar ? undefined : () => set("caracteristicas", activa ? [] : [nombre])}
                         style={{
-                          padding: "8px 12px", cursor: "pointer",
+                          padding: "8px 12px", cursor: esEditar ? "default" : "pointer",
                           background: activa ? "rgba(10,77,181,0.05)" : "transparent",
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           borderBottom: `1px solid ${C.borderSubtle}`,
@@ -696,8 +697,9 @@ function FormularioUsuario({
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {/* Redondo, no cuadrado: la selección es excluyente, no acumulativa. */}
                           <span style={{
-                            width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                            width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
                             border: `2px solid ${activa ? "#0A4DB5" : C.borderDefault}`,
                             background: activa ? "#0A4DB5" : "transparent",
                             display: "inline-flex", alignItems: "center", justifyContent: "center",
@@ -723,6 +725,15 @@ function FormularioUsuario({
                     );
                   })}
                 </div>
+                {esEditar && (
+                  <p style={{
+                    margin: "6px 0 0", fontSize: 11, color: C.textDisabled,
+                    fontFamily: "'DM Sans', system-ui, sans-serif",
+                  }}>
+                    La característica de un profesor ya dado de alta solo cambia mediante una
+                    solicitud de modificación de características.
+                  </p>
+                )}
               </Campo>
             </div>
 
@@ -877,13 +888,14 @@ export default function RegistroProfesores() {
         nombre: formData.nombre,
         apellidos: formData.apellidos,
         correo_institucional: formData.correo_institucional,
+        // Sin `caracteristicas`: al editar, CRED no cambia la característica ni los cupos
+        // derivados de ella (eso pasa por CU-ADM-15/16); el backend también lo ignora.
         ...(formData.rol === "Profesor"
           ? {
               departamento: formData.departamento,
               telefono_personal: formData.telefono_personal,
               horario_atencion: formData.horario_atencion,
               cubiculo: formData.cubiculo,
-              caracteristicas: formData.caracteristicas,
             }
           : {}),
       };

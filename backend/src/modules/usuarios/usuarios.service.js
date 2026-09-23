@@ -12,6 +12,38 @@ const {
 const CUPOS_BASE = 3;
 const MINUTOS_VIGENCIA_TOKEN = 30; // RN-CRED-03
 
+/**
+ * Un profesor tiene 0 o 1 característica VIGENTE y vive en profesor.caracteristica_id.
+ * Su capacidad se deriva siempre de ella: CUPOS_BASE + incremento (CUPOS_BASE si no tiene).
+ *
+ * `solicitud_caracteristica` NO representa la vigencia: es el historial de solicitudes de
+ * CU-ADM-15/16 (pendiente | aprobada | rechazada). Por eso este módulo nunca la escribe —
+ * ni siquiera en el alta, donde el coordinador asigna la característica directamente.
+ *
+ * El contrato con el frontend sigue siendo `caracteristicas: string[]`, ahora de 0 o 1 nombre.
+ */
+async function resolverCaracteristicaVigente(caracteristicas) {
+  if (caracteristicas.length === 0) return null;
+
+  if (caracteristicas.length > 1) {
+    const error = new Error('Un profesor solo puede tener una característica a la vez.');
+    error.status = 400;
+    throw error;
+  }
+
+  const caracteristica = await prisma.caracteristica.findUnique({
+    where: { nombre: caracteristicas[0] },
+  });
+
+  if (!caracteristica) {
+    const error = new Error('La característica seleccionada no es válida.');
+    error.status = 400;
+    throw error;
+  }
+
+  return caracteristica;
+}
+
 function validarDatosBasicos({ nombre, apellidos, correo_institucional, rol }) {
   validarNombreOApellidos(nombre, 'El nombre');
   validarNombreOApellidos(apellidos, 'Los apellidos');
@@ -48,23 +80,13 @@ async function crearUsuario(datos, creadoPorId) {
     throw error;
   }
 
-  // Resuelve las características solicitadas contra el catálogo real (nunca se confía
-  // en nombres mandados desde el frontend sin validarlos contra la BD).
-  let caracteristicasEncontradas = [];
-  if (rol === 'profesor' && caracteristicas.length > 0) {
-    caracteristicasEncontradas = await prisma.caracteristica.findMany({
-      where: { nombre: { in: caracteristicas } },
-    });
+  // Resuelve la característica contra el catálogo real (nunca se confía en un nombre
+  // mandado desde el frontend sin validarlo contra la BD).
+  const caracteristicaVigente = rol === 'profesor'
+    ? await resolverCaracteristicaVigente(caracteristicas)
+    : null;
 
-    if (caracteristicasEncontradas.length !== caracteristicas.length) {
-      const error = new Error('Una o más características seleccionadas no son válidas.');
-      error.status = 400;
-      throw error;
-    }
-  }
-
-  const incrementoTotal = caracteristicasEncontradas.reduce((sum, c) => sum + c.incremento_cupos, 0);
-  const cuposTotales = CUPOS_BASE + incrementoTotal;
+  const cuposTotales = CUPOS_BASE + (caracteristicaVigente?.incremento_cupos ?? 0);
 
   const contrasenaHash = await bcrypt.hash(generarContrasenaAleatoria(), 10);
   const token = generarTokenSeguro();
@@ -86,7 +108,9 @@ async function crearUsuario(datos, creadoPorId) {
     });
 
     if (rol === 'profesor') {
-      const profesorCreado = await tx.profesor.create({
+      // La característica del alta se asigna directamente: no nace de una solicitud,
+      // así que no se registra nada en solicitud_caracteristica.
+      await tx.profesor.create({
         data: {
           usuario_id: usuarioCreado.id,
           departamento,
@@ -94,21 +118,9 @@ async function crearUsuario(datos, creadoPorId) {
           horario_atencion: datos.horario_atencion || '',
           cubiculo: datos.cubiculo || '',
           cupos_totales: cuposTotales,
+          caracteristica_id: caracteristicaVigente?.id ?? null,
         },
       });
-
-      if (caracteristicasEncontradas.length > 0) {
-        await tx.solicitud_caracteristica.createMany({
-          data: caracteristicasEncontradas.map((c) => ({
-            profesor_id: profesorCreado.id,
-            caracteristica_id: c.id,
-            justificacion: 'Asignada por el coordinador al momento de creación de cuenta.',
-            estado: 'aprobada',
-            fecha: ahora,
-            fecha_respuesta: ahora,
-          })),
-        });
-      }
     } else if (rol === 'coordinador') {
       await tx.coordinador.create({
         data: { usuario_id: usuarioCreado.id },
@@ -175,21 +187,14 @@ async function reenviarCorreoBienvenida(usuarioId) {
 
 /**
  * Lista profesores y coordinadores para la pantalla de gestión de usuarios.
- * Incluye datos de perfil y características aprobadas cuando aplica.
+ * La característica es la VIGENTE (profesor.caracteristica), nunca el historial de solicitudes.
  */
 async function listarUsuarios() {
   const usuarios = await prisma.usuario.findMany({
     where: { rol: { in: ['profesor', 'coordinador'] } },
     orderBy: { fecha_creacion: 'desc' },
     include: {
-      profesor: {
-        include: {
-          solicitud_caracteristica: {
-            where: { estado: 'aprobada' },
-            include: { caracteristica: true },
-          },
-        },
-      },
+      profesor: { include: { caracteristica: true } },
       coordinador: true,
     },
   });
@@ -209,7 +214,8 @@ async function listarUsuarios() {
           horario_atencion: u.profesor.horario_atencion,
           cubiculo: u.profesor.cubiculo,
           cupos_totales: u.profesor.cupos_totales,
-          caracteristicas: u.profesor.solicitud_caracteristica.map((sc) => sc.caracteristica.nombre),
+          // Arreglo de 0 o 1 elemento: el contrato con el frontend sigue siendo una lista.
+          caracteristicas: u.profesor.caracteristica ? [u.profesor.caracteristica.nombre] : [],
         }
       : {}),
   }));
@@ -218,9 +224,12 @@ async function listarUsuarios() {
 /**
  * Edición completa de un usuario (solo Coordinador). A diferencia de
  * crearUsuario, aquí SÍ se permite tocar correo_institucional, así que se
- * revalida unicidad excluyendo al propio usuario. Si es profesor, reemplaza
- * por completo el set de características (borra y vuelve a crear) y
- * recalcula cupos_totales.
+ * revalida unicidad excluyendo al propio usuario.
+ *
+ * CRED NO cambia la característica de un profesor ni los cupos derivados de ella:
+ * después del alta, eso pasa exclusivamente por CU-ADM-15/16. Un `caracteristicas`
+ * en el cuerpo se ignora a propósito (los clientes viejos lo siguen mandando), y
+ * ni `caracteristica_id` ni `cupos_totales` se escriben aquí.
  */
 async function actualizarUsuario(id, datos) {
   const usuario = await prisma.usuario.findUnique({
@@ -242,7 +251,6 @@ async function actualizarUsuario(id, datos) {
     telefono_personal,
     horario_atencion,
     cubiculo,
-    caracteristicas = [],
   } = datos;
 
   validarNombreOApellidos(nombre, 'El nombre');
@@ -263,22 +271,6 @@ async function actualizarUsuario(id, datos) {
     }
   }
 
-  let caracteristicasEncontradas = [];
-  if (usuario.rol === 'profesor' && caracteristicas.length > 0) {
-    caracteristicasEncontradas = await prisma.caracteristica.findMany({
-      where: { nombre: { in: caracteristicas } },
-    });
-    if (caracteristicasEncontradas.length !== caracteristicas.length) {
-      const error = new Error('Una o más características seleccionadas no son válidas.');
-      error.status = 400;
-      throw error;
-    }
-  }
-
-  const incrementoTotal = caracteristicasEncontradas.reduce((sum, c) => sum + c.incremento_cupos, 0);
-  const cuposTotales = CUPOS_BASE + incrementoTotal;
-  const ahora = new Date();
-
   await prisma.$transaction(async (tx) => {
     await tx.usuario.update({
       where: { id },
@@ -286,6 +278,7 @@ async function actualizarUsuario(id, datos) {
     });
 
     if (usuario.rol === 'profesor') {
+      // Solo datos de contacto: caracteristica_id y cupos_totales quedan intactos.
       await tx.profesor.update({
         where: { usuario_id: id },
         data: {
@@ -293,25 +286,8 @@ async function actualizarUsuario(id, datos) {
           telefono_personal: telefono_personal || '',
           horario_atencion: horario_atencion || '',
           cubiculo: cubiculo || '',
-          cupos_totales: cuposTotales,
         },
       });
-
-      // Reemplaza el set completo de características.
-      await tx.solicitud_caracteristica.deleteMany({ where: { profesor_id: usuario.profesor.id } });
-
-      if (caracteristicasEncontradas.length > 0) {
-        await tx.solicitud_caracteristica.createMany({
-          data: caracteristicasEncontradas.map((c) => ({
-            profesor_id: usuario.profesor.id,
-            caracteristica_id: c.id,
-            justificacion: 'Actualizada por el coordinador al editar la cuenta.',
-            estado: 'aprobada',
-            fecha: ahora,
-            fecha_respuesta: ahora,
-          })),
-        });
-      }
     }
   });
 

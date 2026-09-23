@@ -17,12 +17,6 @@ Todos los valores en minúsculas; palabras compuestas separadas con guion bajo (
 - `cerrada`
 
 
-## Módulo: Gestión Administrativa
-Solicitudes de modificación de característica
-- `pendiente`
-- `aprobada`
-- `rechazada`
----
 
 ## Módulo: Gestión Reportes
 
@@ -80,3 +74,13 @@ Valores:
 - alumno
 - profesor
 - coordinador
+
+## Módulo: Gestión Administrativa
+Solicitudes de modificación de característica
+solicitud_caracteristica:
+- pendiente: En espera de revisión por Coordinación.
+- aprobada: Solicitud aprobada y cambio aplicado.
+- rechazada: Solicitud rechazada sin aplicar cambios.
+
+Transiciones:
+pendiente → aprobada | rechazada

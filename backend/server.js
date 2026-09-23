@@ -89,6 +89,9 @@ app.use('/coordinador', require('./src/modules/reportes/reportes-coordinacion.ro
 //ADM08 — Calendario institucional (lectura: todos los roles; escritura: coordinador)
 app.use('/calendario', require('./src/modules/administrativa/calendario/calendario.routes'));
 
+//ADM15/ADM16 — Solicitudes de modificación de características (profesor solicita, coordinación resuelve)
+app.use('/solicitudes-caracteristicas', require('./src/modules/administrativa/caracteristicas/caracteristicas.routes'));
+
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');

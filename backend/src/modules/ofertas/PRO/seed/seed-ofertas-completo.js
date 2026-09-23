@@ -1,8 +1,12 @@
 // seed-ofertas-completo.js
 //
-// Seed AUTOCONTENIDO para probar el módulo de Gestión de Ofertas (CU-PRO).
-// No depende de ningún otro seed (seedCaracteristicas.js, seed-test-users.js,
-// seed-profesores-test.js, etc.) — crea desde cero todo lo que necesita.
+// Seed para probar el módulo de Gestión de Ofertas (CU-PRO). Crea desde cero
+// usuarios, carreras y ofertas; no depende de seed-test-users.js ni de
+// seed-profesores-test.js.
+//
+// ÚNICO requisito previo: el catálogo de características, que ya no se define
+// aquí sino en backend/src/lib/seedCaracteristicas.js (fuente única de verdad):
+//   node backend/src/lib/seedCaracteristicas.js
 //
 // Idempotente: usa findFirst/findUnique/upsert antes de crear, se puede
 // correr varias veces sin duplicar nada.
@@ -16,12 +20,14 @@ const prisma = require('../../../../lib/prisma');
 
 const PASSWORD_PLANO = '12345678';
 
+// Capacidad base de todo profesor; su total es CUPOS_BASE + incremento de su característica vigente.
+const CUPOS_BASE = 3;
+
 const CARRERAS = ['ISC', 'LCD', 'IIA'];
 
-const CARACTERISTICAS = [
-  { nombre: 'Investigador', incremento_cupos: 1 },
-  { nombre: 'Coordinador', incremento_cupos: 2 },
-];
+// El catálogo de características NO se define aquí: su única fuente de verdad es
+// backend/src/lib/seedCaracteristicas.js. Este seed solo lee las que necesita.
+const CARACTERISTICAS_REQUERIDAS = ['Investigador'];
 
 async function crearCarreras() {
   for (const nombre of CARRERAS) {
@@ -30,16 +36,19 @@ async function crearCarreras() {
   }
 }
 
-async function crearCaracteristicas() {
-  const creadas = {};
-  for (const c of CARACTERISTICAS) {
-    creadas[c.nombre] = await prisma.caracteristica.upsert({
-      where: { nombre: c.nombre },
-      update: {},
-      create: { nombre: c.nombre, incremento_cupos: c.incremento_cupos },
-    });
+async function leerCaracteristicas() {
+  const leidas = {};
+  for (const nombre of CARACTERISTICAS_REQUERIDAS) {
+    const caracteristica = await prisma.caracteristica.findUnique({ where: { nombre } });
+    if (!caracteristica) {
+      throw new Error(
+        `No existe la característica '${nombre}' en el catálogo. `
+        + 'Corre primero: node backend/src/lib/seedCaracteristicas.js',
+      );
+    }
+    leidas[nombre] = caracteristica;
   }
-  return creadas;
+  return leidas;
 }
 
 async function crearUsuarioBase({ correo_institucional, nombre, apellidos, rol, hash }) {
@@ -100,35 +109,13 @@ async function crearProfesor({ correo, nombre, apellidos, cupos_totales, hash })
   return profesor;
 }
 
-// Devuelve si la solicitud_caracteristica fue creada AHORA (para que el
-// caller solo recalcule cupos_totales la primera vez, y el seed sea
-// idempotente incluso si en el futuro incremento_cupos > 0).
-async function asignarCaracteristicaAprobada(profesorId, caracteristica) {
-  const existente = await prisma.solicitud_caracteristica.findFirst({
-    where: { profesor_id: profesorId, caracteristica_id: caracteristica.id },
-  });
-  if (existente) return { solicitud: existente, creada: false };
-
-  const solicitud = await prisma.solicitud_caracteristica.create({
-    data: {
-      profesor_id: profesorId,
-      caracteristica_id: caracteristica.id,
-      justificacion: 'Proyecto de investigación registrado ante SIP (dato de prueba).',
-      estado: 'aprobada',
-      fecha: new Date(),
-      fecha_respuesta: new Date(),
-    },
-  });
-  return { solicitud, creada: true };
-}
-
 async function main() {
   console.log('Sembrando datos de prueba para Gestión de Ofertas (CU-PRO)...');
 
   const hash = await bcrypt.hash(PASSWORD_PLANO, 10);
 
   await crearCarreras();
-  const caracteristicas = await crearCaracteristicas();
+  const caracteristicas = await leerCaracteristicas();
 
   await crearCoordinador(hash);
 
@@ -146,18 +133,21 @@ async function main() {
     correo: 'profesor.investigador@ipn.mx', nombre: 'Profesor', apellidos: 'Investigador',
     cupos_totales: 3, hash,
   });
-  const { creada } = await asignarCaracteristicaAprobada(profesorInvestigador.id, caracteristicas['Investigador']);
-  if (creada) {
-    const nuevoTotal = profesorInvestigador.cupos_totales + caracteristicas['Investigador'].incremento_cupos;
-    await prisma.profesor.update({
-      where: { id: profesorInvestigador.id },
-      data: { cupos_totales: nuevoTotal },
-    });
-  }
+  // Característica INICIAL vigente, asignada directamente igual que en un alta de CRED:
+  // no simula una solicitud de CU-ADM-15/16, así que no se escribe solicitud_caracteristica.
+  // Idempotente: el valor no depende del estado previo del profesor.
+  const investigador = caracteristicas['Investigador'];
+  await prisma.profesor.update({
+    where: { id: profesorInvestigador.id },
+    data: {
+      caracteristica_id: investigador.id,
+      cupos_totales: CUPOS_BASE + investigador.incremento_cupos,
+    },
+  });
 
   await crearProfesor({
     correo: 'profesor.volumen@ipn.mx', nombre: 'Profesor', apellidos: 'Volumen',
-    cupos_totales: 20, hash,
+    cupos_totales: CUPOS_BASE, hash,
   });
 
   console.log('Seed completado. Usuarios de prueba (password: 12345678):');
@@ -165,7 +155,7 @@ async function main() {
   console.log('  profesor.normal@ipn.mx           (3 cupos, sin características)');
   console.log('  profesor.sininvestigador@ipn.mx  (3 cupos, sin características)');
   console.log('  profesor.investigador@ipn.mx     (3 base + 1 Investigador = 4 cupos)');
-  console.log('  profesor.volumen@ipn.mx          (20 cupos, para pruebas de volumen)');
+  console.log('  profesor.volumen@ipn.mx          (3 cupos, sin características)');
 }
 
 main()

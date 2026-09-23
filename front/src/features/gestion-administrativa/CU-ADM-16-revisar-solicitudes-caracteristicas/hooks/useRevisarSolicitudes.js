@@ -1,167 +1,224 @@
-import { useState, useMemo } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  listarSolicitudesCaracteristica,
+  obtenerSolicitudCaracteristica,
+  aprobarSolicitudCaracteristica,
+  rechazarSolicitudCaracteristica,
+} from "@/services/caracteristicasService";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 
-const COORDINACION = { nombre: "Lic. Morales Vega" };
+export const VISTA = { PENDIENTES: "pendientes", RESUELTAS: "resueltas" };
 
-const MOCK_SOLICITUDES = [
-  {
-    id: 1,
-    profesor: {
-      nombre: "Dr. Torres Vega",
-      id: "PTC-2024-0187",
-      cuposActuales: 3,
-      caracteristicasActuales: [
-        { nombre: "Profesor de base", cuposInfo: "3 cupos de base" },
-      ],
-    },
-    caracteristica: { id: 1, nombre: "Presidente de academia", cuposRef: "+2 cupos", cuposIncremento: 2 },
-    justificacion: "Llevo 5 años coordinando la academia de matemáticas aplicadas. Actualmente dirijo a 8 profesores y requiero cupos adicionales para absorber a los alumnos que no encuentran lugar con otros profesores.",
-    fechaEnvio: "10 de mayo de 2026",
-    estado: "Pendiente",
-    fechaRespuesta: null,
-    cuposOtorgados: null,
-    comentarioRechazo: null,
-  },
-  {
-    id: 2,
-    profesor: {
-      nombre: "Dra. Ramírez Flores",
-      id: "PTC-2024-0203",
-      cuposActuales: 5,
-      caracteristicasActuales: [
-        { nombre: "Profesor de base", cuposInfo: "3 cupos de base" },
-        { nombre: "Coordinador", cuposInfo: "+2 cupos" },
-      ],
-    },
-    caracteristica: { id: 3, nombre: "Jefe de departamento", cuposRef: "+3 cupos", cuposIncremento: 3 },
-    justificacion: "Actualmente estoy a cargo del departamento de sistemas como responsable interina. Necesito cupos adicionales para gestionar los proyectos de servicio social bajo mi supervisión directa.",
-    fechaEnvio: "9 de mayo de 2026",
-    estado: "Pendiente",
-    fechaRespuesta: null,
-    cuposOtorgados: null,
-    comentarioRechazo: null,
-  },
-  {
-    id: 3,
-    profesor: {
-      nombre: "M.C. Gutiérrez Peña",
-      id: "PTC-2023-0156",
-      cuposActuales: 3,
-      caracteristicasActuales: [
-        { nombre: "Profesor de base", cuposInfo: "3 cupos de base" },
-      ],
-    },
-    caracteristica: { id: 4, nombre: "Investigador", cuposRef: "+N cupos (proyectos)", cuposIncremento: 2 },
-    justificacion: "Tengo dos proyectos de investigación activos registrados ante COFAA con financiamiento vigente. Requiero cupos para asignar alumnos de servicio social a tareas directamente relacionadas con dichos proyectos.",
-    fechaEnvio: "7 de mayo de 2026",
-    estado: "Pendiente",
-    fechaRespuesta: null,
-    cuposOtorgados: null,
-    comentarioRechazo: null,
-  },
-];
+const RUTA = "/coordinacion/solicitudes-caracteristicas";
 
+// La notificación puede traer varios ids ("?destacar=3,7") cuando el dashboard agrupa avisos;
+// basta con el primero para abrir su detalle.
+function primerDestacado(valor) {
+  const id = Number((valor ?? "").split(",")[0]);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+// Las solicitudes vienen del backend; ya no hay MOCK. Cada una trae calculadas la capacidad
+// resultante, los ocupados REALES de ese momento y `puedeAprobarse`.
 export function useRevisarSolicitudes() {
-  const [solicitudes, setSolicitudes]   = useState(MOCK_SOLICITUDES);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [destacado] = useState(() => primerDestacado(searchParams.get("destacar")));
+  const destacadoAtendido = useRef(false);
+
+  const [carga, setCarga] = useState({ estado: "cargando", error: null }); // cargando | listo | error
+  const [lista, setLista] = useState({ pendientes: [], resueltas: [] });
+  const [intento, setIntento] = useState(0);
+
+  const [vista, setVista] = useState(VISTA.PENDIENTES);
   const [seleccionada, setSeleccionada] = useState(null);
-  const [panel, setPanel]               = useState("detalle");
-  const [busqueda, setBusqueda]         = useState("");
-  const [comentario, setComentario]     = useState("");
-  const [errores, setErrores]           = useState({});
-  const [toast, setToast]               = useState(null);
+  const [panel, setPanel] = useState("detalle"); // detalle | aprobacion | rechazo
+  const [busqueda, setBusqueda] = useState("");
+  const [comentario, setComentario] = useState("");
+  const [errores, setErrores] = useState({});
+  const [toast, setToast] = useState(null);
+  const [procesando, setProcesando] = useState(false);
+
+  // Al entrar se marcan como leídas SOLO las notificaciones propias de esta bandeja (mismo patrón
+  // que CU-REP-06 y Ofertas). La bandeja es compartida, pero las notificaciones de los demás
+  // coordinadores son suyas y no se tocan.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith(RUTA));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de características:", err));
+  }, []);
+
+  // ?destacar=<id>: se busca en AMBAS listas. Si otro coordinador ya la resolvió, la notificación
+  // sigue siendo útil — abre su detalle en Resueltas en vez de no encontrar nada. Se atiende UNA
+  // sola vez, aunque la bandeja se recargue.
+  const atenderDestacado = useEffectEvent((respuesta) => {
+    if (!destacado || destacadoAtendido.current) return;
+    destacadoAtendido.current = true;
+
+    const enPendientes = respuesta.pendientes.find((s) => s.id === destacado);
+    const enResueltas = respuesta.resueltas.find((s) => s.id === destacado);
+    const encontrada = enPendientes ?? enResueltas;
+    if (encontrada) {
+      setVista(enPendientes ? VISTA.PENDIENTES : VISTA.RESUELTAS);
+      setSeleccionada(encontrada);
+      setPanel("detalle");
+    }
+    navigate(RUTA, { replace: true }); // consumido: al refrescar ya no se vuelve a abrir
+  });
+
+  useEffect(() => {
+    let vigente = true;
+    setCarga({ estado: "cargando", error: null });
+    listarSolicitudesCaracteristica().then(
+      (respuesta) => {
+        if (!vigente) return;
+        setLista({ pendientes: respuesta.pendientes, resueltas: respuesta.resueltas });
+        setCarga({ estado: "listo", error: null });
+        atenderDestacado(respuesta);
+      },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [intento]);
+
+  const recargar = () => setIntento((n) => n + 1);
 
   function mostrarToast(msg, tipo = "success") {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), 4500);
   }
 
-  function handleSeleccionar(s) {
-    setSeleccionada(s);
+  function cambiarVista(nueva) {
+    setVista(nueva);
+    setSeleccionada(null);
     setPanel("detalle");
     setErrores({});
   }
 
-  function handleAprobar() {
+  // Al abrir el detalle se relee del backend: los ocupados pueden haber cambiado desde que se
+  // cargó la lista, y con ellos `puedeAprobarse`.
+  async function handleSeleccionar(solicitud) {
+    setSeleccionada(solicitud);
+    setPanel("detalle");
     setErrores({});
-    setPanel("aprobacion");
-  }
-
-  function handleRechazar() {
     setComentario("");
-    setErrores({});
-    setPanel("rechazo");
+    try {
+      const fresca = await obtenerSolicitudCaracteristica(solicitud.id);
+      setSeleccionada(fresca);
+      setLista((prev) => ({
+        pendientes: prev.pendientes.map((s) => (s.id === fresca.id ? fresca : s)),
+        resueltas: prev.resueltas.map((s) => (s.id === fresca.id ? fresca : s)),
+      }));
+    } catch {
+      // Si la relectura falla se conserva lo que ya se mostraba; el backend revalida al aprobar.
+    }
   }
 
-  function handleCancelarAccion() {
-    setPanel("detalle");
-    setErrores({});
-  }
+  function handleAprobar() { setErrores({}); setPanel("aprobacion"); }
+  function handleRechazar() { setComentario(""); setErrores({}); setPanel("rechazo"); }
+  function handleCancelarAccion() { setPanel("detalle"); setErrores({}); }
 
   function handleComentarioChange(e) {
     setComentario(e.target.value);
-    if (errores.comentario) setErrores(prev => ({ ...prev, comentario: null }));
+    if (errores.comentario) setErrores((prev) => ({ ...prev, comentario: null }));
   }
 
-  function handleConfirmarAprobacion() {
-    const n = seleccionada.caracteristica.cuposIncremento;
-    const fechaResp = new Date().toLocaleDateString("es-MX", {
-      day: "numeric", month: "long", year: "numeric",
-    });
-    setSolicitudes(prev => prev.map(s =>
-      s.id === seleccionada.id
-        ? {
-            ...s,
-            estado: "Aprobada",
-            fechaRespuesta: fechaResp,
-            cuposOtorgados: n,
-            profesor: { ...s.profesor, cuposActuales: s.profesor.cuposActuales + n },
-          }
-        : s
-    ));
-    mostrarToast(
-      `Aprobada. Se otorgaron ${n} cupo${n !== 1 ? "s" : ""} adicional${n !== 1 ? "es" : ""} a ${seleccionada.profesor.nombre}.`
-    );
+  // Resuelta = sale de pendientes y entra al historial, sin recargar toda la bandeja.
+  function moverAResueltas(resultado) {
+    setLista((prev) => ({
+      pendientes: prev.pendientes.filter((s) => s.id !== resultado.id),
+      resueltas: [{ ...seleccionada, ...resultado, puedeAprobarse: false }, ...prev.resueltas],
+    }));
     setSeleccionada(null);
+    setPanel("detalle");
   }
 
-  function handleConfirmarRechazo() {
+  async function handleConfirmarAprobacion() {
+    if (procesando) return;
+    setProcesando(true);
+    setErrores({});
+    try {
+      const resultado = await aprobarSolicitudCaracteristica(seleccionada.id, comentario.trim() || undefined);
+      mostrarToast(
+        `Aprobada. ${seleccionada.profesor.nombre} queda como ${seleccionada.caracteristicaSolicitada?.nombre ?? "Profesor base"} `
+        + `con ${resultado.capacidadResultante} cupos.`,
+      );
+      moverAResueltas(resultado);
+    } catch (err) {
+      // La capacidad pudo cambiar desde que se envió la solicitud: el backend revalida al aprobar
+      // y puede negarla. Se refleja el estado nuevo para que Aprobar quede bloqueado y solo se
+      // pueda rechazar, con los números reales a la vista.
+      if (err.code === "CAPACIDAD_INSUFICIENTE" && err.detalles?.datos) {
+        const { ocupados, capacidadResultante, cuposALiberar } = err.detalles.datos;
+        const actualizada = {
+          ...seleccionada,
+          puedeAprobarse: false,
+          cuposALiberar,
+          capacidadResultante,
+          profesor: { ...seleccionada.profesor, ocupados },
+        };
+        setSeleccionada(actualizada);
+        setLista((prev) => ({
+          ...prev,
+          pendientes: prev.pendientes.map((s) => (s.id === actualizada.id ? actualizada : s)),
+        }));
+        setPanel("detalle");
+      } else if (err.code === "SOLICITUD_YA_RESUELTA") {
+        // Otro coordinador se adelantó: la bandeja es compartida, así que se recarga para verla
+        // ya en el historial con lo que él decidió.
+        recargar();
+        setSeleccionada(null);
+      }
+      setErrores({ accion: err.message });
+      mostrarToast(err.message, "danger");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
+  async function handleConfirmarRechazo() {
+    if (procesando) return;
     if (!comentario.trim()) {
-      setErrores({ comentario: "El comentario es obligatorio al rechazar (RN-ADM-03)." });
+      setErrores({ comentario: "El comentario es obligatorio al rechazar." });
       return;
     }
-    const fechaResp = new Date().toLocaleDateString("es-MX", {
-      day: "numeric", month: "long", year: "numeric",
-    });
-    setSolicitudes(prev => prev.map(s =>
-      s.id === seleccionada.id
-        ? { ...s, estado: "Rechazada", fechaRespuesta: fechaResp, comentarioRechazo: comentario.trim() }
-        : s
-    ));
-    mostrarToast(
-      `Solicitud rechazada. ${seleccionada.profesor.nombre} fue notificado.`,
-      "danger"
-    );
-    setSeleccionada(null);
+    setProcesando(true);
+    setErrores({});
+    try {
+      const resultado = await rechazarSolicitudCaracteristica(seleccionada.id, comentario.trim());
+      mostrarToast(`Solicitud rechazada. ${seleccionada.profesor.nombre} fue notificado.`, "danger");
+      moverAResueltas(resultado);
+    } catch (err) {
+      if (err.code === "SOLICITUD_YA_RESUELTA") {
+        recargar();
+        setSeleccionada(null);
+      }
+      setErrores({ accion: err.message });
+      mostrarToast(err.message, "danger");
+    } finally {
+      setProcesando(false);
+    }
   }
 
-  const solicitudesPendientes = useMemo(
-    () => solicitudes.filter(s => s.estado === "Pendiente"),
-    [solicitudes]
-  );
-
   const solicitudesFiltradas = useMemo(() => {
+    const origen = vista === VISTA.PENDIENTES ? lista.pendientes : lista.resueltas;
     const texto = busqueda.trim().toLowerCase();
-    if (!texto) return solicitudesPendientes;
-    return solicitudesPendientes.filter(s =>
-      s.profesor.nombre.toLowerCase().includes(texto)
-    );
-  }, [solicitudesPendientes, busqueda]);
+    if (!texto) return origen;
+    return origen.filter((s) => s.profesor.nombre.toLowerCase().includes(texto));
+  }, [lista, vista, busqueda]);
 
   return {
-    coordinacion: COORDINACION,
+    carga, recargar,
+    vista, cambiarVista,
+    totales: { pendientes: lista.pendientes.length, resueltas: lista.resueltas.length },
     solicitudesFiltradas,
     seleccionada, panel,
     busqueda, setBusqueda,
-    comentario, errores, toast,
+    comentario, errores, toast, procesando,
     handleSeleccionar,
     handleAprobar, handleRechazar, handleCancelarAccion,
     handleComentarioChange,

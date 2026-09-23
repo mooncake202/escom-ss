@@ -134,12 +134,8 @@ async function resumenAlumno(usuarioId) {
 async function resumenProfesor(usuarioId) {
   const profesor = await prisma.profesor.findUnique({
     where: { usuario_id: usuarioId },
-    include: {
-      solicitud_caracteristica: {
-        where: { estado: 'aprobada' },
-        include: { caracteristica: true },
-      },
-    },
+    // Característica VIGENTE (profesor.caracteristica_id), no el historial de solicitudes.
+    include: { caracteristica: true },
   });
 
   if (!profesor) {
@@ -203,7 +199,8 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     bitacorasPorRevisar,
     departamento: profesor.departamento,
     cubiculo: profesor.cubiculo,
-    caracteristicas: profesor.solicitud_caracteristica.map((sc) => sc.caracteristica.nombre.replace(/_/g, ' ')),
+    // Arreglo de 0 o 1 elemento para no romper el contrato con el frontend.
+    caracteristicas: profesor.caracteristica ? [profesor.caracteristica.nombre.replace(/_/g, ' ')] : [],
   };
 
 }

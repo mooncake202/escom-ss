@@ -3,14 +3,16 @@
 
 const prisma = require('./prisma');
 
-// Valores tomados de profesoresData.js (CARACTERISTICAS), ahora como fuente única de verdad en BD.
+// Catálogo definitivo de características. Es la ÚNICA fuente de verdad del incremento de cupos:
+// la capacidad de un profesor es siempre 3 (base) + incremento_cupos de su característica vigente
+// (profesor.caracteristica_id), o 3 si no tiene ninguna. Ningún otro seed define estos valores.
 const CARACTERISTICAS = [
+  { nombre: 'Investigador', incremento_cupos: 1 },
   { nombre: 'Presidente_de_academia', incremento_cupos: 2 },
   { nombre: 'Coordinador', incremento_cupos: 2 },
   { nombre: 'Jefe_de_departamento', incremento_cupos: 3 },
   { nombre: 'Funcionario', incremento_cupos: 3 },
   { nombre: 'Profesor_coordinador_de_clubes', incremento_cupos: 3 },
-  { nombre: 'Investigador', incremento_cupos: 0 },
 ];
 
 async function main() {

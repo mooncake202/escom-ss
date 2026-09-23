@@ -1,6 +1,21 @@
 import { RADIUS } from "@/themes/colors";
 
+const fechaLegible = (valor) => (valor
+  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  : null);
+
+const ESTADO_ESTILO = {
+  pendiente: { bg: "rgba(234,179,8,0.12)", color: "#ca8a04", borde: "rgba(234,179,8,0.3)", texto: "Pendiente" },
+  aprobada:  { bg: "rgba(34,197,94,0.12)", color: "#16A34A", borde: "rgba(34,197,94,0.3)", texto: "Aprobada" },
+  rechazada: { bg: "rgba(239,68,68,0.12)", color: "#DC2626", borde: "rgba(239,68,68,0.3)", texto: "Rechazada" },
+};
+
+// Una solicitud sin característica pide volver a Profesor base (caracteristica_id = null).
 export function SolicitudCard({ solicitud, seleccionada, onSeleccionar, C }) {
+  const destino = solicitud.caracteristicaSolicitada?.nombre ?? "Profesor base";
+  const estilo = ESTADO_ESTILO[solicitud.estado] ?? ESTADO_ESTILO.pendiente;
+  const pendiente = solicitud.estado === "pendiente";
+
   return (
     <div
       onClick={() => onSeleccionar(solicitud)}
@@ -27,22 +42,31 @@ export function SolicitudCard({ solicitud, seleccionada, onSeleccionar, C }) {
         <span style={{
           flexShrink: 0, fontSize: 10, fontWeight: 700,
           padding: "2px 8px", borderRadius: RADIUS.full,
-          background: "rgba(234,179,8,0.12)", color: "#ca8a04",
-          border: "1px solid rgba(234,179,8,0.3)",
+          background: estilo.bg, color: estilo.color,
+          border: `1px solid ${estilo.borde}`,
         }}>
-          Pendiente
+          {estilo.texto}
         </span>
       </div>
 
       <p style={{ margin: "0 0 4px", fontSize: 12, color: C.textMuted }}>
         Solicita:{" "}
         <span style={{ fontWeight: 600, color: seleccionada ? C.accentText : C.textPrimary }}>
-          {solicitud.caracteristica.nombre}
+          {destino}
         </span>
       </p>
       <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
-        {solicitud.fechaEnvio}
+        {pendiente
+          ? fechaLegible(solicitud.fecha)
+          : `Resuelta el ${fechaLegible(solicitud.fechaRespuesta) ?? "—"}`}
       </p>
+
+      {/* Aviso temprano: ya no cabe en la capacidad que dejaría el cambio. */}
+      {pendiente && !solicitud.puedeAprobarse && (
+        <p style={{ margin: "6px 0 0", fontSize: 10, fontWeight: 700, color: C.danger }}>
+          ⚠ Ya no se puede aprobar
+        </p>
+      )}
     </div>
   );
 }

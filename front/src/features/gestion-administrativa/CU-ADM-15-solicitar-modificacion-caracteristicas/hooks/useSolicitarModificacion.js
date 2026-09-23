@@ -1,93 +1,152 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import {
+  obtenerContextoCaracteristicas,
+  crearSolicitudCaracteristica,
+} from "@/services/caracteristicasService";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 
-const PROFESOR = { nombre: "Dr. Torres Vega", id: "PTC-2024-0187" };
+// Identificador de la opción "Sin característica adicional (Profesor base)". El backend espera
+// caracteristicaId: null para esa solicitud, así que aquí se usa una clave aparte para poder
+// distinguir "no he elegido nada" (null) de "elegí volver a base" (BASE).
+export const OPCION_BASE = "base";
 
-export const CATALOGO = [
-  {
-    id:     1,
-    nombre: "Presidente de academia",
-    cupos:  "+2",
-    cuposDesc: "cupos adicionales",
-  },
-  {
-    id:     2,
-    nombre: "Coordinador",
-    cupos:  "+2",
-    cuposDesc: "cupos adicionales",
-  },
-  {
-    id:     3,
-    nombre: "Jefe de departamento",
-    cupos:  "+3",
-    cuposDesc: "cupos adicionales",
-  },
-  {
-    id:     4,
-    nombre: "Investigador",
-    cupos:  "+N",
-    cuposDesc: "cupos adicionales solo en proyectos",
-  },
-];
+const RUTA = "/profesor/solicitar-modificacion";
 
-// Características ya aprobadas del profesor (RN-ADM-03: no puede solicitar la misma dos veces)
-// El profesor de base no aparece en el catálogo, así que ninguna está aprobada aún
-const CARACTERISTICAS_APROBADAS_IDS = new Set([]);
+// La notificación puede traer varios ids ("?destacar=3,7") cuando el dashboard agrupa avisos;
+// basta con el primero para señalar esa solicitud.
+function primerDestacado(valor) {
+  const id = Number((valor ?? "").split(",")[0]);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
 
-// Características activas actuales — el profesor de base siempre tiene 3 cupos de base
-const CARACTERISTICAS_ACTUALES = [
-  { id: 0, nombre: "Profesor de base", cuposInfo: "3 cupos de base" },
-];
-
-// Cambiar a true para probar el bloqueo por solicitud pendiente (RN-ADM-01)
-const TIENE_SOLICITUD_PENDIENTE = false;
-
+// El catálogo y la capacidad los manda el backend: aquí ya no hay datos fijos.
+// Un profesor tiene 0 o 1 característica vigente, nunca varias.
 export function useSolicitarModificacion() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [llegaDestacado] = useState(() => primerDestacado(searchParams.get("destacar")));
+  const destacadoAtendido = useRef(false);
 
-  const [caracteristicaId, setCaracteristicaId] = useState(null);
-  const [justificacion, setJustificacion]       = useState("");
-  const [errores, setErrores]                   = useState({});
-  const [enviado, setEnviado]                   = useState(false);
+  const [carga, setCarga] = useState({ estado: "cargando", error: null }); // cargando | listo | error
+  const [contexto, setContexto] = useState(null);
+  const [destacado, setDestacado] = useState(null); // solicitud señalada al llegar desde su aviso
+  const [intento, setIntento] = useState(0);
 
-  function handleSeleccionar(id) {
-    setCaracteristicaId(id);
-    if (errores.caracteristica) setErrores(prev => ({ ...prev, caracteristica: null }));
+  const [seleccion, setSeleccion] = useState(null); // id numérico | OPCION_BASE | null
+  const [justificacion, setJustificacion] = useState("");
+  const [errores, setErrores] = useState({});
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+
+  // Al entrar se marcan como leídas SOLO las notificaciones propias de esta pantalla (mismo patrón
+  // que CU-REP-06 y ADM-16). El endpoint únicamente alcanza filas del propio usuario.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith(RUTA));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de características:", err));
+  }, []);
+
+  // ?destacar=<id>: el aviso de resolución (aprobada o rechazada) apunta a la solicitud concreta.
+  // Se señala en el historial, que es donde vive una vez resuelta. Se atiende UNA sola vez.
+  const atenderDestacado = useEffectEvent((respuesta) => {
+    if (!llegaDestacado || destacadoAtendido.current) return;
+    destacadoAtendido.current = true;
+
+    const encontrada = respuesta.historial.find((h) => h.id === llegaDestacado);
+    if (encontrada) setDestacado(encontrada.id);
+    navigate(RUTA, { replace: true }); // consumido: al refrescar ya no se vuelve a señalar
+  });
+
+  useEffect(() => {
+    let vigente = true;
+    setCarga({ estado: "cargando", error: null });
+    obtenerContextoCaracteristicas().then(
+      (respuesta) => {
+        if (!vigente) return;
+        setContexto(respuesta);
+        setCarga({ estado: "listo", error: null });
+        atenderDestacado(respuesta);
+      },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [intento]);
+
+  function recargar() { setIntento((n) => n + 1); }
+
+  function handleSeleccionar(clave) {
+    setSeleccion(clave);
+    if (errores.caracteristica) setErrores((prev) => ({ ...prev, caracteristica: null }));
   }
 
   function handleJustificacionChange(e) {
     setJustificacion(e.target.value);
-    if (errores.justificacion) setErrores(prev => ({ ...prev, justificacion: null }));
+    if (errores.justificacion) setErrores((prev) => ({ ...prev, justificacion: null }));
   }
 
-  function validar() {
+  const opciones = contexto?.opciones ?? [];
+  const opcionSeleccionada = seleccion === null
+    ? null
+    : opciones.find((o) => (seleccion === OPCION_BASE ? o.caracteristicaId === null : o.caracteristicaId === seleccion)) ?? null;
+
+  // Capacidad que tendría el profesor si se aprobara: la calcula el backend por opción.
+  const capacidadResultante = opcionSeleccionada?.capacidadResultante ?? null;
+  // Reducir la capacidad por debajo de los alumnos ya asignados no se puede: ni el front lo envía
+  // ni el backend lo aceptaría (y lo vuelve a comprobar al aprobar).
+  const excedeOcupados = opcionSeleccionada !== null && opcionSeleccionada.viable === false;
+
+  const tieneSolicitudPendiente = Boolean(contexto?.solicitudPendiente);
+  const puedeEnviar = !tieneSolicitudPendiente
+    && opcionSeleccionada !== null
+    && !excedeOcupados
+    && justificacion.trim() !== ""
+    && !enviando;
+
+  async function handleSubmit() {
     const e = {};
-    if (!caracteristicaId)      e.caracteristica = "Debes seleccionar una característica del catálogo.";
-    if (!justificacion.trim())  e.justificacion  = "La justificación es obligatoria.";
-    return e;
-  }
-
-  function handleSubmit() {
-    const e = validar();
+    if (opcionSeleccionada === null) e.caracteristica = "Debes seleccionar una opción.";
+    if (justificacion.trim() === "") e.justificacion = "La justificación es obligatoria.";
+    if (excedeOcupados) {
+      e.caracteristica = `Con ese cambio tendrías ${opcionSeleccionada.capacidadResultante} cupos `
+        + `y hoy ocupas ${contexto.profesor.ocupados}. Libera ${opcionSeleccionada.cuposALiberar} antes de solicitarlo.`;
+    }
     if (Object.keys(e).length > 0) { setErrores(e); return; }
-    setEnviado(true);
+
+    setEnviando(true);
+    setErrores({});
+    try {
+      await crearSolicitudCaracteristica({
+        caracteristicaId: opcionSeleccionada.caracteristicaId, // null = volver a Profesor base
+        justificacion: justificacion.trim(),
+      });
+      setEnviado(true);
+    } catch (err) {
+      // El backend es la autoridad: puede rechazar aunque el front creyera que se podía
+      // (otra pendiente creada en otra pestaña, un alumno asignado hace un segundo...).
+      setErrores({ envio: err.message });
+    } finally {
+      setEnviando(false);
+    }
   }
 
   function handleCancelar() {
     navigate("/dashboard");
   }
 
-  const caracteristicaSeleccionada = CATALOGO.find(c => c.id === caracteristicaId) ?? null;
-
   return {
-    profesor:                 PROFESOR,
-    catalogo:                 CATALOGO,
-    caracteristicasActuales:  CARACTERISTICAS_ACTUALES,
-    caracteristicasAprobadas: CARACTERISTICAS_APROBADAS_IDS,
-    tieneSolicitudPendiente:  TIENE_SOLICITUD_PENDIENTE,
-    caracteristicaId,
-    caracteristicaSeleccionada,
-    justificacion, errores, enviado,
+    carga, recargar,
+    profesor: contexto?.profesor ?? null,
+    opciones,
+    historial: contexto?.historial ?? [],
+    destacado,
+    solicitudPendiente: contexto?.solicitudPendiente ?? null,
+    tieneSolicitudPendiente,
+    seleccion, opcionSeleccionada, capacidadResultante, excedeOcupados,
+    justificacion, errores, enviando, enviado, puedeEnviar,
     handleSeleccionar, handleJustificacionChange,
     handleSubmit, handleCancelar,
   };

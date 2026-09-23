@@ -2,15 +2,38 @@ import { useTheme, RADIUS }          from "@/themes/colors";
 import { DashboardLayout }            from "@/components/layout/DashboardLayout";
 import { SolicitudCard }              from "./components/SolicitudCard";
 import { SolicitudDetalle }           from "./components/SolicitudDetalle";
-import { useRevisarSolicitudes }      from "./hooks/useRevisarSolicitudes";
+import { useRevisarSolicitudes, VISTA } from "./hooks/useRevisarSolicitudes";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+
+// Pestañas de la bandeja, mismo criterio que el listado de Coordinación en Reportes.
+function Pestana({ activa, etiqueta, total, onClick, C }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 14px", borderRadius: RADIUS.full, cursor: "pointer",
+        fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+        background: activa ? C.accent : "transparent",
+        border: `1px solid ${activa ? C.accent : C.borderDefault}`,
+        color: activa ? "#fff" : C.textMuted,
+        transition: "all 0.15s",
+      }}
+    >
+      {etiqueta} ({total})
+    </button>
+  );
+}
 
 export default function RevisarSolicitudesCaracteristicas() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
   const {
-    coordinacion, solicitudesFiltradas,
+    carga, recargar,
+    vista, cambiarVista, totales,
+    solicitudesFiltradas,
     seleccionada, panel,
     busqueda, setBusqueda,
-    comentario, errores, toast,
+    comentario, errores, toast, procesando,
     handleSeleccionar,
     handleAprobar, handleRechazar, handleCancelarAccion,
     handleComentarioChange,
@@ -22,7 +45,7 @@ export default function RevisarSolicitudesCaracteristicas() {
       titulo="Solicitudes de modificación de características"
       subtitulo="CU-ADM-16 · Coordinación"
       rol="coordinacion"
-      usuario={coordinacion.nombre}
+      usuario={nombreCompletoSesion(usuario)}
     >
       <div style={{ maxWidth: 980, margin: "0 auto", width: "100%" }}>
 
@@ -46,12 +69,52 @@ export default function RevisarSolicitudesCaracteristicas() {
           </div>
         )}
 
-        {/* Búsqueda (RF-ADM-01) */}
+        {/* Carga y error de la lista real */}
+        {carga.estado !== "listo" && (
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.lg,
+            border: `1px solid ${C.borderDefault}`,
+            padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando solicitudes...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button onClick={recargar} style={{
+                  padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Reintentar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {carga.estado === "listo" && <>
+        {/* Pendientes | Resueltas + búsqueda */}
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.lg,
           border: `1px solid ${C.borderDefault}`,
           padding: "0.875rem 1.25rem", marginBottom: "1.25rem",
         }}>
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+            <Pestana
+              activa={vista === VISTA.PENDIENTES}
+              etiqueta="Pendientes"
+              total={totales.pendientes}
+              onClick={() => cambiarVista(VISTA.PENDIENTES)}
+              C={C}
+            />
+            <Pestana
+              activa={vista === VISTA.RESUELTAS}
+              etiqueta="Resueltas"
+              total={totales.resueltas}
+              onClick={() => cambiarVista(VISTA.RESUELTAS)}
+              C={C}
+            />
+          </div>
           <input
             type="text"
             placeholder="Buscar por nombre de profesor…"
@@ -80,10 +143,13 @@ export default function RevisarSolicitudesCaracteristicas() {
               margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700,
               color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em",
             }}>
-              {solicitudesFiltradas.length} pendiente{solicitudesFiltradas.length !== 1 ? "s" : ""}
+              {solicitudesFiltradas.length}{" "}
+              {vista === VISTA.PENDIENTES
+                ? `pendiente${solicitudesFiltradas.length !== 1 ? "s" : ""}`
+                : `resuelta${solicitudesFiltradas.length !== 1 ? "s" : ""}`}
             </p>
 
-            {/* Flujo 1.1 — sin pendientes */}
+            {/* Flujo 1.1 — lista vacía */}
             {solicitudesFiltradas.length === 0 ? (
               <div style={{
                 background: C.bgCard, borderRadius: RADIUS.lg,
@@ -104,7 +170,9 @@ export default function RevisarSolicitudesCaracteristicas() {
                 <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
                   {busqueda.trim()
                     ? "No hay solicitudes que coincidan con la búsqueda."
-                    : "No hay solicitudes pendientes de revisión."}
+                    : vista === VISTA.PENDIENTES
+                      ? "No hay solicitudes pendientes de revisión."
+                      : "Todavía no se ha resuelto ninguna solicitud."}
                 </p>
               </div>
             ) : (
@@ -129,6 +197,7 @@ export default function RevisarSolicitudesCaracteristicas() {
               panel={panel}
               comentario={comentario}
               errores={errores}
+              procesando={procesando}
               onAprobar={handleAprobar}
               onRechazar={handleRechazar}
               onCancelar={handleCancelarAccion}
@@ -139,6 +208,7 @@ export default function RevisarSolicitudesCaracteristicas() {
             />
           )}
         </div>
+        </>}
 
       </div>
     </DashboardLayout>

@@ -154,9 +154,14 @@ model profesor {
   telefono_personal String @db.VarChar(10)
   horario_atencion  String @db.VarChar(100)
   cubiculo          String @db.VarChar(100)
+  // cupos_totales = 3 (Profesor base) + incremento de la característica vigente. NULL en caracteristica_id
+  // significa Profesor base (3 cupos): "Profesor base" NO es una fila del catálogo.
   cupos_totales     Int    @db.UnsignedTinyInt
+  // Característica institucional adicional VIGENTE. 0 o 1: al ser una sola columna, tener dos es irrepresentable.
+  caracteristica_id Int?
 
-  usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  usuario        usuario         @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  caracteristica caracteristica? @relation(fields: [caracteristica_id], references: [id], onDelete: Restrict)
 
   solicitud_caracteristica solicitud_caracteristica[]
   oferta_servicio          oferta_servicio[]
@@ -214,20 +219,28 @@ model notificacion {
   usuario usuario @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
 }
 
+// HISTORIAL de solicitudes de cambio de característica (CU-ADM-15/16): cada solicitud es una fila NUEVA, nunca
+// se reutiliza ni se sobrescribe una anterior. La característica VIGENTE no vive aquí, sino en
+// profesor.caracteristica_id. caracteristica_id NULL = solicitud para volver a Profesor base.
+//
+// "Máximo una solicitud pendiente por profesor" es regla de backend (CU-ADM-15), no un constraint: un UNIQUE
+// sobre profesor_id impediría el historial.
 model solicitud_caracteristica {
   id                Int       @id @default(autoincrement())
   profesor_id       Int
-  caracteristica_id Int
+  caracteristica_id Int?
   justificacion     String    @db.Text
   estado            String    @db.VarChar(30)
   fecha             DateTime  @db.DateTime(0)
   comentario        String?   @db.Text
   fecha_respuesta   DateTime? @db.DateTime(0)
 
-  profesor       profesor       @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
-  caracteristica caracteristica @relation(fields: [caracteristica_id], references: [id], onDelete: Cascade)
+  profesor       profesor        @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
+  caracteristica caracteristica? @relation(fields: [caracteristica_id], references: [id], onDelete: Cascade)
 
-  @@unique([profesor_id, caracteristica_id])
+  // Índice que respalda la FK de profesor_id. Antes ese papel lo cumplía el UNIQUE compuesto que se elimina;
+  // sin él, MySQL no permitiría borrar el compuesto mientras exista la FK.
+  @@index([profesor_id])
 }
 
 model evento_calendario {
