@@ -624,18 +624,29 @@ model carta_termino {
   liberacion_proceso liberacion_proceso @relation(fields: [liberacion_proceso_id], references: [id], onDelete: Cascade)
 }
 
+// CU-ADM-09 (baja pedida por el profesor) y CU-ADM-11 (pedida por el alumno). El ORIGEN se deriva:
+// si solicitante_id es el usuario del propio alumno es ADM-11, si no es ADM-09 — no hace falta columna.
+// Estados: pendiente | aprobada | rechazada (caben en VarChar(12)).
+//
+// Una baja APROBADA elimina al usuario del alumno, así que esta misma fila desaparece por CASCADE:
+// es intencional. Solo las RECHAZADAS permanecen como historial.
 model solicitud_baja {
   id             Int      @id @default(autoincrement())
   alumno_id      String   @db.Char(10)
   solicitante_id Int
-  coordinador_id Int
+  // Nullable: al crear la solicitud todavía no hay coordinador; se fija al resolverla.
+  coordinador_id Int?
   documento_id   Int?
   estado         String   @db.VarChar(12)
   motivo         String   @db.Text
   fecha          DateTime @db.DateTime(0)
+  // Resolución. `motivo` es del solicitante; `comentario` es de Coordinación
+  // (obligatorio al rechazar, opcional al aprobar).
+  fecha_respuesta DateTime? @db.DateTime(0)
+  comentario      String?   @db.Text
 
-  alumno      alumno      @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
-  solicitante usuario     @relation(fields: [solicitante_id], references: [id], onDelete: Cascade)
-  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
-  documento   documento?  @relation(fields: [documento_id], references: [id], onDelete: SetNull)
+  alumno      alumno       @relation(fields: [alumno_id], references: [boleta], onDelete: Cascade)
+  solicitante usuario      @relation(fields: [solicitante_id], references: [id], onDelete: Cascade)
+  coordinador coordinador? @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
+  documento   documento?   @relation(fields: [documento_id], references: [id], onDelete: SetNull)
 }

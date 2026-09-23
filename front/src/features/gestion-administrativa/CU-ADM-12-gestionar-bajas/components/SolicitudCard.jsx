@@ -1,54 +1,54 @@
 import { RADIUS } from "@/themes/colors";
+import { ESTADO_CONFIG, fechaLegible } from "./estadosBaja";
 
-export const ESTADO_CONFIG = {
-  "Pendiente de revisión": { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "#f59e0b" },
-  "En revisión":           { color: "#3b82f6", bg: "rgba(59,130,246,0.1)", border: "#3b82f6" },
-  "Aprobada":              { color: "#22c55e", bg: "rgba(34,197,94,0.1)",  border: "#22c55e" },
-  "Rechazada":             { color: "#ef4444", bg: "rgba(239,68,68,0.1)",  border: "#ef4444" },
-};
-
-const TIPO_SS = { color: "#a78bfa", bg: "rgba(167,139,250,0.1)" };
+const ORIGEN_LABEL = { alumno: "Solicitada por el alumno", profesor: "Solicitada por su profesor" };
 
 export function SolicitudCard({ solicitud, seleccionada, onSeleccionar, C }) {
-  const estado = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG["Pendiente de revisión"];
-  const tipo   = TIPO_SS;
+  const cfg = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG.pendiente;
 
   return (
     <div
       onClick={() => onSeleccionar(solicitud)}
       style={{
-        padding: "1rem 1.25rem", borderRadius: RADIUS.lg, cursor: "pointer",
-        background: seleccionada ? C.navItemActive : C.bgCard,
+        padding: "0.875rem 1.125rem",
+        borderRadius: RADIUS.md,
+        background: seleccionada ? C.accentSoft : C.bgCard,
         border: `1px solid ${seleccionada ? C.accent : C.borderDefault}`,
+        cursor: "pointer",
         transition: "all 0.15s",
       }}
     >
-      {/* Nombre + tipo */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, lineHeight: 1.4 }}>
-          {solicitud.alumno}
+        <p style={{
+          margin: 0, fontSize: 13, fontWeight: 700, lineHeight: 1.3,
+          color: seleccionada ? C.accentText : C.textPrimary,
+        }}>
+          {solicitud.alumno.nombre}
         </p>
         <span style={{
-          fontSize: 11, padding: "2px 8px", borderRadius: RADIUS.full,
-          background: tipo.bg, color: tipo.color, fontWeight: 600, flexShrink: 0,
+          flexShrink: 0, fontSize: 10, fontWeight: 700,
+          padding: "2px 8px", borderRadius: RADIUS.full,
+          background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
         }}>
-          {solicitud.tipo}
+          {cfg.label}
         </span>
       </div>
 
-      {/* Solicitante + fecha */}
-      <p style={{ margin: "0 0 6px", fontSize: 11, color: C.textMuted }}>
-        Solicitado por: {solicitud.solicitante} · {solicitud.fechaEnvio}
+      <p style={{ margin: "0 0 4px", fontSize: 12, color: C.textMuted }}>
+        {solicitud.alumno.boleta} · {ORIGEN_LABEL[solicitud.origen]}
+      </p>
+      <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
+        {solicitud.estado === "pendiente"
+          ? fechaLegible(solicitud.fecha)
+          : `Resuelta el ${fechaLegible(solicitud.fechaRespuesta)}`}
       </p>
 
-      {/* Estado */}
-      <span style={{
-        fontSize: 11, padding: "2px 8px", borderRadius: RADIUS.full,
-        background: estado.bg, color: estado.color, fontWeight: 600,
-        border: `1px solid ${estado.border}`,
-      }}>
-        {solicitud.estado}
-      </span>
+      {/* El expediente de ADM-11 puede pasar semanas con las autoridades del Instituto. */}
+      {solicitud.enRevisionInstitucional && (
+        <p style={{ margin: "6px 0 0", fontSize: 10, fontWeight: 700, color: "#3b82f6" }}>
+          En revisión institucional
+        </p>
+      )}
     </div>
   );
 }

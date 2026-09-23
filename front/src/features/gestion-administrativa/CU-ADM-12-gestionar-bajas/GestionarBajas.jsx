@@ -2,18 +2,41 @@ import { useTheme, RADIUS }       from "@/themes/colors";
 import { DashboardLayout }         from "@/components/layout/DashboardLayout";
 import { SolicitudCard }           from "./components/SolicitudCard";
 import { SolicitudDetalle }        from "./components/SolicitudDetalle";
-import { useGestionarBajas }       from "./hooks/useGestionarBajas";
+import { useGestionarBajas, VISTA } from "./hooks/useGestionarBajas";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
-const ESTADOS = ["Todos", "Pendiente de revisión", "En revisión", "Aprobada", "Rechazada"];
+// Pendientes | Resueltas, mismo criterio que el resto de bandejas de Coordinación.
+function Pestana({ activa, etiqueta, total, onClick, C }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: "6px 14px", borderRadius: RADIUS.full, cursor: "pointer",
+        fontSize: 12, fontWeight: 700, fontFamily: "inherit",
+        background: activa ? C.accent : "transparent",
+        border: `1px solid ${activa ? C.accent : C.borderDefault}`,
+        color: activa ? "#fff" : C.textMuted,
+        transition: "all 0.15s",
+      }}
+    >
+      {etiqueta} ({total})
+    </button>
+  );
+}
 
 export default function GestionarBajas() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
   const {
-    coordinacion, solicitudesFiltradas, seleccionada, toast,
-    busqueda, setBusqueda,
-    filtroEstado, setFiltroEstado,
-    hayFiltroActivo, limpiarFiltros,
-    seleccionarSolicitud, actualizarEstado,
+    carga, recargar,
+    vista, cambiarVista, totales,
+    solicitudesFiltradas, seleccionada, panel, toast, procesando,
+    busqueda, setBusqueda, hayFiltroActivo, limpiarFiltros,
+    comentario, errores,
+    seleccionarSolicitud,
+    handleAprobar, handleRechazar, handleCancelarAccion,
+    handleComentarioChange,
+    handleConfirmarAprobacion, handleConfirmarRechazo,
   } = useGestionarBajas();
 
   return (
@@ -21,7 +44,7 @@ export default function GestionarBajas() {
       titulo="Gestionar solicitudes de baja"
       subtitulo="CU-ADM-12 · Coordinación"
       rol="coordinacion"
-      usuario={coordinacion.nombre}
+      usuario={nombreCompletoSesion(usuario)}
     >
       <div style={{ maxWidth: 980, margin: "0 auto", width: "100%" }}>
 
@@ -64,20 +87,13 @@ export default function GestionarBajas() {
           {/* Separador */}
           <div style={{ width: 1, height: 24, background: C.borderDefault, flexShrink: 0 }} />
 
-          {/* Filtro estado */}
-          <select
-            value={filtroEstado}
-            onChange={e => setFiltroEstado(e.target.value)}
-            style={{
-              padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
-              background: C.bgInput,
-              border: `1px solid ${filtroEstado !== "Todos" ? C.accent : C.borderDefault}`,
-              color: filtroEstado !== "Todos" ? C.textPrimary : C.textDisabled,
-              cursor: "pointer", fontFamily: "inherit", outline: "none",
-            }}
-          >
-            {ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
+          {/* Pendientes | Resueltas */}
+          <div style={{ display: "flex", gap: "0.5rem" }}>
+            <Pestana activa={vista === VISTA.PENDIENTES} etiqueta="Pendientes" total={totales.pendientes}
+              onClick={() => cambiarVista(VISTA.PENDIENTES)} C={C} />
+            <Pestana activa={vista === VISTA.RESUELTAS} etiqueta="Resueltas" total={totales.resueltas}
+              onClick={() => cambiarVista(VISTA.RESUELTAS)} C={C} />
+          </div>
 
           {/* Limpiar */}
           {hayFiltroActivo && (
@@ -91,8 +107,28 @@ export default function GestionarBajas() {
           )}
         </div>
 
+        {/* Carga y error */}
+        {carga.estado !== "listo" && (
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.lg,
+            border: `1px solid ${C.borderDefault}`, padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando solicitudes...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button onClick={recargar} style={{
+                  padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>Reintentar</button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Layout principal */}
-        <div style={{
+        {carga.estado === "listo" && <div style={{
           display: "grid",
           gridTemplateColumns: seleccionada ? "340px 1fr" : "1fr",
           gap: "1.5rem", alignItems: "start",
@@ -115,8 +151,10 @@ export default function GestionarBajas() {
               }}>
                 <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
                   {hayFiltroActivo
-                    ? "No hay solicitudes que coincidan con el filtro."
-                    : "No hay solicitudes de baja registradas."}
+                    ? "No hay solicitudes que coincidan con la búsqueda."
+                    : vista === VISTA.PENDIENTES
+                      ? "No hay solicitudes de baja pendientes."
+                      : "Todavía no se ha resuelto ninguna solicitud."}
                 </p>
               </div>
             ) : (
@@ -138,11 +176,20 @@ export default function GestionarBajas() {
           {seleccionada && (
             <SolicitudDetalle
               solicitud={seleccionada}
-              onActualizarEstado={actualizarEstado}
+              panel={panel}
+              comentario={comentario}
+              errores={errores}
+              procesando={procesando}
+              onAprobar={handleAprobar}
+              onRechazar={handleRechazar}
+              onCancelar={handleCancelarAccion}
+              onComentarioChange={handleComentarioChange}
+              onConfirmarAprobacion={handleConfirmarAprobacion}
+              onConfirmarRechazo={handleConfirmarRechazo}
               C={C}
             />
           )}
-        </div>
+        </div>}
 
       </div>
     </DashboardLayout>

@@ -4,6 +4,7 @@ import { AlumnoSelectorCard }          from "./components/AlumnoSelectorCards";
 import { BajaForm }                    from "./components/BajaForm";
 import { AmonestacionForm }            from "./components/AmonestacionForm";
 import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
@@ -13,11 +14,12 @@ const CARRERA_LABEL = {
 
 export default function BajaAlumnoProfesor() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
   const {
-    profesor, alumnos, totalAlumnos,
-    alumnosConBaja, alumnosConAmonestacion,
+    carga, recargar,
+    alumnos, totalAlumnos,
     alumnoSeleccionado, modo, elegirAccion,
-    motivo, observaciones, errores,
+    motivo, observaciones, errores, enviando, cerrar,
     busqueda, setBusqueda,
     toast, dismissToast,
     seleccionarAlumno,
@@ -96,8 +98,8 @@ export default function BajaAlumnoProfesor() {
                   Faltas acumuladas detectadas
                 </p>
                 <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-                  Este alumno tiene <strong style={{ color: C.warning }}>{alumnoSeleccionado.faltasEfectivas} faltas acumuladas</strong>{" "}
-                  ({alumnoSeleccionado.faltasConsEfectivas} consecutivas).
+                  Este alumno tiene <strong style={{ color: C.warning }}>{alumnoSeleccionado.faltasAcumuladas} faltas acumuladas</strong>{" "}
+                  ({alumnoSeleccionado.faltasConsecutivas} consecutivas).
                   Elige la acción a tomar:
                 </p>
               </div>
@@ -201,7 +203,8 @@ export default function BajaAlumnoProfesor() {
           errores={errores}
           onMotivoChange={handleMotivoChange}
           onSubmit={handleSubmitBaja}
-          onCancelar={() => seleccionarAlumno(null)}
+          onCancelar={cerrar}
+          enviando={enviando}
           C={C}
         />
       );
@@ -217,6 +220,7 @@ export default function BajaAlumnoProfesor() {
           onObservacionesChange={handleObservacionesChange}
           onSubmit={handleSubmitAmonestacion}
           onCancelar={() => elegirAccion("selector")}
+          enviando={enviando}
           C={C}
         />
       );
@@ -230,7 +234,7 @@ export default function BajaAlumnoProfesor() {
       titulo="Solicitar baja de alumno"
       subtitulo="CU-ADM-09 · Profesor"
       rol="profesor"
-      usuario={profesor.nombre}
+      usuario={nombreCompletoSesion(usuario)}
     >
       <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
 
@@ -247,7 +251,7 @@ export default function BajaAlumnoProfesor() {
                 stroke="#22c55e" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span style={{ fontSize: 13, color: "#22c55e", fontWeight: 500 }}>{toast}</span>
+              <span style={{ fontSize: 13, color: "#22c55e", fontWeight: 500 }}>{toast.msg}</span>
             </div>
             <button onClick={dismissToast} style={{
               background: "none", border: "none", cursor: "pointer",
@@ -256,8 +260,31 @@ export default function BajaAlumnoProfesor() {
           </div>
         )}
 
+        {/* ── Carga y error ── */}
+        {carga.estado !== "listo" && (
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.lg,
+            border: `1px solid ${C.borderDefault}`,
+            padding: "3rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando tus alumnos...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button onClick={recargar} style={{
+                  padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>
+                  Reintentar
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
         {/* ── Empty state: sin alumnos activos ── */}
-        {totalAlumnos === 0 && (
+        {carga.estado === "listo" && totalAlumnos === 0 && (
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.lg,
             border: `1px solid ${C.borderDefault}`,
@@ -274,7 +301,7 @@ export default function BajaAlumnoProfesor() {
         )}
 
         {/* ── Layout principal: lista + panel ── */}
-        {totalAlumnos > 0 && (
+        {carga.estado === "listo" && totalAlumnos > 0 && (
           <div style={{
             display: "grid",
             gridTemplateColumns: "320px 1fr",
@@ -309,11 +336,9 @@ export default function BajaAlumnoProfesor() {
                 )}
                 {alumnos.map(a => (
                   <AlumnoSelectorCard
-                    key={a.id}
+                    key={a.boleta}
                     alumno={a}
-                    seleccionado={alumnoSeleccionado?.id === a.id}
-                    tieneBaja={alumnosConBaja.has(a.id)}
-                    tieneAmonestacion={alumnosConAmonestacion.has(a.id)}
+                    seleccionado={alumnoSeleccionado?.boleta === a.boleta}
                     onSeleccionar={seleccionarAlumno}
                     C={C}
                   />

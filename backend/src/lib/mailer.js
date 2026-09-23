@@ -81,5 +81,30 @@ async function enviarCorreoRecuperacion({ to, nombre, token }) {
   });
 }
  
-module.exports = { enviarCorreoBienvenida, enviarCorreoRecuperacion };
+/**
+ * CU-ADM-12 — aviso al alumno cuando Coordinación aprueba su baja.
+ *
+ * Es el ÚNICO canal posible: al aprobar se elimina su usuario, así que una notificación en la
+ * plataforma se borraría con él y tampoco podría volver a entrar a leerla.
+ *
+ * Informa solo de los dos hechos: la baja fue aprobada y su proceso quedó cerrado. El oficio o
+ * resolución oficial del Instituto NO viaja aquí ni se almacena en el sistema — ese trámite lo
+ * gestiona Coordinación por su vía institucional.
+ */
+async function enviarCorreoBajaAprobada({ to, nombre }) {
+  await getTransporter().sendMail({
+    from: SMTP_FROM,
+    to,
+    subject: 'Baja aprobada — Sistema de Servicio Social ESCOM',
+    text:
+      `Hola ${nombre},\n\n` +
+      `Tu solicitud de baja del servicio social fue aprobada por la Coordinación.\n` +
+      `Tu proceso en la plataforma fue cerrado y tu cuenta ya no tiene acceso al sistema.\n\n` +
+      `Si más adelante deseas retomar tu servicio social, deberás iniciar el proceso desde el principio, ` +
+      `comenzando por el registro de tu cuenta.\n\n` +
+      `Para cualquier aclaración sobre tu trámite, comunícate con la Coordinación de Servicio Social de ESCOM.`,
+  });
+}
+
+module.exports = { enviarCorreoBienvenida, enviarCorreoRecuperacion, enviarCorreoBajaAprobada };
  

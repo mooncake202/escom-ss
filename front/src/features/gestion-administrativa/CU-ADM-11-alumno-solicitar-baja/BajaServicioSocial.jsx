@@ -4,23 +4,55 @@ import { InstruccionesExpediente }   from "./components/InstruccionesExpediente"
 import { CargaExpediente }           from "./components/CargaExpediente";
 import { useBajaServicioSocial }     from "./hooks/useBajaServicioSocial";
 
+// Estados reales de solicitud_baja. Una baja APROBADA elimina la cuenta del alumno, así que
+// nunca puede verse desde esta pantalla: solo existen pendiente y rechazada.
 const ESTADO_CONFIG = {
-  "Pendiente de revisión": { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "#f59e0b" },
-  "En revisión":           { color: "#3b82f6", bg: "rgba(59,130,246,0.1)", border: "#3b82f6" },
-  "Aprobada":              { color: "#22c55e", bg: "rgba(34,197,94,0.1)",  border: "#22c55e" },
+  pendiente: { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "#f59e0b", texto: "Pendiente de revisión" },
+  rechazada: { color: "#ef4444", bg: "rgba(239,68,68,0.1)",  border: "#ef4444", texto: "Rechazada" },
 };
+
+const fechaLegible = (valor) => (valor
+  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  : "—");
 
 export default function BajaServicioSocial() {
   const { C } = useTheme();
   const {
-    alumno, solicitudActiva, solicitud, archivo, errores, enviado,
-    handleArchivoChange,
+    carga, recargar,
+    alumno, solicitudActiva, solicitud, motivo, archivo, errores, enviando, enviado,
+    handleMotivoChange, handleArchivoChange,
     handleSubmit, handleCancelar, handleIrInicio,
   } = useBajaServicioSocial();
 
+  // ── Carga y error ──
+  if (carga.estado !== "listo") {
+    return (
+      <DashboardLayout titulo="Solicitar baja del servicio social" subtitulo="CU-ADM-11 · Alumno" rol="alumno_asignado" usuario="">
+        <div style={{ maxWidth: 820, margin: "0 auto", width: "100%" }}>
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.lg,
+            border: `1px solid ${C.borderDefault}`, padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button onClick={recargar} style={{
+                  padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>Reintentar</button>
+              </>
+            )}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   // ── Estado: ya existe solicitud activa ───────────────────────
   if (solicitudActiva) {
-    const cfg = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG["Pendiente de revisión"];
+    const cfg = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG.pendiente;
     return (
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
@@ -55,12 +87,12 @@ export default function BajaServicioSocial() {
                 background: cfg.bg, color: cfg.color, fontSize: 13, fontWeight: 700,
                 border: `1px solid ${cfg.border}`,
               }}>
-                {solicitud.estado}
+                {cfg.texto}
               </span>
             </div>
 
             <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
-              Fecha de envío: <strong style={{ color: C.textMuted }}>{solicitud.fechaEnvio}</strong>
+              Fecha de envío: <strong style={{ color: C.textMuted }}>{fechaLegible(solicitud.fecha)}</strong>
             </p>
           </div>
         </div>
@@ -177,6 +209,33 @@ export default function BajaServicioSocial() {
             Datos de la solicitud
           </p>
 
+          {/* Motivo: obligatorio, igual que el expediente */}
+          <div style={{ marginBottom: "1.25rem" }}>
+            <label style={{
+              display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
+              textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6,
+            }}>
+              Motivo de la baja <span style={{ color: C.danger }}>*</span>
+            </label>
+            <textarea
+              value={motivo}
+              onChange={handleMotivoChange}
+              rows={4}
+              placeholder="Explica por qué solicitas darte de baja del servicio social..."
+              style={{
+                width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                background: C.bgInput,
+                border: `1px solid ${errores.motivo ? C.danger : C.borderDefault}`,
+                borderRadius: RADIUS.md, color: C.textPrimary,
+                fontSize: 13, outline: "none", fontFamily: "inherit",
+                resize: "vertical", lineHeight: 1.55,
+              }}
+            />
+            {errores.motivo && (
+              <p style={{ margin: "6px 0 0", fontSize: 12, color: C.danger }}>{errores.motivo}</p>
+            )}
+          </div>
+
           {/* Carga de expediente */}
           <CargaExpediente
             archivo={archivo}
@@ -184,6 +243,16 @@ export default function BajaServicioSocial() {
             onChange={handleArchivoChange}
             C={C}
           />
+
+          {/* El backend es la autoridad: revalida tipo, tamaño y duplicados. */}
+          {errores.envio && (
+            <div style={{
+              marginBottom: "1rem", padding: "10px 14px", borderRadius: RADIUS.md,
+              background: "rgba(239,68,68,0.06)", border: `1px solid ${C.danger}`,
+            }}>
+              <p style={{ margin: 0, fontSize: 12, color: C.danger, lineHeight: 1.55 }}>{errores.envio}</p>
+            </div>
+          )}
 
           {/* Botones */}
           <div style={{ display: "flex", gap: "0.75rem" }}>
@@ -195,12 +264,13 @@ export default function BajaServicioSocial() {
             }}>
               Cancelar
             </button>
-            <button onClick={handleSubmit} style={{
+            <button onClick={handleSubmit} disabled={enviando} style={{
               flex: 2, padding: "10px", borderRadius: RADIUS.md,
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
+              fontSize: 13, fontWeight: 700, cursor: enviando ? "wait" : "pointer",
+              opacity: enviando ? 0.6 : 1,
               background: C.danger, border: "none", color: "#fff", fontFamily: "inherit",
             }}>
-              Enviar solicitud de baja
+              {enviando ? "Enviando…" : "Enviar solicitud de baja"}
             </button>
           </div>
         </div>

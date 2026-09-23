@@ -6,7 +6,7 @@ const CARRERA_LABEL = {
   LCD: "Lic. Ciencia de Datos",
 };
 
-export function AmonestacionForm({ alumno, observaciones, errores, onObservacionesChange, onSubmit, onCancelar, C }) {
+export function AmonestacionForm({ alumno, observaciones, errores, onObservacionesChange, onSubmit, onCancelar, enviando, C }) {
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
@@ -104,7 +104,13 @@ export function AmonestacionForm({ alumno, observaciones, errores, onObservacion
           }}>
             ← Volver
           </button>
-          <button onClick={onSubmit} style={{
+          {/* El backend revalida todo; este error es el que él devuelve. */}
+          {errores.envio && (
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger, lineHeight: 1.55 }}>
+              {errores.envio}
+            </p>
+          )}
+          <button onClick={onSubmit} disabled={enviando} style={{
             flex: 2, padding: "10px", borderRadius: RADIUS.md,
             fontSize: 13, fontWeight: 700, cursor: "pointer",
             background: "#7c3aed", border: "none", color: "#fff", fontFamily: "inherit",

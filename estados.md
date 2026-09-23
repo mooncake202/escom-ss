@@ -84,3 +84,15 @@ solicitud_caracteristica:
 
 Transiciones:
 pendiente → aprobada | rechazada
+
+### CU-ADM-09 / CU-ADM-11 / CU-ADM-12 — `solicitud_baja.estado`
+- pendiente. (La solicitud todavía no tiene una resolución definitiva.)
+- aprobada  (La baja fue autorizada. Inmediatamente después se ejecuta el borrado completo del proceso.)
+- rechazada     (La baja no fue autorizada. La solicitud permanece almacenada y el alumno continúa su servicio.)
+
+Transiciones: pendiente → aprobada | rechazada.
+
+### `documento.estado_documento` para tipo_documento = 'expediente_baja'
+- en_revision   (al enviarse; se mantiene durante la gestión institucional)
+- aprobada  (la resolución fue favorable. Despues se ejecuta el borrado)
+- rechazada     (si Coordinación rechaza la baja)

@@ -6,11 +6,10 @@ const CARRERA_LABEL = {
   LCD: "Lic. Ciencia de Datos",
 };
 
-export function AlumnoSelectorCard({
-  alumno, seleccionado, tieneBaja, tieneAmonestacion, onSeleccionar, C,
-}) {
-  const deshabilitado = tieneBaja;
-  const tieneFaltas   = alumno.faltasEfectivas > 0;
+// `tieneBajaPendiente` lo calcula el backend; las faltas son datos reales de AH y solo informan.
+export function AlumnoSelectorCard({ alumno, seleccionado, onSeleccionar, C }) {
+  const deshabilitado = alumno.tieneBajaPendiente;
+  const tieneFaltas   = alumno.faltasAcumuladas > 0 || alumno.faltasConsecutivas > 0;
 
   return (
     <div
@@ -53,7 +52,7 @@ export function AlumnoSelectorCard({
         </div>
 
         {/* Badges de estado — en orden de prioridad */}
-        {tieneBaja && (
+        {alumno.tieneBajaPendiente && (
           <span style={{
             flexShrink: 0, padding: "2px 8px", borderRadius: RADIUS.full,
             background: C.warningSoft, color: C.warning,
@@ -62,17 +61,8 @@ export function AlumnoSelectorCard({
             Baja solicitada
           </span>
         )}
-        {!tieneBaja && tieneAmonestacion && (
-          <span style={{
-            flexShrink: 0, padding: "2px 8px", borderRadius: RADIUS.full,
-            background: "rgba(139,92,246,0.12)", color: "#a78bfa",
-            border: "1px solid rgba(139,92,246,0.3)",
-            fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
-          }}>
-            Amonestado
-          </span>
-        )}
-        {!tieneBaja && tieneFaltas && (
+        {/* No hay insignia de "amonestado": la amonestación no deja historial, es solo un aviso. */}
+        {!alumno.tieneBajaPendiente && tieneFaltas && (
           <span style={{
             flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 3,
             padding: "2px 8px", borderRadius: RADIUS.full,
@@ -85,7 +75,7 @@ export function AlumnoSelectorCard({
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
-            {alumno.faltasEfectivas} faltas
+            {alumno.faltasAcumuladas} faltas
           </span>
         )}
       </div>

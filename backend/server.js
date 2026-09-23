@@ -92,6 +92,9 @@ app.use('/calendario', require('./src/modules/administrativa/calendario/calendar
 //ADM15/ADM16 — Solicitudes de modificación de características (profesor solicita, coordinación resuelve)
 app.use('/solicitudes-caracteristicas', require('./src/modules/administrativa/caracteristicas/caracteristicas.routes'));
 
+//ADM09/ADM11/ADM12 — Bajas del servicio social (profesor o alumno solicitan, coordinación resuelve)
+app.use('/bajas', require('./src/modules/administrativa/bajas/bajas.routes'));
+
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');

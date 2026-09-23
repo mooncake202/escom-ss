@@ -1,6 +1,6 @@
 import { RADIUS } from "@/themes/colors";
 
-export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, onCancelar, C }) {
+export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, onCancelar, enviando, C }) {
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
@@ -82,7 +82,13 @@ export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, on
           }}>
             Cancelar
           </button>
-          <button onClick={onSubmit} style={{
+          {/* El backend revalida todo; este error es el que él devuelve. */}
+          {errores.envio && (
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger, lineHeight: 1.55 }}>
+              {errores.envio}
+            </p>
+          )}
+          <button onClick={onSubmit} disabled={enviando} style={{
             flex: 2, padding: "10px", borderRadius: RADIUS.md,
             fontSize: 13, fontWeight: 700, cursor: "pointer",
             background: C.danger, border: "none", color: "#fff", fontFamily: "inherit",
