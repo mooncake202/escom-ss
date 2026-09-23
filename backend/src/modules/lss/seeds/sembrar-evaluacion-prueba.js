@@ -22,8 +22,8 @@
 //
 // MODO (uno de los 4):
 //   'sin_evaluar'                              -> Alterno A
-//   'rechazado_profesor'                       -> Alterno C
-//   'aprobado_profesor_pendiente_coordinador'  -> Alterno B
+//   'rechazado_profesor'                       -> Alterno C (estado real: rechazada_por_siss)
+//   'aprobado_profesor_pendiente_coordinador'  -> Alterno B (estado real: pendiente_dictamen)
 //   'ambas_firmas'                              -> Alterno D (crea PDF real)
 
 const fs = require('fs');
@@ -41,8 +41,8 @@ const prisma = require('../../../lib/prisma');
 const { cifrarBuffer, generarNombreSeguro } = require('../../../lib/fileEncryption');
 const {
   ESTADO_EVALUACION_SOLICITADA,
-  ESTADO_EVALUACION_RECHAZADO_PROFESOR,
-  ESTADO_EVALUACION_PENDIENTE_COORDINADOR,
+  ESTADO_EVALUACION_RECHAZADA_POR_SISS,
+  ESTADO_EVALUACION_PENDIENTE_DICTAMEN,
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
 } = require('../lss.shared');
 
@@ -96,6 +96,27 @@ async function crearFirma(evaluacionId, tipoRevisor, usuarioId, estado) {
   });
 }
 
+/**
+ * Un rechazo por SISS NUNCA tiene documento real detrás (corregido: antes
+ * este seed creaba uno con muestra.pdf, imitando por error lo que el
+ * propio servicio real hacía mal — reutilizar el flujo pesado de PDF/
+ * hash/TSA solo para satisfacer la vieja restricción NOT NULL de
+ * documento_id, ya eliminada del schema). documento_id queda NULL.
+ */
+async function crearRechazoSinDocumento(solicitud, observacionesProfesor) {
+  const evaluacion = await prisma.evaluacion_desempeno.create({
+    data: {
+      documento_id: null,
+      liberacion_proceso_id: solicitud.liberacion_proceso.id,
+      estado: ESTADO_EVALUACION_RECHAZADA_POR_SISS,
+      observaciones_profesor: observacionesProfesor,
+      reportes_siss_confirmados: false,
+      fecha_evaluacion: new Date(),
+    },
+  });
+  return { evaluacion };
+}
+
 async function main() {
   if (!MODOS_VALIDOS.includes(MODO)) {
     throw new Error(`MODO inválido: "${MODO}". Debe ser uno de: ${MODOS_VALIDOS.join(', ')}.`);
@@ -142,19 +163,23 @@ async function main() {
   }
 
   if (MODO === 'rechazado_profesor') {
-    const { documento, evaluacion } = await crearDocumentoYEvaluacion(solicitud, ESTADO_EVALUACION_RECHAZADO_PROFESOR, {
-      observacionesProfesor: 'Motivo de prueba (sembrar-evaluacion-prueba): tus reportes mensuales no aparecen validados en el sistema SISS. Confirma la validación y reenvía tu solicitud.',
-      reportesSissConfirmados: false,
-    });
+    const { evaluacion } = await crearRechazoSinDocumento(
+      solicitud,
+      'Motivo de prueba (sembrar-evaluacion-prueba): tus reportes mensuales no aparecen validados en el sistema SISS. Confirma la validación y reenvía tu solicitud.',
+    );
     await crearFirma(evaluacion.id, 'profesor', solicitud.oferta.profesor.usuario_id, 'rechazado');
-    console.log(`✅ Creado evaluacion_desempeno id=${evaluacion.id} (estado=${ESTADO_EVALUACION_RECHAZADO_PROFESOR}), documento id=${documento.id}, 1 firma de profesor (rechazado).`);
-    imprimirReversion(documento.id, solicitud.id);
+    console.log(`✅ Creado evaluacion_desempeno id=${evaluacion.id} (estado=${ESTADO_EVALUACION_RECHAZADA_POR_SISS}), SIN documento (un rechazo no tiene PDF real), 1 firma de profesor (rechazado).`);
+    console.log('\n--- Verificación en BD ---');
+    console.log(`SELECT estado, observaciones_profesor, documento_id FROM evaluacion_desempeno WHERE id=${evaluacion.id};`);
+    console.log('\nPara revertir manualmente lo que creó este script:');
+    console.log(`  DELETE FROM evaluacion_desempeno WHERE id=${evaluacion.id};`);
+    console.log('  (cascada a revision_desempeno — no hace falta borrarla aparte; no hay archivo físico que limpiar)');
   }
 
   if (MODO === 'aprobado_profesor_pendiente_coordinador') {
-    const { documento, evaluacion } = await crearDocumentoYEvaluacion(solicitud, ESTADO_EVALUACION_PENDIENTE_COORDINADOR);
+    const { documento, evaluacion } = await crearDocumentoYEvaluacion(solicitud, ESTADO_EVALUACION_PENDIENTE_DICTAMEN);
     await crearFirma(evaluacion.id, 'profesor', solicitud.oferta.profesor.usuario_id, 'aprobado');
-    console.log(`✅ Creado evaluacion_desempeno id=${evaluacion.id} (estado=${ESTADO_EVALUACION_PENDIENTE_COORDINADOR}), documento id=${documento.id}, 1 firma de profesor (aprobado), sin firma de coordinación.`);
+    console.log(`✅ Creado evaluacion_desempeno id=${evaluacion.id} (estado=${ESTADO_EVALUACION_PENDIENTE_DICTAMEN}), documento id=${documento.id}, 1 firma de profesor (aprobado), sin firma de coordinación.`);
     imprimirReversion(documento.id, solicitud.id);
   }
 

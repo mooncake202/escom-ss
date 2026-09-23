@@ -31,6 +31,7 @@ const EVENTOS_POR_ROL = {
   coordinador: [
     "documentacion:pendiente", "documentacion:decidida",
     "expediente:pendiente_revision", "expediente:decidido",
+    "resumen:actualizado", // CU-LSS-03/04: evaluacionesPendientesDictamen
   ],
 };
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
@@ -528,7 +529,7 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             // (CU-LSS-03, todavía no construido).
             mostrar: (resumen.alumnosConEvaluacionSolicitada ?? 0) > 0,
             mensaje: "Tienes alumnos con evaluación de desempeño pendiente.",
-            ruta: "/profesor/liberacion",
+            ruta: "/profesor/evaluar-alumno",
             tipo: "urgente",
           },
           {
@@ -642,7 +643,24 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </p>
       </div>
 
-      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+      <BloqueAlertasGenerales
+        notificaciones={notificaciones}
+        onLeer={onLeerNotificacion}
+        navigate={navigate}
+        C={C}
+        slotsCalculados={[
+          {
+            // CU-LSS-03/04: notificación calculada (Tipo A) — mientras exista
+            // al menos una evaluación de desempeño que el profesor ya envió
+            // y espera el dictamen de coordinación (evaluacion_desempeno.estado
+            // === 'pendiente_dictamen'). Cálculo real vive en dashboard.service.js.
+            mostrar: (resumen.evaluacionesPendientesDictamen ?? 0) > 0,
+            mensaje: "Tienes evaluaciones de desempeño pendientes de dictaminar.",
+            ruta: "/coordinacion/revisar-evaluacion-alumno",
+            tipo: "urgente",
+          },
+        ]}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem", marginBottom: "1.25rem" }}>
         {[

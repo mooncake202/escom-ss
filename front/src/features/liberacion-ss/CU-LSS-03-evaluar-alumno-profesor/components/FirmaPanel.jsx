@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 
-export function FirmaPanel({ tipo, estado, onFirmar }) {
+export function FirmaPanel({ tipo, estado, onFirmar, onRechazar }) {
   const { C } = useTheme();
+  // Cuadro de texto PROPIO para el motivo del rechazo — visualmente
+  // separado del "Observaciones" de FormEvaluacion (mismo campo de BD por
+  // detrás, observaciones_profesor, pero son dos flujos mutuamente
+  // excluyentes con etiquetas e interfaz distintas).
+  const [motivoRechazo, setMotivoRechazo] = useState("");
 
   const bloqueado =
     (tipo === "coordinacion" && !estado.firmadoProfesor) ||
@@ -124,27 +130,62 @@ export function FirmaPanel({ tipo, estado, onFirmar }) {
         Firmar evaluación →
       </button>
 
-      <button
-        onClick={onFirmar}
-        
-        style={{
-          width: "100%",
-          padding: "12px",
-          borderRadius: RADIUS.md,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: bloqueado ? "not-allowed" : "pointer",
-          background: bloqueado ? C.borderDefault : GRADIENTS.primary,
-          border: "none",
-          color: "#fff",
-          fontFamily: "inherit",
-          boxShadow: bloqueado ? "none" : SHADOWS.accent,
-          opacity: bloqueado ? 0.5 : 1,
-          transition: "opacity 0.2s",
-        }}
-      >
-        Rechazar solicitud de evaluación →
-      </button>
+      {/* Rechazar por SISS es exclusivo del profesor y, a propósito, NO se
+          bloquea por `bloqueado` — esa bandera solo cubre "reportes sin
+          validar", que es precisamente el motivo para rechazar. */}
+      {tipo === "profesor" && (
+        <div style={{ marginTop: "0.5rem", paddingTop: "1rem", borderTop: `1px solid ${C.borderSubtle}` }}>
+          <p style={{
+            margin: "0 0 0.5rem",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#b91c1c",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+          }}>
+            Motivo del rechazo
+          </p>
+          <textarea
+            value={motivoRechazo}
+            onChange={(e) => setMotivoRechazo(e.target.value)}
+            placeholder="Explica por qué rechazas: por ejemplo, los reportes del alumno no aparecen validados en SISS..."
+            style={{
+              width: "100%",
+              height: 70,
+              padding: "10px 12px",
+              borderRadius: RADIUS.md,
+              border: `1px solid ${C.borderDefault}`,
+              background: C.bgInput,
+              color: C.textPrimary,
+              fontSize: 13,
+              fontFamily: "inherit",
+              resize: "vertical",
+              boxSizing: "border-box",
+              outline: "none",
+              lineHeight: 1.5,
+              marginBottom: "0.75rem",
+            }}
+          />
+          <button
+            onClick={() => onRechazar?.(motivoRechazo)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: RADIUS.md,
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+              background: "transparent",
+              border: `1px solid ${C.borderDefault}`,
+              color: "#b91c1c",
+              fontFamily: "inherit",
+              transition: "opacity 0.2s",
+            }}
+          >
+            Rechazar por SISS →
+          </button>
+        </div>
+      )}
     </div>
   );
 }

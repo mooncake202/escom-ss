@@ -7,7 +7,7 @@ const { crearError, validarReportesValidadosSiss } = require('./validators');
 const {
   ESTADO_EVALUACION_SOLICITADA,
   ESTADO_REPORTE_APROBADO_COORDINADOR,
-  ESTADO_EVALUACION_RECHAZADO_PROFESOR,
+  ESTADO_EVALUACION_RECHAZADA_POR_SISS,
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
   ESTADO_SOLICITUD_CARTA_TERMINO,
   exigirEstadoLiberacion,
@@ -251,7 +251,7 @@ async function obtenerEstadoEvaluacion(alumnoUsuarioId) {
   const firmaProfesor = evaluacion.revision_desempeno.find((r) => r.tipo_revisor === 'profesor');
   const firmaCoordinacion = evaluacion.revision_desempeno.find((r) => r.tipo_revisor === 'coordinador');
 
-  const alterno = evaluacion.estado === ESTADO_EVALUACION_RECHAZADO_PROFESOR
+  const alterno = evaluacion.estado === ESTADO_EVALUACION_RECHAZADA_POR_SISS
     ? 'C'
     : evaluacion.estado === ESTADO_EVALUACION_APROBADO_COORDINADOR
       ? 'D'
@@ -272,9 +272,11 @@ async function obtenerEstadoEvaluacion(alumnoUsuarioId) {
 /**
  * RN-LSS-06: reenvía la solicitud tras un rechazo del profesor — solo
  * posible si el alumno confirma explícitamente reportesValidadosSiss=true.
- * Como documento_id es obligatorio en evaluacion_desempeno, "revertir a
- * pendiente" significa borrar la fila completa (cascada a
- * revision_desempeno) — el alumno vuelve exactamente al Alterno A.
+ * Un rechazo por SISS (CU-LSS-03, rechazarPorSiss) NUNCA tiene documento
+ * real detrás — documento_id es NULL a propósito (corregido: un rechazo no
+ * tiene PDF/firma/hash/TSA, nunca debió tenerlos) — así que "revertir a
+ * pendiente" es simplemente borrar la fila de evaluacion_desempeno (cascada
+ * a revision_desempeno), sin ningún documento ni archivo que limpiar.
  */
 async function reenviarSolicitudEvaluacion(alumnoUsuarioId, reportesValidadosSiss) {
   if (reportesValidadosSiss !== true) {
@@ -283,21 +285,14 @@ async function reenviarSolicitudEvaluacion(alumnoUsuarioId, reportesValidadosSis
 
   const { solicitud, proceso } = await resolverConEvaluacion(alumnoUsuarioId);
   exigirEstadoLiberacion(proceso, ESTADO_EVALUACION_SOLICITADA, 'Tu proceso de liberación ya no está en el paso de evaluación.');
-  exigirEstadoEvaluacion(proceso.evaluacion_desempeno, ESTADO_EVALUACION_RECHAZADO_PROFESOR, 'Tu evaluación no está en estado de rechazo — no hay nada que reenviar.');
+  exigirEstadoEvaluacion(proceso.evaluacion_desempeno, ESTADO_EVALUACION_RECHAZADA_POR_SISS, 'Tu evaluación no está en estado de rechazo — no hay nada que reenviar.');
 
   const evaluacion = proceso.evaluacion_desempeno;
-  const documentoViejo = await prisma.documento.findUnique({ where: { id: evaluacion.documento_id } });
 
-  // Borrar el documento cascada a evaluacion_desempeno (onDelete: Cascade
-  // en su FK) y de ahí a revision_desempeno — un solo delete real basta.
   await prisma.$transaction([
-    prisma.documento.delete({ where: { id: evaluacion.documento_id } }),
+    prisma.evaluacion_desempeno.delete({ where: { id: evaluacion.id } }),
     prisma.liberacion_proceso.update({ where: { id: proceso.id }, data: { reportes_validados_siss: true } }),
   ]);
-
-  if (documentoViejo) {
-    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, documentoViejo.ruta_archivo)); } catch {}
-  }
 
   emitirResumenActualizadoAlumno(alumnoUsuarioId);
   const profesorUsuarioId = solicitud.oferta?.profesor?.usuario_id;

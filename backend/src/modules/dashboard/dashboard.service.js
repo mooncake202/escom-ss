@@ -1,6 +1,6 @@
 const prisma = require('../../lib/prisma');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
-const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL } = require('../lss/lss.shared');
+const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN } = require('../lss/lss.shared');
 const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
 const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
 
@@ -254,6 +254,7 @@ async function resumenCoordinacion() {
     alumnosRegistrados,
     expedientesEnRevision,
     evaluacionesPendientes,
+    evaluacionesPendientesDictamen,
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoMasReciente,
@@ -261,6 +262,11 @@ async function resumenCoordinacion() {
     prisma.solicitud_registro.count(),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EVALUACION_SOLICITADA } }),
+    // CU-LSS-03/04: evaluaciones que el profesor ya registró y esperan el
+    // dictamen de coordinación — distinto de evaluacionesPendientes (ese
+    // cuenta liberacion_proceso.estado, una fase mucho más amplia que
+    // incluye alumnos que ni siquiera tienen evaluacion_desempeno todavía).
+    prisma.evaluacion_desempeno.count({ where: { estado: ESTADO_EVALUACION_PENDIENTE_DICTAMEN } }),
     contarAlumnosConHorasCompletas(),
     prisma.liberacion_proceso.count({ where: { NOT: { estado: ESTADO_LSS_TERMINAL } } }),
     prisma.periodo_registro.findFirst({ orderBy: { id: 'desc' } }),
@@ -270,6 +276,7 @@ async function resumenCoordinacion() {
     alumnosRegistrados,
     expedientesEnRevision,
     evaluacionesPendientes,
+    evaluacionesPendientesDictamen,
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoLabel: formatearPeriodo(periodoMasReciente),

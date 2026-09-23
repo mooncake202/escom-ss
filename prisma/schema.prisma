@@ -562,15 +562,26 @@ model liberacion_proceso {
 
 model evaluacion_desempeno {
   id                          Int       @id @default(autoincrement())
-  documento_id                Int       @unique
+  // Nullable a propósito: un rechazo por SISS (estado='rechazada_por_siss')
+  // NUNCA tiene un documento real detrás — no hay PDF, no hay firma, no hay
+  // nada que descargar. Solo registrarEvaluacion/corregirYReenviar (las
+  // aprobaciones reales) crean un documento de verdad. MariaDB permite
+  // múltiples NULL en una columna UNIQUE sin violarla.
+  documento_id                Int?      @unique
   liberacion_proceso_id       Int       @unique
   estado                      String    @db.VarChar(50)
   observaciones_profesor      String?   @db.Text
   reportes_siss_confirmados   Boolean
   fecha_evaluacion            DateTime? @db.DateTime(0)
   motivo_rechazo_coordinacion String?   @db.Text
+  // Puntajes reales capturados en el formulario del profesor (CU-LSS-03):
+  // objeto fijo de 7 claves (nombre del factor -> puntos seleccionados,
+  // uno de {100,95,90,85}) — se guarda completo, nunca se consulta por
+  // factor individual, por eso JSON en vez de una tabla normalizada
+  // (decisión confirmada: colección fija, no una que crece).
+  puntajes_factores           Json?
 
-  documento          documento          @relation(fields: [documento_id], references: [id], onDelete: Cascade)
+  documento          documento?         @relation(fields: [documento_id], references: [id], onDelete: Cascade)
   liberacion_proceso liberacion_proceso @relation(fields: [liberacion_proceso_id], references: [id], onDelete: Cascade)
 
   revision_desempeno revision_desempeno[]

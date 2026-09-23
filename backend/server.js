@@ -77,8 +77,11 @@ app.use('/profesor', require('./src/modules/ah/ah.routes'));
 //AH02
 app.use('/alumno', require('./src/modules/ah/ah-alumno.routes'));
 
-//LSS01
+//LSS01/02
 app.use('/alumno', require('./src/modules/lss/lss-alumno.routes'));
+
+//LSS03
+app.use('/profesor', require('./src/modules/lss/lss-profesor.routes'));
 
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.

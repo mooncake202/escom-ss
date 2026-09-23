@@ -11,18 +11,22 @@ export default function EvaluarAlumnoProfesor() {
 
   const {
     alumnos,
+    cargando,
+    error,
+    accionEnCurso,
     alumnoSeleccionado,
     seleccionarAlumno,
     estado,
     guardar,
     firmar,
-    marcarValidadoSISS,
+    rechazar,
+    marcarReportesSissConfirmados,
   } = useEvaluarAlumnoProfesor();
 
   return (
     <DashboardLayout
       titulo="Evaluación de desempeño"
-      subtitulo="CU-03 Evaluar alumno profesor"
+      
       rol="profesor"
       usuario="Profesor"
     >
@@ -121,10 +125,26 @@ export default function EvaluarAlumnoProfesor() {
                 )}
               </div>
 
-              {/* ALERTA: requiere validación SISS */}
+              {/* Texto informativo (solo lectura): qué eligió el alumno en
+                  CU-LSS-01 — el profesor necesita verlo antes de decidir. */}
+              <div style={{
+                marginBottom: "1rem",
+                padding: "0.75rem 1rem",
+                borderRadius: RADIUS.md,
+                border: `1px solid ${C.borderSubtle}`,
+                background: C.bgInput,
+                fontSize: 13,
+                color: C.textMuted,
+              }}>
+                {alumnoSeleccionado.reportesValidadosSissAlumno
+                  ? "El alumno indicó que sus reportes ya están validados en SISS."
+                  : "El alumno solicitó que tú valides sus reportes en SISS."}
+              </div>
+
+              {/* ALERTA: el alumno pidió que el profesor valide sus reportes */}
               {estado.requiereValidacion && (
                 <div style={{
-                  marginBottom: "1.5rem",
+                  marginBottom: "1rem",
                   padding: "1rem 1.25rem",
                   borderRadius: RADIUS.lg,
                   border: "1px solid rgba(234,179,8,0.35)",
@@ -146,7 +166,7 @@ export default function EvaluarAlumnoProfesor() {
                     color: C.textMuted,
                     lineHeight: 1.5,
                   }}>
-                    Este alumno solicitó que valides sus reportes en la plataforma SISS antes de continuar con la evaluación.
+                    Revisa la plataforma SISS antes de continuar con la evaluación.
                   </p>
 
                   <a
@@ -158,38 +178,38 @@ export default function EvaluarAlumnoProfesor() {
                       fontSize: 13,
                       fontWeight: 600,
                       color: "#b45309",
-                      marginBottom: "0.75rem",
                       textDecoration: "none",
                     }}
                   >
                     Ir a la plataforma SISS →
                   </a>
-
-                  <div style={{
-                    padding: "10px 12px",
-                    borderRadius: RADIUS.md,
-                    border: `1px solid ${estado.validadoSISS ? "rgba(21,128,61,0.3)" : C.borderDefault}`,
-                    background: estado.validadoSISS ? "rgba(21,128,61,0.06)" : C.bgInput,
-                    transition: "all 0.15s",
-                  }}>
-                    <label style={{ display: "flex", gap: 10, cursor: "pointer", alignItems: "flex-start" }}>
-                      <input
-                        type="checkbox"
-                        checked={estado.validadoSISS}
-                        onChange={marcarValidadoSISS}
-                        style={{ marginTop: 2, accentColor: "#15803d" }}
-                      />
-                      <span style={{ fontSize: 13, color: estado.validadoSISS ? "#15803d" : C.textPrimary, lineHeight: 1.4 }}>
-                        Confirmo que los reportes del alumno han sido validados en SISS
-                      </span>
-                    </label>
-                    
-                  </div>
-
                 </div>
-                
-
               )}
+
+              {/* Confirmación del profesor (RN-LSS-09) — SIEMPRE visible,
+                  independiente de si el alumno pidió o no la validación:
+                  ambos casos necesitan que el profesor confirme antes de
+                  poder firmar. */}
+              <div style={{
+                marginBottom: "1.5rem",
+                padding: "10px 12px",
+                borderRadius: RADIUS.md,
+                border: `1px solid ${estado.reportesSissConfirmados ? "rgba(21,128,61,0.3)" : C.borderDefault}`,
+                background: estado.reportesSissConfirmados ? "rgba(21,128,61,0.06)" : C.bgInput,
+                transition: "all 0.15s",
+              }}>
+                <label style={{ display: "flex", gap: 10, cursor: "pointer", alignItems: "flex-start" }}>
+                  <input
+                    type="checkbox"
+                    checked={estado.reportesSissConfirmados}
+                    onChange={marcarReportesSissConfirmados}
+                    style={{ marginTop: 2, accentColor: "#15803d" }}
+                  />
+                  <span style={{ fontSize: 13, color: estado.reportesSissConfirmados ? "#15803d" : C.textPrimary, lineHeight: 1.4 }}>
+                    Confirmo que los reportes de este alumno están validados en el SISS
+                  </span>
+                </label>
+              </div>
 
               {/* FORMULARIO DE EVALUACIÓN */}
               <FormEvaluacion
@@ -197,14 +217,19 @@ export default function EvaluarAlumnoProfesor() {
                 onGuardar={guardar}
               />
 
+              {error && (
+                <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: "1rem" }}>{error}</p>
+              )}
+
               {/* PANEL DE FIRMA */}
               <FirmaPanel
                 tipo="profesor"
                 estado={{
                   ...estado,
-                  requiereValidacion: estado.requiereValidacion && !estado.validadoSISS,
+                  requiereValidacion: !estado.reportesSissConfirmados,
                 }}
                 onFirmar={firmar}
+                onRechazar={rechazar}
               />
 
             </>
