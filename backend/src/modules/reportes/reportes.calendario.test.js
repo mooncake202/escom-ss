@@ -6,6 +6,9 @@ const {
   MOTIVOS_INCONSISTENCIA,
   eventoCubreFecha,
   construirCalendarioPeriodo,
+  TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO,
+  esDiaHabilAdministrativo,
+  primerDiaHabilAdministrativoDesde,
 } = require('./reportes.calendario');
 
 const evento = (id, nombre, tipo, fechaInicio, fechaFin = null) => ({ id, nombre, tipo, fechaInicio, fechaFin });
@@ -171,4 +174,47 @@ test('bitácoras fuera del periodo se ignoran', () => {
     bitacoras: [{ id: 1, fecha: '2025-11-16', horas: 4 }, { id: 2, fecha: '2025-11-24', horas: 4 }],
   });
   assert.equal(cal.dias.every((d) => !d.bitacoraAprobada), true);
+});
+
+// ── Día hábil administrativo (CU-REP-01, Bloque 2) ──────────────────────
+
+test('esDiaHabilAdministrativo: lunes a viernes sin evento es hábil; fin de semana nunca lo es', () => {
+  assert.equal(esDiaHabilAdministrativo('2025-11-17', []), true); // lunes
+  assert.equal(esDiaHabilAdministrativo('2025-11-21', []), true); // viernes
+  assert.equal(esDiaHabilAdministrativo('2025-11-22', []), false); // sábado
+  assert.equal(esDiaHabilAdministrativo('2025-11-23', []), false); // domingo
+});
+
+test('esDiaHabilAdministrativo: Inhabil o Vacacional lo vuelven no hábil; un evento de otro día no afecta', () => {
+  const inhabil = evento(1, 'Puente', 'Inhabil', '2025-11-17');
+  const vacacional = evento(2, 'Receso', 'Vacacional', '2025-11-18', '2025-11-19');
+  assert.equal(esDiaHabilAdministrativo('2025-11-17', [inhabil]), false);
+  assert.equal(esDiaHabilAdministrativo('2025-11-18', [vacacional]), false);
+  assert.equal(esDiaHabilAdministrativo('2025-11-19', [vacacional]), false);
+  assert.equal(esDiaHabilAdministrativo('2025-11-20', [inhabil, vacacional]), true, 'ningún evento cubre este día');
+});
+
+test('primerDiaHabilAdministrativoDesde: si la fecha ya es hábil, es ella misma', () => {
+  assert.equal(primerDiaHabilAdministrativoDesde('2025-11-17', []), '2025-11-17'); // lunes, sin eventos
+});
+
+test('primerDiaHabilAdministrativoDesde: desde un sábado, salta el fin de semana hasta el lunes', () => {
+  assert.equal(primerDiaHabilAdministrativoDesde('2025-11-22', []), '2025-11-24'); // sáb → lun
+});
+
+test('primerDiaHabilAdministrativoDesde: un Inhabil/Vacacional encadenado tras el fin de semana empuja más el resultado', () => {
+  // Sábado 22, domingo 23 (fin de semana) y el lunes 24 es Inhabil: el primer hábil real es el martes 25.
+  const puente = evento(1, 'Puente', 'Inhabil', '2025-11-24');
+  assert.equal(primerDiaHabilAdministrativoDesde('2025-11-22', [puente]), '2025-11-25');
+});
+
+test('primerDiaHabilAdministrativoDesde: null si no hay ningún día hábil dentro del tope de búsqueda', () => {
+  // Un Vacacional que cubre TODO el rango de búsqueda (tope + margen): nunca se encuentra un día hábil.
+  const recesoLargo = evento(1, 'Receso prolongado', 'Vacacional', '2025-11-17', '2026-06-01');
+  assert.equal(primerDiaHabilAdministrativoDesde('2025-11-17', [recesoLargo]), null);
+});
+
+test('TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO: es un entero positivo razonable (evita un bucle indefinido)', () => {
+  assert.equal(Number.isInteger(TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO), true);
+  assert.ok(TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO > 0);
 });

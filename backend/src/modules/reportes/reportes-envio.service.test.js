@@ -123,7 +123,7 @@ test('envío: genera UN PDF, lo hashea, lo sella, lo cifra y registra documento 
   assert.equal(documento.estado_documento, 'vigente');
   assert.equal(documento.aprobado_por_id, null);
   assert.equal(documento.fecha_creacion, e.ahora);
-  assert.match(documento.ruta_archivo, /^2022630001\/[0-9a-f-]{36}\.pdf$/);
+  assert.match(documento.ruta_archivo, /^2022630001\/Reportes\/[0-9a-f-]{36}\.pdf$/);
   assert.equal(path.relative(e.rutaBaseDocumentos, archivo).split(path.sep).join('/'), documento.ruta_archivo);
 
   assert.equal(e.db.reportes.length, 1);
@@ -139,11 +139,12 @@ test('envío: genera UN PDF, lo hashea, lo sella, lo cifra y registra documento 
 
   assert.equal(e.db.revisiones.length, 1);
   const [revision] = e.db.revisiones;
+  assert.equal(revision.ruta_archivo, documento.ruta_archivo, 'la revisión del alumno apunta al PDF que acaba de generar y firmar');
   assert.deepEqual(
     { ...revision, id: undefined },
     {
       id: undefined, reporte_mensual_id: reporte.id, usuario_id: 7, tipo_revisor: 'alumno', estado: 'aprobado', comentario: null,
-      hash_documento: hash, ip_firma: IP, token_tsa: TOKEN, fecha: e.ahora,
+      hash_documento: hash, ruta_archivo: revision.ruta_archivo, ip_firma: IP, token_tsa: TOKEN, fecha: e.ahora,
     },
   );
 });

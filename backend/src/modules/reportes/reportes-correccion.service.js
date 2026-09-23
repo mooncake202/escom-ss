@@ -161,6 +161,7 @@ async function registrarReenvio(tx, { cfg, id, usuarioId, fila, rutaAnterior, ru
       estado: ESTADO_REVISION_FIRMADA,
       comentario: null,
       hash_documento: hash,
+      ruta_archivo: rutaNueva, // el PDF corregido que el alumno acaba de generar y firmar
       ip_firma: normalizarIp(ip),
       token_tsa: token,
       fecha: ahora,

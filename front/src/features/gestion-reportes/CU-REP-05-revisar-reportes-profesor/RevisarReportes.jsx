@@ -20,7 +20,7 @@ export default function RevisarReportes() {
     seleccionado, seleccionar, cerrar,
     pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
-    rubricaGuardada, rubrica, reintentarRubrica, firmaFile, firmaUrl, errorFirma, handleFirmaChange,
+    rubricaGuardada, rubrica, reintentarRubrica, firmaFile, errorFirma, handleFirmaChange,
     comentario, handleComentarioChange, errorComentario,
     resultado, setResultado,
     loading, errorAccion,
@@ -294,7 +294,6 @@ export default function RevisarReportes() {
           rubrica={rubrica}
           onReintentarRubrica={reintentarRubrica}
           firmaFile={firmaFile}
-          firmaUrl={firmaUrl}
           errorFirma={errorFirma}
           handleFirmaChange={handleFirmaChange}
           comentario={comentario}

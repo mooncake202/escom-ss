@@ -21,6 +21,9 @@ const { ErrorTsa } = require('../../lib/timestampTsa');
 
 const PROFESOR_USUARIO = 50; // → profesor 1
 const OTRO_PROFESOR_USUARIO = 51; // → profesor 2
+// Correo que reportes.profesor.fixtures.js deriva por omisión para un profesor sin `correo_institucional` explícito
+// (reorganización de almacenamiento: la rúbrica del profesor vive en uploads/profesores/<correo>/Rubrica/).
+const CORREO_PROFESOR = `profesor${PROFESOR_USUARIO}@ipn.mx`;
 const ALUMNO_USUARIO = 201; // alumno del reporte 1
 const COORDINADORES = [70, 71];
 const IP = '187.190.10.20';
@@ -65,8 +68,8 @@ async function escenario(t, { sinRubrica = false, estado, hashAlumno, sinArchivo
     fs.mkdirSync(path.join(rutaBaseDocumentos, '2022630002'), { recursive: true });
     fs.writeFileSync(path.join(rutaBaseDocumentos, '2022630002/otro.pdf'), cifrarBuffer(Buffer.from('%PDF-del-otro-profesor')));
   }
-  fs.mkdirSync(path.join(rutaBaseRubricas, String(PROFESOR_USUARIO)), { recursive: true });
-  fs.writeFileSync(path.join(rutaBaseRubricas, `${PROFESOR_USUARIO}/firma.enc`), cifrarBuffer(rubricaBytes));
+  fs.mkdirSync(path.join(rutaBaseRubricas, CORREO_PROFESOR, 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rutaBaseRubricas, CORREO_PROFESOR, 'Rubrica/rubrica.enc'), cifrarBuffer(rubricaBytes));
 
   const reportes = [
     reporteMensual({ id: 1, profesorId: 1, estado, rutaArchivo: rutaAlumno, hashAlumno: hashAlumno ?? sha256(pdfAlumno), numero: 2 }),
@@ -77,7 +80,7 @@ async function escenario(t, { sinRubrica = false, estado, hashAlumno, sinArchivo
     profesores: { [PROFESOR_USUARIO]: 1, [OTRO_PROFESOR_USUARIO]: 2 },
     reportes,
     escritura: true,
-    usuarios: { [PROFESOR_USUARIO]: { rubrica_imagen: sinRubrica ? null : `${PROFESOR_USUARIO}/firma.enc` } },
+    usuarios: { [PROFESOR_USUARIO]: { rubrica_imagen: sinRubrica ? null : `${CORREO_PROFESOR}/Rubrica/rubrica.enc` } },
     coordinadores: COORDINADORES,
     ...opcionesBd,
   });
@@ -136,6 +139,7 @@ test('rechazar: estado rechazado_profesor + revisión rechazada con motivo, fech
     estado: 'rechazado',
     comentario: 'Faltan las actividades del segundo mes.',
     hash_documento: null,
+    ruta_archivo: e.rutaAlumno, // no se genera PDF nuevo: el vigente (del alumno) que se está rechazando
     ip_firma: null,
     token_tsa: null,
     fecha: new Date('2026-09-21T15:00:00.000Z'),
@@ -245,7 +249,7 @@ test('aprobar: parte del PDF EXACTO almacenado (no regenera), agrega solo la rú
   // Salida: el PDF final en disco es el que se hasheó y selló, y es el que apunta el documento.
   const rutaFinal = e.reporte.documento.ruta_archivo;
   assert.notEqual(rutaFinal, e.rutaAlumno);
-  assert.match(rutaFinal, /^2022630001\/[0-9a-f-]{36}\.pdf$/);
+  assert.match(rutaFinal, /^2022630001\/Reportes\/[0-9a-f-]{36}\.pdf$/);
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, rutaFinal)));
   assert.notEqual(Buffer.compare(final, e.pdfAlumno), 0);
   assert.equal(e.sellos.length, 1);
@@ -263,6 +267,7 @@ test('aprobar: parte del PDF EXACTO almacenado (no regenera), agrega solo la rú
     estado: 'aprobado',
     comentario: null,
     hash_documento: sha256(final),
+    ruta_archivo: rutaFinal, // el PDF nuevo que el profesor acaba de firmar
     ip_firma: IP,
     token_tsa: TOKEN,
     fecha: new Date('2026-09-21T15:00:00.000Z'),

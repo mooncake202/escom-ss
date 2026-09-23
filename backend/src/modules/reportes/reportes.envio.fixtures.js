@@ -110,7 +110,10 @@ function crearBdEnvio(opciones = {}) {
       usuario: {
         findUnique: leer('usuario.findUnique', async ({ where }) => {
           const u = db.usuarios[where.id];
-          return u ? { id: u.id, rubrica_imagen: u.rubrica_imagen } : null;
+          if (!u) return null;
+          // Reorganización de almacenamiento: la identidad de la rúbrica (reportes.rubricas.js) sale de aquí
+          // (rol + boleta del alumno anidada), nunca del cliente. Esta BD falsa solo representa alumnos.
+          return { id: u.id, rol: 'alumno_asignado', rubrica_imagen: u.rubrica_imagen, correo_institucional: 'agarcia@alumno.ipn.mx', alumno: { boleta: '2022630001' } };
         }),
         // Solo para preparar la prueba (guardarRubrica de la fase 4); el envío nunca la usa.
         updateMany: leer('usuario.updateMany', async ({ where, data }) => {
@@ -164,10 +167,22 @@ function crearBdEnvio(opciones = {}) {
       },
       evento_calendario: { findMany: leer('evento_calendario.findMany', async () => []) },
       bitacora: {
-        findMany: leer('bitacora.findMany', async () => bitacoras),
-        // Suma de horas de las bitácoras aprobadas (las horas acumuladas del reporte global).
+        // Aplica el filtro real (estado y, si viene, rango de fecha_registro) y el orden pedido, como lo haría Prisma.
+        findMany: leer('bitacora.findMany', async ({ where = {}, orderBy } = {}) => {
+          const estados = Array.isArray(where.estado?.in) ? where.estado.in : (where.estado ? [where.estado] : null);
+          const { gte, lte } = where.fecha_registro ?? {};
+          const filas = bitacoras.filter((b) => (!estados || estados.includes(b.estado))
+            && (gte === undefined || b.fecha_registro >= gte)
+            && (lte === undefined || b.fecha_registro <= lte));
+          return orderBy?.fecha_registro === 'asc'
+            ? [...filas].sort((a, b) => a.fecha_registro - b.fecha_registro)
+            : filas;
+        }),
+        // Suma de horas de las bitácoras contabilizables (las horas acumuladas del reporte global). Acepta tanto
+        // `estado: 'x'` como `estado: { in: [...] }` (Bloque 6: aprobada + rechazada), como lo haría Prisma real.
         aggregate: leer('bitacora.aggregate', async ({ where }) => {
-          const filas = bitacoras.filter((b) => b.estado === where.estado);
+          const estados = Array.isArray(where.estado?.in) ? where.estado.in : [where.estado];
+          const filas = bitacoras.filter((b) => estados.includes(b.estado));
           return { _sum: { horas_contabilizadas: filas.length ? filas.reduce((n, b) => n + (b.horas_contabilizadas ?? 0), 0) : null } };
         }),
       },

@@ -2,8 +2,17 @@
 
 const path = require('path');
 
-// Misma carpeta que usa GR para los documentos cifrados: <boleta>/<uuid>.pdf (documento.ruta_archivo es relativa a ella).
+// Misma carpeta que usa GR para los documentos cifrados: <boleta>/... (documento.ruta_archivo es relativa a ella).
+// Reportes guarda ahí los PDF en <boleta>/Reportes/<uuid>.pdf y la rúbrica del alumno en <boleta>/Rubrica/rubrica.enc.
 const RUTA_BASE_DOCUMENTOS = path.join(__dirname, '../../../uploads/documentos');
+
+// Rúbrica del profesor: <correo_institucional>/Rubrica/rubrica.enc (aparte de la de los alumnos: el profesor no
+// tiene boleta ni carpeta en uploads/documentos).
+const RUTA_BASE_PROFESORES = path.join(__dirname, '../../../uploads/profesores');
+
+// Sello institucional (único, fijo del sistema; Coordinación no lo sube): Sellos/sello-escom.enc, cifrado con el
+// mismo mecanismo AES-256-GCM que documentos y rúbricas (reportes.assets.js lo lee).
+const RUTA_BASE_COORDINADOR = path.join(__dirname, '../../../uploads/coordinador');
 
 // reporte_mensual.estado_reporte. No existe 'aprobado_profesor'.
 const ESTADOS_REPORTE = Object.freeze({
@@ -60,8 +69,22 @@ const ESTADO_REVISION_RECHAZADA = 'rechazado';
 const TIPO_REVISOR_ALUMNO = 'alumno';
 const ESTADO_REVISION_FIRMADA = 'aprobado';
 
-// Valor de bitacora.estado definido por AH; Reportes solo lo lee.
+// Valores de bitacora.estado definidos por AH; Reportes solo los lee.
 const ESTADO_BITACORA_APROBADA = 'aprobada';
+const ESTADO_BITACORA_RECHAZADA = 'rechazada';
+const ESTADO_BITACORA_PENDIENTE_REVISION = 'pendiente_revision';
+const ESTADO_BITACORA_PENDIENTE_DATOS = 'pendiente_datos';
+const ESTADO_BITACORA_EN_CURSO = 'en_curso';
+
+// Cuentan para dias_laborados/horas_reportadas del reporte mensual y global (nuevas reglas, Bloque 1): aprobada Y
+// rechazada, porque el profesor ya decidió esa jornada (aceptada o no).
+const ESTADOS_BITACORA_QUE_CUENTAN = Object.freeze([ESTADO_BITACORA_APROBADA, ESTADO_BITACORA_RECHAZADA]);
+
+// NO cuentan ni bloquean el reporte: la jornada todavía no tiene una decisión final (del alumno o del profesor).
+// Se detectan para avisar al alumno (ver `diagnostico.bitacorasNoResueltas` en prepararReporteMensual).
+const ESTADOS_BITACORA_NO_RESUELTOS = Object.freeze([
+  ESTADO_BITACORA_EN_CURSO, ESTADO_BITACORA_PENDIENTE_DATOS, ESTADO_BITACORA_PENDIENTE_REVISION,
+]);
 
 // Valores del enum TipoEventoCalendario que vuelven no laborable un día.
 const TIPO_EVENTO_INHABIL = 'Inhabil';
@@ -86,21 +109,22 @@ function nombreInstitucionalCarrera(codigo) {
   return CARRERAS_NOMBRE_INSTITUCIONAL[CARRERAS_ALIAS_LEGADO[codigo] ?? codigo] ?? null;
 }
 
-// Horas de bitácoras aprobadas (suma de horas_contabilizadas) desde las que se habilita el reporte global.
+// Horas contabilizables (aprobada + rechazada; ver ESTADOS_BITACORA_QUE_CUENTAN) desde las que se habilita el
+// reporte global.
 const HORAS_MINIMAS_REPORTE_GLOBAL = 480;
 
 const MOTIVOS_BLOQUEO = Object.freeze({
   SIN_PERIODO_OFICIAL: 'SIN_PERIODO_OFICIAL',
   INICIO_SERVICIO_FIN_DE_SEMANA: 'INICIO_SERVICIO_FIN_DE_SEMANA',
   SERVICIO_NO_INICIADO: 'SERVICIO_NO_INICIADO',
+  // Solo el reporte global necesita fecha_fin (imprime el periodo oficial completo); el mensual ya no la exige.
   FECHA_FIN_NO_DISPONIBLE: 'FECHA_FIN_NO_DISPONIBLE',
-  PERIODO_REBASA_FIN_SERVICIO: 'PERIODO_REBASA_FIN_SERVICIO',
   PERIODO_NO_CERRADO: 'PERIODO_NO_CERRADO',
   SIN_BITACORAS_APROBADAS: 'SIN_BITACORAS_APROBADAS',
   REPORTE_YA_EXISTE: 'REPORTE_YA_EXISTE',
-  REPORTE_ANTERIOR_SIN_APROBACION_FINAL: 'REPORTE_ANTERIOR_SIN_APROBACION_FINAL',
   // Reporte global (CU-REP-07).
   HORAS_INSUFICIENTES: 'HORAS_INSUFICIENTES',
+  MENSUAL_DE_HORAS_FINALES_NO_ENVIADO: 'MENSUAL_DE_HORAS_FINALES_NO_ENVIADO',
   REPORTE_GLOBAL_YA_EXISTE: 'REPORTE_GLOBAL_YA_EXISTE',
   // Datos que el PDF necesita y que no se pueden inventar ni sustituir por otros.
   SIN_CORREO_PERSONAL: 'SIN_CORREO_PERSONAL',
@@ -117,19 +141,17 @@ const MENSAJES_BLOQUEO = Object.freeze({
   [MOTIVOS_BLOQUEO.SERVICIO_NO_INICIADO]:
     'Tu servicio social todavía no inicia.',
   [MOTIVOS_BLOQUEO.FECHA_FIN_NO_DISPONIBLE]:
-    'El periodo oficial no tiene fecha de término, por lo que no se puede confirmar que el reporte esté dentro del servicio.',
-  [MOTIVOS_BLOQUEO.PERIODO_REBASA_FIN_SERVICIO]:
-    'El siguiente periodo mensual completo rebasa la fecha oficial de término de tu servicio social.',
+    'El periodo oficial no tiene fecha de término, que el reporte global necesita para imprimir el periodo completo.',
   [MOTIVOS_BLOQUEO.PERIODO_NO_CERRADO]:
-    'El periodo de este reporte todavía no termina.',
+    'El periodo de este reporte todavía no está disponible para generarse: debe pasar el primer día hábil administrativo posterior a su fecha de término.',
   [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]:
     'No hay bitácoras aprobadas en el periodo de este reporte.',
   [MOTIVOS_BLOQUEO.REPORTE_YA_EXISTE]:
     'Ya existe un reporte para este periodo.',
-  [MOTIVOS_BLOQUEO.REPORTE_ANTERIOR_SIN_APROBACION_FINAL]:
-    'Todos tus reportes anteriores deben estar aprobados por coordinación antes de generar uno nuevo.',
   [MOTIVOS_BLOQUEO.HORAS_INSUFICIENTES]:
-    `El reporte global se habilita al completar ${HORAS_MINIMAS_REPORTE_GLOBAL} horas de bitácoras aprobadas.`,
+    `El reporte global se habilita al completar ${HORAS_MINIMAS_REPORTE_GLOBAL} horas contabilizables (bitácoras aprobadas o rechazadas).`,
+  [MOTIVOS_BLOQUEO.MENSUAL_DE_HORAS_FINALES_NO_ENVIADO]:
+    'Primero envía el reporte mensual del periodo en el que completaste tus horas; después podrás generar el reporte global.',
   [MOTIVOS_BLOQUEO.REPORTE_GLOBAL_YA_EXISTE]:
     'Ya existe un reporte global para tu servicio social.',
   [MOTIVOS_BLOQUEO.SIN_CORREO_PERSONAL]:
@@ -172,6 +194,8 @@ const tituloReporteGlobal = () => 'Reporte global de actividades';
 
 module.exports = {
   RUTA_BASE_DOCUMENTOS,
+  RUTA_BASE_PROFESORES,
+  RUTA_BASE_COORDINADOR,
   TIPOS_NOTIFICACION,
   ESTADOS_REPORTE,
   ESTADO_REPORTE_APROBACION_FINAL,
@@ -187,6 +211,12 @@ module.exports = {
   ESTADO_REVISION_FIRMADA,
   ESTADO_REVISION_RECHAZADA,
   ESTADO_BITACORA_APROBADA,
+  ESTADO_BITACORA_RECHAZADA,
+  ESTADO_BITACORA_PENDIENTE_REVISION,
+  ESTADO_BITACORA_PENDIENTE_DATOS,
+  ESTADO_BITACORA_EN_CURSO,
+  ESTADOS_BITACORA_QUE_CUENTAN,
+  ESTADOS_BITACORA_NO_RESUELTOS,
   TIPO_EVENTO_INHABIL,
   TIPO_EVENTO_VACACIONAL,
   TIPOS_EVENTO_NO_LABORABLE,

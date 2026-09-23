@@ -133,6 +133,19 @@ function crearBdProfesor({ profesores = { 50: 1 }, reportes = [], globales = [],
   let siguienteRevision = 100000;
   let cola = Promise.resolve();
 
+  // Identidad para la BD falsa de rúbricas (reportes.rubricas.js: rol + boleta o correo, nunca del cliente) —
+  // derivada de lo que YA describen `alumnos`/`profesores` y las filas de reportes/globales (alumno de la
+  // solicitud, profesor de la oferta), para que las pruebas no tengan que repetirlo en `usuarios`.
+  const boletaPorUsuarioId = {};
+  for (const [usuarioId, fila] of Object.entries(alumnos)) if (fila?.boleta) boletaPorUsuarioId[usuarioId] = fila.boleta;
+  const esProfesor = new Set(Object.keys(profesores).map(Number));
+  for (const fila of [...reportes, ...globales]) {
+    const al = fila.solicitud_registro?.alumno;
+    if (al?.usuario_id != null && al?.boleta) boletaPorUsuarioId[al.usuario_id] = al.boleta;
+    const pr = fila.solicitud_registro?.oferta?.profesor;
+    if (pr?.usuario_id != null) esProfesor.add(pr.usuario_id);
+  }
+
   // Un modelo de reporte (mensual o global) sobre su lista, y el de sus revisiones (append-only: solo `create`).
   const modeloReporte = (lista) => ({
     findMany: async ({ where }) => lista.filter((r) => coincide(r, where)),
@@ -162,7 +175,15 @@ function crearBdProfesor({ profesores = { 50: 1 }, reportes = [], globales = [],
       findUnique: async ({ where }) => alumnos[where.usuario_id] ?? null,
     },
     usuario: {
-      findUnique: async ({ where }) => (where.id in usuarios ? { id: where.id, ...usuarios[where.id] } : null),
+      findUnique: async ({ where }) => {
+        const boleta = boletaPorUsuarioId[where.id];
+        const conocido = where.id in usuarios || boleta !== undefined || esProfesor.has(where.id);
+        if (!conocido) return null;
+        const identidad = boleta !== undefined
+          ? { rol: 'alumno_asignado', correo_institucional: null, alumno: { boleta } }
+          : { rol: 'profesor', correo_institucional: `profesor${where.id}@ipn.mx`, alumno: null };
+        return { id: where.id, rubrica_imagen: null, ...identidad, ...usuarios[where.id] };
+      },
     },
     coordinador: {
       findMany: async () => coordinadores.map((usuario_id) => ({ usuario_id })),

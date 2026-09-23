@@ -117,7 +117,7 @@ export default function GenerarReporteGlobal() {
     );
   }
 
-  const { horas, reporte, reporteExistente, motivosBloqueo, firma } = datos;
+  const { horas, mensualDeHorasFinales, reporte, reporteExistente, motivosBloqueo, firma } = datos;
   const periodo = reporte.periodo ? `${reporte.periodo.inicioTexto} — ${reporte.periodo.finTexto}` : null;
 
   // ── Ya existe el reporte global (solo uno por servicio social) ─
@@ -152,8 +152,33 @@ export default function GenerarReporteGlobal() {
           {icono(C.warningSoft, C.warning, <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>)}
           <h3 style={{ margin: "0 0 0.5rem", fontSize: 17, fontWeight: 700, color: C.textPrimary }}>Horas insuficientes</h3>
           <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
-            Para generar el reporte global debes acumular <strong style={{ color: C.textPrimary }}>{horas.requeridas} horas</strong> de bitácoras aprobadas.
+            Para generar el reporte global debes acumular <strong style={{ color: C.textPrimary }}>{horas.requeridas} horas</strong> contabilizables (bitácoras aprobadas o rechazadas).
           </p>
+        </div>
+      </Layout>
+    );
+  }
+
+  // ── Ya tiene las horas, pero falta enviar el mensual donde las completó ─
+  // Aviso persistente derivado (no hay notificación en BD ni WebSocket): el acceso a la pantalla sigue habilitado,
+  // solo no se puede generar todavía. El backend vuelve a validarlo al enviar.
+  if (mensualDeHorasFinales?.numero !== null && !mensualDeHorasFinales?.enviado) {
+    return (
+      <Layout usuario={nombreAlumno}>
+        {flechaAtras}
+        <div style={tarjeta}>
+          {icono(C.warningSoft, C.warning, <><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></>)}
+          <h3 style={{ margin: "0 0 0.5rem", fontSize: 17, fontWeight: 700, color: C.textPrimary }}>
+            Falta enviar tu Reporte Mensual No. {mensualDeHorasFinales.numero}
+          </h3>
+          <p style={{ margin: "0 0 0.75rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
+            Ya completaste tus <strong style={{ color: C.textPrimary }}>{horas.acumuladas} horas</strong>, pero las últimas quedaron
+            dentro del periodo del Reporte Mensual No. {mensualDeHorasFinales.numero}. Envíalo y después podrás generar tu reporte global.
+          </p>
+          <p style={{ margin: "0 0 2rem", fontSize: 12, color: C.textDisabled, lineHeight: 1.6 }}>
+            No necesitas esperar a que tu profesor o coordinación lo revisen: basta con haberlo enviado.
+          </p>
+          <button onClick={() => navigate("/alumno/reportes/generar")} style={botonPrimario()}>Ir a generar mi reporte mensual</button>
         </div>
       </Layout>
     );

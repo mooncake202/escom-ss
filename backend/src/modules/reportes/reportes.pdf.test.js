@@ -1,3 +1,5 @@
+process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -19,7 +21,18 @@ const {
 const { lineasMaximas, envolverTexto, medirActividades } = require('./reportes.medidas');
 const { AREA_ACTIVIDADES, ACTIVIDADES, SELLO } = require('./reportes.plantilla');
 const { leerSello } = require('./reportes.assets');
+const { cifrarBuffer } = require('../../lib/fileEncryption');
 const { crearPng, JPEG_PEQUENO, resultadoEjemplo, ACTIVIDADES_EJEMPLO } = require('./reportes.pdf.fixtures');
+
+// Sello institucional real (cifrado, AES-256-GCM) en un archivo temporal — reportes.assets.js ya no lo lee en
+// claro desde assets/sellos.
+function selloCifradoDePrueba(t) {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-sello-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  const rutaSello = path.join(base, 'sello-escom.enc');
+  fs.writeFileSync(rutaSello, cifrarBuffer(crearPng(300, 300, [10, 120, 30])));
+  return rutaSello;
+}
 
 const datos = (cambios, actividades = ACTIVIDADES_EJEMPLO) => construirDatosPdf(resultadoEjemplo(cambios), actividades);
 const rechaza = (fn, code) => assert.rejects(async () => fn(), (err) => err.code === code && err.status >= 400, code);
@@ -510,11 +523,11 @@ test('agregarSelloValidacion: el sello va SOLO en SELLO.zona y nada más del PDF
   assert.ok(contraGenerador.n === 0 || dentroDeZonaSello(contraGenerador.caja), 'mismas coordenadas y escala que el generador');
 });
 
-test('agregarSelloValidacion: con el sello real del prototipo, mantiene una página Carta y las firmas previas; el original no se toca', async () => {
+test('agregarSelloValidacion: con el sello institucional real (cifrado, descifrado por reportes.assets.js), mantiene una página Carta y las firmas previas; el original no se toca', async (t) => {
   const firmado = await agregarRubricaProfesor(await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) }), crearPng(300, 100));
   const copia = Buffer.from(firmado);
 
-  const final = await agregarSelloValidacion(firmado, leerSello().data);
+  const final = await agregarSelloValidacion(firmado, leerSello({ rutaSello: selloCifradoDePrueba(t) }).data);
 
   assert.ok(Buffer.isBuffer(final));
   assert.equal(Buffer.compare(firmado, copia), 0, 'el PDF de entrada no se modifica');

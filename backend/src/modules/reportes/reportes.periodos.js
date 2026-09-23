@@ -14,9 +14,9 @@
 // El inicio REAL del servicio nunca se corrige: si cae en sábado o domingo es una inconsistencia
 // (InicioServicioNoLaboralError) que debe resolver quien registró el Periodo.
 //
-// Solo periodos mensuales completos: si uno rebasa fecha_fin no se recorta, no se fusiona y no se
-// generan periodos residuales; REP-01 lo bloquea.
-// PENDIENTE: el tramo final del servicio se resuelve junto con CU-REP-07 y la regla de las 480 h.
+// Solo periodos mensuales completos: nunca se recortan, no se fusionan y no se generan periodos residuales.
+// fecha_fin es administrativa y NO detiene la secuencia: un periodo que la rebasa se genera igual (R8, R9…), y
+// `rebasaFinServicio` queda solo como información. El reporte global (CU-REP-07) sí usa fecha_fin tal cual.
 
 const CONFIG_PERIODOS = Object.freeze({
   diasLaboralesInicioMesCalendario: 5,
@@ -184,6 +184,22 @@ function listarPeriodosCompletos({ fechaInicio, fechaFin, config = CONFIG_PERIOD
   return periodos;
 }
 
+/**
+ * Número de reporte mensual cuyo periodo CONTIENE `fecha` (p. ej. el bitacora.fecha_registro de una jornada).
+ * Recorre los periodos consecutivos desde el #1; NO depende de fechaFin, que es administrativa y no detiene la
+ * secuencia. null si la fecha queda antes del inicio del servicio, o si cae en un hueco entre dos periodos
+ * (solo sábado/domingo: una jornada ahí es una inconsistencia de AH que Reportes informa, no corrige).
+ */
+function numeroPeriodoDeFecha({ fechaInicio, fecha, config = CONFIG_PERIODOS, maximo = 36 }) {
+  const objetivo = normalizarFechaISO(fecha);
+  for (let numero = 1; numero <= maximo; numero++) {
+    const periodo = calcularPeriodoReporte({ fechaInicio, numero, config });
+    if (objetivo < periodo.inicio) return null;
+    if (objetivo <= periodo.fin) return numero;
+  }
+  return null;
+}
+
 /** Cierra el día siguiente a su último día (`hoy` = día calendario México). */
 function periodoCerrado(periodo, hoy) {
   return normalizarFechaISO(hoy) > periodo.fin;
@@ -207,6 +223,7 @@ module.exports = {
   determinarEsquema,
   calcularPeriodoReporte,
   listarPeriodosCompletos,
+  numeroPeriodoDeFecha,
   periodoCerrado,
   servicioIniciado,
 };

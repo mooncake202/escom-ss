@@ -47,10 +47,12 @@ async function levantar(t, opciones) {
     fs.mkdirSync(path.dirname(path.join(rutaBaseDocumentos, ruta)), { recursive: true });
     fs.writeFileSync(path.join(rutaBaseDocumentos, ruta), cifrarBuffer(ruta === '1/a.pdf' ? PDF_ALUMNO : Buffer.from('%PDF-del-otro-profesor')));
   }
+  // Reorganización de almacenamiento: rúbrica del profesor en <correo>/Rubrica/rubrica.enc — 'profesor50@ipn.mx' es
+  // el correo que reportes.profesor.fixtures.js deriva por omisión para el usuario 50 sin correo_institucional explícito.
   const rutaBaseRubricas = fs.mkdtempSync(path.join(os.tmpdir(), 'http-rubricas-profesor-'));
   t.after(() => fs.rmSync(rutaBaseRubricas, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(rutaBaseRubricas, '50'));
-  fs.writeFileSync(path.join(rutaBaseRubricas, '50/firma.enc'), cifrarBuffer(Buffer.from('rúbrica de prueba')));
+  fs.mkdirSync(path.join(rutaBaseRubricas, 'profesor50@ipn.mx', 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rutaBaseRubricas, 'profesor50@ipn.mx/Rubrica/rubrica.enc'), cifrarBuffer(Buffer.from('rúbrica de prueba')));
   const avisos = { notificaciones: [], emisiones: [] };
   const sellos = [];
   let tsa = async (hash) => { sellos.push(hash); return { token: TOKEN }; };
@@ -58,7 +60,7 @@ async function levantar(t, opciones) {
   const bd = crearBdProfesor({
     profesores: { 50: 1, 51: 2 },
     escritura: true,
-    usuarios: { 50: { rubrica_imagen: '50/firma.enc' }, 51: { rubrica_imagen: null } },
+    usuarios: { 50: { rubrica_imagen: 'profesor50@ipn.mx/Rubrica/rubrica.enc' }, 51: { rubrica_imagen: null } },
     coordinadores: [70],
     reportes: [
       reporteMensual({ id: 1, profesorId: 1, solicitudId: 1001, envio: '2026-08-16T15:00:00.000Z', diasLaborados: 2, horasReportadas: 7, rutaArchivo: '1/a.pdf', hashAlumno: sha256(PDF_ALUMNO) }),

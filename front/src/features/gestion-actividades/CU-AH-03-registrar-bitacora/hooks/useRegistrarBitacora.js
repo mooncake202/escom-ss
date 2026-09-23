@@ -22,6 +22,8 @@ const MENSAJES_BLOQUEO = {
   limiteHorasAlcanzado: "Ya completaste las 480 horas de tu servicio social.",
   noEsDiaLaborable: "Hoy no es día laborable (fin de semana, día inhábil o periodo vacacional). No puedes iniciar una jornada.",
   yaRegistroHoy: "Ya registraste tu bitácora de hoy. Vuelve mañana para registrar tu siguiente jornada.",
+  // El backend ya decide cuándo aplica (plazo de envío del reporte mensual vencido); aquí solo se muestra el mensaje.
+  reporteMensualVencido: "Tienes un reporte mensual pendiente cuyo plazo de envío venció. Envíalo desde Reportes para poder registrar nuevas jornadas.",
 };
 
 export function useRegistrarBitacora() {
@@ -207,6 +209,7 @@ export function useRegistrarBitacora() {
     (bloqueos.limiteHorasAlcanzado && MENSAJES_BLOQUEO.limiteHorasAlcanzado) ||
     (bloqueos.noEsDiaLaborable && MENSAJES_BLOQUEO.noEsDiaLaborable) ||
     (bloqueos.yaRegistroHoy && MENSAJES_BLOQUEO.yaRegistroHoy) ||
+    (bloqueos.reporteMensualVencido && MENSAJES_BLOQUEO.reporteMensualVencido) ||
     null;
 
   return {

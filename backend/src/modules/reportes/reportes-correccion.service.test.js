@@ -62,8 +62,8 @@ async function escenario(t, { estado = ESTADOS_REPORTE.RECHAZADO_PROFESOR, revis
   fs.mkdirSync(path.join(rutaBaseDocumentos, '2022630001'), { recursive: true });
   const pdfAnterior = Buffer.from('%PDF-anterior (versión rechazada)');
   fs.writeFileSync(path.join(rutaBaseDocumentos, '2022630001/anterior.pdf'), cifrarBuffer(pdfAnterior));
-  fs.mkdirSync(path.join(rutaBaseRubricas, String(ALUMNO)), { recursive: true });
-  fs.writeFileSync(path.join(rutaBaseRubricas, `${ALUMNO}/firma.enc`), cifrarBuffer(RUBRICA));
+  fs.mkdirSync(path.join(rutaBaseRubricas, '2022630001', 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rutaBaseRubricas, '2022630001/Rubrica/rubrica.enc'), cifrarBuffer(RUBRICA));
 
   const historial = revisiones ?? (estado === ESTADOS_REPORTE.RECHAZADO_COORDINADOR ? HISTORIAL_RECHAZO_COORDINACION() : HISTORIAL_RECHAZO_PROFESOR());
   const reportes = [
@@ -76,7 +76,7 @@ async function escenario(t, { estado = ESTADOS_REPORTE.RECHAZADO_PROFESOR, revis
     profesores: {},
     reportes,
     escritura: true,
-    usuarios: { [ALUMNO]: { rubrica_imagen: sinRubrica ? null : `${ALUMNO}/firma.enc` } },
+    usuarios: { [ALUMNO]: { rubrica_imagen: sinRubrica ? null : '2022630001/Rubrica/rubrica.enc' } },
     alumnos: { [ALUMNO]: alumnoGrafo({ usuarioId: ALUMNO, ...alumno }) },
     ...opcionesBd,
   });
@@ -149,7 +149,7 @@ test('reenviar: el PDF usa la plantilla con el número y el periodo del snapshot
   assert.equal(datos.actividades.texto, ACTIVIDADES_NUEVAS);
   assert.equal(Buffer.compare(rubrica, RUBRICA), 0, 'la rúbrica guardada, sin pedir otra');
   assert.ok(!e.operaciones.includes('usuario.updateMany'), 'no se registra una rúbrica nueva');
-  assert.deepEqual(archivos(e.rutaBaseRubricas), [`${ALUMNO}/firma.enc`], 'la rúbrica anterior no se toca');
+  assert.deepEqual(archivos(e.rutaBaseRubricas), ['2022630001/Rubrica/rubrica.enc'], 'la rúbrica anterior no se toca');
 });
 
 test('reenviar: hash, TSA, archivo y BD son de ESE mismo Buffer; el documento apunta al PDF nuevo y el anterior queda en disco', async (t) => {
@@ -158,7 +158,7 @@ test('reenviar: hash, TSA, archivo y BD son de ESE mismo Buffer; el documento ap
 
   const rutaNueva = e.reporte.documento.ruta_archivo;
   assert.notEqual(rutaNueva, '2022630001/anterior.pdf');
-  assert.match(rutaNueva, /^2022630001\/[0-9a-f-]{36}\.pdf$/);
+  assert.match(rutaNueva, /^2022630001\/Reportes\/[0-9a-f-]{36}\.pdf$/);
   const guardado = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, rutaNueva)));
   assert.equal(guardado.toString(), `%PDF-corregido\n${ACTIVIDADES_NUEVAS}`);
   assert.deepEqual(e.sellosDeTiempo, [sha256(guardado)], 'la TSA recibió el hash del Buffer que se guardó');
@@ -177,9 +177,10 @@ test('reenviar: agrega una revisión NUEVA del alumno (hash, IP, TSA) y conserva
   const revisiones = revisionesDe(e.reporte);
   assert.deepEqual(revisiones.slice(0, antes.length), antes, 'las revisiones, hashes y sellos de tiempo anteriores quedan idénticos');
   assert.equal(revisiones.length, antes.length + 1);
-  const { id, usuario, ...nueva } = revisiones.at(-1);
+  const { id, usuario, ruta_archivo: rutaArchivo, ...nueva } = revisiones.at(-1);
   assert.equal(usuario, undefined);
   assert.ok(id > 9000);
+  assert.equal(rutaArchivo, e.reporte.documento.ruta_archivo, 'la revisión apunta al PDF nuevo, el mismo que ya quedó vigente en el documento');
   assert.deepEqual({ ...nueva, hash_documento: '(hash)' }, {
     reporte_mensual_id: 1,
     usuario_id: ALUMNO,

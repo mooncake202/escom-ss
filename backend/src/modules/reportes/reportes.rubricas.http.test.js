@@ -26,9 +26,13 @@ const guardarReal = rubricas.guardarRubrica;
 async function levantar(t) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'rubricas-http-'));
   const usuario = { id: 7, rubrica_imagen: null };
+  const BOLETA = '2022630001';
   const bd = {
     usuario: {
-      findUnique: async () => ({ id: usuario.id, rubrica_imagen: usuario.rubrica_imagen }),
+      findUnique: async () => ({
+        id: usuario.id, rol: 'alumno_asignado', rubrica_imagen: usuario.rubrica_imagen,
+        correo_institucional: null, alumno: { boleta: BOLETA },
+      }),
       updateMany: async ({ where, data }) => {
         if (where.rubrica_imagen === null && usuario.rubrica_imagen !== null) return { count: 0 };
         Object.assign(usuario, data);
@@ -99,7 +103,7 @@ test('201: guarda la rúbrica y responde solo el estado, aclarando que no se fir
   assert.equal(JSON.stringify(cuerpo).includes(usuario.rubrica_imagen), false, 'la ruta no se expone');
 
   assert.equal(archivosGuardados().length, 1);
-  assert.ok(usuario.rubrica_imagen.startsWith('7/'));
+  assert.equal(usuario.rubrica_imagen, '2022630001/Rubrica/rubrica.enc');
   assert.ok(typeof usuario.rubrica_ip === 'string' && usuario.rubrica_ip.length > 0, 'IP registrada');
   const [id, archivo, opciones] = servicio.mock.calls[0].arguments;
   assert.equal(id, 7, 'el usuario sale del token, no del cuerpo');

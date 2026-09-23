@@ -49,7 +49,10 @@ function crearBdReporte(opciones = {}) {
     usuario: {
       findUnique: async ({ where }) => {
         const u = usuarios[where.id];
-        return u ? { id: u.id, rubrica_imagen: u.rubrica_imagen } : null;
+        if (!u) return null;
+        // Reorganización de almacenamiento: la identidad de la rúbrica (reportes.rubricas.js) sale de aquí
+        // (rol + boleta del alumno anidada), nunca del cliente. Esta BD falsa solo representa alumnos.
+        return { id: u.id, rol: 'alumno_asignado', rubrica_imagen: u.rubrica_imagen, correo_institucional: 'agarcia@alumno.ipn.mx', alumno: sinAlumno ? null : { boleta: '2022630001' } };
       },
       updateMany: async ({ where, data }) => {
         const u = usuarios[where.id];

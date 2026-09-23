@@ -137,6 +137,7 @@ async function rechazarReporte(usuarioId, tipoReporte, reporteId, comentario, de
         estado: ESTADO_REVISION_RECHAZADA,
         comentario: motivo,
         hash_documento: null,
+        ruta_archivo: fila.documento.ruta_archivo, // no se genera PDF nuevo: el vigente que se está rechazando
         ip_firma: null,
         token_tsa: null,
         fecha: ahora,
@@ -170,6 +171,7 @@ async function registrarValidacion(tx, { cfg, id, usuarioId, fila, rutaAnterior,
       estado: ESTADO_REVISION_FIRMADA,
       comentario: null,
       hash_documento: hash,
+      ruta_archivo: rutaNueva, // el PDF nuevo que Coordinación acaba de sellar
       ip_firma: normalizarIp(ip),
       token_tsa: token,
       fecha: ahora,
@@ -191,7 +193,7 @@ async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
 
   // 1) Validaciones: nada se sella ni guarda si algo no está en orden (el sello se verifica antes de tocar el PDF).
   const { cfg, fila, id } = await cargarReporteValidable(prisma, usuarioId, tipoReporte, reporteId);
-  const sello = (deps.leerSello ?? leerSello)('prototipo');
+  const sello = (deps.leerSello ?? leerSello)();
 
   // 2) El PDF vigente exacto + solo el sello = UN Buffer nuevo. Todo lo demás se hace sobre él.
   const rutaAnterior = fila.documento?.ruta_archivo;

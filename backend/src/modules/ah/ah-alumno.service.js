@@ -13,6 +13,9 @@ const {
   calcularHorasNetas,
   limiteHorasAlcanzado,
 } = require('./ah.shared');
+// Bloque 4 (Reportes): mismo cálculo de plazo de envío que Reportes ya deriva del calendario administrativo
+// (Bloque 3) — aquí solo se consulta, nunca se recalculan periodos ni días hábiles.
+const { plazoEnvioReporteMensualVencido } = require('../reportes/reportes-alumno.service');
 
 /**
  * Socket genérico (fail-open): avisa al propio alumno que su resumen del
@@ -146,7 +149,7 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
   const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
   const hoy = calcularDiaMexicoUTC();
 
-  const [esLaborable, pendiente, bitacoraHoy, actividades, cumulo] = await Promise.all([
+  const [esLaborable, pendiente, bitacoraHoy, actividades, cumulo, reporteMensualVencido] = await Promise.all([
     esDiaLaborable(hoy),
     prisma.bitacora.findFirst({
       where: { solicitud_registro_id: solicitud.id, estado: 'pendiente_datos' },
@@ -155,6 +158,8 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
     obtenerBitacoraDelDia(solicitud.id, hoy),
     listarActividadesReportables(solicitud.id),
     prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumno.boleta } }),
+    // Bloque 4: mismo aviso de plazo que Reportes (Bloque 3) — no se recalcula aquí ningún periodo ni día hábil.
+    plazoEnvioReporteMensualVencido(alumnoUsuarioId),
   ]);
 
   const horasAcumuladas = cumulo?.horas_acumuladas ?? 0;
@@ -165,6 +170,7 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
     limiteHorasAlcanzado: limiteHorasAlcanzado(cumulo),
     sinActividades: actividades.length === 0,
     yaRegistroHoy: !!bitacoraHoy && bitacoraHoy.estado !== 'pendiente_datos' && bitacoraHoy.estado !== 'en_curso',
+    reporteMensualVencido,
   };
 
   let fase;
@@ -180,7 +186,9 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
     bitacoraActiva = bitacoraHoy;
   } else if (bloqueos.yaRegistroHoy) {
     fase = 'enviado';
-  } else if (bloqueos.noEsDiaLaborable || bloqueos.limiteHorasAlcanzado || bloqueos.sinActividades) {
+  } else if (bloqueos.noEsDiaLaborable || bloqueos.limiteHorasAlcanzado || bloqueos.sinActividades || bloqueos.reporteMensualVencido) {
+    // reporteMensualVencido solo bloquea llegar a 'inicio' (una jornada NUEVA) — nunca las ramas de arriba
+    // (jornada pendiente de capturar o en curso): esas ya existen y este bloqueo no las toca.
     fase = 'bloqueado';
   } else {
     fase = 'inicio';
@@ -229,6 +237,17 @@ async function iniciarJornada(alumnoUsuarioId) {
   const actividades = await listarActividadesReportables(solicitud.id);
   if (actividades.length === 0) {
     throw crearError('No tienes actividades asignadas; pide a tu profesor que te asigne una antes de registrar bitácora.');
+  }
+
+  // Bloque 4: vencido el plazo de envío del reporte mensual (Bloque 3: 5 días hábiles administrativos desde que se
+  // habilitó), no se permite iniciar una jornada NUEVA hasta que ese reporte se envíe — "enviado" = existe el
+  // reporte_mensual, sin importar si luego lo rechaza el profesor/coordinador. Nunca afecta una bitácora existente.
+  if (await plazoEnvioReporteMensualVencido(alumnoUsuarioId)) {
+    throw crearError(
+      'Tienes un reporte mensual pendiente cuyo plazo de envío venció. Envíalo para poder registrar nuevas jornadas.',
+      409,
+      'REPORTE_MENSUAL_PENDIENTE',
+    );
   }
 
   let bitacora;

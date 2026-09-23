@@ -50,13 +50,13 @@ async function levantar(t) {
     fs.mkdirSync(path.dirname(path.join(rutaBaseDocumentos, ruta)), { recursive: true });
     fs.writeFileSync(path.join(rutaBaseDocumentos, ruta), cifrarBuffer(ruta === '1/a.pdf' ? PDF_ALUMNO : Buffer.from('%PDF-del-otro-alumno')));
   }
-  fs.mkdirSync(path.join(rutaBaseRubricas, '201'), { recursive: true });
-  fs.writeFileSync(path.join(rutaBaseRubricas, '201/firma.enc'), cifrarBuffer(Buffer.from('rúbrica de prueba')));
+  fs.mkdirSync(path.join(rutaBaseRubricas, '2022630001', 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rutaBaseRubricas, '2022630001/Rubrica/rubrica.enc'), cifrarBuffer(Buffer.from('rúbrica de prueba')));
 
   const bd = crearBdProfesor({
     profesores: {},
     escritura: true,
-    usuarios: { 201: { rubrica_imagen: '201/firma.enc' } },
+    usuarios: { 201: { rubrica_imagen: '2022630001/Rubrica/rubrica.enc' } },
     alumnos: { 201: alumnoGrafo({ usuarioId: 201 }) },
     reportes: [
       reporteMensual({ id: 1, numero: 1, estado: 'rechazado_profesor', actividades: ORIGINAL, rutaArchivo: '1/a.pdf', diasLaborados: 4, horasReportadas: 13,

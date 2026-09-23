@@ -40,11 +40,29 @@ const bitacoras = (horas, extra = []) => [
   ...(horas % 4 ? [{ id: 9000, estado: 'aprobada', fecha_registro: utc('2025-10-17'), fecha_revision: new Date('2025-10-18T16:00:00.000Z'), horas_contabilizadas: horas % 4 }] : []),
   ...extra,
 ];
+// Sin decidir todavía: no cuentan para las 480 h del global (mismo criterio que dias_laborados/horas_reportadas del
+// mensual). 'rechazada' SÍ cuenta desde Bloque 6 — no va en esta lista.
 const NO_CUENTAN = [
   { id: 9101, estado: 'pendiente_revision', fecha_registro: utc('2026-01-05'), horas_contabilizadas: 4 },
-  { id: 9102, estado: 'rechazada', fecha_registro: utc('2026-01-06'), horas_contabilizadas: 4 },
+  { id: 9102, estado: 'pendiente_datos', fecha_registro: utc('2026-01-06'), horas_contabilizadas: 4 },
   { id: 9103, estado: 'en_curso', fecha_registro: utc('2026-01-07'), horas_contabilizadas: null },
 ];
+
+// Línea base de mensuales ya enviados. Las bitácoras por omisión caen todas en el periodo #1, así que el mensual
+// del cruce de las 480 h (el #1) siempre está entre estos: las pruebas de PDF/TSA/envío no tienen que ocuparse de
+// esa condición. No hay ningún mínimo de reportes; son seis solo por realismo.
+const seisMensualesAprobados = (extra = []) => [
+  ...Array.from({ length: 6 }, (_, i) => ({ id: i + 1, num_reporte: i + 1, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR })),
+  ...extra,
+];
+
+// 480 h exactas donde la ÚLTIMA jornada (la que hace cruzar el mínimo) cae el 20-abr-2026: periodo mensual #7
+// (2026-04-16 → 2026-05-15), que además termina DESPUÉS de la fecha_fin oficial (2026-05-14).
+const BITACORAS_CRUCE_EN_PERIODO_7 = [
+  { id: 1, estado: 'aprobada', fecha_registro: utc('2025-10-16'), horas_contabilizadas: 476 },
+  { id: 2, estado: 'aprobada', fecha_registro: utc('2026-04-20'), horas_contabilizadas: 4 },
+];
+const septimoMensual = (estado) => ({ id: 7, num_reporte: 7, estado_reporte: estado });
 
 /** Escenario: BD falsa con `horas` aprobadas, carpetas de rúbricas y documentos, y espías de PDF, TSA y avisos. */
 async function escenario(t, { horas = HORAS_MINIMAS_REPORTE_GLOBAL, bd: opcionesBd = {}, conRubrica = true, tsa, generarPdf } = {}) {
@@ -55,7 +73,11 @@ async function escenario(t, { horas = HORAS_MINIMAS_REPORTE_GLOBAL, bd: opciones
   };
   const rutaBaseRubricas = tmp('global-rubricas-');
   const rutaBaseDocumentos = tmp('global-docs-');
-  const bd = crearBdEnvio({ bitacoras: bitacoras(horas, NO_CUENTAN), ...opcionesBd });
+  const bd = crearBdEnvio({
+    bitacoras: bitacoras(horas, NO_CUENTAN),
+    reportesIniciales: seisMensualesAprobados(),
+    ...opcionesBd,
+  });
   if (conRubrica) await guardarRubrica(7, { buffer: RUBRICA }, { prisma: bd.prisma, rutaBase: rutaBaseRubricas, ip: '10.0.0.1' });
   bd.operaciones.length = 0;
 
@@ -117,12 +139,35 @@ test('480 h justas habilitan el global; 479 no; más de 480 sí — se suma hora
   assert.equal((await variadas.preparar()).horas.acumuladas, 480);
 });
 
-test('solo cuentan las bitácoras APROBADAS: pendientes, rechazadas o en curso no suman', async (t) => {
-  const e = await escenario(t, { horas: 476 }); // + 3 filas que no cuentan (4 h cada una si contaran)
+test('Bloque 6 — horas: cuentan aprobada Y rechazada; en_curso, pendiente_datos y pendiente_revision NO', async (t) => {
+  const e = await escenario(t, { horas: 476 }); // + 3 filas que NUNCA cuentan (NO_CUENTAN), 4 h cada una si contaran
   const r = await e.preparar();
   assert.equal(r.horas.acumuladas, 476);
   assert.equal(r.puedeGenerar, false);
   assert.equal(codigos(r).includes('HORAS_INSUFICIENTES'), true);
+});
+
+test('Bloque 6 — horas: una bitácora rechazada cuenta igual que una aprobada', async (t) => {
+  const e = await escenario(t, {
+    bd: { bitacoras: [{ id: 1, estado: 'rechazada', fecha_registro: utc('2025-10-16'), horas_contabilizadas: 480 }] },
+  });
+  const r = await e.preparar();
+  assert.equal(r.horas.acumuladas, 480);
+  assert.equal(r.puedeGenerar, true);
+});
+
+test('Bloque 6 — horas: aprobada + rechazada se suman', async (t) => {
+  const e = await escenario(t, {
+    bd: {
+      bitacoras: [
+        { id: 1, estado: 'aprobada', fecha_registro: utc('2025-10-16'), horas_contabilizadas: 240 },
+        { id: 2, estado: 'rechazada', fecha_registro: utc('2025-10-17'), horas_contabilizadas: 240 },
+      ],
+    },
+  });
+  const r = await e.preparar();
+  assert.equal(r.horas.acumuladas, 480);
+  assert.equal(r.puedeGenerar, true);
 });
 
 test('sin bitácoras aprobadas: 0 horas y bloqueado', async (t) => {
@@ -131,13 +176,13 @@ test('sin bitácoras aprobadas: 0 horas y bloqueado', async (t) => {
   assert.equal(r.puedeGenerar, false);
 });
 
-test('la preparación es de solo lectura, no toca reportes mensuales y no consulta bitácoras una por una (suma en BD)', async (t) => {
+test('la preparación es de solo lectura; suma las horas en BD y consulta reportes mensuales y bitácoras (para ubicar el mensual de las horas finales)', async (t) => {
   const e = await escenario(t);
   await e.preparar();
   assert.deepEqual(e.escrituras(), []);
-  assert.ok(e.operaciones.includes('bitacora.aggregate'));
-  assert.ok(!e.operaciones.includes('bitacora.findMany'));
-  assert.ok(!e.operaciones.includes('reporte_mensual.findMany'), 'el global no depende de los reportes mensuales');
+  assert.ok(e.operaciones.includes('bitacora.aggregate'), 'el total de horas se sigue sumando en BD');
+  assert.ok(e.operaciones.includes('bitacora.findMany'), 'se recorren en orden para ubicar con cuál se llega a las 480 h');
+  assert.ok(e.operaciones.includes('reporte_mensual.findMany'), 'el global depende de los mensuales (>=6 y el de las horas finales)');
 });
 
 // ══ Periodo, datos y firma ════════════════════════════════════
@@ -153,6 +198,21 @@ test('periodo del global = fecha de inicio → fecha de fin del periodo oficial 
   // La "hoy" del fixture (20-nov-2025) es muy anterior al fin del periodo: no lo recorta.
   assert.equal(r.reporte.periodo.fin, '2026-05-14');
   assert.deepEqual([r.servicio.fechaInicio, r.servicio.fechaFin], ['2025-10-16', '2026-05-14']);
+});
+
+test('fecha_fin del periodo oficial sigue intacta para el global aunque ya NO limite los mensuales', async (t) => {
+  // Los mensuales pueden rebasar fecha_fin (R7, R8…), pero el global sigue imprimiendo el periodo oficial tal cual:
+  // aquí hay 8 mensuales aprobados, varios posteriores al 14-may-2026, y el periodo del global no se mueve.
+  const e = await escenario(t, {
+    bd: { reportesIniciales: seisMensualesAprobados([
+      { id: 7, num_reporte: 7, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR },
+      { id: 8, num_reporte: 8, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR },
+    ]) },
+  });
+  const r = await e.preparar();
+  assert.deepEqual([r.reporte.periodo.inicio, r.reporte.periodo.fin], ['2025-10-16', '2026-05-14']);
+  assert.equal(r.reporte.periodo.finTexto, '14 de mayo de 2026');
+  assert.equal(r.puedeGenerar, true, 'ocho mensuales aprobados siguen habilitando el global');
 });
 
 test('sin periodo oficial o sin fecha de término → bloqueado con su motivo (no se inventa el fin)', async (t) => {
@@ -179,9 +239,137 @@ test('faltan datos que el PDF imprime (correo, profesor, programa) → bloqueado
   assert.deepEqual(sinRubrica.firma, { tieneRubrica: false, requiereSubirRubrica: true });
 });
 
-test('un reporte mensual existente no bloquea el global; uno global sí (solo uno por solicitud)', async (t) => {
-  const conMensual = await (await escenario(t, { bd: { reportesIniciales: [{ id: 1, num_reporte: 1, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR }] } })).preparar();
-  assert.equal(conMensual.puedeGenerar, true);
+// ══ El Global no depende del estado ni del número de mensuales, solo del que cubre el cruce ═══
+
+test('< 480 h → no habilita el Global, aunque haya mensuales de sobra', async (t) => {
+  const e = await escenario(t, { horas: 400 });
+  const r = await e.preparar();
+  assert.equal(r.puedeGenerar, false);
+  assert.deepEqual(codigos(r), ['HORAS_INSUFICIENTES']);
+});
+
+test('el Global YA NO exige que todos los mensuales estén aprobado_coordinador (no depende de profesor/coordinación)', async (t) => {
+  for (const estado of [
+    ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR,
+    ESTADOS_REPORTE.RECHAZADO_PROFESOR,
+    ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR,
+    ESTADOS_REPORTE.RECHAZADO_COORDINADOR,
+  ]) {
+    const reportes = seisMensualesAprobados();
+    reportes[5] = { ...reportes[5], estado_reporte: estado }; // el 6º, sin aprobación final
+    const e = await escenario(t, { bd: { reportesIniciales: reportes } });
+    const r = await e.preparar();
+    assert.deepEqual(codigos(r), [], estado);
+    assert.equal(r.puedeGenerar, true, estado);
+  }
+});
+
+test('mensuales con estados mezclados (ninguno aprobado por coordinación) igualmente habilitan el Global', async (t) => {
+  const mezclados = [
+    { id: 1, num_reporte: 1, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR },
+    { id: 2, num_reporte: 2, estado_reporte: ESTADOS_REPORTE.RECHAZADO_PROFESOR },
+    { id: 3, num_reporte: 3, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR },
+    { id: 4, num_reporte: 4, estado_reporte: ESTADOS_REPORTE.RECHAZADO_COORDINADOR },
+    { id: 5, num_reporte: 5, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR },
+    { id: 6, num_reporte: 6, estado_reporte: ESTADOS_REPORTE.RECHAZADO_PROFESOR },
+  ];
+  const e = await escenario(t, { bd: { reportesIniciales: mezclados } });
+  const r = await e.preparar();
+  assert.deepEqual(codigos(r), []);
+  assert.equal(r.puedeGenerar, true);
+});
+
+test('>= 480h + el mensual de las horas finales enviado → habilita el Global', async (t) => {
+  const e = await escenario(t); // 480 h que caen en el periodo #1, cuyo mensual ya está enviado
+  const r = await e.preparar();
+  assert.equal(r.puedeGenerar, true);
+  assert.deepEqual(r.mensualDeHorasFinales, { numero: 1, enviado: true });
+  assert.deepEqual(r.motivosBloqueo, []);
+});
+
+// ══ El mensual que contiene las horas con las que se llega a 480 debe estar ENVIADO ═══
+
+test('< 480 h: el Global no se habilita y no se señala ningún mensual pendiente', async (t) => {
+  const r = await (await escenario(t, { horas: 476 })).preparar();
+  assert.equal(r.horas.suficientes, false);
+  assert.deepEqual(r.mensualDeHorasFinales, { numero: null, enviado: false });
+  assert.deepEqual(codigos(r), ['HORAS_INSUFICIENTES']);
+  assert.equal(r.puedeGenerar, false);
+});
+
+test('>= 480 h pero el mensual que contiene las horas finales NO se ha enviado: acceso habilitado, generación bloqueada y aviso', async (t) => {
+  const e = await escenario(t, { bd: { bitacoras: BITACORAS_CRUCE_EN_PERIODO_7, reportesIniciales: seisMensualesAprobados() } });
+  const r = await e.preparar();
+  // Acceso habilitado: las horas alcanzan y la pantalla puede mostrarse con sus datos.
+  assert.deepEqual(r.horas, { acumuladas: 480, requeridas: 480, suficientes: true });
+  assert.equal(r.reporte.titulo, 'Reporte global de actividades');
+  // Pero no se puede generar todavía, y el aviso dice exactamente cuál falta.
+  assert.deepEqual(r.mensualDeHorasFinales, { numero: 7, enviado: false });
+  assert.deepEqual(codigos(r), ['MENSUAL_DE_HORAS_FINALES_NO_ENVIADO']);
+  assert.match(r.motivosBloqueo[0].mensaje, /envía el reporte mensual/i);
+  assert.equal(r.puedeGenerar, false);
+});
+
+test('el mensual de las horas finales cuenta como enviado en CUALQUIER estado (incluye rechazados)', async (t) => {
+  for (const estado of [
+    ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR,
+    ESTADOS_REPORTE.RECHAZADO_PROFESOR,
+    ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR,
+    ESTADOS_REPORTE.RECHAZADO_COORDINADOR,
+    ESTADOS_REPORTE.APROBADO_COORDINADOR,
+  ]) {
+    const e = await escenario(t, {
+      bd: { bitacoras: BITACORAS_CRUCE_EN_PERIODO_7, reportesIniciales: seisMensualesAprobados([septimoMensual(estado)]) },
+    });
+    const r = await e.preparar();
+    assert.deepEqual(r.mensualDeHorasFinales, { numero: 7, enviado: true }, estado);
+    assert.deepEqual(codigos(r), [], estado);
+    assert.equal(r.puedeGenerar, true, estado);
+  }
+});
+
+test('las horas que alcanzan las 480 pueden caer en un mensual POSTERIOR a la fecha_fin oficial', async (t) => {
+  // El periodo #7 (2026-04-16 → 2026-05-15) rebasa la fecha_fin oficial (2026-05-14) y aun así se exige su envío…
+  const sinEnviar = await (await escenario(t, {
+    bd: { bitacoras: BITACORAS_CRUCE_EN_PERIODO_7, reportesIniciales: seisMensualesAprobados() },
+  })).preparar();
+  assert.deepEqual(codigos(sinEnviar), ['MENSUAL_DE_HORAS_FINALES_NO_ENVIADO']);
+
+  // …y una vez enviado, el Global se habilita con 7 mensuales.
+  const e = await escenario(t, {
+    bd: {
+      bitacoras: BITACORAS_CRUCE_EN_PERIODO_7,
+      reportesIniciales: seisMensualesAprobados([septimoMensual(ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR)]),
+    },
+  });
+  const r = await e.preparar();
+  assert.equal(r.puedeGenerar, true);
+  // Y el periodo impreso del Global sigue siendo el oficial, sin moverse por ese mensual posterior.
+  assert.deepEqual([r.reporte.periodo.inicio, r.reporte.periodo.fin], ['2025-10-16', '2026-05-14']);
+});
+
+test('el mensual de las horas finales se ubica por fecha_registro, no por max(num_reporte)', async (t) => {
+  // Hay 8 mensuales enviados, pero el cruce de las 480 h ocurre en el periodo #7: es ESE el que importa, y como
+  // existe, el Global se habilita. Si se usara max(num_reporte) se estaría mirando el #8, no el #7.
+  const e = await escenario(t, {
+    bd: {
+      bitacoras: BITACORAS_CRUCE_EN_PERIODO_7,
+      reportesIniciales: seisMensualesAprobados([
+        septimoMensual(ESTADOS_REPORTE.RECHAZADO_PROFESOR),
+        { id: 8, num_reporte: 8, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR },
+      ]),
+    },
+  });
+  const r = await e.preparar();
+  assert.deepEqual(r.mensualDeHorasFinales, { numero: 7, enviado: true });
+  assert.equal(r.puedeGenerar, true);
+});
+
+// ── Duplicados (regla ya existente; se confirma que sigue intacta junto a las nuevas) ──
+
+test('los mensuales ya enviados no bloquean el global; un global existente sí (solo uno por solicitud)', async (t) => {
+  const conMensuales = await (await escenario(t)).preparar();
+  assert.equal(conMensuales.puedeGenerar, true);
 
   const conGlobal = await (await escenario(t, { bd: { globalesIniciales: [{ id: 1, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR }] } })).preparar();
   assert.equal(conGlobal.puedeGenerar, false);
@@ -267,11 +455,15 @@ test('envío: mismo Buffer para hash, TSA, archivo cifrado y BD; documento repor
   assert.equal(e.db.revisionesGlobales.length, 1);
   const { id, ...revision } = e.db.revisionesGlobales[0];
   assert.ok(id > 0);
+  assert.equal(revision.ruta_archivo, e.db.documentos[0].ruta_archivo, 'la revisión del alumno apunta al PDF que acaba de generar y firmar');
   assert.deepEqual(revision, {
     reporte_global_id: global.id, usuario_id: 7, tipo_revisor: 'alumno', estado: 'aprobado', comentario: null,
-    hash_documento: sha256(pdf), ip_firma: IP, token_tsa: TOKEN, fecha: e.ahora,
+    hash_documento: sha256(pdf), ruta_archivo: revision.ruta_archivo, ip_firma: IP, token_tsa: TOKEN, fecha: e.ahora,
   });
-  assert.deepEqual([e.db.reportes, e.db.revisiones], [[], []], 'no se crea nada mensual');
+  // La línea base trae 6 mensuales enviados — lo que se verifica es que el envío del global no crea NINGÚN
+  // mensual nuevo ni ninguna revisión mensual.
+  assert.equal(e.db.reportes.length, 6, 'los 6 mensuales de la línea base siguen igual, ninguno nuevo');
+  assert.deepEqual(e.db.revisiones, [], 'no se crea ninguna revisión mensual');
 });
 
 test('envío: el PDF lleva título global y el periodo completo; los datos impresos NO contienen las horas', async (t) => {
@@ -348,6 +540,34 @@ test('si cambian los datos impresos mientras se firma → 409 DATOS_DEL_REPORTE_
   nadaPersistido(e);
 });
 
+// ── Revalida también al enviar (no basta con deshabilitar el frontend) ──
+
+test('envío sin haber enviado el mensual de las horas finales → 409; no basta con deshabilitar el frontend', async (t) => {
+  const e = await escenario(t, { bd: { bitacoras: BITACORAS_CRUCE_EN_PERIODO_7, reportesIniciales: seisMensualesAprobados() } });
+  await assert.rejects(
+    e.enviar(),
+    (err) => err.status === 409 && err.code === 'REPORTE_NO_GENERABLE' && err.motivosBloqueo.some((m) => m.codigo === 'MENSUAL_DE_HORAS_FINALES_NO_ENVIADO'),
+  );
+  assert.deepEqual([e.eventos, e.sellos, e.notificaciones], [[], [], []]);
+  nadaPersistido(e);
+});
+
+test('si el mensual de las horas finales deja de existir bajo el bloqueo (entre preparar y firmar) → 409, nada queda registrado', async (t) => {
+  let e;
+  e = await escenario(t, {
+    // El escenario base cruza las 480 h en el periodo #1: si su reporte desaparece justo antes de firmar, la
+    // revalidación dentro de la transacción tiene que detenerlo.
+    tsa: async (hash) => {
+      e.db.reportes.splice(0, 1);
+      e.sellos.push(hash);
+      return { token: TOKEN, fecha: new Date() };
+    },
+  });
+  await assert.rejects(e.enviar(), (err) => err.status === 409 && err.code === 'REPORTE_NO_GENERABLE');
+  nadaPersistido(e);
+  assert.ok(e.operaciones.includes('$transaction.rollback'));
+});
+
 // ── Solo uno por solicitud ───────────────────────────────────
 
 test('solo un global por solicitud: si ya existe → 409 antes de firmar; ningún segundo reporte ni archivo', async (t) => {
@@ -417,9 +637,9 @@ test('las escrituras ocurren solo dentro de la transacción y después de tomar 
   assert.ok(!e.operaciones.some((op) => /reporte_mensual\.create|revision_reporte_mensual/.test(op)));
 });
 
-test('el número de envíos previos del mensual no cambia el global (ni el global bloquea nuevos mensuales por sí solo)', async (t) => {
-  const e = await escenario(t, { bd: { reportesIniciales: [{ id: 1, num_reporte: 1, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR }, { id: 2, num_reporte: 2, estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR }] } });
+test('enviar el global no toca los reportes mensuales existentes (7 aprobados: más de los 6 mínimos, todos aprobados)', async (t) => {
+  const e = await escenario(t, { bd: { reportesIniciales: seisMensualesAprobados([{ id: 7, num_reporte: 7, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR }]) } });
   await e.enviar();
-  assert.equal(e.db.reportes.length, 2, 'los mensuales existentes no se tocan');
+  assert.equal(e.db.reportes.length, 7, 'los mensuales existentes no se tocan ni se recortan a 6');
   assert.equal(e.db.globales.length, 1);
 });

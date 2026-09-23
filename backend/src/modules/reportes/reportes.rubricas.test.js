@@ -1,4 +1,8 @@
-// Rúbrica del alumno (CU-REP-01, fase 4): BD falsa en memoria y carpeta temporal real; sin BD, Redis ni TSA.
+// Rúbrica del alumno y del profesor (CU-REP-01 fase 4 / CU-REP-05): BD falsa en memoria y carpeta temporal real;
+// sin BD, Redis ni TSA.
+//
+// Reorganización de almacenamiento: alumno → <boleta>/Rubrica/rubrica.enc; profesor → <correo>/Rubrica/rubrica.enc
+// (nombre de archivo fijo, ya no aleatorio). La identidad (rol + boleta/correo) sale siempre de `usuario.findUnique`.
 
 process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
 
@@ -23,28 +27,44 @@ const { crearPng, crearPngRuido, JPEG_PEQUENO, resultadoEjemplo, ACTIVIDADES_EJE
 const AHORA = new Date('2026-09-20T18:30:00.000Z');
 const PNG = crearPng(400, 140);
 
-// BD falsa: solo `usuario`, con la misma semántica condicional (WHERE rubrica_imagen IS NULL) que la real.
-function crearBd({ usuarios = { 7: { id: 7, rubrica_imagen: null } }, antesDeActualizar, falloActualizar } = {}) {
+// Identidad por defecto de cada usuario de prueba (alumno_asignado con su boleta), para no repetirla en cada
+// escenario: quien la necesite distinta (o un profesor) la fija explícitamente en `usuarios`.
+const IDENTIDAD_POR_DEFECTO = {
+  7: { rol: 'alumno_asignado', boleta: '2022630001' },
+  8: { rol: 'alumno_asignado', boleta: '2022630002' },
+};
+
+// BD falsa: solo `usuario`, con la misma semántica condicional (WHERE rubrica_imagen IS NULL) que la real, y la
+// misma identidad (rol + boleta o correo_institucional) que resuelve reportes.rubricas.js para construir la ruta.
+function crearBd({ usuarios = { 7: { id: 7, rubrica_imagen: null } }, falloActualizar } = {}) {
   const llamadas = { findUnique: 0, updateMany: [] };
+  const filas = {};
+  for (const [id, datos] of Object.entries(usuarios)) {
+    const defecto = IDENTIDAD_POR_DEFECTO[id] ?? {};
+    filas[id] = { id: Number(id), correo_institucional: null, rubrica_imagen: null, ...defecto, ...datos };
+  }
   const bd = {
     usuario: {
       findUnique: async ({ where }) => {
         llamadas.findUnique += 1;
-        const u = usuarios[where.id];
-        return u ? { id: u.id, rubrica_imagen: u.rubrica_imagen } : null;
+        const u = filas[where.id];
+        if (!u) return null;
+        return {
+          id: u.id, rol: u.rol, rubrica_imagen: u.rubrica_imagen, correo_institucional: u.correo_institucional,
+          alumno: u.boleta ? { boleta: u.boleta } : null,
+        };
       },
       updateMany: async ({ where, data }) => {
         llamadas.updateMany.push({ where, data });
         if (falloActualizar) throw falloActualizar;
-        if (antesDeActualizar) await antesDeActualizar();
-        const u = usuarios[where.id];
+        const u = filas[where.id];
         if (!u || (where.rubrica_imagen === null && u.rubrica_imagen !== null)) return { count: 0 };
         Object.assign(u, data);
         return { count: 1 };
       },
     },
   };
-  return { bd, usuarios, llamadas };
+  return { bd, usuarios: filas, llamadas };
 }
 
 function carpetaTemporal(t) {
@@ -69,7 +89,7 @@ test('primera subida: guarda el PNG cifrado, registra ruta relativa, IP y fecha,
   assert.deepEqual(r, { tieneRubrica: true, requiereSubirRubrica: false, fechaRegistro: AHORA.toISOString() });
 
   const usuario = usuarios[7];
-  assert.match(usuario.rubrica_imagen, /^7\/[0-9a-f-]{36}\.enc$/, 'ruta relativa <usuario_id>/<uuid>');
+  assert.equal(usuario.rubrica_imagen, '2022630001/Rubrica/rubrica.enc', 'ruta relativa <boleta>/Rubrica/rubrica.enc (nombre fijo)');
   assert.equal(usuario.rubrica_ip, '187.190.10.20');
   assert.equal(usuario.rubrica_fecha_registro, AHORA);
 
@@ -80,7 +100,6 @@ test('primera subida: guarda el PNG cifrado, registra ruta relativa, IP y fecha,
   // Nada de la ruta ni de los bytes sale en la respuesta.
   const texto = JSON.stringify(r);
   assert.equal(texto.includes(usuario.rubrica_imagen), false);
-  assert.equal(texto.includes(path.basename(archivos[0])), false);
   assert.equal(texto.includes(base), false);
 });
 
@@ -104,8 +123,8 @@ test('acepta también JPEG', async (t) => {
 
 test('acepta un Buffer de multer y no depende del nombre ni del tipo declarado por el cliente', async (t) => {
   const { usuarios } = await guardar(t, { buffer: Buffer.from(PNG), originalname: '../../etc/passwd.exe', mimetype: 'application/x-msdownload' });
-  assert.ok(usuarios[7].rubrica_imagen.startsWith('7/'));
-  assert.equal(usuarios[7].rubrica_imagen.includes('passwd'), false);
+  // El nombre del archivo es fijo ("rubrica.enc"): nunca puede reflejar lo que declaró el cliente.
+  assert.equal(usuarios[7].rubrica_imagen, '2022630001/Rubrica/rubrica.enc');
 });
 
 test('la IP se guarda solo si es válida para la columna (máx. 45 caracteres)', async (t) => {
@@ -160,7 +179,7 @@ test('archivos que no son imagen o están dañados → 422 IMAGEN_INVALIDA (con 
   const malos = [
     Buffer.from('%PDF-1.7 no soy una imagen'),
     Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'),
-    Buffer.from('MZ\u0090\u0000 ejecutable disfrazado'),
+    Buffer.from('MZ  ejecutable disfrazado'),
     Buffer.from(PNG.subarray(0, 60)),                       // PNG truncado (colgaba a pdf-lib)
     Buffer.from(PNG.subarray(0, PNG.length - 12)),          // sin IEND
     corrupto,                                               // CRC roto
@@ -205,27 +224,19 @@ test('segunda subida → 409 RUBRICA_YA_REGISTRADA: no reemplaza, no escribe y n
 });
 
 test('la segunda subida se rechaza con 409 aunque el archivo nuevo sea inválido (no se procesa nada)', async (t) => {
-  const escenario = crearBd({ usuarios: { 7: { id: 7, rubrica_imagen: '7/existente.enc' } } });
+  const escenario = crearBd({ usuarios: { 7: { id: 7, rubrica_imagen: '2022630001/Rubrica/rubrica.enc' } } });
   await assert.rejects(
     () => guardarRubrica(7, { buffer: Buffer.from('basura') }, { prisma: escenario.bd, rutaBase: carpetaTemporal(t) }),
     (err) => err.code === 'RUBRICA_YA_REGISTRADA',
   );
 });
 
-test('carrera: dos subidas simultáneas → una gana, la otra recibe 409 y borra su archivo', async (t) => {
+test('carrera: dos subidas simultáneas → una gana (el archivo es de nombre fijo, así que decide quién lo crea primero), la otra recibe 409 y no toca nada', async (t) => {
   const base = carpetaTemporal(t);
-  // Ambas pasan la comprobación previa; la BD condicional deja pasar solo a la primera que actualiza.
-  let liberar;
-  const barrera = new Promise((resolver) => { liberar = resolver; });
-  let enEspera = 0;
-  const escenario = crearBd({
-    antesDeActualizar: async () => {
-      enEspera += 1;
-      if (enEspera === 2) liberar();
-      await barrera;
-    },
-  });
+  const escenario = crearBd();
   const otra = crearPng(300, 100, [200, 30, 30]);
+  // Sin barrera artificial: el nombre fijo (rubrica.enc) hace que la propia escritura exclusiva en disco ('wx')
+  // sea el punto de la carrera — ya no hace falta forzar el orden en la BD para que sea determinista.
   const resultados = await Promise.allSettled([
     guardarRubrica(7, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: base }),
     guardarRubrica(7, { buffer: otra }, { prisma: escenario.bd, ahora: AHORA, rutaBase: base }),
@@ -239,7 +250,7 @@ test('carrera: dos subidas simultáneas → una gana, la otra recibe 409 y borra
   assert.equal(perdedoras[0].reason.code, 'RUBRICA_YA_REGISTRADA');
 
   const archivos = archivosEn(base);
-  assert.equal(archivos.length, 1, 'sin archivos huérfanos');
+  assert.equal(archivos.length, 1, 'sin archivos huérfanos, y el de quien perdió nunca se tocó');
   assert.equal(path.relative(base, archivos[0]).split(path.sep).join('/'), escenario.usuarios[7].rubrica_imagen);
   const guardada = descifrarBuffer(fs.readFileSync(archivos[0]));
   assert.ok(guardada.equals(PNG) || guardada.equals(otra));
@@ -260,7 +271,8 @@ test('si falla la BD al guardar: se borra el archivo y el error se propaga', asy
 
 test('si no se puede escribir el archivo: no se modifica la BD', async (t) => {
   const base = carpetaTemporal(t);
-  fs.writeFileSync(path.join(base, '7'), 'esto es un archivo, no una carpeta'); // impide crear uploads/rubricas/7/
+  fs.mkdirSync(path.join(base, '2022630001'), { recursive: true });
+  fs.writeFileSync(path.join(base, '2022630001', 'Rubrica'), 'esto es un archivo, no una carpeta'); // impide crear .../Rubrica/
   const escenario = crearBd();
   await assert.rejects(() => guardarRubrica(7, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: base }));
   assert.equal(escenario.llamadas.updateMany.length, 0);
@@ -329,8 +341,8 @@ test('obtenerRubricaAlumno: archivo ausente, alterado o ruta fuera de su carpeta
   fs.rmSync(archivo);
   await comprobar();
 
-  // Rutas que se salen de su carpeta (otro usuario, subir niveles, absoluta).
-  for (const ruta of [escenario.usuarios[8].rubrica_imagen, '7/../8/x.enc', '../../etc/passwd', '/etc/passwd', '7']) {
+  // Rutas que se salen de su carpeta (otro alumno, subir niveles, absoluta, la carpeta misma sin archivo).
+  for (const ruta of [escenario.usuarios[8].rubrica_imagen, '2022630001/../2022630002/rubrica.enc', '../../etc/passwd', '/etc/passwd', '2022630001']) {
     escenario.usuarios[7].rubrica_imagen = ruta;
     await comprobar();
   }
@@ -379,4 +391,65 @@ test('integración con la fase 3: la rúbrica guardada se estampa en el PDF del 
       && o.dict.get(PDFName.of('ColorSpace')) !== PDFName.of('DeviceGray')) imagenes += 1;
   }
   assert.equal(imagenes, 3, 'logo IPN + logo ESCOM + rúbrica');
+});
+
+// ── Profesor: misma mecánica, identidad y base distintas (reorganización de almacenamiento) ──
+
+test('guardarRubrica/obtenerRubricaAlumno: para un profesor la ruta usa su correo institucional, no su usuario_id', async (t) => {
+  const base = carpetaTemporal(t);
+  const escenario = crearBd({ usuarios: { 60: { id: 60, rol: 'profesor', correo_institucional: 'profesor.torres@ipn.mx', rubrica_imagen: null } } });
+
+  await guardarRubrica(60, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: base });
+  assert.equal(escenario.usuarios[60].rubrica_imagen, 'profesor.torres@ipn.mx/Rubrica/rubrica.enc');
+
+  const leida = await obtenerRubricaAlumno(60, { prisma: escenario.bd, rutaBase: base });
+  assert.ok(leida.equals(PNG));
+});
+
+test('un profesor no puede leer fuera de su propia carpeta (otro profesor, u otra que exista fuera de la suya)', async (t) => {
+  const silencio = t.mock.method(console, 'error', () => {});
+  const base = carpetaTemporal(t);
+  const escenario = crearBd({
+    usuarios: {
+      60: { id: 60, rol: 'profesor', correo_institucional: 'uno@ipn.mx', rubrica_imagen: null },
+      61: { id: 61, rol: 'profesor', correo_institucional: 'dos@ipn.mx', rubrica_imagen: null },
+    },
+  });
+  await guardarRubrica(60, { buffer: PNG }, { prisma: escenario.bd, rutaBase: base });
+  await guardarRubrica(61, { buffer: crearPng(300, 100, [200, 30, 30]) }, { prisma: escenario.bd, rutaBase: base });
+
+  escenario.usuarios[60].rubrica_imagen = escenario.usuarios[61].rubrica_imagen;
+  await assert.rejects(
+    () => obtenerRubricaAlumno(60, { prisma: escenario.bd, rutaBase: base }),
+    (err) => err.status === 500 && err.code === 'RUBRICA_NO_DISPONIBLE',
+  );
+  assert.ok(silencio.mock.callCount() >= 1);
+});
+
+test('un correo institucional con formato inválido nunca se usa para construir una ruta de archivo', async (t) => {
+  const escenario = crearBd({ usuarios: { 60: { id: 60, rol: 'profesor', correo_institucional: '../../etc/passwd', rubrica_imagen: null } } });
+  await assert.rejects(
+    () => guardarRubrica(60, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: carpetaTemporal(t) }),
+    (err) => err.status === 500,
+  );
+});
+
+test('una boleta con formato inválido tampoco se usa para construir una ruta de archivo', async (t) => {
+  const escenario = crearBd({ usuarios: { 9: { id: 9, rol: 'alumno_asignado', boleta: '../../etc/passwd', rubrica_imagen: null } } });
+  await assert.rejects(
+    () => guardarRubrica(9, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: carpetaTemporal(t) }),
+    (err) => err.status === 500,
+  );
+});
+
+test('una cuenta sin rol de alumno ni de profesor no puede guardar ni leer una rúbrica: 403', async (t) => {
+  const escenario = crearBd({ usuarios: { 70: { id: 70, rol: 'coordinador', rubrica_imagen: null } } });
+  await assert.rejects(
+    () => guardarRubrica(70, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: carpetaTemporal(t) }),
+    (err) => err.status === 403,
+  );
+  await assert.rejects(
+    () => obtenerRubricaAlumno(70, { prisma: escenario.bd, rutaBase: carpetaTemporal(t) }),
+    (err) => err.status === 403,
+  );
 });

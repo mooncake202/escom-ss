@@ -28,7 +28,6 @@ export function useRevisarReportes() {
   // El backend solo dice si ya existe su rúbrica (nunca la imagen): la primera vez se sube, después se reutiliza.
   const [rubrica, setRubrica]                 = useState({ estado: "inactivo", tiene: false, error: null }); // inactivo | cargando | listo | error
   const [firmaFile, setFirmaFile]             = useState(null);
-  const [firmaUrl, setFirmaUrl]               = useState(null);
   const [errorFirma, setErrorFirma]           = useState(null);
 
   // ── Estado de rechazo ────────────────────────────────────
@@ -52,10 +51,6 @@ export function useRevisarReportes() {
   const detalleRef = useRef(0); // descarta respuestas de un detalle que ya no es el seleccionado
   const rubricaRef = useRef(0);  // ídem para el estado de la rúbrica
   const accionRef = useRef(false); // evita el doble envío de aprobar/rechazar (el estado tarda un render en reflejarse)
-  const firmaUrlRef = useRef(null); // vista previa local de la firma elegida; se libera al cambiarla, cancelar y desmontar
-  useEffect(() => () => {
-    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
-  }, []);
 
   // `silencioso`: una actualización de fondo que falla no reemplaza la pantalla por el error.
   const cargarLista = useCallback((silencioso = false) => listarReportesProfesor().then(
@@ -96,11 +91,8 @@ export function useRevisarReportes() {
     setComentario("");
     setErrorComentario(false);
     setFirmaFile(null);
-    setFirmaUrl(null);
     setErrorFirma(null);
     setErrorAccion(null);
-    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
-    firmaUrlRef.current = null;
   }
 
   function resetModo() {
@@ -159,19 +151,21 @@ export function useRevisarReportes() {
     if (errorComentario) setErrorComentario(false);
   }
 
-  // Firma elegida por el profesor (solo la primera vez): validación previa; el servidor valida de verdad.
-  function handleFirmaChange(e) {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
+  // Firma dibujada por el profesor (solo la primera vez): `archivo` viene de FirmaCanvas, un File PNG al terminar un
+  // trazo o null en cuanto el canvas queda vacío. Validación previa; el servidor valida de verdad.
+  function handleFirmaChange(archivo) {
+    if (!archivo) {
+      setFirmaFile(null);
+      setErrorFirma(null);
+      return;
+    }
     const problema = validarArchivoFirma(archivo);
     if (problema) {
+      setFirmaFile(null);
       setErrorFirma(problema);
       return;
     }
-    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
-    firmaUrlRef.current = URL.createObjectURL(archivo);
     setFirmaFile(archivo);
-    setFirmaUrl(firmaUrlRef.current);
     setErrorFirma(null);
   }
 
@@ -251,7 +245,7 @@ export function useRevisarReportes() {
     pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
     // firma profesor
-    rubricaGuardada: rubrica.tiene, rubrica, reintentarRubrica: cargarRubrica, firmaFile, firmaUrl, errorFirma,
+    rubricaGuardada: rubrica.tiene, rubrica, reintentarRubrica: cargarRubrica, firmaFile, errorFirma,
     handleFirmaChange,
     // rechazo
     comentario, handleComentarioChange, errorComentario,

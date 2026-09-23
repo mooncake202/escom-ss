@@ -16,6 +16,7 @@ export default function HistorialReportes() {
   const {
     carga, recargar, tieneHistorial, reportes, expandido, toggleExpandir,
     pdf, reporteEnPdf, verPdf, cerrarVisor, descargarPdf, estadoPdfDe,
+    plazoEnvio, limiteServicio,
   } = useHistorialReportes();
 
   // Acceso al reporte global (el backend decide si ya se puede generar: 480 h de bitácoras aprobadas).
@@ -24,6 +25,63 @@ export default function HistorialReportes() {
     background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textMuted,
     fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
+
+  // Aviso persistente por plazo de envío del reporte mensual (Bloque 3): derivado en cada carga, nunca guardado.
+  // Preventivo mientras hay días hábiles restantes; vencido en cuanto se agotan. Desaparece solo al enviar el reporte.
+  const avisoPlazo = plazoEnvio.aplica && (
+    <div style={{
+      margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
+      background: plazoEnvio.estado === "vencido" ? C.dangerSoft : C.warningSoft,
+      border: `1px solid ${plazoEnvio.estado === "vencido" ? C.danger : C.warning}`,
+    }}>
+      {plazoEnvio.estado === "vencido" ? (
+        <>
+          <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: C.danger }}>
+            El plazo para enviar tu reporte mensual venció
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
+            La fecha límite era el {plazoEnvio.fechaLimiteTexto}. El registro de nuevas bitácoras quedará bloqueado hasta que envíes tu reporte.
+          </p>
+        </>
+      ) : (
+        <>
+          <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: C.warning }}>
+            Tienes un reporte mensual pendiente de enviar
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
+            Día hábil {plazoEnvio.diaHabilActual} de {plazoEnvio.diasPlazo}: envíalo antes del {plazoEnvio.fechaLimiteTexto}.
+          </p>
+        </>
+      )}
+    </div>
+  );
+
+  // Aviso del plazo máximo de 2 años del servicio social. Es SOLO informativo: no deshabilita ningún botón ni
+  // impide generar, enviar o corregir reportes. El bloqueo de nuevas bitácoras corresponde a AH, no a Reportes.
+  const limiteExcedido = limiteServicio.estado === "excedido";
+  const avisoLimite = limiteServicio.estado && (
+    <div style={{
+      margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
+      background: limiteExcedido ? C.dangerSoft : C.warningSoft,
+      border: `1px solid ${limiteExcedido ? C.danger : C.warning}`,
+    }}>
+      <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: limiteExcedido ? C.danger : C.warning }}>
+        {limiteExcedido
+          ? "Se alcanzó el plazo máximo de 2 años de tu servicio social"
+          : limiteServicio.estado === "alcanzado"
+            ? "Hoy es el último día del plazo máximo de tu servicio social"
+            : "Tu servicio social se acerca al plazo máximo de 2 años"}
+      </p>
+      <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
+        {limiteExcedido
+          ? `La fecha límite era el ${limiteServicio.fechaLimiteTexto}.`
+          : limiteServicio.estado === "alcanzado"
+            ? `La fecha límite es hoy, ${limiteServicio.fechaLimiteTexto}.`
+            : `Te ${limiteServicio.diasHabilesRestantes === 1 ? "queda" : "quedan"} ${limiteServicio.diasHabilesRestantes} `
+              + `${limiteServicio.diasHabilesRestantes === 1 ? "día hábil" : "días hábiles"} antes del ${limiteServicio.fechaLimiteTexto}.`}
+      </p>
+    </div>
+  );
 
   // ── Carga inicial y error ─────────────────────────────────
   if (carga.estado !== "listo") {
@@ -62,6 +120,8 @@ export default function HistorialReportes() {
     return (
       <DashboardLayout titulo="Mis reportes" subtitulo="Alumno" rol="alumno_asignado" usuario={nombreAlumno}>
         <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
+          {avisoLimite}
+          {avisoPlazo}
           <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.625rem", marginBottom: "1.5rem" }}>
             <button onClick={() => navigate("/alumno/reportes/global")} style={botonGlobal}>Reporte global</button>
             <button
@@ -104,6 +164,8 @@ export default function HistorialReportes() {
         C={C}
       />
       <div style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
+        {avisoLimite}
+        {avisoPlazo}
 
         {/* Encabezado con acción */}
         <div style={{

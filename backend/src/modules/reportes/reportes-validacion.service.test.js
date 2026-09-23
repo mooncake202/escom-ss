@@ -17,6 +17,7 @@ const { generarPdfReporteMensual, construirDatosPdf, agregarRubricaProfesor } = 
 const { ESTADOS_REPORTE } = require('./reportes.shared');
 const { reporteMensual, crearBdProfesor } = require('./reportes.profesor.fixtures');
 const { crearPng, resultadoEjemplo, ACTIVIDADES_EJEMPLO } = require('./reportes.pdf.fixtures');
+const { leerSello: leerSelloReal } = require('./reportes.assets');
 const { cifrarBuffer, descifrarBuffer } = require('../../lib/fileEncryption');
 const { ErrorTsa } = require('../../lib/timestampTsa');
 
@@ -138,7 +139,7 @@ test('aprobar: parte del PDF vigente EXACTO (no regenera), agrega solo el sello,
   // Salida: el PDF final en disco es el que se hasheó y selló en el tiempo, y es el que apunta el documento.
   const rutaFinal = e.reporte.documento.ruta_archivo;
   assert.notEqual(rutaFinal, e.rutaVigente);
-  assert.match(rutaFinal, /^2022630001\/[0-9a-f-]{36}\.pdf$/);
+  assert.match(rutaFinal, /^2022630001\/Reportes\/[0-9a-f-]{36}\.pdf$/);
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, rutaFinal)));
   assert.notEqual(Buffer.compare(final, e.pdf), 0);
   assert.deepEqual(e.sellosDeTiempo, [sha256(final)], 'la TSA recibió el hash del Buffer final');
@@ -155,6 +156,7 @@ test('aprobar: parte del PDF vigente EXACTO (no regenera), agrega solo el sello,
     estado: 'aprobado',
     comentario: null,
     hash_documento: sha256(final),
+    ruta_archivo: rutaFinal, // el PDF nuevo que Coordinación acaba de sellar
     ip_firma: IP,
     token_tsa: TOKEN,
     fecha: new Date('2026-09-22T15:00:00.000Z'),
@@ -177,9 +179,15 @@ test('aprobar: el PDF final es una página Carta con las firmas previas y UNA im
   assert.equal(archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/')).length, 2);
 });
 
-test('aprobar: con el sello real del prototipo (verificado por SHA-256) termina bien y el PDF conserva una página', async (t) => {
+test('aprobar: con el sello institucional real (cifrado; reportes.assets.js lo descifra con AES-256-GCM) termina bien y el PDF conserva una página', async (t) => {
   const e = await escenario(t);
-  await e.aprobar({ deps: { leerSello: undefined } });
+  // La función REAL de reportes.assets.js (no el doble `leerSelloDePrueba`), leyendo un .enc cifrado de verdad —
+  // ya no un PNG en claro con SHA-256 fijo.
+  const dirSello = fs.mkdtempSync(path.join(os.tmpdir(), 'validacion-sello-'));
+  t.after(() => fs.rmSync(dirSello, { recursive: true, force: true }));
+  const rutaSello = path.join(dirSello, 'sello-escom.enc');
+  fs.writeFileSync(rutaSello, cifrarBuffer(SELLO_PNG));
+  await e.aprobar({ deps: { leerSello: (opciones) => leerSelloReal({ ...opciones, rutaSello }) } });
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, e.reporte.documento.ruta_archivo)));
   assert.equal((await PDFDocument.load(new Uint8Array(final))).getPageCount(), 1);
   assert.equal(await imagenesDe(final), (await imagenesDe(e.pdf)) + 1);
@@ -405,6 +413,7 @@ test('rechazar: estado rechazado_coordinador + revisión rechazada con motivo, f
     estado: 'rechazado',
     comentario: 'Falta el detalle de las horas.',
     hash_documento: null,
+    ruta_archivo: e.rutaVigente, // no se genera PDF nuevo: el vigente que se está rechazando
     ip_firma: null,
     token_tsa: null,
     fecha: new Date('2026-09-22T15:00:00.000Z'),

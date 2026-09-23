@@ -84,6 +84,7 @@ model caracteristica {
   incremento_cupos Int                  @db.UnsignedTinyInt
 
   solicitud_caracteristica solicitud_caracteristica[]
+  profesor                 profesor[]
 }
 
 // ─────────────────────────────────────────
@@ -518,6 +519,7 @@ model revision_reporte_mensual {
   estado             EstadoRevision
   comentario         String?        @db.Text
   hash_documento     String?        @db.VarChar(64)
+  ruta_archivo       String         @db.VarChar(255)
   ip_firma           String?        @db.VarChar(45)
   token_tsa          String?        @db.Text
   fecha              DateTime       @db.DateTime(0)
@@ -534,6 +536,7 @@ model revision_reporte_global {
   estado            EstadoRevision
   comentario        String?        @db.Text
   hash_documento    String?        @db.VarChar(64)
+  ruta_archivo      String         @db.VarChar(255)
   ip_firma          String?        @db.VarChar(45)
   token_tsa         String?        @db.Text
   fecha             DateTime       @db.DateTime(0)

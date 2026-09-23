@@ -4,7 +4,7 @@
 // AH controla las bitácoras y ADM el calendario. Una bitácora aprobada en fin de semana o en un
 // día Inhabil/Vacacional es una inconsistencia entre ambos: Reportes solo la informa, no la corrige.
 
-const { listarFechasISO, esFinDeSemanaISO } = require('./reportes.periodos');
+const { listarFechasISO, esFinDeSemanaISO, sumarDiasISO } = require('./reportes.periodos');
 const { TIPO_EVENTO_INHABIL, TIPO_EVENTO_VACACIONAL } = require('./reportes.shared');
 
 // Orden de prioridad para clasificar un día.
@@ -107,9 +107,69 @@ function construirCalendarioPeriodo({ inicio, fin, eventos = [], bitacoras = [] 
   return { dias, eventos: eventosDelPeriodo, inconsistencias };
 }
 
+// ── Día hábil ADMINISTRATIVO (CU-REP-01, Bloque 2) ──────────────────────
+//
+// Distinto del día laboral de AH (bitácoras): aquí decide desde cuándo Reportes permite GENERAR un reporte, no
+// cuándo el alumno puede trabajar. Lunes a viernes, sin evento Inhabil ni Vacacional ese día.
+
+// Tope de búsqueda hacia adelante: evita un bucle indefinido ante una anomalía del calendario institucional
+// (varios eventos Inhabil/Vacacional encadenados sin un día hábil de por medio).
+const TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO = 90;
+
+function esDiaHabilAdministrativo(fecha, eventos) {
+  if (esFinDeSemanaISO(fecha)) return false;
+  return !eventos.some((e) => (e.tipo === TIPO_EVENTO_INHABIL || e.tipo === TIPO_EVENTO_VACACIONAL) && eventoCubreFecha(e, fecha));
+}
+
+/**
+ * Primer día hábil administrativo a partir de `fecha` (inclusive). `eventos` debe cubrir ese rango de búsqueda —
+ * es responsabilidad de quien llama haberlos consultado. null si no se encuentra dentro del tope: anomalía del
+ * calendario institucional, no un caso de negocio esperado.
+ */
+function primerDiaHabilAdministrativoDesde(fecha, eventos) {
+  let candidato = fecha;
+  for (let i = 0; i < TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO; i += 1) {
+    if (esDiaHabilAdministrativo(candidato, eventos)) return candidato;
+    candidato = sumarDiasISO(candidato, 1);
+  }
+  return null;
+}
+
+/**
+ * Los primeros `n` días hábiles administrativos a partir de `fecha` (inclusive), en orden. `eventos` debe cubrir
+ * el rango de búsqueda. El arreglo trae menos de `n` elementos si se agota el tope de búsqueda (misma anomalía de
+ * calendario que primerDiaHabilAdministrativoDesde).
+ */
+function diasHabilesAdministrativosDesde(fecha, n, eventos) {
+  const dias = [];
+  let candidato = fecha;
+  for (let i = 0; i < TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO && dias.length < n; i += 1) {
+    if (esDiaHabilAdministrativo(candidato, eventos)) dias.push(candidato);
+    candidato = sumarDiasISO(candidato, 1);
+  }
+  return dias;
+}
+
+/**
+ * Cantidad de días hábiles administrativos entre `desde` y `hasta`, ambos inclusive. 0 si `hasta` es anterior a
+ * `desde`. `eventos` debe cubrir ese rango.
+ */
+function contarDiasHabilesAdministrativos(desde, hasta, eventos) {
+  let contados = 0;
+  for (let fecha = desde; fecha <= hasta; fecha = sumarDiasISO(fecha, 1)) {
+    if (esDiaHabilAdministrativo(fecha, eventos)) contados += 1;
+  }
+  return contados;
+}
+
 module.exports = {
   TIPOS_DIA,
   MOTIVOS_INCONSISTENCIA,
   eventoCubreFecha,
   construirCalendarioPeriodo,
+  TOPE_BUSQUEDA_DIA_HABIL_ADMINISTRATIVO,
+  esDiaHabilAdministrativo,
+  primerDiaHabilAdministrativoDesde,
+  diasHabilesAdministrativosDesde,
+  contarDiasHabilesAdministrativos,
 };

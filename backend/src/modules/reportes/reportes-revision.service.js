@@ -135,6 +135,7 @@ async function rechazarReporte(usuarioId, tipoReporte, reporteId, comentario, de
         estado: ESTADO_REVISION_RECHAZADA,
         comentario: motivo,
         hash_documento: null,
+        ruta_archivo: fila.documento.ruta_archivo, // no se genera PDF nuevo: el vigente que se está rechazando
         ip_firma: null,
         token_tsa: null,
         fecha: ahora,
@@ -186,6 +187,7 @@ async function registrarAprobacion(tx, { cfg, id, profesor, usuarioId, fila, rut
       estado: ESTADO_REVISION_FIRMADA,
       comentario: null,
       hash_documento: hash,
+      ruta_archivo: rutaNueva, // el PDF nuevo que el profesor acaba de firmar
       ip_firma: normalizarIp(ip),
       token_tsa: token,
       fecha: ahora,

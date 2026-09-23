@@ -4,7 +4,7 @@ import { useNavigate }                          from "react-router-dom";
 import { useSesion, nombreCompletoSesion }      from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { CalendarioReporte }                    from "./components/CalendarioReporte";
 import { AvanceActividades }                    from "./components/AvanceActividades";
-import { FirmaUpload }                          from "./components/FirmaUpload";
+import { FirmaCanvas }                          from "../compartido/FirmaCanvas";
 import { useGenerarReporte }                    from "./hooks/useGenerarReporte";
 import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico } from "./reportesGeneracion";
 
@@ -317,25 +317,30 @@ export default function GenerarReporte() {
         {franjaResumen}
         <div style={tarjeta}>
           {encabezadoPaso}
-          <h3 style={{ margin: "0 0 1.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Sube tu firma</h3>
+          <h3 style={{ margin: "0 0 0.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>Dibuja tu firma</h3>
 
           {g.firmaSubida ? (
             <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.success }}>
               Tu firma ya quedó registrada y se usará en este y en tus próximos reportes.
             </p>
           ) : (
-            <FirmaUpload
-              firma={g.firma}
-              firmaUrl={g.firmaUrl}
-              error={g.errores.firma}
-              onChange={g.handleFirmaChange}
-              C={C}
-            />
+            <>
+              <p style={{ margin: "0 0 1.25rem", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                Dibuja tu firma con el mouse, el trackpad o el dedo. Se guardará y se usará automáticamente en tus reportes futuros.
+              </p>
+              <div style={{ marginBottom: "1.25rem" }}>
+                <FirmaCanvas onCambiar={g.handleFirmaChange} error={g.errores.firma} C={C} />
+              </div>
+            </>
           )}
 
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button onClick={g.atras} disabled={g.subiendoFirma} style={botonSecundario()}>← Atrás</button>
-            <button onClick={g.continuarDesdeFirma} disabled={g.subiendoFirma} style={botonPrimario(g.subiendoFirma)}>
+            <button
+              onClick={g.continuarDesdeFirma}
+              disabled={g.subiendoFirma || (!g.firmaSubida && !g.firma)}
+              style={botonPrimario(g.subiendoFirma || (!g.firmaSubida && !g.firma))}
+            >
               {g.subiendoFirma ? "Guardando firma..." : "Ver vista previa →"}
             </button>
           </div>

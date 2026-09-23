@@ -78,7 +78,7 @@ const borrarSilencioso = (ruta) => fs.promises.rm(ruta, { force: true }).catch((
 
 async function guardarPdfCifrado(pdf, boleta, hash, rutaBase) {
   if (!/^[A-Za-z0-9]{1,10}$/.test(boleta)) throw errorInterno('No se pudo enviar el reporte.', CODIGOS_ERROR.ARCHIVO_INCONSISTENTE);
-  const rutaRelativa = path.posix.join(boleta, generarNombreSeguro('pdf'));
+  const rutaRelativa = path.posix.join(boleta, 'Reportes', generarNombreSeguro('pdf'));
   const rutaAbsoluta = path.join(rutaBase, rutaRelativa);
 
   await fs.promises.mkdir(path.dirname(rutaAbsoluta), { recursive: true, mode: 0o700 });
@@ -171,6 +171,7 @@ async function registrarEnvio(tx, { usuarioId, solicitudId, numero, datos, activ
       estado: ESTADO_REVISION_FIRMADA,
       comentario: null,
       hash_documento: hash,
+      ruta_archivo: rutaRelativa, // el PDF que el alumno acaba de generar y firmar
       ip_firma: normalizarIp(ip),
       token_tsa: token,
       fecha: ahora,

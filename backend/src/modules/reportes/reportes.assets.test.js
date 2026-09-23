@@ -1,10 +1,14 @@
+process.env.ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'a'.repeat(64);
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
-const { DIRECTORIO_LOGOS, DIRECTORIO_SELLOS, LOGOS, SELLOS, dimensionesPng, leerLogo, leerSello } = require('./reportes.assets');
+const { DIRECTORIO_LOGOS, RUTA_SELLO, LOGOS, dimensionesPng, leerLogo, leerSello } = require('./reportes.assets');
+const { cifrarBuffer } = require('../../lib/fileEncryption');
 
 const sha256 = (buffer) => crypto.createHash('sha256').update(buffer).digest('hex');
 
@@ -69,31 +73,70 @@ test('logos: los originales y el PDF de referencia NO son necesarios en ejecuci�
   assert.equal(/referencia|IPN-Logo|logoescom/.test(fuente.replace(/\/\/.*$/gm, '')), false);
 });
 
-// ── Sello de validación del prototipo ────────────────────────
+// ── Sello institucional (cifrado, no versionado con el código) ──────────
 
-const SHA_SELLO = 'bc6a4d2d36c20be63ebabd46ccb8876d00de18ae02aeaa3b737becf8f1567694';
+// PNG mínimo válido (cabecera IHDR real) para probar el sello sin depender de un archivo real en disco.
+function pngDePrueba() {
+  const { crearPng } = require('./reportes.pdf.fixtures');
+  return crearPng(20, 12);
+}
 
-test('sello: el PNG del prototipo coincide con el SHA-256 aprobado (cálculo independiente)', () => {
-  assert.equal(sha256(fs.readFileSync(path.join(DIRECTORIO_SELLOS, 'sello-prototipo.png'))), SHA_SELLO);
-  assert.equal(SELLOS.prototipo.sha256, SHA_SELLO);
-  assert.equal(SELLOS.prototipo.archivo, 'sello-prototipo.png');
-  assert.match(DIRECTORIO_SELLOS.split(path.sep).slice(-4).join('/'), /^modules\/reportes\/assets\/sellos$/);
+function carpetaTemporal(t) {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'sello-test-'));
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }));
+  return base;
+}
+
+// Ruta a un .enc temporal con `bytes` cifrados con el mismo mecanismo real (AES-256-GCM, fileEncryption.js).
+function selloCifradoEn(t, bytes = pngDePrueba()) {
+  const ruta = path.join(carpetaTemporal(t), 'sello-escom.enc');
+  fs.writeFileSync(ruta, cifrarBuffer(bytes));
+  return ruta;
+}
+
+test('sello: RUTA_SELLO apunta a uploads/coordinador/Sellos/sello-escom.enc (no a assets/)', () => {
+  assert.match(RUTA_SELLO.split(path.sep).slice(-4).join('/'), /^uploads\/coordinador\/Sellos\/sello-escom\.enc$/);
 });
 
-test('sello: leerSello devuelve el PNG verificado con sus dimensiones; "prototipo" es el valor por omisión y se reutiliza la lectura', () => {
-  const sello = leerSello();
+test('sello: ya no se lee en claro desde assets/sellos ni depende de un SHA-256 fijo', () => {
+  const fuente = fs.readFileSync(path.join(__dirname, 'reportes.assets.js'), 'utf8').replace(/\/\/.*$/gm, '');
+  assert.equal(/assets.*sellos|DIRECTORIO_SELLOS/i.test(fuente), false);
+  assert.equal(/descifrarBuffer/.test(fuente), true, 'se descifra con el mecanismo real de fileEncryption.js');
+});
+
+test('sello: leerSello descifra el archivo cifrado (AES-256-GCM) y devuelve el PNG con sus dimensiones; se reutiliza la lectura (caché)', (t) => {
+  const bytes = pngDePrueba();
+  const rutaSello = selloCifradoEn(t, bytes);
+
+  const sello = leerSello({ rutaSello });
   assert.equal(sello.format, 'png');
-  assert.deepEqual([sello.ancho, sello.alto], [1254, 1254]);
-  assert.equal(sha256(sello.data), SHA_SELLO);
-  assert.equal(leerSello('prototipo'), sello);
-  assert.notEqual(leerLogo('ipn'), sello, 'el caché de sellos y el de logos no se mezclan');
+  assert.deepEqual([sello.ancho, sello.alto], [20, 12]);
+  assert.ok(sello.data.equals(bytes));
+  assert.equal(leerSello({ rutaSello }), sello, 'se reutiliza la lectura (caché)');
+  assert.notEqual(leerLogo('ipn'), sello, 'el caché de logos y el del sello no se mezclan');
 });
 
-test('sello: un archivo alterado → SELLO_ALTERADO; ausente → SELLO_NO_ENCONTRADO; nombre desconocido → TypeError', () => {
-  const alterado = (ruta) => { const b = Buffer.from(fs.readFileSync(ruta)); b[100] ^= 0x01; return b; };
-  assert.throws(() => leerSello('prototipo', { leer: alterado }), (err) => err.code === 'SELLO_ALTERADO' && /sello-prototipo\.png/.test(err.message));
+test('sello: un archivo cifrado alterado → SELLO_ALTERADO (lo detecta la autenticación de AES-GCM, no un hash fijo)', (t) => {
+  const rutaSello = selloCifradoEn(t);
+  const alterado = (ruta) => { const b = Buffer.from(fs.readFileSync(ruta)); b[b.length - 1] ^= 0x01; return b; };
+  assert.throws(() => leerSello({ rutaSello, leer: alterado }), (err) => err.code === 'SELLO_ALTERADO');
+});
+
+test('sello: archivo ausente → SELLO_NO_ENCONTRADO', () => {
   const ausente = () => { throw Object.assign(new Error('no existe'), { code: 'ENOENT' }); };
-  assert.throws(() => leerSello('prototipo', { leer: ausente }), (err) => err.code === 'SELLO_NO_ENCONTRADO' && /ENOENT/.test(err.message));
-  for (const malo of ['institucional', '', 'ipn']) assert.throws(() => leerSello(malo), TypeError);
-  assert.throws(() => leerSello('prototipo', { leer: () => Buffer.from('no soy un png, solo texto de relleno largo') }), (err) => err.code === 'SELLO_ALTERADO', 'el hash se revisa antes de interpretar el archivo');
+  assert.throws(() => leerSello({ leer: ausente }), (err) => err.code === 'SELLO_NO_ENCONTRADO' && /ENOENT/.test(err.message));
+});
+
+test('sello: descifra bien pero el contenido no es un PNG válido → SELLO_ALTERADO', (t) => {
+  const rutaSello = selloCifradoEn(t, Buffer.from('no soy un PNG, solo texto de relleno largo'));
+  assert.throws(() => leerSello({ rutaSello }), (err) => err.code === 'SELLO_ALTERADO');
+});
+
+test('sello: la llave de cifrado incorrecta también se rechaza como SELLO_ALTERADO (nunca datos corruptos en silencio)', (t) => {
+  const rutaSello = path.join(carpetaTemporal(t), 'sello-escom.enc');
+  const llaveOriginal = process.env.ENCRYPTION_KEY;
+  process.env.ENCRYPTION_KEY = 'b'.repeat(64);
+  fs.writeFileSync(rutaSello, cifrarBuffer(pngDePrueba()));
+  process.env.ENCRYPTION_KEY = llaveOriginal;
+  assert.throws(() => leerSello({ rutaSello }), (err) => err.code === 'SELLO_ALTERADO');
 });

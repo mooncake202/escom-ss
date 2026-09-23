@@ -16,7 +16,6 @@ export function useGenerarReporte() {
   const [errores, setErrores]         = useState({});
 
   const [firma, setFirma]               = useState(null);
-  const [firmaUrl, setFirmaUrl]         = useState(null);
   const [firmaSubida, setFirmaSubida]   = useState(false);
   const [subiendoFirma, setSubiendoFirma] = useState(false);
 
@@ -27,7 +26,6 @@ export function useGenerarReporte() {
 
   // La vista previa es un Blob del servidor: se libera su URL al reemplazarla, al salir del paso y al desmontar.
   const vistaRef = useRef({ url: null, id: 0 });
-  const firmaUrlRef = useRef(null);
 
   const liberarVista = useCallback(() => {
     if (vistaRef.current.url) URL.revokeObjectURL(vistaRef.current.url);
@@ -53,7 +51,6 @@ export function useGenerarReporte() {
   useEffect(() => () => {
     vistaRef.current.id += 1;
     liberarVista();
-    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
   }, [liberarVista]);
 
   // ── Datos ya calculados por el backend ──────────────────────
@@ -117,18 +114,20 @@ export function useGenerarReporte() {
     else irAVista(actividades);
   }
 
-  function handleFirmaChange(e) {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
+  // `archivo` viene de FirmaCanvas: un File PNG al terminar un trazo, o null en cuanto el canvas queda vacío.
+  function handleFirmaChange(archivo) {
+    if (!archivo) {
+      setFirma(null);
+      setErrores((prev) => ({ ...prev, firma: null }));
+      return;
+    }
     const problema = validarArchivoFirma(archivo);
     if (problema) {
+      setFirma(null);
       setErrores((prev) => ({ ...prev, firma: problema }));
       return;
     }
-    if (firmaUrlRef.current) URL.revokeObjectURL(firmaUrlRef.current);
-    firmaUrlRef.current = URL.createObjectURL(archivo);
     setFirma(archivo);
-    setFirmaUrl(firmaUrlRef.current);
     setErrores((prev) => ({ ...prev, firma: null }));
   }
 
@@ -208,7 +207,7 @@ export function useGenerarReporte() {
     meses, mesActivo, setMesActivo, avances,
     pasoActual, numeroPaso: Math.min(indice, pasos.length - 1) + 1, totalPasos: pasos.length,
     actividades, handleActividadesChange, errores,
-    firma, firmaUrl, firmaSubida, subiendoFirma, handleFirmaChange,
+    firma, firmaSubida, subiendoFirma, handleFirmaChange,
     continuarDesdeCalendario, continuarDesdeActividades, continuarDesdeFirma,
     atras, irAActividades,
     vistaPrevia, reintentarVistaPrevia,

@@ -1,15 +1,21 @@
-// Imágenes fijas del reporte mensual, versionadas con el código y verificadas por SHA-256 antes de usarse:
-//  - Logos institucionales (assets/logos/), ya recortados y optimizados a partir de los PNG originales de IPN y ESCOM:
-//    sin redibujar, sin cambiar colores y con la proporción original.
-//  - Sello de validación del prototipo (assets/sellos/), que Coordinación agrega al aprobar (CU-REP-06).
+// Imágenes fijas del reporte mensual:
+//  - Logos institucionales (assets/logos/), versionados con el código y verificados por SHA-256 antes de usarse:
+//    ya recortados y optimizados a partir de los PNG originales de IPN y ESCOM, sin redibujar, sin cambiar colores
+//    y con la proporción original.
+//  - Sello institucional, que Coordinación agrega al aprobar (CU-REP-06): a diferencia de los logos, NO es un
+//    archivo versionado con el código — es un único sello fijo del sistema (Coordinación no lo sube) que vive
+//    cifrado en uploads/ con el mismo mecanismo AES-256-GCM que documentos y rúbricas (lib/fileEncryption.js).
+//    Su integridad la da esa misma autenticación, no un SHA-256 fijo.
 // El PDF de referencia de la plantilla NO se usa en tiempo de ejecución.
 
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { descifrarBuffer } = require('../../lib/fileEncryption');
+const { RUTA_BASE_COORDINADOR } = require('./reportes.shared');
 
 const DIRECTORIO_LOGOS = path.join(__dirname, 'assets', 'logos');
-const DIRECTORIO_SELLOS = path.join(__dirname, 'assets', 'sellos');
+const RUTA_SELLO = path.join(RUTA_BASE_COORDINADOR, 'Sellos', 'sello-escom.enc');
 
 const LOGOS = Object.freeze({
   ipn: Object.freeze({
@@ -19,14 +25,6 @@ const LOGOS = Object.freeze({
   escom: Object.freeze({
     archivo: 'escom.png',
     sha256: 'b8962cb65dc77725d9c63511522034bb6a56bd7a675fb53e9b62fdaa140bbe49',
-  }),
-});
-
-// Sello fijo del prototipo (no es un sello institucional oficial).
-const SELLOS = Object.freeze({
-  prototipo: Object.freeze({
-    archivo: 'sello-prototipo.png',
-    sha256: 'bc6a4d2d36c20be63ebabd46ccb8876d00de18ae02aeaa3b737becf8f1567694',
   }),
 });
 
@@ -81,14 +79,39 @@ function leerLogo(nombre, { leer = null } = {}) {
 }
 
 /**
- * Sello de validación del prototipo verificado (mismo formato que leerLogo).
- * Lanza SELLO_NO_ENCONTRADO / SELLO_ALTERADO. `leer` es solo para pruebas (no usa la caché).
+ * Sello institucional verificado: { data: Buffer, format: 'png', ancho, alto } (mismo formato que leerLogo).
+ * Se lee cifrado (AES-256-GCM, lib/fileEncryption.js) desde uploads/coordinador/Sellos/sello-escom.enc — nunca en
+ * claro desde assets/. La propia autenticación de AES-GCM detecta cualquier alteración del archivo; no hay un
+ * SHA-256 fijo que mantener porque, a diferencia de los logos, no es un archivo versionado con el código.
+ * Lanza SELLO_NO_ENCONTRADO / SELLO_ALTERADO. `leer` y `rutaSello` son solo para pruebas (no usan la caché real).
  */
-function leerSello(nombre = 'prototipo', { leer = null } = {}) {
-  return leerVerificada({
-    tabla: SELLOS, directorio: DIRECTORIO_SELLOS, nombre, etiqueta: 'Sello', leer,
-    codigos: { noEncontrado: 'SELLO_NO_ENCONTRADO', alterado: 'SELLO_ALTERADO' },
-  });
+function leerSello({ leer = null, rutaSello = RUTA_SELLO } = {}) {
+  if (!leer && cache.has(rutaSello)) return cache.get(rutaSello);
+
+  let cifrado;
+  try {
+    cifrado = (leer ?? ((ruta) => fs.readFileSync(ruta)))(rutaSello);
+  } catch (err) {
+    throw crearError(`No se pudo leer el sello institucional (${err.code ?? err.message}).`, 'SELLO_NO_ENCONTRADO');
+  }
+
+  let contenido;
+  try {
+    contenido = descifrarBuffer(cifrado);
+  } catch (err) {
+    throw crearError(`El sello institucional no se pudo descifrar: pudo alterarse o la llave de cifrado no coincide (${err.message}).`, 'SELLO_ALTERADO');
+  }
+
+  let dimensiones;
+  try {
+    dimensiones = dimensionesPng(contenido);
+  } catch {
+    throw crearError('El sello institucional descifrado no es un PNG válido.', 'SELLO_ALTERADO');
+  }
+
+  const resultado = Object.freeze({ data: contenido, format: 'png', ...dimensiones });
+  if (!leer) cache.set(rutaSello, resultado);
+  return resultado;
 }
 
-module.exports = { DIRECTORIO_LOGOS, DIRECTORIO_SELLOS, LOGOS, SELLOS, dimensionesPng, leerLogo, leerSello };
+module.exports = { DIRECTORIO_LOGOS, RUTA_SELLO, LOGOS, dimensionesPng, leerLogo, leerSello };

@@ -125,8 +125,8 @@ async function escenarioCorreccion(t, { estado = ESTADOS_REPORTE.RECHAZADO_PROFE
   const rubricas = carpeta(t, 'global-corr-rubricas-');
   fs.mkdirSync(path.join(docs, '2022630001'), { recursive: true });
   fs.writeFileSync(path.join(docs, '2022630001/anterior.pdf'), cifrarBuffer(Buffer.from('%PDF-global-anterior')));
-  fs.mkdirSync(path.join(rubricas, String(ALUMNO)), { recursive: true });
-  fs.writeFileSync(path.join(rubricas, `${ALUMNO}/firma.enc`), cifrarBuffer(RUBRICA));
+  fs.mkdirSync(path.join(rubricas, '2022630001', 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rubricas, '2022630001/Rubrica/rubrica.enc'), cifrarBuffer(RUBRICA));
 
   const reportes = [reporteMensual({ id: 1, estado: ESTADOS_REPORTE.RECHAZADO_PROFESOR, diasLaborados: 4, horasReportadas: 13, actividades: 'Mensual intacto.', rutaArchivo: '2022630001/mensual.pdf' })];
   const globales = [reporteGlobal({
@@ -135,7 +135,7 @@ async function escenarioCorreccion(t, { estado = ESTADOS_REPORTE.RECHAZADO_PROFE
   })];
   const bd = crearBdProfesor({
     profesores: {}, reportes, globales, escritura: true,
-    usuarios: { [ALUMNO]: { rubrica_imagen: `${ALUMNO}/firma.enc` } },
+    usuarios: { [ALUMNO]: { rubrica_imagen: '2022630001/Rubrica/rubrica.enc' } },
     alumnos: { [ALUMNO]: alumnoGrafo({ usuarioId: ALUMNO }) },
   });
   const sellos = [];
@@ -213,8 +213,10 @@ async function escenarioProfesor(t, { estado = ESTADOS_REPORTE.PENDIENTE_REVISIO
   const pdf = await pdfBase();
   fs.mkdirSync(path.join(docs, '2022630001'), { recursive: true });
   fs.writeFileSync(path.join(docs, '2022630001/alumno.pdf'), cifrarBuffer(pdf));
-  fs.mkdirSync(path.join(rubricas, String(PROFESOR)), { recursive: true });
-  fs.writeFileSync(path.join(rubricas, `${PROFESOR}/firma.enc`), cifrarBuffer(RUBRICA));
+  // Reorganización de almacenamiento: rúbrica del profesor en <correo>/Rubrica/rubrica.enc — 'profesor50@ipn.mx' es
+  // el correo que reportes.profesor.fixtures.js deriva por omisión para el usuario PROFESOR sin correo explícito.
+  fs.mkdirSync(path.join(rubricas, 'profesor50@ipn.mx', 'Rubrica'), { recursive: true });
+  fs.writeFileSync(path.join(rubricas, 'profesor50@ipn.mx/Rubrica/rubrica.enc'), cifrarBuffer(RUBRICA));
 
   const reportes = [reporteMensual({ id: 1, estado: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR, rutaArchivo: '2022630001/mensual.pdf' })];
   const globales = [
@@ -223,7 +225,7 @@ async function escenarioProfesor(t, { estado = ESTADOS_REPORTE.PENDIENTE_REVISIO
   ];
   const bd = crearBdProfesor({
     profesores: { [PROFESOR]: 1 }, reportes, globales, escritura: true, coordinadores: [COORDINADOR, 71],
-    usuarios: { [PROFESOR]: { rubrica_imagen: `${PROFESOR}/firma.enc` } },
+    usuarios: { [PROFESOR]: { rubrica_imagen: 'profesor50@ipn.mx/Rubrica/rubrica.enc' } },
   });
   const sellos = [];
   const notificaciones = [];

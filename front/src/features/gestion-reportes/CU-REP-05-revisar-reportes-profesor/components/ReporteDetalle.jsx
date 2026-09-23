@@ -2,79 +2,15 @@ import { RADIUS, SHADOWS }        from "@/themes/colors";
 import { EstatusBadge }            from "./EstatusBadge";
 import { InfoRow }                 from "./InfoRow";
 import { BotonVerPdf, VisorPdf }   from "../../compartido/VisorPdf";
+import { FirmaCanvas }             from "../../compartido/FirmaCanvas";
 import { MODO } from "../hooks/useRevisarReportes";
 import { etiquetaReporte, textoPeriodo, textoFechaEnvio } from "../revisionReportes";
-
-function FirmaUploadInline({ firmaFile, firmaUrl, errorFirma, onChange, C }) {
-  return (
-    <div style={{ marginBottom: "1rem" }}>
-      <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: C.textPrimary }}>
-        Firma digital
-      </p>
-      <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-        Sube una imagen de tu firma en formato PNG o JPG. Se guardará y se usará automáticamente en aprobaciones posteriores.
-      </p>
-
-      {/* Preview */}
-      {firmaUrl && (
-        <div style={{
-          marginBottom: "0.75rem", padding: "1rem",
-          background: "#fff", borderRadius: RADIUS.md,
-          border: `1px solid ${C.borderDefault}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          minHeight: 70,
-        }}>
-          <img
-            src={firmaUrl}
-            alt="Vista previa de firma"
-            style={{ maxHeight: 70, maxWidth: "100%", objectFit: "contain" }}
-          />
-        </div>
-      )}
-
-      {/* Input */}
-      <label style={{
-        display: "flex", alignItems: "center", gap: "0.75rem",
-        padding: "10px 14px", borderRadius: RADIUS.md, cursor: "pointer",
-        background: C.bgInput,
-        border: `1px solid ${errorFirma ? C.danger : firmaFile ? C.success : C.borderDefault}`,
-        transition: "border-color 0.15s",
-      }}>
-        <input type="file" accept=".png,.jpg,.jpeg" onChange={onChange} style={{ display: "none" }} />
-        <svg width={15} height={15} viewBox="0 0 24 24" fill="none"
-          stroke={firmaFile ? C.success : C.textDisabled} strokeWidth={2}
-          strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/>
-          <line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
-        <span style={{ fontSize: 13, color: firmaFile ? C.success : C.textDisabled, flex: 1 }}>
-          {firmaFile ? firmaFile.name : "Seleccionar imagen de firma (PNG o JPG)..."}
-        </span>
-        {firmaFile && (
-          <span style={{ fontSize: 11, color: C.textDisabled }}>
-            {(firmaFile.size / 1024).toFixed(0)} KB
-          </span>
-        )}
-      </label>
-
-      {errorFirma && (
-        <p style={{ margin: "5px 0 0", fontSize: 12, color: C.danger }}>{errorFirma}</p>
-      )}
-      {!errorFirma && firmaFile && (
-        <p style={{ margin: "5px 0 0", fontSize: 12, color: C.success }}>
-          Firma cargada correctamente.
-        </p>
-      )}
-    </div>
-  );
-}
 
 export function ReporteDetalle({
   reporte, detalle, onReintentar, onCerrar,
   pdf, onVerPdf, onCerrarPdf,
   modo, irModo, resetModo,
-  rubricaGuardada, rubrica, onReintentarRubrica, firmaFile, firmaUrl, errorFirma, handleFirmaChange,
+  rubricaGuardada, rubrica, onReintentarRubrica, firmaFile, errorFirma, handleFirmaChange,
   comentario, onComentarioChange, errorComentario,
   loading, errorAccion, confirmarAprobacion, confirmarRechazo,
   C,
@@ -83,6 +19,8 @@ export function ReporteDetalle({
 
   const esPendiente = reporte.puedeRevisar;
   const datos       = detalle.estado === "listo" ? detalle.datos : null;
+  // Sin rúbrica guardada, hace falta haber dibujado la firma (FirmaCanvas no vacío) antes de poder confirmar.
+  const faltaFirma  = rubrica.estado !== "listo" || (!rubricaGuardada && !firmaFile);
 
   return (
     <>
@@ -225,14 +163,16 @@ export function ReporteDetalle({
                   </span>
                 </div>
               ) : (
-                /* Primera vez — subir rúbrica */
-                <FirmaUploadInline
-                  firmaFile={firmaFile}
-                  firmaUrl={firmaUrl}
-                  errorFirma={errorFirma}
-                  onChange={handleFirmaChange}
-                  C={C}
-                />
+                /* Primera vez — dibujar la rúbrica */
+                <div style={{ marginBottom: "1rem" }}>
+                  <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: C.textPrimary }}>
+                    Firma digital
+                  </p>
+                  <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                    Dibuja tu firma con el mouse, el trackpad o el dedo. Se guardará y se usará automáticamente en aprobaciones posteriores.
+                  </p>
+                  <FirmaCanvas onCambiar={handleFirmaChange} error={errorFirma} C={C} ancho={420} alto={140} />
+                </div>
               ))}
 
               {/* Aviso de qué pasará al confirmar (una sola acción; no hay segunda vista previa) */}
@@ -315,16 +255,17 @@ export function ReporteDetalle({
             {/* MODO APROBAR */}
             {modo === MODO.APROBAR && (
               <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-                {/* Única acción: el servidor firma, sella y envía a coordinación */}
+                {/* Única acción: el servidor firma, sella y envía a coordinación. Sin rúbrica guardada, hace falta
+                    haber dibujado la firma (canvas no vacío) antes de poder confirmar. */}
                 <button
                   onClick={confirmarAprobacion}
-                  disabled={loading || rubrica.estado !== "listo"}
+                  disabled={loading || faltaFirma}
                   style={{
                     padding: "11px", borderRadius: RADIUS.md,
-                    background: loading || rubrica.estado !== "listo" ? C.borderDefault : C.success,
+                    background: loading || faltaFirma ? C.borderDefault : C.success,
                     border: "none", color: "#fff",
                     fontSize: 13, fontWeight: 700,
-                    cursor: loading ? "wait" : rubrica.estado !== "listo" ? "not-allowed" : "pointer", fontFamily: "inherit",
+                    cursor: loading ? "wait" : faltaFirma ? "not-allowed" : "pointer", fontFamily: "inherit",
                   }}
                 >
                   {loading ? "Firmando y enviando..." : "Confirmar y enviar a coordinación →"}
