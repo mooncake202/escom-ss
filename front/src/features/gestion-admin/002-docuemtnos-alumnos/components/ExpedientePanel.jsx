@@ -82,18 +82,12 @@ export function BarraProgreso({ progreso, etapaActual = null, C }) {
           {progreso.totalDocumentos} archivo{progreso.totalDocumentos !== 1 ? "s" : ""} disponible{progreso.totalDocumentos !== 1 ? "s" : ""}
         </span>
         <span style={{ fontSize: 11, fontWeight: 700, color: completo ? "#22C55E" : C.accentText }}>{pct}%</span>
+        {/* Siempre una de las tres etapas documentales. Llegar al 100% no crea una cuarta: un
+            expediente completo sigue estando en Término. */}
         <span style={{ fontSize: 11, color: C.textDisabled }}>
           {etapaActual ? `Etapa: ${etapaActual}` : ""}
         </span>
       </div>
-
-      {/* Mientras no se integre LSS el expediente no puede darse por completo: falta el expediente
-          de liberación y la evaluación de desempeño, que esta rama no conoce. */}
-      {progreso.catalogoCompleto === false && (
-        <p style={{ margin: "8px 0 0", fontSize: 11, color: C.textDisabled }}>
-          El expediente se completa con los documentos de liberación del servicio social.
-        </p>
-      )}
     </div>
   );
 }

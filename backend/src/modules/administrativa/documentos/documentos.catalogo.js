@@ -8,24 +8,24 @@
 // productores no marcan la aprobación en el mismo sitio:
 //
 //   DOCUMENTO_APROBADO          → documento.estado_documento = 'aprobado'
-//                                 (GR y ADM-14 aprueban sobre la propia fila de `documento`)
+//                                 (GR, ADM-14 y LSS-09 aprueban sobre la propia fila de `documento`)
 //   REPORTE_MENSUAL_APROBADO    → reporte_mensual.estado_reporte = 'aprobado_coordinador'
 //   REPORTE_GLOBAL_APROBADO     → reporte_global.estado_reporte  = 'aprobado_coordinador'
+//   EVALUACION_DESEMPENO_APROBADA → documento.estado_documento = 'aprobado'
+//                                 Y evaluacion_desempeno.estado = 'aprobado_coordinador'
 //
 // Los reportes NO pueden usar la primera regla: su `documento` nace y permanece en 'vigente', que
 // —según el propio catálogo de estados del proyecto— "no significa que el reporte haya sido
-// aprobado". Tampoco se consultan `revision_reporte_*`: son historial append-only y la revisión más
-// reciente da falsos positivos justo después de que un alumno corrige y reenvía un rechazado.
+// aprobado". Tampoco se consultan `revision_reporte_*` ni `revision_desempeno`: son historial
+// append-only y la revisión más reciente da falsos positivos justo después de que un alumno corrige
+// y reenvía un rechazado.
 //
 // PARA AGREGAR UN DOCUMENTO basta con añadir una entrada con su regla: servicio, controlador y
 // frontend lo recogen solos. No hay ningún número de documentos cableado en el sistema.
 //
-// PENDIENTE DE INTEGRAR LSS (rama feature/LSS-CU-01, todavía no fusionada). Cuando exista, se
-// añaden dos entradas a TÉRMINO y nada más:
-//   - `expediente_lss`       → regla DOCUMENTO_APROBADO
-//   - `evaluacion_desempeno` → regla nueva: documento.estado_documento='aprobado'
-//                              Y evaluacion_desempeno.estado='aprobado_coordinador'
-// Hoy NO se declaran: sus flujos no existen en esta rama y consultarlos daría siempre vacío.
+// LSS YA ESTÁ INTEGRADO: `expediente_lss` y `evaluacion_desempeno` son los dos documentos que
+// produce y forman parte de TÉRMINO. ADM solo los CONSULTA: no los crea, no los modifica y no los
+// aprueba — eso vive en el módulo LSS, que es de otra integrante del equipo.
 
 const { ESTADO_REPORTE_APROBACION_FINAL } = require('../../reportes/reportes.shared');
 
@@ -49,13 +49,20 @@ const REGLAS = Object.freeze({
   DOCUMENTO_APROBADO: 'documento_aprobado',
   REPORTE_MENSUAL_APROBADO: 'reporte_mensual_aprobado',
   REPORTE_GLOBAL_APROBADO: 'reporte_global_aprobado',
+  EVALUACION_DESEMPENO_APROBADA: 'evaluacion_desempeno_aprobada',
 });
 
-// Estado con el que GR y ADM-14 marcan un documento como definitivo.
+// Estado con el que GR, ADM-14 y LSS-09 marcan un documento como definitivo.
 const ESTADO_DOCUMENTO_APROBADO = 'aprobado';
 // Estado con el que Coordinación cierra un reporte. Se importa de Reportes para que no se
 // desincronice si allá cambia.
 const ESTADO_REPORTE_APROBADO = ESTADO_REPORTE_APROBACION_FINAL;
+// Estado con el que Coordinación cierra la evaluación de desempeño (LSS-04), en la tabla satélite
+// `evaluacion_desempeno`. Se declara aquí, y NO se importa de lss.shared.js, a propósito: el módulo
+// LSS pertenece a otra integrante y ADM no debe acoplarse a sus internos. Es el contrato de datos
+// que ADM consulta, y las pruebas de ADM lo fijan de forma explícita para que un cambio silencioso
+// allá se detecte aquí.
+const ESTADO_EVALUACION_DESEMPENO_APROBADA = 'aprobado_coordinador';
 
 // `orden` ordena dentro de su etapa. `tipo` es el valor exacto de documento.tipo_documento.
 // `multiple: true` marca los tipos de los que un alumno puede tener VARIOS documentos.
@@ -127,12 +134,33 @@ const CATALOGO = Object.freeze([
     multiple: false,
     orden: 1,
   },
+  {
+    tipo: 'expediente_lss',
+    nombre: 'Expediente de liberación',
+    // Es un PDF combinado: carta compromiso + carta de término + dictamen (este último solo si se
+    // declaró al registrarse). El alumno lo integra y Coordinación lo dictamina.
+    descripcion: 'Expediente de liberación del servicio social, dictaminado por Coordinación.',
+    etapa: ETAPAS.TERMINO,
+    responsable: RESPONSABLES.ALUMNO,
+    regla: REGLAS.DOCUMENTO_APROBADO,
+    // Se reemplaza sobre la MISMA fila en cada reenvío: nunca hay dos.
+    multiple: false,
+    orden: 2,
+  },
+  {
+    tipo: 'evaluacion_desempeno',
+    nombre: 'Evaluación de desempeño',
+    descripcion: 'Evaluación de tu desempeño firmada por tu profesor y dictaminada por Coordinación.',
+    etapa: ETAPAS.TERMINO,
+    responsable: RESPONSABLES.COORDINACION,
+    // La única entrada con condición compuesta: ver REGLAS.EVALUACION_DESEMPENO_APROBADA.
+    regla: REGLAS.EVALUACION_DESEMPENO_APROBADA,
+    // Solo puede existir una: `evaluacion_desempeno.liberacion_proceso_id` es UNIQUE, y una
+    // corrección borra y recrea la fila en vez de acumular versiones.
+    multiple: false,
+    orden: 3,
+  },
 ]);
-
-// Mientras falten los dos documentos de LSS, el expediente NUNCA está completo: HEAD no puede
-// saberlo. La pantalla usa esto para no declarar "Completado" un expediente que sí podría faltarle
-// algo. Se pondrá en true cuando el catálogo incluya `expediente_lss` y `evaluacion_desempeno`.
-const CATALOGO_COMPLETO = false;
 
 const POR_TIPO = new Map(CATALOGO.map((d) => [d.tipo, d]));
 
@@ -192,27 +220,22 @@ function calcularProgreso(documentos) {
     disponibles: tiposPresentes.size,
     total: CATALOGO.length,
     totalDocumentos: documentos.length,
-    // Mientras el catálogo no incluya LSS, la pantalla no debe hablar de expediente "completo".
-    catalogoCompleto: CATALOGO_COMPLETO,
   };
 }
 
 /**
- * Etapa más avanzada que el alumno ya alcanzó, derivada de lo que REALMENTE tiene aprobado. Mismo
- * espíritu que el mock original (`getEtapaActual`), con una diferencia deliberada: el mock devolvía
- * "Completado" al tener el último documento del catálogo, y hoy eso mentiría — faltan los dos de
- * LSS. Mientras `CATALOGO_COMPLETO` sea false nunca se devuelve "Completado".
+ * Etapa más avanzada que el alumno ya alcanzó, derivada de lo que REALMENTE tiene aprobado.
+ *
+ * SOLO puede devolver una de las tres etapas de `ETAPAS`, por construcción: se elige la última de
+ * `ORDEN_ETAPAS` que el alumno haya alcanzado. No existe una cuarta etapa "Completado" — un alumno
+ * con el 100% de su expediente sigue estando documentalmente en Término. El progreso (que sí puede
+ * llegar al 100%) se informa aparte, en `calcularProgreso`.
  */
 function etapaActual(documentos) {
   if (documentos.length === 0) return ETAPAS.INICIO;
 
   const alcanzadas = new Set(documentos.map((d) => d.etapa));
-  const ultima = [...ORDEN_ETAPAS].reverse().find((e) => alcanzadas.has(e)) ?? ETAPAS.INICIO;
-
-  if (!CATALOGO_COMPLETO) return ultima;
-
-  const tiposPresentes = new Set(documentos.map((d) => d.tipo));
-  return tiposPresentes.size === CATALOGO.length ? 'Completado' : ultima;
+  return [...ORDEN_ETAPAS].reverse().find((e) => alcanzadas.has(e)) ?? ETAPAS.INICIO;
 }
 
 module.exports = {
@@ -222,8 +245,8 @@ module.exports = {
   REGLAS,
   ESTADO_DOCUMENTO_APROBADO,
   ESTADO_REPORTE_APROBADO,
+  ESTADO_EVALUACION_DESEMPENO_APROBADA,
   CATALOGO,
-  CATALOGO_COMPLETO,
   TIPOS_CATALOGADOS,
   TIPOS_POR_REGLA,
   metadataDe,

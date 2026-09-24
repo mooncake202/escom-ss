@@ -33,10 +33,20 @@ const BOLETA_VALIDA = /^[0-9]{10}$/;
  * su rama desaparece sola de la consulta.
  */
 const FRAGMENTO_POR_REGLA = {
-  // GR y ADM-14 aprueban sobre la propia fila de `documento`.
+  // GR, ADM-14 y LSS-09 aprueban sobre la propia fila de `documento`.
   [catalogo.REGLAS.DOCUMENTO_APROBADO]: (tipos) => ({
     tipo_documento: { in: tipos },
     estado_documento: catalogo.ESTADO_DOCUMENTO_APROBADO,
+  }),
+  // La evaluación de desempeño (LSS) exige las DOS condiciones a la vez. Hoy LSS escribe ambas en
+  // la misma transacción, así que la primera bastaría; se piden las dos a propósito, porque ese
+  // detalle vive en un módulo que ADM no controla y que no tiene pruebas que lo protejan. Se filtra
+  // por la relación 1:1 `documento.evaluacion_desempeno`, nunca por `revision_desempeno` (historial
+  // append-only: la revisión más reciente daría falsos positivos, mismo motivo que en los reportes).
+  [catalogo.REGLAS.EVALUACION_DESEMPENO_APROBADA]: (tipos) => ({
+    tipo_documento: { in: tipos },
+    estado_documento: catalogo.ESTADO_DOCUMENTO_APROBADO,
+    evaluacion_desempeno: { is: { estado: catalogo.ESTADO_EVALUACION_DESEMPENO_APROBADA } },
   }),
   // El `documento` de un reporte se queda en 'vigente' para siempre: la aprobación vive en su
   // propia tabla. Se filtra por la relación 1:1, nunca por `revision_reporte_*`.
@@ -198,8 +208,6 @@ async function listarAlumnosConDocumentos() {
         etapaActual: catalogo.etapaActual(suyos),
       };
     }),
-    // La pantalla no debe inventar un estado "Completado" mientras falten los documentos de LSS.
-    catalogoCompleto: catalogo.CATALOGO_COMPLETO,
   };
 }
 

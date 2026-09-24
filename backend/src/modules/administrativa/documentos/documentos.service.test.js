@@ -103,6 +103,10 @@ function montar() {
     reportesGlobales: [
       { id: 1, documento_id: 10, estado_reporte: 'aprobado_coordinador' },
     ],
+    // Tabla satélite de LSS. Solo se CONSULTA (relación 1:1 desde `documento`): ADM no la escribe.
+    // Arranca vacía y cada prueba de LSS monta su propio escenario con `sembrarLss`, para no alterar
+    // los conteos del fixture base en los que se apoyan las pruebas de ADM-14.
+    evaluacionesDesempeno: [],
     secuencia: 100,
     fallarEscritura: false,
   };
@@ -129,9 +133,10 @@ function montar() {
     return salida;
   };
 
-  // Relaciones 1:1 de `documento` hacia las tablas de Reportes.
+  // Relaciones 1:1 de `documento` hacia las tablas de Reportes y de LSS.
   const reporteMensualDe = (d) => bd.reportesMensuales.find((r) => r.documento_id === d.id) ?? null;
   const reporteGlobalDe = (d) => bd.reportesGlobales.find((r) => r.documento_id === d.id) ?? null;
+  const evaluacionDesempenoDe = (d) => bd.evaluacionesDesempeno.find((e) => e.documento_id === d.id) ?? null;
 
   // Reproduce el `where` que arma el servicio, incluido el OR por reglas y los filtros por
   // relación (`reporte_mensual: { is: { estado_reporte } }`).
@@ -159,6 +164,12 @@ function montar() {
     if (where.reporte_global?.is) {
       const r = reporteGlobalDe(d);
       if (!r || r.estado_reporte !== where.reporte_global.is.estado_reporte) return false;
+    }
+    // `documento.evaluacion_desempeno` es nullable: una evaluación rechazada por SISS no tiene fila
+    // satélite, y un `is` sobre una relación ausente NO casa (igual que en Prisma).
+    if (where.evaluacion_desempeno?.is) {
+      const e = evaluacionDesempenoDe(d);
+      if (!e || e.estado !== where.evaluacion_desempeno.is.estado) return false;
     }
     return true;
   };
@@ -231,13 +242,45 @@ test.before(() => {
 
 test.beforeEach(() => { montar(); });
 
+/**
+ * Añade a Ana un documento producido por LSS, tal como lo dejaría ese módulo.
+ *
+ * `estadoEvaluacion` solo aplica a `evaluacion_desempeno`: crea además la fila satélite. Pasar
+ * `null` reproduce el caso real de un rechazo por SISS, donde `documento_id` queda en NULL y por
+ * tanto NO hay fila satélite que enlace con el documento.
+ *
+ * ADM no escribe nada de esto: el helper solo siembra el estado que ADM-13 debe consultar.
+ */
+function sembrarLss({ id, tipo, estadoDocumento, estadoEvaluacion = undefined, boleta = B_ANA }) {
+  bd.documentos.push({
+    id,
+    alumno_id: boleta,
+    creador_id: U_ANA,
+    tipo_documento: tipo,
+    estado_documento: estadoDocumento,
+    ruta_archivo: escribirCifrado(path.join(boleta, `lss-${id}.enc`)),
+    fecha_creacion: new Date('2026-11-01T10:00:00Z'),
+  });
+  if (estadoEvaluacion !== undefined && estadoEvaluacion !== null) {
+    bd.evaluacionesDesempeno.push({ id: bd.evaluacionesDesempeno.length + 1, documento_id: id, estado: estadoEvaluacion });
+  }
+  return id;
+}
+
+/** Los ids que ADM-13 expone en la etapa Término del expediente de Ana. */
+async function idsEnTermino(usuarioId = U_ANA) {
+  const r = await servicio.obtenerMiExpediente({ usuarioId });
+  return r.etapas.find((e) => e.etapa === catalogo.ETAPAS.TERMINO).documentos.map((d) => d.id);
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // Catálogo
 // ════════════════════════════════════════════════════════════════════════════
 
-test('catálogo: contiene los 6 tipos implementados en esta rama, cada uno con su regla', () => {
+test('catálogo: contiene los 8 tipos del expediente, cada uno con su regla', () => {
   const ESPERADOS = ['carta_creditos', 'constancia_seguro_social', 'expediente',
-    'reporte_mensual', 'reporte_global', 'carta_compromiso_firmada'];
+    'reporte_mensual', 'reporte_global', 'carta_compromiso_firmada',
+    'expediente_lss', 'evaluacion_desempeno'];
   assert.deepEqual([...catalogo.TIPOS_CATALOGADOS].sort(), [...ESPERADOS].sort());
 
   for (const d of catalogo.CATALOGO) {
@@ -267,12 +310,43 @@ test('catálogo: los reportes NO usan la regla de estado_documento', () => {
   }
 });
 
-test('catálogo: LSS sigue PENDIENTE de integración y el catálogo se declara incompleto', () => {
-  // Estos dos entran cuando se fusione feature/LSS-CU-01; hoy consultarlos daría siempre vacío.
+test('catálogo: los dos documentos de LSS ya están integrados, en TÉRMINO', () => {
   for (const tipo of ['expediente_lss', 'evaluacion_desempeno']) {
-    assert.equal(catalogo.estaEnCatalogo(tipo), false, `${tipo} todavía no existe en esta rama`);
+    assert.equal(catalogo.estaEnCatalogo(tipo), true, `${tipo} debe estar catalogado`);
+    assert.equal(catalogo.metadataDe(tipo).etapa, catalogo.ETAPAS.TERMINO);
+    assert.equal(catalogo.metadataDe(tipo).multiple, false, 'de ambos existe como máximo uno');
   }
-  assert.equal(catalogo.CATALOGO_COMPLETO, false, 'sin LSS, el expediente nunca está completo');
+});
+
+test('catálogo: el orden dentro de TÉRMINO es carta compromiso → expediente LSS → evaluación', () => {
+  const termino = catalogo.CATALOGO
+    .filter((d) => d.etapa === catalogo.ETAPAS.TERMINO)
+    .sort((a, b) => a.orden - b.orden)
+    .map((d) => d.tipo);
+  assert.deepEqual(termino, ['carta_compromiso_firmada', 'expediente_lss', 'evaluacion_desempeno']);
+});
+
+test('catálogo: `expediente_lss` reutiliza DOCUMENTO_APROBADO; la evaluación tiene su regla propia', () => {
+  assert.equal(catalogo.metadataDe('expediente_lss').regla, catalogo.REGLAS.DOCUMENTO_APROBADO);
+  assert.equal(
+    catalogo.metadataDe('evaluacion_desempeno').regla,
+    catalogo.REGLAS.EVALUACION_DESEMPENO_APROBADA,
+    'es la única con condición compuesta',
+  );
+});
+
+// Los dos estados que ADM consulta de LSS se fijan aquí a propósito: LSS es de otra integrante y no
+// tiene pruebas propias, así que si allá cambiaran el valor, el fallo debe aparecer en ADM.
+test('catálogo: los estados que ADM exige a los documentos de LSS son los del contrato', () => {
+  assert.equal(catalogo.ESTADO_DOCUMENTO_APROBADO, 'aprobado');
+  assert.equal(catalogo.ESTADO_EVALUACION_DESEMPENO_APROBADA, 'aprobado_coordinador');
+});
+
+test('catálogo: ya NO existe CATALOGO_COMPLETO ni la etapa "Completado"', () => {
+  assert.equal(catalogo.CATALOGO_COMPLETO, undefined, 'la bandera se retiró con la integración de LSS');
+  assert.deepEqual(Object.values(catalogo.ETAPAS), ['Inicio', 'Desarrollo', 'Término']);
+  assert.equal(Object.values(catalogo.ETAPAS).includes('Completado'), false);
+  assert.equal(catalogo.calcularProgreso([{ tipo: 'expediente' }]).catalogoCompleto, undefined);
 });
 
 test('catálogo: los tipos que NO son del expediente siguen fuera', () => {
@@ -302,17 +376,201 @@ test('catálogo: el progreso se DERIVA del catálogo, nunca de un número fijo',
   assert.equal(/total:\s*\d+/.test(fuente), false, 'no debe haber un total cableado');
 });
 
-test('catálogo: la etapa actual se deriva y NUNCA dice "Completado" sin LSS', () => {
+test('catálogo: la etapa actual se deriva y solo puede ser una de las TRES', () => {
   assert.equal(catalogo.etapaActual([]), 'Inicio');
   assert.equal(catalogo.etapaActual([{ tipo: 'expediente', etapa: 'Inicio' }]), 'Inicio');
   assert.equal(catalogo.etapaActual([
     { tipo: 'expediente', etapa: 'Inicio' }, { tipo: 'reporte_mensual', etapa: 'Desarrollo' },
   ]), 'Desarrollo');
 
-  // Aun teniendo TODOS los tipos de esta rama, sigue sin ser "Completado": faltan los de LSS.
+  // Ningún conjunto de documentos, ni siquiera el completo, produce un cuarto valor.
+  const combinaciones = [
+    [],
+    [{ tipo: 'expediente', etapa: 'Inicio' }],
+    [{ tipo: 'reporte_global', etapa: 'Desarrollo' }],
+    [{ tipo: 'evaluacion_desempeno', etapa: 'Término' }],
+    catalogo.CATALOGO.map((d) => ({ tipo: d.tipo, etapa: d.etapa })),
+  ];
+  for (const docs of combinaciones) {
+    assert.ok(
+      Object.values(catalogo.ETAPAS).includes(catalogo.etapaActual(docs)),
+      `etapaActual devolvió algo que no es una etapa: ${catalogo.etapaActual(docs)}`,
+    );
+    assert.notEqual(catalogo.etapaActual(docs), 'Completado');
+  }
+});
+
+test('catálogo: un expediente al 100% sigue en TÉRMINO, no en una cuarta etapa', () => {
   const todos = catalogo.CATALOGO.map((d) => ({ tipo: d.tipo, etapa: d.etapa }));
-  assert.notEqual(catalogo.etapaActual(todos), 'Completado');
+  const progreso = catalogo.calcularProgreso(todos);
+
+  // El progreso SÍ llega al 100%...
+  assert.equal(progreso.disponibles, progreso.total, 'están todos los tipos del catálogo');
+  assert.equal(progreso.disponibles, catalogo.CATALOGO.length);
+  // ...y aun así la etapa documental es Término.
   assert.equal(catalogo.etapaActual(todos), 'Término');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// CU-ADM-13 — documentos de LSS (expediente_lss y evaluacion_desempeno)
+//
+// ADM solo los CONSULTA. Estas pruebas fijan el contrato de datos que ADM-13 espera de LSS; si ese
+// módulo cambiara los estados, el fallo debe aparecer aquí (LSS no tiene pruebas propias).
+// ════════════════════════════════════════════════════════════════════════════
+
+test('LSS: `expediente_lss` aprobado SÍ aparece, y en la etapa Término', async () => {
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  const doc = r.documentos.find((d) => d.id === 20);
+
+  assert.ok(doc, 'el expediente de liberación aprobado debe exponerse');
+  assert.equal(doc.tipo, 'expediente_lss');
+  assert.equal(doc.etapa, catalogo.ETAPAS.TERMINO);
+  assert.equal(doc.estado, 'aprobado');
+  assert.deepEqual(await idsEnTermino(), [20]);
+});
+
+test('LSS: `expediente_lss` en_revision NO aparece', async () => {
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'en_revision' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  assert.equal(r.documentos.some((d) => d.id === 20), false, 'todavía lo está revisando Coordinación');
+  assert.deepEqual(await idsEnTermino(), []);
+});
+
+test('LSS: `expediente_lss` rechazado NO aparece', async () => {
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'rechazado' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  assert.equal(r.documentos.some((d) => d.id === 20), false, 'un expediente rechazado no es histórico');
+  assert.deepEqual(await idsEnTermino(), []);
+});
+
+test('LSS: la evaluación con AMBOS estados finales SÍ aparece, en Término', async () => {
+  sembrarLss({ id: 22, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'aprobado_coordinador' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  const doc = r.documentos.find((d) => d.id === 22);
+
+  assert.ok(doc, 'documento aprobado + evaluación aprobada por coordinación');
+  assert.equal(doc.tipo, 'evaluacion_desempeno');
+  assert.equal(doc.etapa, catalogo.ETAPAS.TERMINO);
+  assert.deepEqual(await idsEnTermino(), [22]);
+});
+
+test('LSS: la evaluación pendiente de dictamen NO aparece', async () => {
+  // Así nace: el profesor firma y el documento queda en 'pendiente'.
+  sembrarLss({ id: 22, tipo: 'evaluacion_desempeno', estadoDocumento: 'pendiente', estadoEvaluacion: 'pendiente_dictamen' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  assert.equal(r.documentos.some((d) => d.id === 22), false, 'falta el dictamen de Coordinación');
+  assert.deepEqual(await idsEnTermino(), []);
+});
+
+test('LSS: la evaluación necesita los DOS estados finales — uno solo no basta', async () => {
+  // (a) documento aprobado pero la evaluación sigue pendiente de dictamen.
+  sembrarLss({ id: 23, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'pendiente_dictamen' });
+  // (b) evaluación aprobada por coordinación pero el documento no lo refleja.
+  sembrarLss({ id: 24, tipo: 'evaluacion_desempeno', estadoDocumento: 'pendiente', estadoEvaluacion: 'aprobado_coordinador' });
+  // (c) sin fila satélite: es el caso real del rechazo por SISS, que deja documento_id en NULL.
+  sembrarLss({ id: 25, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: null });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  for (const id of [23, 24, 25]) {
+    assert.equal(r.documentos.some((d) => d.id === id), false, `el documento ${id} no cumple la regla compuesta`);
+  }
+  assert.deepEqual(await idsEnTermino(), []);
+});
+
+test('LSS: la regla compuesta también cierra la descarga del archivo', async () => {
+  sembrarLss({ id: 23, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'pendiente_dictamen' });
+
+  // Aunque el estado_documento diga 'aprobado' y el archivo exista en disco, no se puede sacar.
+  await assert.rejects(
+    () => servicio.obtenerArchivo({ usuarioId: U_ANA, rol: 'alumno_asignado', documentoId: 23 }),
+    (err) => err.code === 'DOCUMENTO_NO_DISPONIBLE',
+  );
+});
+
+test('LSS: sus documentos NO se cuelan en Inicio ni en Desarrollo', async () => {
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+  sembrarLss({ id: 22, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'aprobado_coordinador' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  const tiposDe = (etapa) => r.etapas.find((e) => e.etapa === etapa).documentos.map((d) => d.tipo);
+
+  for (const etapa of [catalogo.ETAPAS.INICIO, catalogo.ETAPAS.DESARROLLO]) {
+    assert.equal(tiposDe(etapa).includes('expediente_lss'), false, `expediente_lss no va en ${etapa}`);
+    assert.equal(tiposDe(etapa).includes('evaluacion_desempeno'), false, `evaluacion_desempeno no va en ${etapa}`);
+  }
+  assert.deepEqual(tiposDe(catalogo.ETAPAS.TERMINO), ['expediente_lss', 'evaluacion_desempeno']);
+});
+
+test('LSS: en Término se respeta el orden del catálogo', async () => {
+  // Se siembran al revés del orden esperado, a propósito: el orden lo pone el catálogo, no la
+  // fecha de creación ni el id.
+  sembrarLss({ id: 22, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'aprobado_coordinador' });
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+  sembrarLss({ id: 21, tipo: 'carta_compromiso_firmada', estadoDocumento: 'aprobado' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  const termino = r.etapas.find((e) => e.etapa === catalogo.ETAPAS.TERMINO).documentos.map((d) => d.tipo);
+  assert.deepEqual(termino, ['carta_compromiso_firmada', 'expediente_lss', 'evaluacion_desempeno']);
+});
+
+test('LSS: con el expediente completo el progreso llega al 100% y la etapa sigue en Término', async () => {
+  // Los tres reportes mensuales que faltaban por aprobar y todo lo de Término.
+  bd.reportesMensuales.find((r) => r.documento_id === 8).estado_reporte = 'aprobado_coordinador';
+  bd.reportesMensuales.find((r) => r.documento_id === 9).estado_reporte = 'aprobado_coordinador';
+  bd.documentos.find((d) => d.id === 3).estado_documento = 'aprobado'; // constancia_seguro_social
+  sembrarLss({ id: 21, tipo: 'carta_compromiso_firmada', estadoDocumento: 'aprobado' });
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+  sembrarLss({ id: 22, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'aprobado_coordinador' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+
+  assert.equal(r.progreso.disponibles, catalogo.CATALOGO.length, 'los 8 tipos cubiertos');
+  assert.equal(r.progreso.disponibles, r.progreso.total, '100%');
+  // Lo que importa: el 100% NO inventa una cuarta etapa.
+  assert.equal(r.etapaActual, 'Término');
+  assert.notEqual(r.etapaActual, 'Completado');
+  assert.deepEqual(r.etapas.map((e) => e.etapa), ['Inicio', 'Desarrollo', 'Término']);
+});
+
+test('LSS: las tres etapas se devuelven aunque Inicio y Desarrollo estén vacías', async () => {
+  // Solo documentos de Término: las otras dos etapas deben venir igual, vacías.
+  bd.documentos = bd.documentos.filter((d) => d.alumno_id !== B_ANA);
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+
+  assert.deepEqual(r.etapas.map((e) => e.etapa), ['Inicio', 'Desarrollo', 'Término']);
+  assert.deepEqual(r.etapas.find((e) => e.etapa === 'Inicio').documentos, []);
+  assert.deepEqual(r.etapas.find((e) => e.etapa === 'Desarrollo').documentos, []);
+  assert.equal(r.etapas.find((e) => e.etapa === 'Término').documentos.length, 1);
+});
+
+// Caso borde DOCUMENTADO, no corregido: `documento` no tiene índice único en
+// (alumno_id, tipo_documento), así que a nivel de esquema pueden existir dos `expediente_lss`
+// aprobados de la misma boleta. El flujo real de LSS no los produce (reemplaza sobre la MISMA fila),
+// y ADM no puede evitarlo sin tocar LSS ni el schema. Esta prueba fija el comportamiento ACTUAL:
+// ADM-13 los muestra AMBOS y el progreso sigue contando UN tipo cubierto, porque se mide en tipos.
+test('LSS: dos `expediente_lss` aprobados (inconsistencia de BD) se muestran los dos, sin deduplicar', async () => {
+  sembrarLss({ id: 20, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+  sembrarLss({ id: 26, tipo: 'expediente_lss', estadoDocumento: 'aprobado' });
+
+  const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
+  const enTermino = r.etapas.find((e) => e.etapa === catalogo.ETAPAS.TERMINO).documentos;
+
+  assert.deepEqual(enTermino.map((d) => d.id).sort((a, b) => a - b), [20, 26], 'se muestran los dos');
+  assert.equal(
+    r.progreso.disponibles,
+    new Set(r.documentos.map((d) => d.tipo)).size,
+    'el progreso se mide en TIPOS: los dos cuentan como uno',
+  );
+  // Y el catálogo sigue declarándolo como no múltiple: la inconsistencia es de datos, no de ADM.
+  assert.equal(catalogo.metadataDe('expediente_lss').multiple, false);
 });
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -354,10 +612,11 @@ test('ADM-13 alumno: los documentos llegan clasificados por etapa', async () => 
 
 test('ADM-13 alumno: el progreso es derivado y no cuenta lo no aprobado', async () => {
   const r = await servicio.obtenerMiExpediente({ usuarioId: U_ANA });
-  // 4 TIPOS cubiertos (carta_creditos, expediente, reporte_mensual, reporte_global) de 6, con 5
-  // archivos reales: los dos reportes mensuales cuentan como un solo tipo.
+  // 4 TIPOS cubiertos (carta_creditos, expediente, reporte_mensual, reporte_global) de los 8 del
+  // catálogo, con 5 archivos reales: los dos reportes mensuales cuentan como un solo tipo.
+  // `catalogoCompleto` ya no viaja: desapareció junto con la etapa "Completado".
   assert.deepEqual(r.progreso, {
-    disponibles: 4, total: catalogo.CATALOGO.length, totalDocumentos: 5, catalogoCompleto: false,
+    disponibles: 4, total: catalogo.CATALOGO.length, totalDocumentos: 5,
   });
   assert.equal(r.etapaActual, 'Desarrollo');
 });
@@ -779,15 +1038,37 @@ test('ADM-13: el cliente NUNCA recibe ruta_archivo ni datos de almacenamiento', 
   }
 });
 
-test('ADM-13 coordinación: el listado deriva etapa y progreso reales, sin declarar Completado', async () => {
-  const { alumnos, catalogoCompleto } = await servicio.listarAlumnosConDocumentos();
+test('ADM-13 coordinación: el listado deriva etapa y progreso reales, y solo usa las tres etapas', async () => {
+  const respuesta = await servicio.listarAlumnosConDocumentos();
 
-  assert.equal(catalogoCompleto, false, 'faltan los documentos de LSS');
-  for (const a of alumnos) {
+  assert.equal('catalogoCompleto' in respuesta, false, 'la bandera ya no forma parte del contrato');
+  for (const a of respuesta.alumnos) {
+    // Los tres valores posibles son exactamente los tres filtros de la pantalla de Coordinación:
+    // ningún alumno puede quedar fuera de todos ellos.
     assert.ok(['Inicio', 'Desarrollo', 'Término'].includes(a.etapaActual));
     assert.notEqual(a.etapaActual, 'Completado');
     assert.equal(a.totalCatalogo, catalogo.CATALOGO.length);
   }
+});
+
+test('ADM-13 coordinación: un alumno con expediente completo sigue cayendo en el filtro Término', async () => {
+  // Beto ya tiene su carta compromiso; se le completa el resto del expediente.
+  bd.documentos.push(
+    { id: 40, alumno_id: B_BETO, creador_id: U_BETO, tipo_documento: 'carta_creditos', estado_documento: 'aprobado', ruta_archivo: 'x.enc', fecha_creacion: new Date('2026-05-01T10:00:00Z') },
+    { id: 41, alumno_id: B_BETO, creador_id: U_BETO, tipo_documento: 'constancia_seguro_social', estado_documento: 'aprobado', ruta_archivo: 'x.enc', fecha_creacion: new Date('2026-05-01T10:00:00Z') },
+    { id: 42, alumno_id: B_BETO, creador_id: U_BETO, tipo_documento: 'reporte_mensual', estado_documento: 'vigente', ruta_archivo: 'x.enc', fecha_creacion: new Date('2026-06-01T10:00:00Z') },
+    { id: 43, alumno_id: B_BETO, creador_id: U_BETO, tipo_documento: 'reporte_global', estado_documento: 'vigente', ruta_archivo: 'x.enc', fecha_creacion: new Date('2026-07-01T10:00:00Z') },
+  );
+  bd.reportesMensuales.push({ id: 90, documento_id: 42, num_reporte: 1, estado_reporte: 'aprobado_coordinador' });
+  bd.reportesGlobales.push({ id: 90, documento_id: 43, estado_reporte: 'aprobado_coordinador' });
+  sembrarLss({ id: 44, tipo: 'expediente_lss', estadoDocumento: 'aprobado', boleta: B_BETO });
+  sembrarLss({ id: 45, tipo: 'evaluacion_desempeno', estadoDocumento: 'aprobado', estadoEvaluacion: 'aprobado_coordinador', boleta: B_BETO });
+
+  const { alumnos } = await servicio.listarAlumnosConDocumentos();
+  const beto = alumnos.find((a) => a.boleta === B_BETO);
+
+  assert.equal(beto.tiposDisponibles, catalogo.CATALOGO.length, 'expediente completo');
+  assert.equal(beto.etapaActual, 'Término', 'no desaparece del filtro Término al completarse');
 });
 
 test('ADM-13: las tres etapas se devuelven aunque el alumno no tenga nada', async () => {

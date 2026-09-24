@@ -13,6 +13,8 @@ const ICONO_POR_TIPO = {
   carta_creditos: "🎓",
   constancia_seguro_social: "🩺",
   carta_compromiso_firmada: "📋",
+  expediente_lss: "🗂️",
+  evaluacion_desempeno: "⭐",
 };
 
 export const iconoDeDocumento = (tipo) => ICONO_POR_TIPO[tipo] ?? "📄";

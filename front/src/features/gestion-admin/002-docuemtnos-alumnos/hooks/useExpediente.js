@@ -75,7 +75,7 @@ export function useMiExpediente() {
     carga, recargar,
     alumno: datos?.alumno ?? null,
     etapas: datos?.etapas ?? [],
-    progreso: datos?.progreso ?? { disponibles: 0, total: 0, totalDocumentos: 0, catalogoCompleto: false },
+    progreso: datos?.progreso ?? { disponibles: 0, total: 0, totalDocumentos: 0 },
     etapaActual: datos?.etapaActual ?? null,
     ...visor,
   };
@@ -88,10 +88,9 @@ export function useExpedienteCoordinacion() {
   const [alumnos, setAlumnos] = useState([]);
   const [intento, setIntento] = useState(0);
   const [busqueda, setBusqueda] = useState("");
-  // Se filtra por ETAPA documental, y las etapas del CU son solo tres. "Completado" no es una etapa
-  // documental, así que no existe como filtro de la pantalla.
+  // Se filtra por ETAPA documental, y las etapas del CU son solo tres. No existe "Completado": un
+  // expediente al 100% sigue estando en Término, así que los tres filtros cubren a todos los alumnos.
   const [filtro, setFiltro] = useState("todos"); // todos | Inicio | Desarrollo | Término
-  const [catalogoCompleto, setCatalogoCompleto] = useState(false);
 
   const [boleta, setBoleta] = useState(null);
   const [expediente, setExpediente] = useState(null);
@@ -105,7 +104,6 @@ export function useExpedienteCoordinacion() {
       (r) => {
         if (!vigente) return;
         setAlumnos(r.alumnos);
-        setCatalogoCompleto(r.catalogoCompleto ?? false);
         setCarga({ estado: "listo", error: null });
       },
       (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
@@ -163,7 +161,7 @@ export function useExpedienteCoordinacion() {
   return {
     carga, recargar,
     alumnos: alumnosFiltrados,
-    metricas, catalogoCompleto,
+    metricas,
     busqueda, setBusqueda,
     filtro, setFiltro,
     alumnoSeleccionado, seleccionar,
