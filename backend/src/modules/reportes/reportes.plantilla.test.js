@@ -246,8 +246,10 @@ test('actividades: 12 pt de margen lateral y 8 pt vertical entre el recuadro y e
   assert.deepEqual([bloque.x, bloque.y, bloque.ancho, bloque.alto], [AREA_ACTIVIDADES.x, AREA_ACTIVIDADES.y, AREA_ACTIVIDADES.ancho, AREA_ACTIVIDADES.alto]);
 });
 
-test('pie: "Página 1 de 1" alineado a la derecha, dentro de la hoja', () => {
-  const pie = planificarPagina(datos(), {}).find((e) => e.texto === PIE.texto);
+test('pie: alineado a la derecha, dentro de la hoja; declara si hay hoja de asistencia', () => {
+  // Sin hoja 2 (reporte global) conserva "Página 1 de 1"; con ella pasa a "Página 1 de 2".
+  assert.ok(planificarPagina(datos(), {}).some((e) => e.texto === PIE.texto));
+  const pie = planificarPagina(datos(), {}, { llevaAsistencia: true }).find((e) => e.texto === 'Página 1 de 2');
   assert.ok(Math.abs(pie.left + pie.ancho - (PIE.derecha)) < 1e-6);
   assert.ok(pie.left + pie.ancho <= PAGINA.ancho);
 });

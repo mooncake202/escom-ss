@@ -80,7 +80,7 @@ test('200: entrega el PDF (una página Carta) con cabeceras que evitan guardarlo
   assert.equal(Number(respuesta.headers.get('content-length')), bytes.length);
   assert.equal(bytes.subarray(0, 5).toString('latin1'), '%PDF-');
   const doc = await PDFDocument.load(bytes);
-  assert.equal(doc.getPageCount(), 1);
+  assert.equal(doc.getPageCount(), 2, 'reporte + control de asistencia');
 
   assert.deepEqual(escrituras(), [], 'no se escribió nada en la BD');
   const [id, actividades] = servicio.mock.calls[0].arguments;

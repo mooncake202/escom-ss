@@ -326,11 +326,11 @@ function textoDelPdf(buffer) {
   }
 }
 
-test('generarPdfReporteMensual: etapa 1 (alumno) → un PDF de una sola página Carta con la fuente aprobada incrustada', async () => {
+test('generarPdfReporteMensual: etapa 1 (alumno) → un PDF de DOS páginas Carta con la fuente aprobada incrustada', async () => {
   const pdf = await generarPdfReporteMensual(datos(), { rubricaAlumno });
   assert.equal(pdf.subarray(0, 5).toString('latin1'), '%PDF-');
   const { paginas, imagenes, pdf: doc } = await paginasYImagenes(pdf);
-  assert.equal(paginas, 1);
+  assert.equal(paginas, 2, 'reporte + control de asistencia');
   assert.equal(imagenes, 3, 'logo IPN + logo ESCOM + rúbrica del alumno');
   const { width, height } = doc.getPage(0).getSize();
   assert.deepEqual([Math.round(width), Math.round(height)], [612, 792]);
@@ -344,13 +344,13 @@ test('generarPdfReporteMensual: las tres etapas (alumno; +profesor; +sello) y si
   const etapa2 = await generarPdfReporteMensual(datos(), { rubricaAlumno, rubricaProfesor });
   const etapa3 = await generarPdfReporteMensual(datos(), { rubricaAlumno, rubricaProfesor, selloInstitucional: sello });
   const resultados = await Promise.all([sinFirmas, etapa2, etapa3].map(paginasYImagenes));
-  assert.deepEqual(resultados.map((r) => r.paginas), [1, 1, 1]);
+  assert.deepEqual(resultados.map((r) => r.paginas), [2, 2, 2]);
   assert.deepEqual(resultados.map((r) => r.imagenes), [2, 4, 5]);
 });
 
 test('generarPdfReporteMensual: acepta rúbricas JPEG', async () => {
   const pdf = await generarPdfReporteMensual(datos(), { rubricaAlumno: JPEG_PEQUENO });
-  assert.equal((await paginasYImagenes(pdf)).paginas, 1);
+  assert.equal((await paginasYImagenes(pdf)).paginas, 2);
 });
 
 test('generarPdfReporteMensual: imágenes dañadas → IMAGEN_INVALIDA, sin PDF', async () => {
@@ -366,10 +366,10 @@ test('generarPdfReporteMensual: actividades que no caben → error explícito, n
   await rechaza(() => generarPdfReporteMensual(datos({}, justoMas), { rubricaAlumno }), 'ACTIVIDADES_EXCEDEN_ESPACIO');
 });
 
-test('generarPdfReporteMensual: con las actividades al límite exacto sigue siendo una página y el texto queda dentro del recuadro', async () => {
+test('generarPdfReporteMensual: con las actividades al límite exacto sigue siendo dos páginas y el texto queda dentro del recuadro', async () => {
   const limite = parrafoDeLineas(lineasMaximas(1));
   const pdf = await generarPdfReporteMensual(datos({}, limite), { rubricaAlumno, rubricaProfesor, selloInstitucional: sello });
-  assert.equal((await paginasYImagenes(pdf)).paginas, 1);
+  assert.equal((await paginasYImagenes(pdf)).paginas, 2);
 });
 
 test('generarPdfReporteMensual: el contenido impreso es el esperado (si hay pdftotext)', async (t) => {
@@ -383,7 +383,7 @@ test('generarPdfReporteMensual: el contenido impreso es el esperado (si hay pdft
     'Datos del Prestador o Prestadora', 'ANA MARÍA GARCÍA LÓPEZ', 'Ingeniería en Inteligencia Artificial', '2022630001', '85.5 %',
     '5512345678', 'ana.garcia.lopez@example.com', 'Prestatario: Escuela Superior de Cómputo',
     'Redacción en párrafos describiendo las actividades realizadas durante el periodo mensual.',
-    'ñandú', 'LUIS ENRIQUE TORRES VEGA', 'Elaboró', 'Autorizó', 'Responsable Directo', 'Sello del Prestatario', 'Página 1 de 1',
+    'ñandú', 'LUIS ENRIQUE TORRES VEGA', 'Elaboró', 'Autorizó', 'Responsable Directo', 'Sello del Prestatario', 'Página 1 de 2',
   ]) {
     assert.ok(plano.includes(esperado), `falta: ${esperado}`);
   }
@@ -427,7 +427,7 @@ test('agregarRubricaProfesor: queda EXACTAMENTE donde el generador pone la rúbr
   assert.notEqual(Buffer.compare(rasterizar(sellado), rasterizar(soloAlumno)), 0, 'y sí cambia respecto al PDF solo del alumno');
 });
 
-test('agregarRubricaProfesor: devuelve un Buffer nuevo de una página Carta, no toca el original y conserva sus metadatos', async () => {
+test('agregarRubricaProfesor: devuelve un Buffer nuevo con las dos hojas, no toca el original y conserva sus metadatos', async () => {
   const soloAlumno = await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) });
   const copia = Buffer.from(soloAlumno);
 
@@ -438,7 +438,7 @@ test('agregarRubricaProfesor: devuelve un Buffer nuevo de una página Carta, no 
   assert.equal(Buffer.compare(soloAlumno, copia), 0, 'el PDF original no se modifica');
   const original = await PDFDocument.load(soloAlumno);
   const final = await PDFDocument.load(sellado);
-  assert.equal(final.getPageCount(), 1);
+  assert.equal(final.getPageCount(), 2);
   assert.deepEqual([final.getPage(0).getWidth(), final.getPage(0).getHeight()], [612, 792]);
   assert.equal(final.getTitle(), original.getTitle());
   assert.equal(final.getAuthor(), original.getAuthor());
@@ -450,8 +450,8 @@ test('agregarRubricaProfesor: devuelve un Buffer nuevo de una página Carta, no 
 
 test('agregarRubricaProfesor: acepta una rúbrica JPG y la proporción se conserva (una rúbrica muy ancha no se deforma)', async () => {
   const soloAlumno = await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) });
-  assert.equal((await PDFDocument.load(await agregarRubricaProfesor(soloAlumno, JPEG_PEQUENO))).getPageCount(), 1);
-  assert.equal((await PDFDocument.load(await agregarRubricaProfesor(soloAlumno, crearPng(3000, 100)))).getPageCount(), 1);
+  assert.equal((await PDFDocument.load(await agregarRubricaProfesor(soloAlumno, JPEG_PEQUENO))).getPageCount(), 2);
+  assert.equal((await PDFDocument.load(await agregarRubricaProfesor(soloAlumno, crearPng(3000, 100)))).getPageCount(), 2);
 });
 
 test('agregarRubricaProfesor: rúbrica ausente, no imagen, dañada o truncada → IMAGEN_INVALIDA (nunca se cuelga ni se guarda algo a medias)', async () => {
@@ -462,14 +462,15 @@ test('agregarRubricaProfesor: rúbrica ausente, no imagen, dañada o truncada �
   }
 });
 
-test('agregarRubricaProfesor: solo acepta el PDF del reporte (una página Carta); otra cosa → PDF_ALMACENADO_INVALIDO', async () => {
+test('agregarRubricaProfesor: acepta el PDF del reporte (1 o 2 páginas Carta); otra cosa → PDF_ALMACENADO_INVALIDO', async () => {
   const png = crearPng(300, 100);
-  const dos = await PDFDocument.create();
-  dos.addPage([612, 792]); dos.addPage([612, 792]);
+  // DOS páginas Carta ya es un reporte válido (reporte + control de asistencia). Lo que se rechaza es todo lo demás.
+  const tres = await PDFDocument.create();
+  tres.addPage([612, 792]); tres.addPage([612, 792]); tres.addPage([612, 792]);
   const a4 = await PDFDocument.create();
   a4.addPage([595, 842]);
 
-  for (const malo of [Buffer.from('%PDF-1.7 roto'), Buffer.from('no es un pdf'), Buffer.alloc(0), null, 'texto', Buffer.from(await dos.save()), Buffer.from(await a4.save())]) {
+  for (const malo of [Buffer.from('%PDF-1.7 roto'), Buffer.from('no es un pdf'), Buffer.alloc(0), null, 'texto', Buffer.from(await tres.save()), Buffer.from(await a4.save())]) {
     await rechaza(() => agregarRubricaProfesor(malo, png), CODIGOS_ERROR.PDF_ALMACENADO_INVALIDO);
   }
 });
@@ -523,7 +524,7 @@ test('agregarSelloValidacion: el sello va SOLO en SELLO.zona y nada más del PDF
   assert.ok(contraGenerador.n === 0 || dentroDeZonaSello(contraGenerador.caja), 'mismas coordenadas y escala que el generador');
 });
 
-test('agregarSelloValidacion: con el sello institucional real (cifrado, descifrado por reportes.assets.js), mantiene una página Carta y las firmas previas; el original no se toca', async (t) => {
+test('agregarSelloValidacion: con el sello institucional real (cifrado, descifrado por reportes.assets.js), mantiene las dos hojas y las firmas previas; el original no se toca', async (t) => {
   const firmado = await agregarRubricaProfesor(await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) }), crearPng(300, 100));
   const copia = Buffer.from(firmado);
 
@@ -533,7 +534,7 @@ test('agregarSelloValidacion: con el sello institucional real (cifrado, descifra
   assert.equal(Buffer.compare(firmado, copia), 0, 'el PDF de entrada no se modifica');
   assert.notEqual(Buffer.compare(final, firmado), 0);
   const documento = await PDFDocument.load(final);
-  assert.equal(documento.getPageCount(), 1);
+  assert.equal(documento.getPageCount(), 2);
   assert.deepEqual([Math.round(documento.getPage(0).getWidth()), Math.round(documento.getPage(0).getHeight())], [612, 792]);
   assert.equal(documento.getTitle(), (await PDFDocument.load(firmado)).getTitle());
   assert.equal((await paginasYImagenes(final)).imagenes, (await paginasYImagenes(firmado)).imagenes + 1);
@@ -544,9 +545,9 @@ test('agregarSelloValidacion: sello ausente o inservible → IMAGEN_INVALIDA; PD
   for (const malo of [null, undefined, Buffer.from('no soy una imagen'), crearPng(300, 100).subarray(0, 60), 'texto']) {
     await assert.rejects(() => agregarSelloValidacion(firmado, malo), (err) => err.code === CODIGOS_ERROR.IMAGEN_INVALIDA && /sello de validación del prototipo/.test(err.message));
   }
-  const dos = await PDFDocument.create();
-  dos.addPage([612, 792]); dos.addPage([612, 792]);
-  for (const malo of [Buffer.from('%PDF-1.7 roto'), Buffer.alloc(0), null, Buffer.from(await dos.save())]) {
+  const tres = await PDFDocument.create();
+  tres.addPage([612, 792]); tres.addPage([612, 792]); tres.addPage([612, 792]);
+  for (const malo of [Buffer.from('%PDF-1.7 roto'), Buffer.alloc(0), null, Buffer.from(await tres.save())]) {
     await rechaza(() => agregarSelloValidacion(malo, crearPng(300, 100)), CODIGOS_ERROR.PDF_ALMACENADO_INVALIDO);
   }
 });

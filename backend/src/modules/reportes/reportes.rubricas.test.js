@@ -376,7 +376,7 @@ test('integración con la fase 1: al guardar la rúbrica, firma.requiereSubirRub
   assert.equal(JSON.stringify(despues).includes(escenario.usuarios[7].rubrica_imagen), false, 'la ruta no se expone');
 });
 
-test('integración con la fase 3: la rúbrica guardada se estampa en el PDF del reporte (una página)', async (t) => {
+test('integración con la fase 3: la rúbrica guardada se estampa en el PDF del reporte (dos páginas)', async (t) => {
   const escenario = crearBd();
   const base = carpetaTemporal(t);
   await guardarRubrica(7, { buffer: PNG }, { prisma: escenario.bd, ahora: AHORA, rutaBase: base });
@@ -384,7 +384,7 @@ test('integración con la fase 3: la rúbrica guardada se estampa en el PDF del 
 
   const pdf = await generarPdfReporteMensual(construirDatosPdf(resultadoEjemplo(), ACTIVIDADES_EJEMPLO), { rubricaAlumno });
   const doc = await PDFDocument.load(pdf);
-  assert.equal(doc.getPageCount(), 1);
+  assert.equal(doc.getPageCount(), 2);
   let imagenes = 0;
   for (const [, o] of doc.context.enumerateIndirectObjects()) {
     if (o instanceof PDFRawStream && o.dict.get(PDFName.of('Subtype')) === PDFName.of('Image') && !o.dict.has(PDFName.of('SMaskInData'))

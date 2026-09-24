@@ -136,8 +136,15 @@ test('el snapshot dias_laborados / horas_reportadas solo se escribe al crear el 
   const path = require('path');
   const fuentes = fs.readdirSync(__dirname).filter((f) => f.endsWith('.js') && !/\.(test|fixtures)\.js$/.test(f));
   const escriben = fuentes.filter((f) => /(dias_laborados|horas_reportadas)\s*:/.test(fs.readFileSync(path.join(__dirname, f), 'utf8').replace(/\/\/.*$/gm, '')));
-  // reportes.tipos.js solo las LEE (`select: { dias_laborados: true }` y el snapshot del mensual); ahí no se escribe ningún valor.
-  assert.deepEqual(escriben, ['reportes-envio.service.js', 'reportes.tipos.js']);
+  // reportes.tipos.js y reportes-alumno.service.js solo las LEEN (`select: { ... : true }`, el snapshot del mensual y
+  // la suma de horas ya reportadas para el acumulado del Control de Asistencia); ahí no se escribe ningún valor.
+  assert.deepEqual(escriben, ['reportes-alumno.service.js', 'reportes-envio.service.js', 'reportes.tipos.js']);
+  const alumno = fs.readFileSync(path.join(__dirname, 'reportes-alumno.service.js'), 'utf8').replace(/\/\/.*$/gm, '');
+  for (const columna of ['dias_laborados', 'horas_reportadas']) {
+    const valores = [...alumno.matchAll(new RegExp(`${columna}\\s*:\\s*([^,}\\s]+)`, 'g'))].map((m) => m[1]);
+    assert.ok(valores.every((v) => v === 'true'), `${columna} solo se selecciona, nunca se escribe`);
+  }
+  assert.equal(/reporte_mensual\.update/.test(alumno), false, 'la preparación no escribe el snapshot');
   const tipos = fs.readFileSync(path.join(__dirname, 'reportes.tipos.js'), 'utf8').replace(/\/\/.*$/gm, '');
   for (const columna of ['dias_laborados', 'horas_reportadas']) {
     assert.deepEqual([...tipos.matchAll(new RegExp(`${columna}\\s*:\\s*([^,}\\s]+)`, 'g'))].map((m) => m[1]), ['true'], columna);

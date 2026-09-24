@@ -8,6 +8,7 @@
 //  - Periodo = fecha de inicio → fecha de fin del periodo de prestación elegido en el registro (no hasta la fecha de generación).
 //  - El PDF usa la plantilla del mensual con el título "REPORTE GLOBAL DE ACTIVIDADES", ese periodo y el resumen de actividades.
 //    Las horas acumuladas se muestran en la interfaz, NUNCA en el PDF.
+//  - UNA sola página: el Control de Asistencia (página 2) es exclusivo de los reportes MENSUALES.
 //  - No guarda snapshot de días ni horas (su tabla no tiene esas columnas): esos datos solo existen al generarlo.
 
 const { isDeepStrictEqual } = require('util');

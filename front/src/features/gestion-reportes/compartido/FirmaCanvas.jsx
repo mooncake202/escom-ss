@@ -74,7 +74,10 @@ export function FirmaCanvas({ onCambiar, error, C, ancho = 460, alto = 160, disa
   }
 
   return (
-    <div>
+    // El bloque completo (recuadro, su pie y el error) se centra dentro de la tarjeta: se le da el ancho del canvas y
+    // se reparten los márgenes. `maxWidth` evita que se desborde en pantallas estrechas. Solo layout: ni el tamaño del
+    // canvas ni sus coordenadas cambian.
+    <div style={{ width: ancho, maxWidth: "100%", margin: "0 auto" }}>
       <canvas
         ref={canvasRef}
         role="img"

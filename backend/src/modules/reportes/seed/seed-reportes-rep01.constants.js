@@ -3,9 +3,11 @@
 // fecha_fin = inicio + 7 meses + 1 día) con fechas ya cerradas, para poder verificar puedeGenerar=true.
 
 const path = require('path');
-const { calcularDiaMexicoUTC } = require('../../../lib/fechas');
-const { calcularPeriodoReporte, periodoCerrado, esFinDeSemanaISO, normalizarFechaISO } = require('../reportes.periodos');
+const { calcularPeriodoReporte, periodoCerrado, esFinDeSemanaISO } = require('../reportes.periodos');
 const { eventoCubreFecha } = require('../reportes.calendario');
+// Se importa el MISMO conjunto de estados que usa el servicio, en vez de repetirlo aquí: si mañana cambia,
+// el fixture cambia con él y no puede volver a divergir en silencio.
+const { ESTADOS_BITACORA_QUE_CUENTAN } = require('../reportes.shared');
 
 const PREFIJO = '[SEED-REPORTES-REP01]';
 const PASSWORD_PLANO = '12345678';
@@ -130,11 +132,13 @@ const ESPERADO_REPORTE_1 = Object.freeze({
   numero: 1,
   esquema: 'mediados_de_mes',
   periodo: { inicio: '2026-07-16', fin: '2026-08-14' }, // el 15-ago es sábado: el periodo termina el viernes
-  diasLaborados: 4,
-  horas: 13,
-  bitacorasAprobadas: 4,
+  // B1 + B2 + B3 + R + B4: las cuatro aprobadas MÁS la rechazada, que también cuenta.
+  // Quedan fuera P (pendiente_revision, sin decisión final) y F (fecha_registro del periodo #2).
+  diasLaborados: 5,
+  horas: 17,
+  bitacorasQueCuentan: 5,
   cumulo: { horasAcumuladas: 23, horasRechazadas: 4 },
-  actividad1: { porcentajeActual: 80, avance: { alInicio: 0, alCierre: 60, enPeriodo: 60 }, bitacorasEnPeriodo: 4 },
+  actividad1: { porcentajeActual: 80, avance: { alInicio: 0, alCierre: 60, enPeriodo: 60 }, bitacorasEnPeriodo: 5 },
 });
 
 const fechaUTC = (iso) => new Date(`${iso}T00:00:00.000Z`);
@@ -165,11 +169,16 @@ function verificarConsistenciaFixture(hoyISO) {
     if (horasReales !== b.horas) problemas.push(`${b.clave}: hora_fin - hora_inicio ≠ ${b.horas} h`);
   }
 
-  // Una bitácora cuenta en el reporte cuyo periodo contiene su fecha_revision (día en México), no su fecha_registro.
-  const diaDeRevision = (b) => normalizarFechaISO(calcularDiaMexicoUTC(instanteUTC(b.revision)));
-  const cuentan = BITACORAS.filter((b) => b.estado === 'aprobada' && diaDeRevision(b) >= periodo.inicio && diaDeRevision(b) <= periodo.fin);
+  // Mismo criterio que consultarBitacorasDelPeriodo + el filtro de prepararReporteMensual:
+  // una bitácora cuenta por su FECHA_REGISTRO (el día trabajado), no por su fecha_revision, y cuentan los
+  // estados de ESTADOS_BITACORA_QUE_CUENTAN — aprobada Y rechazada. Las tres sin decisión final
+  // (en_curso, pendiente_datos, pendiente_revision) no cuentan.
+  const cuentan = BITACORAS.filter(
+    (b) => ESTADOS_BITACORA_QUE_CUENTAN.includes(b.estado) && b.fecha >= periodo.inicio && b.fecha <= periodo.fin,
+  );
   const horas = cuentan.reduce((s, b) => s + b.horas, 0);
-  if (cuentan.length !== esperado.bitacorasAprobadas) problemas.push(`bitácoras que cuentan = ${cuentan.length}`);
+  if (cuentan.length !== esperado.bitacorasQueCuentan) problemas.push(`bitácoras que cuentan = ${cuentan.length}`);
+  if (cuentan.length !== esperado.diasLaborados) problemas.push(`días laborados = ${cuentan.length}`);
   if (horas !== esperado.horas) problemas.push(`horas del reporte #1 = ${horas}`);
   if (cuentan.length * 4 === horas) problemas.push('las horas coinciden con días × 4: el fixture no demuestra horas reales');
   if (CUMULO.horasAcumuladas !== esperado.cumulo.horasAcumuladas || CUMULO.horasRechazadas !== esperado.cumulo.horasRechazadas) {

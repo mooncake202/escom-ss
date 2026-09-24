@@ -25,11 +25,15 @@ const {
   MOTIVOS_BLOQUEO,
   MENSAJES_BLOQUEO,
 } = require('./reportes.shared');
+const { construirAsistencia } = require('./reportes.asistencia');
 const { construirDatosPdf, generarPdfReporteMensual } = require('./reportes.pdf');
 const { normalizarTexto } = require('./reportes.texto');
 const { normalizarIp, obtenerRubricaAlumno } = require('./reportes.rubricas');
 const { crearError, CODIGOS_ERROR: CODIGOS_PREPARACION } = require('./reportes-preparacion');
-const { resolverAlumnoYSolicitud, datosDeImpresion } = require('./reportes-alumno.service');
+const {
+  resolverAlumnoYSolicitud, datosDeImpresion, consultarAsistenciaDelPeriodo, consultarReportes,
+  sumarHorasReportadasPrevias,
+} = require('./reportes-alumno.service');
 const { cambiarEstado } = require('./reportes-revision.service');
 const {
   OPCIONES_TRANSACCION, sha256, pedirSello, guardarPdfCifrado, descartarArchivo, avisarUsuario,
@@ -82,8 +86,11 @@ async function cargarReporteCorregible(prisma, usuarioId, tipoReporte, reporteId
   return { cfg, fila: { ...fila, documento: fila.documento ? { ...fila.documento } : null }, id };
 }
 
-// Lo que el PDF necesita, con los datos actuales del alumno y el número/periodo del reporte (sin bitácoras).
-function construirResultado({ alumno, solicitud }, cfg, fila) {
+// Lo que el PDF necesita, con los datos actuales del alumno y el número/periodo del reporte.
+//
+// `asistencia` (página 2) se arma con las bitácoras del MISMO periodo y el mismo filtro de siempre, pero el total del
+// mes es el SNAPSHOT `horas_reportadas` del reporte: una corrección no vuelve a calcular las horas ya firmadas.
+function construirResultado({ alumno, solicitud }, cfg, fila, { bitacoras = [], horasPrevias = 0 } = {}) {
   const impresion = datosDeImpresion(alumno, solicitud);
   const { periodo } = cfg.periodo(solicitud, fila);
 
@@ -94,9 +101,36 @@ function construirResultado({ alumno, solicitud }, cfg, fila) {
     profesor: impresion.profesor,
     servicio: { programa: impresion.programa },
     reporte: { tipo: cfg.tipo, numero: cfg.numero(fila), periodo },
+    asistencia: construirAsistencia({
+      bitacoras,
+      totalDelMes: cfg.snapshot(fila).horasReportadas ?? null,
+      horasPrevias,
+      responsable: impresion.profesor
+        ? { nombre: impresion.profesor.nombreCompleto, cargo: impresion.profesor.cargo }
+        : null,
+    }),
     puedeGenerar: motivosBloqueo.length === 0,
     motivosBloqueo,
   };
+}
+
+/**
+ * Bitácoras del periodo del reporte que se corrige y horas ya reportadas antes de él. Reutiliza la MISMA consulta y el
+ * MISMO filtro de la preparación normal (estados 'aprobada' + 'rechazada', por fecha_registro, orden cronológico): no
+ * hay una segunda lógica de selección.
+ *
+ * El global no entra: su tabla de asistencia todavía no tiene una regla definida.
+ */
+async function datosDeAsistencia(prisma, solicitud, cfg, fila) {
+  const { periodo } = cfg.periodo(solicitud, fila);
+  if (cfg.tipo !== 'mensual' || !periodo) return { bitacoras: [], horasPrevias: 0 };
+
+  const [bitacoras, reportes] = await Promise.all([
+    consultarAsistenciaDelPeriodo(prisma, solicitud.id, periodo),
+    consultarReportes(prisma, solicitud.id),
+  ]);
+
+  return { bitacoras, horasPrevias: sumarHorasReportadasPrevias(reportes, cfg.numero(fila)) };
 }
 
 /**
@@ -107,7 +141,8 @@ async function prepararCorreccion(prisma, usuarioId, tipoReporte, reporteId, act
   const { cfg, fila, id } = await cargarReporteCorregible(prisma, usuarioId, tipoReporte, reporteId);
   const contexto = await resolverAlumnoYSolicitud(prisma, usuarioId);
 
-  const resultado = construirResultado(contexto, cfg, fila);
+  const asistencia = await datosDeAsistencia(prisma, contexto.solicitud, cfg, fila);
+  const resultado = construirResultado(contexto, cfg, fila, asistencia);
   if (!resultado.puedeGenerar) {
     throw crearError('El reporte todavía no se puede generar.', 409, CODIGOS_ERROR.REPORTE_NO_GENERABLE, { motivosBloqueo: resultado.motivosBloqueo });
   }

@@ -127,7 +127,7 @@ function alumnoGrafo({
  * `profesores`: { usuario_id → profesor_id }. `usuarios`: { usuario_id → { rubrica_imagen } }. `coordinadores`: usuario_id[].
  * `globales`: reportes globales (reporteGlobal()). `alumnos`: { usuario_id → alumnoGrafo() }. `fallos`: { 'modelo.operacion': Error } falla esa operación. Devuelve { prisma, operaciones, reportes } (los mismos objetos que se pasan: reflejan lo que se escribió).
  */
-function crearBdProfesor({ profesores = { 50: 1 }, reportes = [], globales = [], escritura = false, usuarios = {}, coordinadores = [], alumnos = {}, fallos = {} } = {}) {
+function crearBdProfesor({ profesores = { 50: 1 }, reportes = [], globales = [], escritura = false, usuarios = {}, coordinadores = [], alumnos = {}, fallos = {}, bitacoras = [] } = {}) {
   const operaciones = [];
   const documentos = () => [...reportes, ...globales].map((r) => r.documento);
   let siguienteRevision = 100000;
@@ -191,6 +191,16 @@ function crearBdProfesor({ profesores = { 50: 1 }, reportes = [], globales = [],
     },
     reporte_mensual: modeloReporte(reportes),
     reporte_global: modeloReporte(globales),
+    // CU-REP-04: la corrección arma también el Control de asistencia (página 2) con las bitácoras del MISMO periodo,
+    // reutilizando consultarBitacorasDelPeriodo. `bitacoras` las aporta cada prueba que lo necesite.
+    bitacora: {
+      findMany: async ({ where }) => bitacoras
+        .filter((b) => b.solicitud_registro_id === where.solicitud_registro_id
+          && where.estado.in.includes(b.estado)
+          && b.fecha_registro >= where.fecha_registro.gte
+          && b.fecha_registro <= where.fecha_registro.lte)
+        .sort((a2, b2) => a2.fecha_registro - b2.fecha_registro),
+    },
     documento: {
       findFirst: async ({ where }) => documentos().find((d) => coincide(d, where)) ?? null,
       updateMany: async ({ where, data }) => {

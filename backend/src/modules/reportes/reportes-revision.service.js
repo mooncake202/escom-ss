@@ -25,6 +25,9 @@ const {
   nombreCompleto,
 } = require('./reportes.shared');
 const { agregarRubricaProfesor } = require('./reportes.pdf');
+const { FILAS: FILAS_ASISTENCIA } = require('./reportes.asistencia');
+const { consultarAsistenciaDelPeriodo } = require('./reportes-alumno.service');
+const { MENSUAL } = require('./reportes.tipos');
 const { normalizarIp, obtenerRubricaAlumno: obtenerRubricaGuardada } = require('./reportes.rubricas');
 const { crearError } = require('./reportes-preparacion');
 const {
@@ -70,7 +73,13 @@ const seleccionRevisable = (cfg) => ({
     select: { id: true, tipo_revisor: true, fecha: true, hash_documento: true },
   },
   solicitud_registro: {
-    select: { alumno: { select: { boleta: true, usuario_id: true, usuario: { select: { nombre: true, apellidos: true } } } } },
+    select: {
+      // `id` y el periodo oficial: el Control de asistencia (página 2) necesita saber qué registros lleva la tabla
+      // para firmar solo esas celdas. Es el mismo grafo que usa cfg.periodo().
+      id: true,
+      alumno: { select: { boleta: true, usuario_id: true, usuario: { select: { nombre: true, apellidos: true } } } },
+      periodo_registro: { include: { evento_calendario: true } },
+    },
   },
 });
 
@@ -88,6 +97,24 @@ async function cargarReporteRevisable(prisma, usuarioId, tipoReporte, reporteId)
 }
 
 const alumnoDe = (fila) => fila.solicitud_registro.alumno;
+
+/**
+ * Índices (0..23) de las filas del Control de asistencia que llevan firma: exactamente las que tienen registro.
+ *
+ * Se derivan de los MISMOS registros con los que se renderiza la tabla (consultarAsistenciaDelPeriodo), no del
+ * snapshot `dias_laborados`. No son equivalentes: `dias_laborados` es la foto del PRIMER envío, mientras que una
+ * corrección (CU-REP-04) vuelve a construir la tabla con las bitácoras del periodo. Usar el snapshot dejaría filas
+ * pobladas sin firma.
+ *
+ * El reporte GLOBAL no lleva Control de Asistencia: devuelve una lista vacía y no se firma ninguna celda.
+ */
+async function filasFirmablesDeAsistencia(prisma, cfg, fila) {
+  if (cfg.tipo !== MENSUAL.tipo) return [];
+  const solicitud = fila.solicitud_registro;
+  const { periodo } = cfg.periodo(solicitud, fila);
+  const registros = await consultarAsistenciaDelPeriodo(prisma, solicitud.id, periodo);
+  return Array.from({ length: Math.min(registros.length, FILAS_ASISTENCIA) }, (_, i) => i);
+}
 
 // ── Rechazar ─────────────────────────────────────────────────
 
@@ -237,7 +264,9 @@ async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
   const rutaAnterior = fila.documento?.ruta_archivo;
   const pdfAlumno = await leerPdfAlmacenado(rutaAnterior, base);
   exigirPdfVigente(cfg, fila, pdfAlumno, { tipoRevisor: TIPO_REVISOR_ALUMNO, firmante: 'el alumno' });
-  const pdfFinal = Buffer.from(await agregarRubrica(pdfAlumno, rubrica));
+  // Filas del Control de asistencia con registro: la misma rúbrica se repite en esas celdas.
+  const filasConRegistro = await filasFirmablesDeAsistencia(prisma, cfg, fila);
+  const pdfFinal = Buffer.from(await agregarRubrica(pdfAlumno, rubrica, filasConRegistro));
   const hash = sha256(pdfFinal);
 
   // 3) Sello de tiempo de ese hash. Si falla, no hay nada que deshacer.

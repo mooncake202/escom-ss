@@ -387,7 +387,7 @@ test('vista previa: usa la plantilla del mensual con título global, periodo com
   const { pdf } = await e.vistaPrevia('Resumen final de todo el servicio social realizado.');
 
   const documento = await PDFDocument.load(new Uint8Array(pdf));
-  assert.equal(documento.getPageCount(), 1);
+  assert.equal(documento.getPageCount(), 1, 'el global NO lleva Control de Asistencia');
   assert.deepEqual([Math.round(documento.getPage(0).getWidth()), Math.round(documento.getPage(0).getHeight())], [612, 792]);
 
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'texto-global-'));
@@ -474,6 +474,8 @@ test('envío: el PDF lleva título global y el periodo completo; los datos impre
   assert.equal(datos.numeroReporte, null);
   assert.deepEqual(datos.periodo, { inicioTexto: '16 de octubre de 2025', finTexto: '14 de mayo de 2026' });
   assert.equal(/480|500|horas/i.test(JSON.stringify(datos)), false);
+  // El Control de Asistencia es EXCLUSIVO del mensual: el global ni siquiera lo arma.
+  assert.equal(datos.asistencia, null);
 });
 
 test('envío: la rúbrica del alumno registrada se aplica al PDF (sin pedir otra) y la TSA se pide una sola vez', async (t) => {

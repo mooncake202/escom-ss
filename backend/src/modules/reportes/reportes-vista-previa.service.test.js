@@ -81,7 +81,7 @@ test('genera el PDF de vista previa con los datos reales, las actividades y la r
   assert.equal(numeroReporte, 1);
 
   const doc = await PDFDocument.load(pdf);
-  assert.equal(doc.getPageCount(), 1);
+  assert.equal(doc.getPageCount(), 2, 'reporte + control de asistencia');
   const { width, height } = doc.getPage(0).getSize();
   assert.deepEqual([Math.round(width), Math.round(height)], [612, 792]);
 
@@ -91,7 +91,7 @@ test('genera el PDF de vista previa con los datos reales, las actividades y la r
   for (const esperado of [
     'REPORTE MENSUAL DE ACTIVIDADES NÚMERO: 1', 'Correspondiente al periodo mensual del: 16 de octubre de 2025 al 14 de noviembre de 2025',
     'ANA GARCIA LOPEZ', 'Ingeniería en Inteligencia Artificial', '2022630001', '85.5 %', '5512345678', 'ana.garcia@example.com',
-    'Escuela Superior de Cómputo', 'Programa SISS de prueba', 'LUIS TORRES VEGA', 'Responsable Directo', 'Página 1 de 1',
+    'Escuela Superior de Cómputo', 'Programa SISS de prueba', 'LUIS TORRES VEGA', 'Responsable Directo', 'Página 1 de 2',
     'Diseñé e implementé el módulo de consulta de reportes mensuales', 'ñandú',
   ]) assert.ok(plano.includes(esperado), `falta: ${esperado}`);
 });

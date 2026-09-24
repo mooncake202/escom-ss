@@ -112,7 +112,8 @@ test('envío: genera UN PDF, lo hashea, lo sella, lo cifra y registra documento 
   const descifrado = descifrarBuffer(enDisco);
   assert.ok(descifrado.equals(e.generados[0]), 'lo cifrado es exactamente el PDF hasheado');
   assert.equal(sha256(descifrado), hash);
-  assert.deepEqual(await contarImagenes(descifrado), { paginas: 1, imagenes: 3 });
+  // Dos hojas: reporte + control de asistencia. Las imágenes son los dos logos de cada hoja y la rúbrica del alumno.
+  assert.deepEqual(await contarImagenes(descifrado), { paginas: 2, imagenes: 3 });
 
   // Registros.
   const [documento] = e.db.documentos;
@@ -149,16 +150,22 @@ test('envío: genera UN PDF, lo hashea, lo sella, lo cifra y registra documento 
   );
 });
 
-test('snapshot: días y horas se calculan bajo el bloqueo con lo que AH tiene aprobado en ese momento', async (t) => {
+test('snapshot: si AH cambia una bitácora del periodo bajo el bloqueo, el envío se rechaza y no queda nada', async (t) => {
   const e = await escenario(t, {}, { tsa: null });
   const sello = async () => {
-    // Mientras se espera a la TSA, AH aprueba otra bitácora dentro del periodo: entra en el snapshot del envío.
+    // Mientras se espera a la TSA, AH aprueba otra bitácora dentro del periodo.
     e.bitacoras.push({ id: 3, estado: 'aprobada', fecha_registro: new Date('2025-10-20T00:00:00.000Z'), fecha_revision: new Date('2025-11-01T16:00:00.000Z'), horas_contabilizadas: 2 });
     return { token: TOKEN, fecha: new Date() };
   };
-  await e.enviar(ACTIVIDADES_EJEMPLO, { solicitarSelloTiempo: sello });
-  assert.equal(e.db.reportes[0].dias_laborados, 3);
-  assert.equal(e.db.reportes[0].horas_reportadas, 9);
+
+  // Desde que el PDF imprime el Control de Asistencia, esa bitácora forma parte de lo IMPRESO: el documento que el
+  // alumno ya firmó dejaría de coincidir con los datos, así que el envío se aborta en vez de guardar un PDF que
+  // contradiga el snapshot. La revalidación bajo el bloqueo ya existía; lo que creció es lo que se compara.
+  await assert.rejects(
+    () => e.enviar(ACTIVIDADES_EJEMPLO, { solicitarSelloTiempo: sello }),
+    (err) => /cambiaron mientras se enviaba/.test(err.message),
+  );
+  assert.equal(e.db.reportes.length, 0, 'no se registró ningún reporte');
 });
 
 test('snapshot: usa las horas reales de AH (1 a 4 h), no 4 por día', async (t) => {

@@ -164,13 +164,13 @@ test('aprobar: parte del PDF vigente EXACTO (no regenera), agrega solo el sello,
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.APROBADO_COORDINADOR);
 });
 
-test('aprobar: el PDF final es una página Carta con las firmas previas y UNA imagen más (el sello); el PDF vigente anterior se conserva en disco', async (t) => {
+test('aprobar: el PDF final conserva las dos hojas con las firmas previas y UNA imagen más (el sello); el PDF vigente anterior se conserva en disco', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, e.reporte.documento.ruta_archivo)));
 
   const documento = await PDFDocument.load(new Uint8Array(final));
-  assert.equal(documento.getPageCount(), 1);
+  assert.equal(documento.getPageCount(), 2, 'reporte + control de asistencia');
   assert.deepEqual([Math.round(documento.getPage(0).getWidth()), Math.round(documento.getPage(0).getHeight())], [612, 792]);
   assert.equal(await imagenesDe(final), (await imagenesDe(e.pdf)) + 1);
 
@@ -179,7 +179,7 @@ test('aprobar: el PDF final es una página Carta con las firmas previas y UNA im
   assert.equal(archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/')).length, 2);
 });
 
-test('aprobar: con el sello institucional real (cifrado; reportes.assets.js lo descifra con AES-256-GCM) termina bien y el PDF conserva una página', async (t) => {
+test('aprobar: con el sello institucional real (cifrado; reportes.assets.js lo descifra con AES-256-GCM) termina bien y el PDF conserva sus dos hojas', async (t) => {
   const e = await escenario(t);
   // La función REAL de reportes.assets.js (no el doble `leerSelloDePrueba`), leyendo un .enc cifrado de verdad —
   // ya no un PNG en claro con SHA-256 fijo.
@@ -189,7 +189,7 @@ test('aprobar: con el sello institucional real (cifrado; reportes.assets.js lo d
   fs.writeFileSync(rutaSello, cifrarBuffer(SELLO_PNG));
   await e.aprobar({ deps: { leerSello: (opciones) => leerSelloReal({ ...opciones, rutaSello }) } });
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, e.reporte.documento.ruta_archivo)));
-  assert.equal((await PDFDocument.load(new Uint8Array(final))).getPageCount(), 1);
+  assert.equal((await PDFDocument.load(new Uint8Array(final))).getPageCount(), 2);
   assert.equal(await imagenesDe(final), (await imagenesDe(e.pdf)) + 1);
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.APROBADO_COORDINADOR);
 });

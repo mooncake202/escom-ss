@@ -75,6 +75,8 @@ const JPEG_PEQUENO = Buffer.from(
 );
 
 // Resultado con la forma de prepararReporteMensual (ya generable) con datos ficticios.
+const { construirAsistencia } = require('./reportes.asistencia');
+
 function resultadoEjemplo(cambios = {}) {
   const base = {
     puedeGenerar: true,
@@ -90,6 +92,17 @@ function resultadoEjemplo(cambios = {}) {
     profesor: { nombreCompleto: 'LUIS ENRIQUE TORRES VEGA' },
     servicio: { programa: 'Programa de Desarrollo de Sistemas de Información para Apoyo a la Gestión Académica' },
     reporte: { numero: 3, periodo: { inicioTexto: '16 de septiembre de 2025', finTexto: '15 de octubre de 2025' } },
+    // Página 2 (Control de asistencia): tres jornadas del periodo, 9 h en total, con 80 h ya reportadas antes.
+    asistencia: construirAsistencia({
+      bitacoras: [
+        { fecha: '2025-09-16', horas: 4, horaInicio: '2025-09-16T15:00:00.000Z', horaFin: '2025-09-16T19:00:00.000Z' },
+        { fecha: '2025-09-17', horas: 3, horaInicio: '2025-09-17T16:30:00.000Z', horaFin: '2025-09-17T19:45:00.000Z' },
+        { fecha: '2025-09-18', horas: 2, horaInicio: '2025-09-18T14:00:00.000Z', horaFin: '2025-09-18T16:10:00.000Z' },
+      ],
+      totalDelMes: 9,
+      horasPrevias: 80,
+      responsable: { nombre: 'LUIS ENRIQUE TORRES VEGA', cargo: 'Profesor base' },
+    }),
   };
   return {
     ...base,
@@ -98,6 +111,7 @@ function resultadoEjemplo(cambios = {}) {
     profesor: { ...base.profesor, ...(cambios.profesor ?? {}) },
     servicio: { ...base.servicio, ...(cambios.servicio ?? {}) },
     reporte: { ...base.reporte, ...(cambios.reporte ?? {}) },
+    asistencia: cambios.asistencia ?? base.asistencia,
   };
 }
 

@@ -131,8 +131,10 @@ test('reenviar: pasa a pendiente_revision_profesor con las actividades nuevas y 
   assert.equal(e.reporte.num_reporte, 2);
   assert.equal(e.reporte.dias_laborados, 4);
   assert.equal(e.reporte.horas_reportadas, 13);
-  // Nunca se consultan bitácoras (el modelo no existe en la BD falsa: consultarlas haría fallar todo).
-  assert.ok(!e.operaciones.some((o) => o.startsWith('bitacora')));
+  // El Control de asistencia (página 2) SÍ consulta bitácoras, pero solo de lectura: el snapshot de arriba
+  // (días y horas) es el del primer envío y no se recalcula con ellas.
+  assert.ok(e.operaciones.includes('bitacora.findMany'));
+  assert.ok(!e.operaciones.some((o) => o.startsWith('bitacora.') && o !== 'bitacora.findMany'));
 });
 
 test('reenviar: el PDF usa la plantilla con el número y el periodo del snapshot, los datos actuales del alumno, y la rúbrica YA registrada', async (t) => {
@@ -405,7 +407,8 @@ test('la IP sale de la conexión y una IP inservible no se guarda', async (t) =>
 test('reenviar: solo lecturas y las escrituras previstas — nunca se borra ni se modifica una revisión (append-only)', async (t) => {
   const e = await escenario(t);
   await e.reenviar();
-  const permitidas = new Set(['reporte_mensual.findFirst', 'alumno.findUnique', 'usuario.findUnique', '$transaction', 'reporte_mensual.updateMany', 'documento.updateMany', 'revision_reporte_mensual.create']);
+  // bitacora.findMany y reporte_mensual.findMany son las LECTURAS del Control de asistencia (página 2).
+  const permitidas = new Set(['reporte_mensual.findFirst', 'reporte_mensual.findMany', 'bitacora.findMany', 'alumno.findUnique', 'usuario.findUnique', '$transaction', 'reporte_mensual.updateMany', 'documento.updateMany', 'revision_reporte_mensual.create']);
   assert.ok(e.operaciones.every((o) => permitidas.has(o)), e.operaciones.join(', '));
   assert.throws(() => e.prisma.revision_reporte_mensual.deleteMany, /Operación no permitida/);
   assert.throws(() => e.prisma.revision_reporte_mensual.updateMany, /Operación no permitida/);
@@ -413,19 +416,19 @@ test('reenviar: solo lecturas y las escrituras previstas — nunca se borra ni s
 
 // ── PDF real ─────────────────────────────────────────────────
 
-test('PDF real: el reenvío guarda una página Carta con la firma del alumno y el hash del archivo coincide con el registrado', async (t) => {
+test('PDF real: el reenvío guarda las DOS páginas con la firma del alumno y el hash del archivo coincide con el registrado', async (t) => {
   const { generarPdfReporteMensual } = require('./reportes.pdf');
   const e = await escenario(t, { generarPdf: generarPdfReporteMensual });
   await e.reenviar();
 
   const guardado = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, e.reporte.documento.ruta_archivo)));
   const documento = await PDFDocument.load(new Uint8Array(guardado));
-  assert.equal(documento.getPageCount(), 1);
+  assert.equal(documento.getPageCount(), 2, 'reporte + control de asistencia');
   assert.deepEqual([Math.round(documento.getPage(0).getWidth()), Math.round(documento.getPage(0).getHeight())], [612, 792]);
   assert.equal(revisionesDe(e.reporte).at(-1).hash_documento, sha256(guardado));
   assert.deepEqual(e.sellosDeTiempo, [sha256(guardado)]);
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR);
 
   const { pdf } = await (await escenario(t, { generarPdf: generarPdfReporteMensual })).vistaPrevia();
-  assert.equal((await PDFDocument.load(new Uint8Array(pdf))).getPageCount(), 1);
+  assert.equal((await PDFDocument.load(new Uint8Array(pdf))).getPageCount(), 2);
 });

@@ -168,6 +168,10 @@ const MENSAJES_BLOQUEO = Object.freeze({
 const PRESTATARIO = 'Escuela Superior de Cómputo';
 const TEXTO_RESPONSABLE_DIRECTO = 'Responsable Directo';
 
+// Cargo del responsable directo cuando el profesor no tiene característica vigente. El schema lo documenta:
+// caracteristica_id NULL = Profesor base, y "Profesor base" NO es una fila del catálogo `caracteristica`.
+const CARGO_PROFESOR_BASE = 'Profesor base';
+
 // "Nombre Apellidos", tal como están guardados (sin cambiar mayúsculas).
 function nombreCompleto(nombre, apellidos) {
   return [nombre, apellidos].map((t) => String(t ?? '').trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ');
@@ -221,6 +225,7 @@ module.exports = {
   TIPO_EVENTO_VACACIONAL,
   TIPOS_EVENTO_NO_LABORABLE,
   DESFASE_MEXICO_HORAS,
+  CARGO_PROFESOR_BASE,
   CARRERAS_NOMBRE_INSTITUCIONAL,
   CARRERAS_ALIAS_LEGADO,
   nombreInstitucionalCarrera,

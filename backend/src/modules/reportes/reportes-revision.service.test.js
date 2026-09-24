@@ -275,13 +275,13 @@ test('aprobar: parte del PDF EXACTO almacenado (no regenera), agrega solo la rú
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR);
 });
 
-test('aprobar: el PDF final es una página Carta con la firma del alumno y UNA imagen más (la rúbrica); el PDF del alumno sigue intacto en disco', async (t) => {
+test('aprobar: el PDF final conserva las dos hojas con la firma del alumno y UNA imagen más (la rúbrica); el PDF del alumno sigue intacto en disco', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
   const final = descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, e.reporte.documento.ruta_archivo)));
 
   const documento = await PDFDocument.load(new Uint8Array(final));
-  assert.equal(documento.getPageCount(), 1);
+  assert.equal(documento.getPageCount(), 2, 'reporte + control de asistencia');
   const { width, height } = documento.getPage(0).getSize();
   assert.deepEqual([Math.round(width), Math.round(height)], [612, 792]);
   assert.equal(await imagenesDe(final), (await imagenesDe(e.pdfAlumno)) + 1);
@@ -446,7 +446,8 @@ test('aprobar: la IP sale de la conexión (nunca de un dato del cliente) y una I
 test('aprobar y rechazar: solo lecturas y las escrituras previstas — nunca se borra ni se modifica una revisión (append-only)', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
-  const permitidas = new Set(['profesor.findUnique', 'usuario.findUnique', 'reporte_mensual.findFirst', '$transaction', 'reporte_mensual.updateMany', 'documento.updateMany', 'revision_reporte_mensual.create', 'coordinador.findMany']);
+  // bitacora.findMany es la LECTURA del Control de asistencia: qué filas de la página 2 llevan firma del profesor.
+  const permitidas = new Set(['profesor.findUnique', 'usuario.findUnique', 'reporte_mensual.findFirst', 'bitacora.findMany', '$transaction', 'reporte_mensual.updateMany', 'documento.updateMany', 'revision_reporte_mensual.create', 'coordinador.findMany']);
   assert.ok(e.operaciones.every((o) => permitidas.has(o)), e.operaciones.join(', '));
   assert.ok(!e.operaciones.some((o) => /delete|update\b/.test(o) && o.startsWith('revision_')));
   // El Prisma falso ni siquiera expone borrar/modificar revisiones: intentarlo falla.

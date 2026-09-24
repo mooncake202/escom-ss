@@ -17,6 +17,7 @@
 // necesaria para el Reporte Global (CU-REP-07), que sí imprime el periodo oficial completo.
 
 const { calcularDiaMexicoUTC, calcularFechaLimiteServicio } = require('../../lib/fechas');
+const { construirAsistencia } = require('./reportes.asistencia');
 const {
   ESTADO_REPORTE_APROBACION_FINAL,
   ESTADOS_REPORTE_RECHAZADOS,
@@ -26,6 +27,7 @@ const {
   DESFASE_MEXICO_HORAS,
   MOTIVOS_BLOQUEO,
   MENSAJES_BLOQUEO,
+  CARGO_PROFESOR_BASE,
   nombreInstitucionalCarrera,
   nombreCompleto,
   aNumero,
@@ -76,7 +78,17 @@ async function resolverAlumnoYSolicitud(prisma, usuarioId) {
       solicitud_registro: {
         include: {
           periodo_registro: { include: { evento_calendario: true } },
-          oferta: { include: { profesor: { include: { usuario: { select: { nombre: true, apellidos: true } } } } } },
+          oferta: {
+            include: {
+              profesor: {
+                include: {
+                  usuario: { select: { nombre: true, apellidos: true } },
+                  // Característica VIGENTE (0 o 1): es el "Cargo" del responsable directo en la página 2.
+                  caracteristica: { select: { nombre: true } },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -92,8 +104,44 @@ function consultarReportes(prisma, solicitudId) {
   return prisma.reporte_mensual.findMany({
     where: { solicitud_registro_id: solicitudId },
     orderBy: { num_reporte: 'asc' },
-    select: { id: true, num_reporte: true, estado_reporte: true },
+    // horas_reportadas es el SNAPSHOT del primer envío: lo usa el acumulado del Control de Asistencia. Nunca se
+    // recalcula a partir de las bitácoras actuales.
+    select: { id: true, num_reporte: true, estado_reporte: true, horas_reportadas: true },
   });
+}
+
+/**
+ * Registros del Control de Asistencia de un reporte MENSUAL ya existente: las bitácoras de su periodo con el filtro
+ * de siempre (estados que cuentan, por fecha_registro, orden cronológico), en la forma que consume
+ * reportes.asistencia.js.
+ *
+ * Es la MISMA selección que usa la preparación; se comparte para que la corrección (CU-REP-04) y el estampado de la
+ * firma del profesor no dupliquen el criterio ni puedan desincronizarse de lo que se renderiza.
+ */
+async function consultarAsistenciaDelPeriodo(prisma, solicitudId, periodo) {
+  if (!periodo) return [];
+  const filas = await consultarBitacorasDelPeriodo(prisma, solicitudId, periodo.inicio, periodo.fin);
+  return filas
+    .filter((b) => ESTADOS_BITACORA_QUE_CUENTAN.includes(b.estado))
+    .map((b) => ({
+      fecha: normalizarFechaISO(b.fecha_registro),
+      horas: b.horas_contabilizadas ?? 0,
+      horaInicio: b.hora_inicio ? b.hora_inicio.toISOString() : null,
+      horaFin: b.hora_fin ? b.hora_fin.toISOString() : null,
+    }));
+}
+
+/**
+ * Horas formalmente reportadas ANTES del reporte `numero`: SUM(horas_reportadas) de los mensuales con num_reporte
+ * menor. Es la mitad histórica del acumulado del Control de Asistencia; la otra mitad es el total del propio reporte.
+ *
+ * Se apoya solo en los snapshots, así que un reporte antiguo conserva el acumulado que le correspondía y no depende
+ * del acumulador vivo del alumno (cumulo_horas_y_faltas).
+ */
+function sumarHorasReportadasPrevias(reportes, numero) {
+  return reportes
+    .filter((r) => r.num_reporte < numero)
+    .reduce((suma, r) => suma + Number(r.horas_reportadas ?? 0), 0);
 }
 
 // Calendario global: no se filtra por coordinador (igual que AH).
@@ -136,7 +184,12 @@ function consultarBitacorasDelPeriodo(prisma, solicitudId, inicio, fin) {
       fecha_registro: { gte: aDateUTC(inicio), lte: aDateUTC(fin) },
     },
     orderBy: { fecha_registro: 'asc' },
-    select: { id: true, estado: true, fecha_registro: true, fecha_revision: true, horas_contabilizadas: true },
+    // hora_inicio / hora_fin son SOLO para el Control de Asistencia (página 2): no intervienen en ningún cálculo.
+    // Las horas del reporte siguen saliendo de horas_contabilizadas, nunca de la resta salida - entrada.
+    select: {
+      id: true, estado: true, fecha_registro: true, fecha_revision: true, horas_contabilizadas: true,
+      hora_inicio: true, hora_fin: true,
+    },
   });
 }
 
@@ -251,6 +304,17 @@ function evaluarBloqueos({
   return motivos;
 }
 
+/**
+ * "Cargo" del responsable directo en el Control de Asistencia.
+ *
+ * El modelo permite UNA sola característica vigente (`profesor.caracteristica_id`, 0 o 1): no hay combinaciones.
+ * `null` significa Profesor base, que NO es una fila del catálogo, de ahí la etiqueta fija.
+ */
+function cargoDeProfesor(profesor) {
+  const nombre = profesor?.caracteristica?.nombre;
+  return nombre ? String(nombre).replace(/_/g, ' ') : CARGO_PROFESOR_BASE;
+}
+
 // Lo que el PDF imprime del alumno, del profesor responsable y del programa, y qué datos faltan. Lo comparten la
 // preparación del reporte (CU-REP-01) y la corrección de uno rechazado (CU-REP-04): mismos datos, mismos bloqueos.
 function datosDeImpresion(alumno, solicitud) {
@@ -266,6 +330,7 @@ function datosDeImpresion(alumno, solicitud) {
         ofertaId: solicitud.oferta.id,
         ofertaNombre: solicitud.oferta.nombre_proyecto,
         usuarioId: solicitud.oferta.profesor.usuario_id,
+        cargo: cargoDeProfesor(solicitud.oferta.profesor),
       }
     : null;
   const motivosDatos = evaluarBloqueosDeDatos({
@@ -457,6 +522,7 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
       ...base,
       reporte: null,
       resumen: { diasLaborados: 0, horas: 0, bitacorasQueCuentan: 0 },
+      asistencia: construirAsistencia({}),
       bitacoras: [],
       calendario: { dias: [], eventos: [] },
       actividades: [],
@@ -505,6 +571,10 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
     fecha: normalizarFechaISO(b.fecha_registro),
     fechaRevision: b.fecha_revision.toISOString(),
     horas: b.horas_contabilizadas ?? 0,
+    // Instantes reales de la jornada, para el Control de Asistencia. `horaFin` puede ser null en una jornada sin
+    // cerrar, pero esos estados no están entre los que cuentan, así que aquí siempre viene.
+    horaInicio: b.hora_inicio ? b.hora_inicio.toISOString() : null,
+    horaFin: b.hora_fin ? b.hora_fin.toISOString() : null,
   }));
   const bitacorasNoResueltas = bitacorasNoResueltasFilas.map((b) => ({ id: b.id, estado: b.estado, fecha: normalizarFechaISO(b.fecha_registro) }));
 
@@ -558,6 +628,14 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
       },
     },
     resumen: { diasLaborados, horas, bitacorasQueCuentan: bitacoras.length },
+    // Página 2 del PDF. El total del mes es el cálculo vigente: en la primera generación es exactamente el valor que
+    // después se persiste como horas_reportadas. Si el reporte YA existe, manda su snapshot.
+    asistencia: construirAsistencia({
+      bitacoras,
+      totalDelMes: reporteExistenteFila?.horas_reportadas ?? horas,
+      horasPrevias: sumarHorasReportadasPrevias(reportes, numero),
+      responsable: profesor ? { nombre: profesor.nombreCompleto, cargo: profesor.cargo } : null,
+    }),
     bitacoras,
     calendario: { dias: calendario.dias, eventos: calendario.eventos },
     actividades: calcularAvanceActividades({ actividades, registros, inicio: periodo.inicio, fin: periodo.fin }),
@@ -613,6 +691,10 @@ module.exports = {
   prepararReporteMensual,
   resolverAlumnoYSolicitud,
   datosDeImpresion,
+  sumarHorasReportadasPrevias,
+  consultarBitacorasDelPeriodo,
+  consultarAsistenciaDelPeriodo,
+  consultarReportes,
   calcularAvanceActividades,
   evaluarBloqueos,
   evaluarBloqueosDeDatos,
