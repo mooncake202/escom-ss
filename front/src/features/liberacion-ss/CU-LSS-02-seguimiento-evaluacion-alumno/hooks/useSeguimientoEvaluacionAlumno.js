@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   getEstadoEvaluacion,
   reenviarSolicitudEvaluacion,
@@ -6,6 +7,7 @@ import {
   confirmarSubidaSiss,
   solicitarCartaTermino,
 } from "@/services/lssAlumnoService";
+import { ESTADO_LSS_A_RUTA } from "@/features/liberacion-ss/utils/estadoRutasLSS";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export function useSeguimientoEvaluacionAlumno() {
@@ -14,6 +16,7 @@ export function useSeguimientoEvaluacionAlumno() {
   const [error, setError] = useState(null);
   const [accionEnCurso, setAccionEnCurso] = useState(false);
   const { socket } = useSocket();
+  const navigate = useNavigate();
 
   const cargar = useCallback(async () => {
     try {
@@ -89,7 +92,12 @@ export function useSeguimientoEvaluacionAlumno() {
     setError(null);
     try {
       await solicitarCartaTermino();
-      await cargar();
+      // NO se hace cargar() aquí: obtenerEstadoEvaluacion (backend) calcula
+      // el alterno solo a partir de evaluacion_desempeno.estado, que esta
+      // mutación no toca (solo cambia liberacion_proceso.estado) — un
+      // refetch devolvería el mismo alterno 'D' y la pantalla se quedaría
+      // igual. Hay que navegar a la pantalla real de ese nuevo estado.
+      navigate(ESTADO_LSS_A_RUTA.solicitud_carta_termino);
     } catch (err) {
       setError(err.message || "No se pudo solicitar la carta de término.");
     } finally {

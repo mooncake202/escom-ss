@@ -125,6 +125,34 @@ export default function EvaluarAlumnoProfesor() {
                 )}
               </div>
 
+              {/* CU-LSS-04: coordinación devolvió esta evaluación para
+                  corrección — visualmente distinto (azul) del rechazo por
+                  SISS (rojo, en FirmaPanel) para que el profesor nunca
+                  confunda quién rechazó qué. */}
+              {alumnoSeleccionado.motivoRechazoCoordinacion && (
+                <div style={{
+                  marginBottom: "1rem",
+                  padding: "1rem 1.25rem",
+                  borderRadius: RADIUS.lg,
+                  border: "1px solid rgba(37,99,235,0.35)",
+                  background: "rgba(37,99,235,0.07)",
+                }}>
+                  <p style={{
+                    margin: "0 0 0.35rem",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#2563eb",
+                    letterSpacing: "0.07em",
+                    textTransform: "uppercase",
+                  }}>
+                    Observación de coordinación
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.5 }}>
+                    {alumnoSeleccionado.motivoRechazoCoordinacion}
+                  </p>
+                </div>
+              )}
+
               {/* Texto informativo (solo lectura): qué eligió el alumno en
                   CU-LSS-01 — el profesor necesita verlo antes de decidir. */}
               <div style={{

@@ -29,6 +29,12 @@ function mapearAlumno(a) {
     // requiereValidacion.
     reportesValidadosSissAlumno: !!a.reportesValidadosSiss,
     estadoEvaluacion: a.estadoEvaluacion,
+    // CU-LSS-04: motivo por el que coordinación devolvió la evaluación —
+    // solo tiene valor cuando estadoEvaluacion === 'devuelta_para_correccion'.
+    // Distinto del motivo de rechazo por SISS (ese nunca llega aquí: un
+    // alumno rechazado por SISS desaparece de esta lista hasta que él
+    // mismo reenvíe, CU-LSS-02).
+    motivoRechazoCoordinacion: a.motivoRechazoCoordinacion,
   };
 }
 

@@ -127,6 +127,23 @@ const FACTORES_EVALUACION = [
 const VALORES_VALIDOS_FACTOR = [100, 95, 90, 85];
 const SUMA_TOTAL_MAXIMA = FACTORES_EVALUACION.length * 100;
 
+// carrera.nombre en BD guarda solo la sigla (VARCHAR(3), diseño original de
+// la tabla) — este mapeo a nombre completo solo existía en el frontend
+// (front/src/features/gestion-registro/CU-GR-01-enviar-solicitud/utils/constants.js,
+// arreglo CARRERAS) hasta ahora; se duplica aquí (mismo criterio de
+// duplicación ya usado en todo el módulo LSS) porque el PDF de evaluación
+// se genera en el backend. "IA" es "Inteligencia Artificial" a secas —
+// SIN "Ingeniería en" — confirmado contra el catálogo real de GR.
+const NOMBRES_CARRERA = {
+  ISC: 'Ingeniería en Sistemas Computacionales',
+  IA: 'Inteligencia Artificial',
+  LCD: 'Licenciatura en Ciencia de Datos',
+};
+
+function nombreCompletoCarrera(sigla) {
+  return NOMBRES_CARRERA[sigla] ?? sigla ?? '';
+}
+
 /**
  * RN-LSS-08: valida que `valores` traiga exactamente las 7 claves de
  * FACTORES_EVALUACION, cada una con uno de los 4 puntajes fijos — nunca un
@@ -203,6 +220,8 @@ module.exports = {
   FACTORES_EVALUACION,
   VALORES_VALIDOS_FACTOR,
   SUMA_TOTAL_MAXIMA,
+  NOMBRES_CARRERA,
+  nombreCompletoCarrera,
   validarYCalcularPuntajes,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,

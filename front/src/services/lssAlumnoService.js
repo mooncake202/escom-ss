@@ -34,9 +34,10 @@ export async function solicitarCartaTermino() {
 
 /**
  * Descarga (PDF ya descifrado por el backend, y marca evaluacion_descargada
- * en el mismo request) y lo abre en pestaña nueva. No reutiliza apiFetch
- * porque la respuesta es binaria, no JSON — mismo patrón exacto que
- * verDocumentoPDF (coordinadorDocumentacionService.js).
+ * en el mismo request) mediante un <a download> disparado por código — no se
+ * usa window.open porque, tras el await de fetch/blob, ya se perdió el
+ * contexto de gesto de usuario y el navegador lo bloquea como pop-up. No
+ * reutiliza apiFetch porque la respuesta es binaria, no JSON.
  */
 export async function descargarEvaluacion() {
   const token = localStorage.getItem("token");
@@ -56,6 +57,11 @@ export async function descargarEvaluacion() {
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = "evaluacion-desempeno.pdf";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

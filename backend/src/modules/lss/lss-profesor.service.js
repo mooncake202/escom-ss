@@ -15,6 +15,7 @@ const {
   ESTADO_EVALUACION_PENDIENTE_DICTAMEN,
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
   ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
+  nombreCompletoCarrera,
   validarYCalcularPuntajes,
   exigirEstadoEvaluacion,
 } = require('./lss.shared');
@@ -105,7 +106,7 @@ function datosParaPdf(solicitud, observacionesProfesor, profesor, valores, sumaT
     alumno: {
       nombreCompleto: `${solicitud.alumno.usuario.nombre} ${solicitud.alumno.usuario.apellidos}`,
       boleta: solicitud.alumno.boleta,
-      carreraNombre: solicitud.carrera?.nombre ?? '',
+      carreraNombre: nombreCompletoCarrera(solicitud.carrera?.nombre),
     },
     unidadAcademica: 'ESCOM',
     periodo: {
@@ -398,8 +399,7 @@ async function rechazarPorSiss(profesorUsuarioId, alumnoBoleta, observacionesPro
 
 /**
  * Flujo Alterno 1.3 (RN-LSS-11): solo posible si coordinación devolvió la
- * evaluación para corrección (CU-LSS-04, todavía no existe — esta función
- * ya queda lista para recibir ese estado). Regenera el documento completo
+ * evaluación para corrección (CU-LSS-04, dictaminarRechazado). Regenera el documento completo
  * (pasos 4-11) y vuelve a 'pendiente_dictamen'; motivo_rechazo_coordinacion
  * queda limpio automáticamente porque la fila se recrea desde cero (no se
  * reutiliza la anterior).
@@ -475,6 +475,10 @@ async function listarAlumnosConEvaluacionPendiente(profesorUsuarioId) {
     // pendiente_dictamen y aprobado_coordinador ya no llegan aquí, por eso
     // motivoRechazo ya no tiene sentido en esta lista (se eliminó).
     estadoEvaluacion: s.liberacion_proceso.evaluacion_desempeno?.estado ?? null,
+    // CU-LSS-04: motivo por el que coordinación devolvió la evaluación —
+    // solo tiene valor real cuando estadoEvaluacion === 'devuelta_para_correccion'.
+    // Campo previamente faltante (confirmado en la exploración de LSS-04).
+    motivoRechazoCoordinacion: s.liberacion_proceso.evaluacion_desempeno?.motivo_rechazo_coordinacion ?? null,
     // CU-LSS-01: cuándo el alumno inició el proceso de liberación (y por
     // tanto solicitó esta evaluación) — "Fecha de envío" en el frontend.
     fechaInicio: s.liberacion_proceso.fecha_inicio,

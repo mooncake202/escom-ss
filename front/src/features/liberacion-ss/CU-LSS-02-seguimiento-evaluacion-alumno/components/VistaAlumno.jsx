@@ -98,6 +98,23 @@ export function VistaAlumno({ estado, error, accionEnCurso, onReenviar, onDescar
         </div>
       )}
 
+      {/* Alterno E — coordinación devolvió la evaluación al profesor para
+          corrección (CU-LSS-04, Camino A) — el alumno no hace nada aquí,
+          solo informativo, sin ningún botón de acción. */}
+      {alterno === "E" && (
+        <div style={{
+          marginTop: "1.5rem", padding: "1.25rem", borderRadius: RADIUS.lg,
+          background: "rgba(234,179,8,0.07)", border: "1px solid rgba(234,179,8,0.35)",
+        }}>
+          <p style={{ margin: "0 0 0.5rem", fontSize: 12, fontWeight: 700, color: "#b45309", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            En corrección
+          </p>
+          <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.5 }}>
+            Tu evaluación fue devuelta para corrección por coordinación. Tu profesor la está ajustando.
+          </p>
+        </div>
+      )}
+
       {/* Alterno D — ambas firmas completas */}
       {alterno === "D" && (
         <div style={{

@@ -22,7 +22,7 @@ export default function ValidacionRequisitos() {
       <ProcesoLSSLayout
         pasoActual={1}
         titulo="Liberación de servicio social"
-        subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
+        
         rol="alumno"
         usuario={nombreAlumno}
       >
@@ -43,7 +43,7 @@ export default function ValidacionRequisitos() {
       <ProcesoLSSLayout
         pasoActual={2}
         titulo="Liberación de servicio social"
-        subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
+        
         rol="alumno"
         usuario={nombreAlumno}>
         <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
@@ -95,7 +95,7 @@ export default function ValidacionRequisitos() {
     <ProcesoLSSLayout
       pasoActual={1}
       titulo="Liberación de servicio social"
-      subtitulo="CU 01 - Inicio de proceso de evaluación de desempeño"
+      
       rol="alumno"
       usuario={nombreAlumno}
      >

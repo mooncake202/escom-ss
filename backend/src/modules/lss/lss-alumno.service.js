@@ -9,6 +9,7 @@ const {
   ESTADO_REPORTE_APROBADO_COORDINADOR,
   ESTADO_EVALUACION_RECHAZADA_POR_SISS,
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
+  ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
   ESTADO_SOLICITUD_CARTA_TERMINO,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
@@ -227,12 +228,17 @@ async function resolverConEvaluacion(alumnoUsuarioId) {
 }
 
 /**
- * RF-LSS — resuelve cuál de los 4 alternos de CU-LSS-02 le toca pintar al
+ * RF-LSS — resuelve cuál de los 5 alternos de CU-LSS-02 le toca pintar al
  * frontend, sin que este tenga que reimplementar ninguna regla:
  * A: sin evaluar (evaluacion_desempeno no existe todavía).
  * B: profesor aprobó, coordinación pendiente.
  * C: profesor rechazó (reportes SISS no confirmados).
  * D: ambas firmas completas.
+ * E: coordinación devolvió para corrección (CU-LSS-04, Camino A) — el
+ *    alumno no hace nada aquí, le toca al profesor corregir y reenviar.
+ *    Corregido: antes 'devuelta_para_correccion' caía por default en 'B'
+ *    ("coordinación pendiente"), mensaje incorrecto porque coordinación
+ *    YA actuó (rechazó) y la pelota está con el profesor, no con ella.
  */
 async function obtenerEstadoEvaluacion(alumnoUsuarioId) {
   const { proceso } = await resolverConEvaluacion(alumnoUsuarioId);
@@ -255,7 +261,9 @@ async function obtenerEstadoEvaluacion(alumnoUsuarioId) {
     ? 'C'
     : evaluacion.estado === ESTADO_EVALUACION_APROBADO_COORDINADOR
       ? 'D'
-      : 'B';
+      : evaluacion.estado === ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION
+        ? 'E'
+        : 'B';
 
   return {
     alterno,

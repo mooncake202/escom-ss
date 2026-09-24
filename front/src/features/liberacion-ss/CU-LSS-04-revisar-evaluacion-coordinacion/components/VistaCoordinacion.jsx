@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTheme, RADIUS, GRADIENTS, SHADOWS } from "@/themes/colors";
 
-export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
+export function VistaCoordinacion({ estado, onFirmar, onRechazar, onDescargarPdf }) {
   const { C } = useTheme();
   const [rechazando, setRechazando] = useState(false);
   const [motivo, setMotivo] = useState("");
@@ -28,6 +28,24 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
 
   return (
     <>
+      {/* Punto 6 (requisito nuevo): recordatorio informativo, NO bloqueante
+          — coordinación debe verificar manualmente en SISS antes de
+          aprobar. Mismo estilo que el aviso equivalente ya usado en la
+          vista del profesor (EvaluarAlumnoProfesor.jsx). */}
+      <div style={{
+        marginBottom: "1rem",
+        padding: "0.75rem 1rem",
+        borderRadius: RADIUS.md,
+        border: `1px solid ${C.borderSubtle}`,
+        background: C.bgInput,
+        fontSize: 13,
+        color: C.textMuted,
+      }}>
+        {estado.reportesValidadosSiss
+          ? "El alumno indicó que ya validó sus reportes en SISS. Verifícalo antes de aprobar."
+          : "El alumno pidió que el profesor validara sus reportes en SISS — confírmalo con el profesor antes de aprobar."}
+      </div>
+
       {/* Banner PDF */}
       <div style={{
         padding: "1rem 1.25rem", borderRadius: RADIUS.lg,
@@ -44,7 +62,7 @@ export function VistaCoordinacion({ estado, onFirmar, onRechazar }) {
           </p>
         </div>
         <button
-          onClick={() => alert("Descargando PDF...")}
+          onClick={onDescargarPdf}
           style={{
             padding: "8px 16px", borderRadius: RADIUS.md, fontSize: 13,
             fontWeight: 600, cursor: "pointer", background: "rgba(21,128,61,0.10)",
