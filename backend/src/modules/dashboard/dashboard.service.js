@@ -112,7 +112,7 @@ async function resumenAlumno(usuarioId) {
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion, cartaTermino] = await Promise.all([
+  const [actividadesAsignadas, reportesAprobados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion, cartaTermino] = await Promise.all([
 
     // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
     // y ambas variantes de completada (antes contaba todo, bug reportado).
