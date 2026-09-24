@@ -1,6 +1,6 @@
 import { RADIUS } from "@/themes/colors";
 
-export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancelar, C }) {
+export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancelar, enviando, C }) {
   const inputStyle = (hasError) => ({
     width: "100%", padding: "10px 14px", boxSizing: "border-box",
     background: C.bgInput,
@@ -49,14 +49,18 @@ export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancel
         </div>
       </div>
 
+      {errores.envio && (
+        <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger }}>{errores.envio}</p>
+      )}
+
       <div style={{ display: "flex", gap: "0.75rem" }}>
-        <button onClick={onCancelar}
+        <button onClick={onCancelar} disabled={enviando}
           style={{ flex: 1, padding: "9px", borderRadius: RADIUS.md, fontSize: 13, fontWeight: 500, cursor: "pointer", background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textMuted, fontFamily: "inherit" }}>
           Cancelar
         </button>
-        <button onClick={onGuardar}
-          style={{ flex: 2, padding: "9px", borderRadius: RADIUS.md, fontSize: 13, fontWeight: 700, cursor: "pointer", background: C.accent, border: "none", color: "#fff", fontFamily: "inherit" }}>
-          {modo === "agregar" ? "Guardar recurso" : "Guardar cambios"}
+        <button onClick={onGuardar} disabled={enviando}
+          style={{ flex: 2, padding: "9px", borderRadius: RADIUS.md, fontSize: 13, fontWeight: 700, cursor: enviando ? "default" : "pointer", background: enviando ? C.bgInput : C.accent, border: "none", color: enviando ? C.textDisabled : "#fff", fontFamily: "inherit" }}>
+          {enviando ? "Guardando..." : modo === "agregar" ? "Guardar recurso" : "Guardar cambios"}
         </button>
       </div>
     </div>

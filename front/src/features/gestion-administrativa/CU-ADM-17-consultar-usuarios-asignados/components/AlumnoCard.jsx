@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearAvance } from "./formato";
 
 export function AlumnoCard({ alumno, onSeleccionar, C }) {
   return (
@@ -28,13 +29,13 @@ export function AlumnoCard({ alumno, onSeleccionar, C }) {
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
-            {alumno.nombre}
+            {alumno.nombreCompleto}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>{alumno.boleta}</p>
         </div>
       </div>
 
-      {/* Carrera + créditos + flecha */}
+      {/* Carrera + avance académico + flecha */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <span style={{
@@ -43,11 +44,12 @@ export function AlumnoCard({ alumno, onSeleccionar, C }) {
           }}>
             {alumno.carrera}
           </span>
+          {/* Avance académico, NO horas de servicio social. */}
           <span style={{
             fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: RADIUS.full,
             background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accentText,
           }}>
-            {alumno.creditos} créditos
+            {formatearAvance(alumno.creditos)} avance
           </span>
         </div>
         <svg width={13} height={13} viewBox="0 0 24 24" fill="none"

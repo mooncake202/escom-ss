@@ -7,16 +7,43 @@ import { useActualizarDatosProfesor }    from "./hooks/useActualizarDatosProfeso
 export default function ActualizarDatosProfesor() {
   const { C } = useTheme();
   const {
-    datosInstitucionales, form, errores, guardado, ultimaAct,
+    carga, recargar,
+    institucionales, form, errores, guardando, guardado, hayCambios,
     handleChange, handleCancelar, handleGuardar,
   } = useActualizarDatosProfesor();
+
+  // ── Carga y error ──
+  if (carga.estado !== "listo") {
+    return (
+      <DashboardLayout titulo="Mis datos personales" subtitulo="Tus datos de contacto" rol="profesor" usuario="">
+        <div style={{ maxWidth: 560, margin: "0 auto", width: "100%" }}>
+          <div style={{
+            background: C.bgCard, borderRadius: RADIUS.lg,
+            border: `1px solid ${C.borderDefault}`, padding: "2.5rem 2rem", textAlign: "center",
+          }}>
+            {carga.estado === "cargando" ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando tus datos...</p>
+            ) : (
+              <>
+                <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+                <button onClick={recargar} style={{
+                  padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                  color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                }}>Reintentar</button>
+              </>
+            )}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
       titulo="Mis datos"
-      subtitulo="CU-ADM-10 · Profesor"
+      subtitulo="Tus datos de contacto"
       rol="profesor"
-      usuario={datosInstitucionales.nombre}
+      usuario={institucionales.nombreCompleto}
     >
       <div style={{ maxWidth: 540, margin: "0 auto", width: "100%" }}>
 
@@ -32,7 +59,7 @@ export default function ActualizarDatosProfesor() {
               stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Datos actualizados correctamente · {ultimaAct}
+            Datos actualizados correctamente.
           </div>
         )}
 
@@ -44,10 +71,11 @@ export default function ActualizarDatosProfesor() {
             Datos institucionales
           </h3>
 
-          <CampoLocked label="Nombre completo"    valor={datosInstitucionales.nombre}       C={C} />
-          <CampoLocked label="Correo institucional" valor={datosInstitucionales.correo}     C={C} />
-          <CampoLocked label="Departamento"        valor={datosInstitucionales.departamento} C={C} />
-          <CampoLocked label="Cubículo"            valor={datosInstitucionales.cubiculo}     C={C} />
+          {/* Solo lectura: los administra Coordinación desde CU-CRED-03. Sin ID de empleado: no existe en el schema. */}
+          <CampoLocked label="Nombre completo"      valor={institucionales.nombreCompleto}      C={C} />
+          <CampoLocked label="Correo institucional" valor={institucionales.correoInstitucional} C={C} />
+          <CampoLocked label="Departamento"         valor={institucionales.departamento}        C={C} />
+          <CampoLocked label="Cubículo"             valor={institucionales.cubiculo}            C={C} />
 
           <div style={{ height: 1, background: C.borderDefault, margin: "1.25rem 0" }} />
 
@@ -57,30 +85,40 @@ export default function ActualizarDatosProfesor() {
 
           <CampoEditable
             label="Horario de atención"
-            name="horarioAtencion"
-            value={form.horarioAtencion}
+            name="horario_atencion"
+            value={form.horario_atencion}
             onChange={handleChange}
             placeholder="Ej. Lunes y miércoles, 10:00–12:00 h"
-            error={errores.horarioAtencion}
+            error={errores.horario_atencion}
             requerido
             C={C}
           />
           <CampoEditable
             label="Teléfono personal"
-            name="telefonoPersonal"
-            value={form.telefonoPersonal}
+            name="telefono_personal"
+            value={form.telefono_personal}
             onChange={handleChange}
             placeholder="Ej. 55 1234 5678"
-            error={errores.telefonoPersonal}
+            error={errores.telefono_personal}
             C={C}
           />
+
+          {/* El backend revalida: su mensaje manda sobre el del formulario. */}
+          {errores.envio && (
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger, lineHeight: 1.55 }}>
+              {errores.envio}
+            </p>
+          )}
 
           <div style={{ display: "flex", gap: "0.75rem", marginTop: "0.5rem" }}>
             <button
               onClick={handleCancelar}
+              disabled={!hayCambios || guardando}
               style={{
                 flex: 1, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 500, cursor: "pointer",
+                fontSize: 13, fontWeight: 500,
+                cursor: !hayCambios || guardando ? "default" : "pointer",
+                opacity: !hayCambios || guardando ? 0.5 : 1,
                 background: "transparent", border: `1px solid ${C.borderDefault}`,
                 color: C.textMuted, fontFamily: "inherit",
               }}
@@ -89,22 +127,21 @@ export default function ActualizarDatosProfesor() {
             </button>
             <button
               onClick={handleGuardar}
+              disabled={!hayCambios || guardando}
               style={{
                 flex: 2, padding: "10px", borderRadius: RADIUS.md,
-                fontSize: 13, fontWeight: 700, cursor: "pointer",
+                fontSize: 13, fontWeight: 700,
+                cursor: !hayCambios || guardando ? "default" : "pointer",
+                opacity: !hayCambios || guardando ? 0.5 : 1,
                 background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
               }}
             >
-              Guardar cambios
+              {guardando ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
         </div>
 
-        {ultimaAct && !guardado && (
-          <p style={{ margin: "0.75rem 0 0", fontSize: 11, color: C.textDisabled, textAlign: "right" }}>
-            Última actualización: {ultimaAct}
-          </p>
-        )}
+        {/* Sin "última actualización" ni ID de empleado: ninguno existe en el schema. */}
 
       </div>
     </DashboardLayout>

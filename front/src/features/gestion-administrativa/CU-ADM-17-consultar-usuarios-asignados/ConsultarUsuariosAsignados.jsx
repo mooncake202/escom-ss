@@ -6,13 +6,49 @@ import { AlumnoCard }                from "./components/AlumnoCard";
 import { AlumnoDetalle }             from "./components/AlumnoDetalle";
 import { useConsultarUsuarios }      from "./hooks/useConsultarUsuarios";
 
-function EmptyState({ msg, C }) {
+const REJILLA = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+  gap: "0.75rem",
+};
+
+function Aviso({ children, C }) {
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
       border: `1px solid ${C.borderDefault}`,
       padding: "2.5rem", textAlign: "center",
     }}>
+      {children}
+    </div>
+  );
+}
+
+function Cargando({ msg, C }) {
+  return (
+    <Aviso C={C}>
+      <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>{msg}</p>
+    </Aviso>
+  );
+}
+
+function ErrorCarga({ error, onReintentar, C }) {
+  return (
+    <Aviso C={C}>
+      <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{error}</p>
+      <button onClick={onReintentar} style={{
+        padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+        color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+      }}>
+        Reintentar
+      </button>
+    </Aviso>
+  );
+}
+
+function EmptyState({ msg, C }) {
+  return (
+    <Aviso C={C}>
       <div style={{
         width: 42, height: 42, borderRadius: "50%", background: C.bgInput,
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -25,7 +61,7 @@ function EmptyState({ msg, C }) {
         </svg>
       </div>
       <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>{msg}</p>
-    </div>
+    </Aviso>
   );
 }
 
@@ -40,135 +76,151 @@ function SectionLabel({ count, singular, plural, C }) {
   );
 }
 
+// Lista de alumnos con sus tres estados. La comparten la vista del profesor (nivel 1) y la de
+// coordinación (nivel 2): es la misma tarjeta sobre la misma respuesta del backend.
+function ListaAlumnos({ carga, alumnos, onSeleccionar, onReintentar, vacio, C }) {
+  if (carga.estado === "cargando") return <Cargando msg="Cargando alumnos..." C={C} />;
+  if (carga.estado === "error") return <ErrorCarga error={carga.error} onReintentar={onReintentar} C={C} />;
+  if (alumnos.length === 0) return <EmptyState msg={vacio} C={C} />;
+
+  return (
+    <div style={REJILLA}>
+      {alumnos.map((a) => (
+        <AlumnoCard key={a.boleta} alumno={a} onSeleccionar={onSeleccionar} C={C} />
+      ))}
+    </div>
+  );
+}
+
 export default function ConsultarUsuariosAsignados({ rol }) {
   const { C } = useTheme();
   const {
-    usuario, nivel,
+    nombreUsuario, esProfesor, nivel,
+    carga, recargar,
     profesoresFiltrados, profesorSel,
-    alumnosActuales, alumnoSel,
+    alumnos, cargaAlumnos, reintentarAlumnos,
+    detalle, cargaDetalle, reintentarDetalle,
     busqueda, setBusqueda,
-    handleSeleccionarProfesor, handleSeleccionarAlumno,
+    seleccionarProfesor, seleccionarAlumno,
     breadcrumbs,
   } = useConsultarUsuarios(rol);
 
-  const titulo    = rol === "profesor" ? "Mis alumnos asignados" : "Usuarios asignados";
-  const subtitulo = `CU-ADM-17 · ${rol === "profesor" ? "Profesor" : "Coordinación"}`;
+  const titulo = esProfesor ? "Mis alumnos asignados" : "Usuarios asignados";
+  const subtitulo = esProfesor
+    ? "Consulta de alumnos que supervisas"
+    : "Consulta de profesores y sus alumnos asignados";
+
+  const enDetalle = (esProfesor && nivel === 2) || (!esProfesor && nivel === 3);
 
   return (
-    <DashboardLayout titulo={titulo} subtitulo={subtitulo} rol={rol} usuario={usuario.nombre}>
+    <DashboardLayout titulo={titulo} subtitulo={subtitulo} rol={rol} usuario={nombreUsuario}>
       <div style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
 
-        {/* Breadcrumb (RF-ADM-05) */}
         <Breadcrumb items={breadcrumbs} C={C} />
 
-        {/* ── Coordinador · Nivel 1: lista de profesores (RF-ADM-02) ── */}
-        {rol === "coordinacion" && nivel === 1 && (
+        {/* ── Coordinación · Nivel 1: profesores ── */}
+        {!esProfesor && nivel === 1 && (
           <>
-            <div style={{
-              background: C.bgCard, borderRadius: RADIUS.lg,
-              border: `1px solid ${C.borderDefault}`,
-              padding: "0.875rem 1.25rem", marginBottom: "1.25rem",
-            }}>
-              <input
-                type="text"
-                placeholder="Buscar por nombre de profesor…"
-                value={busqueda}
-                onChange={e => setBusqueda(e.target.value)}
-                style={{
-                  width: "100%", boxSizing: "border-box",
-                  padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
-                  background: C.bgInput,
-                  border: `1px solid ${busqueda ? C.accent : C.borderDefault}`,
-                  color: C.textPrimary, fontFamily: "inherit", outline: "none",
-                }}
-              />
-            </div>
+            {carga.estado === "cargando" && <Cargando msg="Cargando profesores..." C={C} />}
+            {carga.estado === "error" && <ErrorCarga error={carga.error} onReintentar={recargar} C={C} />}
 
-            <SectionLabel count={profesoresFiltrados.length} singular="profesor" plural="profesores" C={C} />
+            {carga.estado === "listo" && (
+              <>
+                <div style={{
+                  background: C.bgCard, borderRadius: RADIUS.lg,
+                  border: `1px solid ${C.borderDefault}`,
+                  padding: "0.875rem 1.25rem", marginBottom: "1.25rem",
+                }}>
+                  <input
+                    type="text"
+                    placeholder="Buscar por nombre de profesor…"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    style={{
+                      width: "100%", boxSizing: "border-box",
+                      padding: "6px 10px", borderRadius: RADIUS.md, fontSize: 12,
+                      background: C.bgInput,
+                      border: `1px solid ${busqueda ? C.accent : C.borderDefault}`,
+                      color: C.textPrimary, fontFamily: "inherit", outline: "none",
+                    }}
+                  />
+                </div>
 
-            {profesoresFiltrados.length === 0 ? (
-              <EmptyState
-                msg={busqueda.trim()
-                  ? "No hay profesores que coincidan con la búsqueda."
-                  : "No hay profesores con alumnos asignados en el periodo actual."}
-                C={C}
-              />
-            ) : (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: "0.75rem",
-              }}>
-                {profesoresFiltrados.map(p => (
-                  <ProfesorCard key={p.id} profesor={p} onSeleccionar={handleSeleccionarProfesor} C={C} />
-                ))}
-              </div>
+                <SectionLabel count={profesoresFiltrados.length} singular="profesor" plural="profesores" C={C} />
+
+                {profesoresFiltrados.length === 0 ? (
+                  <EmptyState
+                    msg={busqueda.trim()
+                      ? "No hay profesores que coincidan con la búsqueda."
+                      : "Todavía no hay profesores registrados."}
+                    C={C}
+                  />
+                ) : (
+                  <div style={REJILLA}>
+                    {profesoresFiltrados.map((p) => (
+                      <ProfesorCard key={p.id} profesor={p} onSeleccionar={seleccionarProfesor} C={C} />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
 
-        {/* ── Coordinador · Nivel 2: alumnos del profesor (RF-ADM-03) ── */}
-        {rol === "coordinacion" && nivel === 2 && (
+        {/* ── Coordinación · Nivel 2: alumnos del profesor elegido ── */}
+        {!esProfesor && nivel === 2 && profesorSel && (
           <>
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10, marginBottom: "1.25rem",
-            }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1.25rem", flexWrap: "wrap" }}>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textPrimary }}>
-                {profesorSel.nombre}
+                {profesorSel.nombreCompleto}
               </p>
-              <span style={{
-                fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: RADIUS.full,
-                background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accentText,
-              }}>
-                {alumnosActuales.length} alumno{alumnosActuales.length !== 1 ? "s" : ""}
-              </span>
+              <span style={{ fontSize: 12, color: C.textMuted }}>{profesorSel.departamento}</span>
             </div>
 
-            {alumnosActuales.length === 0 ? (
-              <EmptyState msg="Este profesor no tiene alumnos asignados en el periodo actual." C={C} />
-            ) : (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: "0.75rem",
-              }}>
-                {alumnosActuales.map(a => (
-                  <AlumnoCard key={a.id} alumno={a} onSeleccionar={handleSeleccionarAlumno} C={C} />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ── Profesor · Nivel 1: sus alumnos (RF-ADM-01) ── */}
-        {rol === "profesor" && nivel === 1 && (
-          <>
-            <SectionLabel
-              count={alumnosActuales.length}
-              singular="alumno asignado"
-              plural="alumnos asignados"
+            <ListaAlumnos
+              carga={cargaAlumnos}
+              alumnos={alumnos}
+              onSeleccionar={seleccionarAlumno}
+              onReintentar={reintentarAlumnos}
+              vacio="Este profesor no tiene alumnos asignados."
               C={C}
             />
-
-            {alumnosActuales.length === 0 ? (
-              <EmptyState msg="No tienes alumnos asignados en el periodo actual." C={C} />
-            ) : (
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: "0.75rem",
-              }}>
-                {alumnosActuales.map(a => (
-                  <AlumnoCard key={a.id} alumno={a} onSeleccionar={handleSeleccionarAlumno} C={C} />
-                ))}
-              </div>
-            )}
           </>
         )}
 
-        {/* ── Detalle del alumno — Profesor nivel 2 / Coordinador nivel 3 (RF-ADM-04) ── */}
-        {((rol === "profesor" && nivel === 2) || (rol === "coordinacion" && nivel === 3)) && alumnoSel && (
-          <AlumnoDetalle alumno={alumnoSel} C={C} />
+        {/* ── Profesor · Nivel 1: sus alumnos ── */}
+        {esProfesor && nivel === 1 && (
+          <>
+            {carga.estado === "listo" && (
+              <SectionLabel
+                count={alumnos.length}
+                singular="alumno asignado"
+                plural="alumnos asignados"
+                C={C}
+              />
+            )}
+            <ListaAlumnos
+              carga={carga}
+              alumnos={alumnos}
+              onSeleccionar={seleccionarAlumno}
+              onReintentar={recargar}
+              vacio="No tienes alumnos asignados."
+              C={C}
+            />
+          </>
+        )}
+
+        {/* ── Detalle del alumno — profesor nivel 2 / coordinación nivel 3 ── */}
+        {enDetalle && (
+          <>
+            {cargaDetalle.estado === "cargando" && <Cargando msg="Cargando la información del alumno..." C={C} />}
+            {cargaDetalle.estado === "error" && (
+              <ErrorCarga error={cargaDetalle.error} onReintentar={reintentarDetalle} C={C} />
+            )}
+            {cargaDetalle.estado === "listo" && detalle && (
+              <AlumnoDetalle detalle={detalle} mostrarProfesor={!esProfesor} C={C} />
+            )}
+          </>
         )}
 
       </div>

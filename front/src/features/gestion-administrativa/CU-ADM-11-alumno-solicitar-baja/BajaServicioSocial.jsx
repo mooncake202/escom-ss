@@ -15,11 +15,77 @@ const fechaLegible = (valor) => (valor
   ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
   : "—");
 
+// Solicitudes anteriores del alumno. Una APROBADA nunca llega aquí: al aprobarse se elimina su
+// cuenta. En la práctica son las RECHAZADAS, y lo importante es que pueda leer el motivo que
+// escribió Coordinación (`comentario`) para corregir y volver a solicitar.
+function HistorialSolicitudes({ solicitudes, C }) {
+  if (solicitudes.length === 0) return null;
+
+  return (
+    <div style={{
+      background: C.bgCard, borderRadius: RADIUS.lg,
+      border: `1px solid ${C.borderDefault}`,
+      padding: "1.25rem 1.5rem", marginTop: "1.25rem",
+    }}>
+      <p style={{
+        margin: "0 0 0.875rem", fontSize: 12, fontWeight: 700, color: C.textDisabled,
+        textTransform: "uppercase", letterSpacing: "0.08em",
+      }}>
+        Mis solicitudes anteriores
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
+        {solicitudes.map((h) => {
+          const cfg = ESTADO_CONFIG[h.estado] ?? ESTADO_CONFIG.pendiente;
+          return (
+            <div key={h.id} style={{
+              padding: "0.875rem 1rem", borderRadius: RADIUS.md,
+              background: C.bgInput, border: `1px solid ${C.borderDefault}`,
+            }}>
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                gap: 8, marginBottom: 6,
+              }}>
+                <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
+                  Enviada el {fechaLegible(h.fecha)}
+                  {h.fechaRespuesta ? ` · resuelta el ${fechaLegible(h.fechaRespuesta)}` : ""}
+                </p>
+                <span style={{
+                  flexShrink: 0, padding: "2px 10px", borderRadius: RADIUS.full,
+                  background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                  fontSize: 10, fontWeight: 700,
+                }}>
+                  {cfg.texto}
+                </span>
+              </div>
+
+              <p style={{ margin: "0 0 6px", fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+                <strong style={{ color: C.textMuted }}>Tu motivo:</strong> {h.motivo}
+              </p>
+
+              {h.comentario && (
+                <div style={{
+                  marginTop: 8, padding: "8px 12px", borderRadius: RADIUS.sm,
+                  background: cfg.bg, border: `1px solid ${cfg.border}`,
+                }}>
+                  <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+                    <strong style={{ color: cfg.color }}>Respuesta de Coordinación:</strong> {h.comentario}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function BajaServicioSocial() {
   const { C } = useTheme();
   const {
     carga, recargar,
-    alumno, solicitudActiva, solicitud, motivo, archivo, errores, enviando, enviado,
+    alumno, solicitudActiva, solicitud, historial, motivo, archivo, errores, enviando, enviado,
     handleMotivoChange, handleArchivoChange,
     handleSubmit, handleCancelar, handleIrInicio,
   } = useBajaServicioSocial();
@@ -27,7 +93,7 @@ export default function BajaServicioSocial() {
   // ── Carga y error ──
   if (carga.estado !== "listo") {
     return (
-      <DashboardLayout titulo="Solicitar baja del servicio social" subtitulo="CU-ADM-11 · Alumno" rol="alumno_asignado" usuario="">
+      <DashboardLayout titulo="Solicitar baja del servicio social" subtitulo="Solicitud de baja y envío de expediente" rol="alumno_asignado" usuario="">
         <div style={{ maxWidth: 820, margin: "0 auto", width: "100%" }}>
           <div style={{
             background: C.bgCard, borderRadius: RADIUS.lg,
@@ -56,7 +122,7 @@ export default function BajaServicioSocial() {
     return (
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
-        subtitulo="CU-ADM-11 · Alumno"
+        subtitulo="Solicitud de baja y envío de expediente"
         rol="alumno_asignado"
         usuario={alumno.nombre}
       >
@@ -95,6 +161,8 @@ export default function BajaServicioSocial() {
               Fecha de envío: <strong style={{ color: C.textMuted }}>{fechaLegible(solicitud.fecha)}</strong>
             </p>
           </div>
+
+          <HistorialSolicitudes solicitudes={historial} C={C} />
         </div>
       </DashboardLayout>
     );
@@ -105,7 +173,7 @@ export default function BajaServicioSocial() {
     return (
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
-        subtitulo="CU-ADM-11 · Alumno"
+        subtitulo="Solicitud de baja y envío de expediente"
         rol="alumno_asignado"
         usuario={alumno.nombre}
       >
@@ -165,7 +233,7 @@ export default function BajaServicioSocial() {
   return (
     <DashboardLayout
       titulo="Solicitar baja del servicio social"
-      subtitulo="CU-ADM-11 · Alumno"
+      subtitulo="Solicitud de baja y envío de expediente"
       rol="alumno_asignado"
       usuario={alumno.nombre}
     >
@@ -274,6 +342,8 @@ export default function BajaServicioSocial() {
             </button>
           </div>
         </div>
+
+        <HistorialSolicitudes solicitudes={historial} C={C} />
 
       </div>
     </DashboardLayout>

@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearAvance, etiquetaCarrera } from "./formato";
 
 const CAMPO = ({ label, value, C }) => (
   <div style={{
@@ -12,13 +13,17 @@ const CAMPO = ({ label, value, C }) => (
     }}>
       {label}
     </p>
-    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
-      {value ?? "—"}
+    <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, wordBreak: "break-word" }}>
+      {value ?? "No registrado"}
     </p>
   </div>
 );
 
-export function AlumnoDetalle({ alumno, C }) {
+// `detalle` es la respuesta completa: { alumno, oferta, profesor }. `profesor` solo se pinta en la
+// navegación de coordinación, donde aporta contexto; al profesor le sobra porque es él mismo.
+export function AlumnoDetalle({ detalle, mostrarProfesor, C }) {
+  const { alumno, oferta, profesor } = detalle;
+
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
@@ -45,7 +50,7 @@ export function AlumnoDetalle({ alumno, C }) {
         </div>
         <div>
           <p style={{ margin: "0 0 2px", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-            {alumno.nombre}
+            {alumno.nombreCompleto}
           </p>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
             <span style={{
@@ -58,13 +63,13 @@ export function AlumnoDetalle({ alumno, C }) {
               fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: RADIUS.full,
               background: C.accentSoft, border: `1px solid ${C.accent}`, color: C.accentText,
             }}>
-              {alumno.creditos} créditos acumulados
+              {formatearAvance(alumno.creditos)} de avance académico
             </span>
           </div>
         </div>
       </div>
 
-      {/* Aviso solo lectura (RN-ADM-02) */}
+      {/* Aviso solo lectura */}
       <div style={{
         display: "flex", alignItems: "center", gap: 6,
         padding: "7px 12px", borderRadius: RADIUS.md,
@@ -80,14 +85,19 @@ export function AlumnoDetalle({ alumno, C }) {
         <span style={{ fontSize: 11, color: "#b45309" }}>Vista de solo lectura</span>
       </div>
 
-      {/* Campos (RN-ADM-01, RF-ADM-04) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.625rem" }}>
-        <CAMPO label="Boleta"                 value={alumno.boleta}    C={C} />
-        <CAMPO label="Carrera"                value={alumno.carrera}   C={C} />
-        <CAMPO label="Correo institucional"   value={alumno.correoInst} C={C} />
-        <CAMPO label="Correo alternativo"     value={alumno.correoAlt} C={C} />
-        <CAMPO label="Teléfono personal"      value={alumno.telefono}  C={C} />
-        <CAMPO label="Créditos acumulados"    value={`${alumno.creditos} créditos`} C={C} />
+        <CAMPO label="Boleta"               value={alumno.boleta} C={C} />
+        <CAMPO label="Carrera"              value={etiquetaCarrera(alumno.carrera)} C={C} />
+        <CAMPO label="Semestre"             value={alumno.semestre} C={C} />
+        {/* Porcentaje de avance académico. NO son horas de servicio social. */}
+        <CAMPO label="Avance académico"     value={formatearAvance(alumno.creditos)} C={C} />
+        <CAMPO label="Correo institucional" value={alumno.correoInstitucional} C={C} />
+        <CAMPO label="Correo personal"      value={alumno.correoPersonal} C={C} />
+        <CAMPO label="Celular"              value={alumno.celular} C={C} />
+        <CAMPO label="Proyecto asignado"    value={oferta?.nombre} C={C} />
+        {mostrarProfesor && (
+          <CAMPO label="Profesor responsable" value={profesor?.nombreCompleto} C={C} />
+        )}
       </div>
     </div>
   );

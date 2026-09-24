@@ -9,6 +9,7 @@ import {
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+import { useAnunciosRecientes, tiempoRelativo } from "@/features/gestion-administrativa/CU-ADM-02-anuncios/hooks/useAnunciosRecientes";
 
 // Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
 // revisado contra el catálogo completo de Parte 2. `carta:*` no tiene campo
@@ -343,6 +344,8 @@ function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalc
 // DASHBOARD ALUMNO
 // ══════════════════════════════════════════════════════════════════
 const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
+  // CU-ADM-02 (resumen): los 3 anuncios más recientes visibles para este alumno.
+  const { anuncios: anunciosRecientes, cargando: cargandoAnuncios } = useAnunciosRecientes();
   const stats = [
     { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasNetas ?? 0,             ...T.blue  },
     { icon: "document", label: "Reportes aprobados",  value: resumen.reportesAprobados ?? 0,     ...T.teal  },
@@ -431,7 +434,7 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.purple} C={C}>
           <ActionItem icon="bell"   {...T.warning} label="Anuncios del sistema"        desc="Anuncios nuevos"          onClick={() => navigate("/alumno/anuncios")} C={C} />
-          <ActionItem icon="user"   {...T.purple}  label="Contacto del profesor"       desc="Datos de contacto de tu profesor" onClick={() => navigate("/alumno/contacto-profesor")} C={C} />
+          <ActionItem icon="user"   {...T.purple}  label="Mi asignación"               desc="Tu profesor responsable y tu equipo" onClick={() => navigate("/alumno/mi-asignacion")} C={C} />
           <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales" desc="Teléfono, correo personal" onClick={() => navigate("/alumno/datos")} C={C} />
           <ActionItem icon="logout" {...T.danger}  label="Baja del servicio"           desc="Proceso irreversible, requiere justificación" onClick={() => navigate("/alumno/solicitar-baja")} C={C} />
           <SlotNotificacion ruta="/alumno/solicitar-baja" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
@@ -475,16 +478,44 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         background: C.bgCard, borderRadius: RADIUS.lg,
         border: `1px solid ${C.borderSubtle}`, padding: "1rem 1.25rem", marginTop: "0.875rem",
       }}>
-        <p style={{ margin: "0 0 0.875rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Anuncios recientes</p>
-        {[
-          { from: "Dr. Alejandro Méndez", text: "Recuerden que la sesión de seguimiento es el viernes a las 10:00 AM en el cubículo B-203.", time: "Hace 2 horas", isNew: true },
-          { from: "Coordinación SS",      text: "El periodo de entrega de reportes mensuales cierra el 15 de abril. No olviden firmar sus documentos.", time: "Ayer", isNew: true },
-          { from: "Dr. Alejandro Méndez", text: "Actividades del mes de abril han sido actualizadas. Revisen las fechas límite.", time: "Hace 3 días", isNew: false },
-        ].map((a, i, arr) => (
-          <div key={i} style={{
-            display: "flex", gap: 12, padding: "10px 0",
-            borderBottom: i < arr.length - 1 ? `1px solid ${C.borderSubtle}` : "none",
-          }}>
+        {/* CU-ADM-02 — resumen. El historial completo está en /alumno/anuncios; aquí solo los más
+            recientes, del mismo endpoint y con la misma regla de visibilidad. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "0.875rem" }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary }}>Anuncios recientes</p>
+          {anunciosRecientes.length > 0 && (
+            <button
+              onClick={() => navigate("/alumno/anuncios")}
+              style={{
+                marginLeft: "auto", background: "transparent", border: "none", padding: 0,
+                fontSize: 12, fontWeight: 600, color: C.accentText, cursor: "pointer", fontFamily: "inherit",
+              }}
+            >
+              Ver todos
+            </button>
+          )}
+        </div>
+
+        {cargandoAnuncios && (
+          <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando anuncios...</p>
+        )}
+
+        {!cargandoAnuncios && anunciosRecientes.length === 0 && (
+          <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>No tienes anuncios por ahora.</p>
+        )}
+
+        {/* Cada anuncio abre su detalle en la pantalla completa vía ?anuncio=<id>, que ADM-02
+            valida contra los anuncios realmente visibles antes de seleccionarlo. */}
+        {anunciosRecientes.map((a, i, arr) => (
+          <button
+            key={a.id}
+            onClick={() => navigate(`/alumno/anuncios?anuncio=${a.id}`)}
+            style={{
+              width: "100%", textAlign: "left", cursor: "pointer",
+              background: "transparent", border: "none", fontFamily: "inherit",
+              display: "flex", gap: 12, padding: "10px 0",
+              borderBottom: i < arr.length - 1 ? `1px solid ${C.borderSubtle}` : "none",
+            }}
+          >
             <div style={{
               width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
               background: GRADIENTS.primary,
@@ -494,13 +525,15 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{a.from}</span>
-                {a.isNew && <Badge {...T.blue}>Nuevo</Badge>}
-                <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>{a.time}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.textPrimary }}>{a.autor}</span>
+                {!a.visto && <Badge {...T.blue}>Nuevo</Badge>}
+                <span style={{ fontSize: 11, color: C.textDisabled, marginLeft: "auto" }}>
+                  {tiempoRelativo(a.fechaPublicacion)}
+                </span>
               </div>
-              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.55 }}>{a.text}</p>
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.55 }}>{a.titulo}</p>
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </>
@@ -618,7 +651,7 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.slate} C={C}>
           <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"    desc="Teléfono, cubículo, departamento" onClick={() => navigate("/profesor/datos-personales")} C={C} />
-          <ActionItem icon="bell"   {...T.warning} label="Publicar anuncio a mis alumnos" desc="Notificar a todos o a un alumno específico" onClick={() => navigate("/profesor/anuncios")} C={C} />
+          <ActionItem icon="bell"   {...T.warning} label="Publicar anuncio a mis alumnos" desc="Visible para todos tus alumnos asignados" onClick={() => navigate("/profesor/anuncios")} C={C} />
           <ActionItem icon="logout" {...T.danger}  label="Solicitar baja de alumno"       desc="Requiere justificación documentada" onClick={() => navigate("/profesor/solicitar-baja-alumno")} C={C} />
           <SlotNotificacion ruta="/profesor/solicitar-baja-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="pencil" {...T.blue}  label="Solicitar modificación en características de profesor" desc="Requiere justificación" onClick={() => navigate("/profesor/solicitar-modificacion")} C={C} />
@@ -725,7 +758,7 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.slate} C={C}>
           <ActionItem icon="calendar" {...T.blue}    label="Gestionar calendario escolar" desc="Periodos, días inhábiles, vacaciones" onClick={() => navigate("/coordinacion/calendario")} C={C} />
-          <ActionItem icon="bell"     {...T.warning} label="Publicar anuncio"             desc="Para todos los alumnos o por profesor" onClick={() => navigate("/coordinacion/admin/anuncios")} C={C} />
+          <ActionItem icon="bell"     {...T.warning} label="Publicar anuncio"             desc="Visible para todos los alumnos asignados" onClick={() => navigate("/coordinacion/admin/anuncios")} C={C} />
           <ActionItem icon="link"     {...T.teal}    label="Gestionar medios de contacto" desc="Información institucional visible" onClick={() => navigate("/coordinacion/contacto-institucional")} C={C} />
           <ActionItem icon="key"      {...T.purple}  label="Gestionar recursos del SS"    desc="Documentos y guías del servicio" onClick={() => navigate("/coordinacion/admin/recursos")} C={C} />
           <ActionItem icon="flag"     {...T.danger}  label="Solicitudes de baja"          desc="Gestionar solicitudes de baja" onClick={() => navigate("/coordinacion/gestionar-bajas")} C={C} />

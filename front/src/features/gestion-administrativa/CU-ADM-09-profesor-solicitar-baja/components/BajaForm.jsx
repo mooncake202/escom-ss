@@ -26,7 +26,7 @@ export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, on
             {alumno.nombre}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>
-            {alumno.correoInst}
+            {alumno.correo}
           </p>
         </div>
       </div>
@@ -39,8 +39,9 @@ export function BajaForm({ alumno, motivo, errores, onMotivoChange, onSubmit, on
           border: `1px solid ${C.warning}`, color: C.warning,
           fontSize: 13, lineHeight: 1.5,
         }}>
-          <strong>Aviso:</strong> La solicitud será enviada a coordinación para su revisión.
-          Coordinación decidirá si las horas acumuladas del alumno son contabilizadas o no.
+          <strong>Aviso:</strong> La solicitud será enviada a Coordinación para su revisión.
+          Si la baja es aprobada, el proceso actual de servicio social del alumno se dará por
+          terminado y, si desea realizarlo nuevamente, deberá iniciar un nuevo proceso de registro.
         </div>
 
         {/* Campo motivo */}

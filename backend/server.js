@@ -95,6 +95,21 @@ app.use('/solicitudes-caracteristicas', require('./src/modules/administrativa/ca
 //ADM09/ADM11/ADM12 — Bajas del servicio social (profesor o alumno solicitan, coordinación resuelve)
 app.use('/bajas', require('./src/modules/administrativa/bajas/bajas.routes'));
 
+//ADM01/ADM03/ADM17 — Directorio: profesor y equipo del alumno; usuarios asignados (profesor/coordinación)
+app.use('/directorio', require('./src/modules/administrativa/directorio/directorio.routes'));
+
+//ADM02/ADM07 — Anuncios (comunicación manual; distinto de `notificacion`)
+app.use('/anuncios', require('./src/modules/administrativa/anuncios/anuncios.routes'));
+
+//ADM13/ADM14 — Expediente documental histórico (consulta) y carta compromiso firmada
+app.use('/documentos', require('./src/modules/administrativa/documentos/documentos.routes'));
+
+//ADM05 — Recursos del proceso de registro (coordinación administra, alumnos consultan)
+app.use('/recursos', require('./src/modules/administrativa/recursos/recursos.routes'));
+
+//ADM06 — Contacto institucional (coordinación administra, alumno asignado consulta)
+app.use('/contacto-institucional', require('./src/modules/administrativa/contacto/contacto.routes'));
+
 // Cron de vencimiento de actividades (AH02) — arranque explícito y visible
 // junto con el resto de los módulos AH, no oculto dentro de otro archivo.
 const { iniciarCronVencimientoActividades, iniciarCronsBitacora } = require('./src/modules/ah/ah.cron');

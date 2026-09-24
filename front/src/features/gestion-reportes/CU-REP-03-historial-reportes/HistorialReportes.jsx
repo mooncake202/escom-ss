@@ -16,7 +16,7 @@ export default function HistorialReportes() {
   const {
     carga, recargar, tieneHistorial, reportes, expandido, toggleExpandir,
     pdf, reporteEnPdf, verPdf, cerrarVisor, descargarPdf, estadoPdfDe,
-    plazoEnvio, limiteServicio,
+    plazoEnvio, periodoPendiente, limiteServicio,
   } = useHistorialReportes();
 
   // Acceso al reporte global (el backend decide si ya se puede generar: 480 h de bitácoras aprobadas).
@@ -25,6 +25,14 @@ export default function HistorialReportes() {
     background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textMuted,
     fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
+
+  // A qué periodo corresponde el reporte del aviso. Los textos vienen YA formateados del backend
+  // (reporte.periodo.inicioTexto/finTexto): aquí no se calcula ni se formatea ninguna fecha.
+  const lineaPeriodo = periodoPendiente && (
+    <p style={{ margin: "0 0 4px", fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
+      Periodo: {periodoPendiente.inicioTexto} — {periodoPendiente.finTexto}
+    </p>
+  );
 
   // Aviso persistente por plazo de envío del reporte mensual (Bloque 3): derivado en cada carga, nunca guardado.
   // Preventivo mientras hay días hábiles restantes; vencido en cuanto se agotan. Desaparece solo al enviar el reporte.
@@ -39,6 +47,7 @@ export default function HistorialReportes() {
           <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: C.danger }}>
             El plazo para enviar tu reporte mensual venció
           </p>
+          {lineaPeriodo}
           <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
             La fecha límite era el {plazoEnvio.fechaLimiteTexto}. El registro de nuevas bitácoras quedará bloqueado hasta que envíes tu reporte.
           </p>
@@ -48,6 +57,7 @@ export default function HistorialReportes() {
           <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: C.warning }}>
             Tienes un reporte mensual pendiente de enviar
           </p>
+          {lineaPeriodo}
           <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.5 }}>
             Día hábil {plazoEnvio.diaHabilActual} de {plazoEnvio.diasPlazo}: envíalo antes del {plazoEnvio.fechaLimiteTexto}.
           </p>

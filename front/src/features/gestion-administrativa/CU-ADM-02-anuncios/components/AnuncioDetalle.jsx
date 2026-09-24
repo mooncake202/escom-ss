@@ -1,61 +1,43 @@
 import { RADIUS } from "@/themes/colors";
-import { OrigenBadge } from "./OrigenBadge";
 
-export function AnuncioDetalle({ anuncio, leido, onCerrar, onMarcarLeido, formatFecha, C }) {
+// Cuerpo de la tarjeta expandida. A propósito NO repite título, autor, badge de origen ni la fecha
+// corta: todo eso ya está en el encabezado, justo encima.
+//
+// Solo dos cosas: el contenido completo y, al pie, la fecha de publicación en formato largo.
+// Tampoco hay botón de "marcar como leído": expandir ya lo marca.
+export function AnuncioDetalle({ anuncio, onCerrar, formatFechaHora, C }) {
   return (
     <div style={{
-      background: C.bgCard, borderRadius: RADIUS.lg,
-      border: `1px solid ${C.borderDefault}`,
-      borderTop: `3px solid ${anuncio.origen === "coordinacion" ? "#4A90D9" : "#a78bfa"}`,
-      padding: "1.5rem",
-      position: "sticky", top: 16,
+      padding: "0 1.25rem 1.125rem",
+      borderTop: `1px solid ${C.borderDefault}`,
+      marginTop: -1,
     }}>
-      {/* Encabezado */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.75rem", marginBottom: "1rem" }}>
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary, lineHeight: 1.4 }}>
-          {anuncio.titulo}
-        </h2>
-        <button
-          onClick={onCerrar}
-          style={{ background: "transparent", border: "none", color: C.textDisabled, cursor: "pointer", fontSize: 18, lineHeight: 1, flexShrink: 0 }}
-          title="Cerrar"
-        >
-          ×
-        </button>
-      </div>
-
-      {/* Meta */}
-      <div style={{ display: "flex", gap: "0.625rem", flexWrap: "wrap", alignItems: "center", marginBottom: "1.25rem" }}>
-        <OrigenBadge origen={anuncio.origen} />
-        <span style={{ fontSize: 12, color: C.textMuted }}>{anuncio.autor}</span>
-        <span style={{ fontSize: 11, color: C.textDisabled, fontFamily: "monospace", marginLeft: "auto" }}>
-          {formatFecha(anuncio.fecha)}
-        </span>
-      </div>
-
-      <hr style={{ border: "none", borderTop: `1px solid ${C.borderDefault}`, margin: "0 0 1.25rem" }} />
-
-      {/* Contenido */}
-      <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.textMuted, lineHeight: 1.7 }}>
+      <p style={{
+        margin: "1.125rem 0 1rem", fontSize: 13, color: C.textMuted,
+        lineHeight: 1.7, whiteSpace: "pre-wrap",
+      }}>
         {anuncio.contenido}
       </p>
 
-      {/* Botón marcar como leído */}
-      <button
-        onClick={() => onMarcarLeido(anuncio.id)}
-        disabled={leido}
-        style={{
-          width: "100%", padding: "9px", borderRadius: RADIUS.md,
-          fontSize: 13, fontWeight: 600, fontFamily: "inherit",
-          cursor: leido ? "default" : "pointer",
-          background: leido ? C.bgInput : C.accentSoft,
-          border: `1px solid ${leido ? C.borderDefault : C.accent}`,
-          color: leido ? C.textDisabled : C.accentText,
-          transition: "background 0.15s, color 0.15s",
-        }}
-      >
-        {leido ? "Ya leído" : "Marcar como leído"}
-      </button>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        gap: "0.75rem", flexWrap: "wrap",
+      }}>
+        <span style={{ fontSize: 11, color: C.textDisabled }}>
+          Publicado: {formatFechaHora(anuncio.fechaPublicacion)}
+        </span>
+        {/* Se puede contraer también volviendo a pulsar el encabezado; esto es el atajo discreto. */}
+        <button
+          onClick={onCerrar}
+          style={{
+            background: "transparent", border: `1px solid ${C.borderDefault}`,
+            borderRadius: RADIUS.sm, padding: "3px 10px",
+            fontSize: 11, color: C.textMuted, cursor: "pointer", fontFamily: "inherit",
+          }}
+        >
+          Cerrar
+        </button>
+      </div>
     </div>
   );
 }

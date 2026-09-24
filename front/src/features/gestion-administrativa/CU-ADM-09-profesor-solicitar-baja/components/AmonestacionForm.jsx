@@ -47,7 +47,7 @@ export function AmonestacionForm({ alumno, observaciones, errores, onObservacion
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
           </svg>
-          {alumno.faltasEfectivas} faltas
+          {alumno.faltasAcumuladas} faltas
         </span>
       </div>
 
@@ -61,8 +61,8 @@ export function AmonestacionForm({ alumno, observaciones, errores, onObservacion
           color: "#a78bfa",
           fontSize: 13, lineHeight: 1.5,
         }}>
-          <strong>Amonestación:</strong> Se generará un anuncio visible solo para este alumno
-          y sus contadores de faltas serán reiniciados automáticamente.
+          <strong>Amonestación:</strong> El alumno recibirá una notificación con tus observaciones.
+          Sus faltas no se modifican: el registro de asistencia sigue su curso normal.
         </div>
 
         {/* Campo observaciones */}

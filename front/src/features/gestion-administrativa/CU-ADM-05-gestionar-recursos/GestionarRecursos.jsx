@@ -3,22 +3,55 @@ import { DashboardLayout }        from "@/components/layout/DashboardLayout";
 import { RecursoRow }             from "./components/RecursoRow";
 import { RecursoForm }            from "./components/RecursoForm";
 import { useGestionarRecursos }   from "./hooks/useGestionarRecursos";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
+// CU-ADM-05 — Coordinación administra los enlaces del proceso de registro. Datos reales.
+// No se suben archivos: solo se administra la URL. El modelo no tiene categoría.
 export default function GestionarRecursos() {
   const { C } = useTheme();
+  const { usuario } = useSesion();
   const {
-    coordinacion, recursos, modo, recursoActivo, form, errores, toast,
+    carga, recargar,
+    recursos, modo, recursoActivo, form, errores, enviando, toast,
     abrirAgregar, abrirEditar, abrirEliminar,
     cancelar, handleChange, handleGuardar, handleEliminar,
   } = useGestionarRecursos();
 
+  const marco = {
+    titulo: "Recursos del proceso de registro",
+    subtitulo: "Enlaces a formatos, guías y documentos institucionales",
+    rol: "coordinacion",
+    usuario: nombreCompletoSesion(usuario),
+  };
+
+  if (carga.estado !== "listo") {
+    return (
+      <DashboardLayout {...marco}>
+        <div style={{
+          maxWidth: 520, margin: "3rem auto", textAlign: "center",
+          background: C.bgCard, borderRadius: RADIUS.lg,
+          border: `1px solid ${C.borderDefault}`, padding: "3rem 2rem",
+        }}>
+          {carga.estado === "cargando" ? (
+            <p style={{ margin: 0, fontSize: 13, color: C.textDisabled }}>Cargando recursos...</p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 1rem", fontSize: 13, color: C.danger }}>{carga.error}</p>
+              <button onClick={recargar} style={{
+                padding: "9px 22px", borderRadius: RADIUS.md, background: C.accent, border: "none",
+                color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+              }}>
+                Reintentar
+              </button>
+            </>
+          )}
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   return (
-    <DashboardLayout
-      titulo="Recursos del proceso de registro"
-      subtitulo="CU-ADM-05 · Coordinación"
-      rol="coordinacion"
-      usuario={coordinacion.nombre}
-    >
+    <DashboardLayout {...marco}>
       <div style={{ maxWidth: 920, margin: "0 auto", width: "100%" }}>
 
         {/* Toast */}
@@ -62,6 +95,7 @@ export default function GestionarRecursos() {
             onChange={handleChange}
             onGuardar={handleGuardar}
             onCancelar={cancelar}
+            enviando={enviando}
             C={C}
           />
         )}
@@ -100,6 +134,7 @@ export default function GestionarRecursos() {
               onEliminar={abrirEliminar}
               onCancelar={cancelar}
               onConfirmarEliminar={handleEliminar}
+              enviando={enviando}
               C={C}
             />
           ))}

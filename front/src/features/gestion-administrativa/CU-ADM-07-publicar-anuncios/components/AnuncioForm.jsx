@@ -1,6 +1,8 @@
 import { RADIUS } from "@/themes/colors";
+import { MAX_TITULO } from "../hooks/usePublicarAnuncios";
 
-export function AnuncioForm({ modo, form, errores, onChange, onGuardar, onCancelar, C }) {
+// Solo crea: los anuncios publicados no se editan.
+export function AnuncioForm({ form, errores, enviando, onChange, onGuardar, onCancelar, C }) {
   const inputStyle = (hasError) => ({
     width: "100%", padding: "10px 14px", boxSizing: "border-box",
     background: C.bgInput,
@@ -16,7 +18,7 @@ export function AnuncioForm({ modo, form, errores, onChange, onGuardar, onCancel
       padding: "1.25rem 1.5rem", marginBottom: "1.25rem",
     }}>
       <p style={{ margin: "0 0 1rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>
-        {modo === "nuevo" ? "Nuevo anuncio" : "Editar anuncio"}
+        Nuevo anuncio
       </p>
 
       <div style={{ marginBottom: "1rem" }}>
@@ -30,12 +32,16 @@ export function AnuncioForm({ modo, form, errores, onChange, onGuardar, onCancel
           name="titulo"
           value={form.titulo}
           onChange={onChange}
+          maxLength={MAX_TITULO}
           placeholder="Ej. Recordatorio: fecha límite de reportes"
           style={inputStyle(!!errores.titulo)}
         />
-        {errores.titulo && (
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.titulo}</p>
-        )}
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.titulo ?? ""}</p>
+          <span style={{ marginTop: 4, fontSize: 11, color: C.textDisabled, flexShrink: 0 }}>
+            {form.titulo.length}/{MAX_TITULO}
+          </span>
+        </div>
       </div>
 
       <div style={{ marginBottom: "1rem" }}>
@@ -58,12 +64,17 @@ export function AnuncioForm({ modo, form, errores, onChange, onGuardar, onCancel
         )}
       </div>
 
+      {errores.envio && (
+        <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.danger }}>{errores.envio}</p>
+      )}
+
       <div style={{ display: "flex", gap: "0.75rem" }}>
         <button
           onClick={onCancelar}
+          disabled={enviando}
           style={{
             flex: 1, padding: "9px", borderRadius: RADIUS.md,
-            fontSize: 13, fontWeight: 500, cursor: "pointer",
+            fontSize: 13, fontWeight: 500, cursor: enviando ? "default" : "pointer",
             background: "transparent", border: `1px solid ${C.borderDefault}`,
             color: C.textMuted, fontFamily: "inherit",
           }}
@@ -72,13 +83,15 @@ export function AnuncioForm({ modo, form, errores, onChange, onGuardar, onCancel
         </button>
         <button
           onClick={onGuardar}
+          disabled={enviando}
           style={{
             flex: 2, padding: "9px", borderRadius: RADIUS.md,
-            fontSize: 13, fontWeight: 700, cursor: "pointer",
-            background: C.accent, border: "none", color: "#fff", fontFamily: "inherit",
+            fontSize: 13, fontWeight: 700, cursor: enviando ? "default" : "pointer",
+            background: enviando ? C.bgInput : C.accent, border: "none",
+            color: enviando ? C.textDisabled : "#fff", fontFamily: "inherit",
           }}
         >
-          {modo === "nuevo" ? "Publicar anuncio" : "Guardar cambios"}
+          {enviando ? "Publicando..." : "Publicar anuncio"}
         </button>
       </div>
     </div>

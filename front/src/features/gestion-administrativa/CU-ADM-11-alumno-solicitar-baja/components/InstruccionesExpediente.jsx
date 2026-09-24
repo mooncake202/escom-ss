@@ -1,6 +1,8 @@
 import { RADIUS } from "@/themes/colors";
 
-const URL_SISS = "https://www.siss.ipn.mx";
+// Mismo portal que usan CU-GR-03 y CU-GR-06. Antes apuntaba a www.siss.ipn.mx, que no es el sitio
+// del Sistema Institucional de Servicio Social.
+const URL_SISS = "https://serviciosocial.ipn.mx/";
 
 export function InstruccionesExpediente({ C }) {
   return (
@@ -91,6 +93,26 @@ export function InstruccionesExpediente({ C }) {
           }}>
             BAJA_ESCOM_APELLIDOPATERNO_APELLIDOMATERNO_NOMBRE_BOLETA
           </code>
+        </div>
+      </div>
+
+      {/* Paso 4 — el oficio de baja lo emite Coordinación por su vía institucional:
+          NO se almacena en el sistema ni hay nada que descargar desde aquí. */}
+      <div style={{ display: "flex", gap: "0.875rem", marginBottom: "1rem" }}>
+        <div style={{
+          width: 24, height: 24, borderRadius: "50%", background: C.accentSoft,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, color: C.accentText, flexShrink: 0,
+        }}>4</div>
+        <div>
+          <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
+            Recibe la resolución de tu solicitud
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+            Una vez enviado tu expediente, Coordinación dará seguimiento al proceso de baja.
+            Cuando exista una resolución, recibirás la información correspondiente y, en caso
+            de aprobación, el oficio de baja será enviado a tu correo institucional.
+          </p>
         </div>
       </div>
 

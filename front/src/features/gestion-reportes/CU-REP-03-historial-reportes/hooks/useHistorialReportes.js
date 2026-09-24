@@ -36,6 +36,9 @@ export function useHistorialReportes() {
   const { pdf, abrirPdf, cerrarPdf }    = usePdfAlmacenado();
   const [plazoEnvio, setPlazoEnvio]     = useState(SIN_AVISO_PLAZO_ENVIO);
   const [limiteServicio, setLimiteServicio] = useState(SIN_LIMITE_SERVICIO);
+  // Periodo del reporte al que se refiere el aviso, tal como lo calculó el backend. Se guarda solo
+  // para poder nombrarlo en el texto: aquí no se recalcula ni se reformatea ninguna fecha.
+  const [periodoPendiente, setPeriodoPendiente] = useState(null);
 
   const [intento, setIntento]         = useState(0);
 
@@ -71,6 +74,7 @@ export function useHistorialReportes() {
         if (!vigente) return;
         setPlazoEnvio(respuesta.diagnostico?.plazoEnvio ?? SIN_AVISO_PLAZO_ENVIO);
         setLimiteServicio(respuesta.diagnostico?.limiteServicio ?? SIN_LIMITE_SERVICIO);
+        setPeriodoPendiente(respuesta.reporte?.periodo ?? null);
       },
       (err) => { if (vigente) console.error("No se pudo obtener el aviso de plazo de envío:", err); },
     );
@@ -130,6 +134,7 @@ export function useHistorialReportes() {
     reportes, expandido, toggleExpandir,
     pdf, reporteEnPdf, verPdf, cerrarVisor, descargarPdf, estadoPdfDe,
     plazoEnvio,
+    periodoPendiente,
     limiteServicio,
   };
 }

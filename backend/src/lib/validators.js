@@ -1,6 +1,9 @@
 const NOMBRE_REGEX = /^[A-Za-zÀ-ÖØ-öø-ÿÑñ' -]{2,50}$/;
 const TELEFONO_REGEX = /^\d{10}$/;
 const CORREO_IPN_REGEX = /^[^\s@]+@ipn\.mx$/i;
+// Correo personal (CU-ADM-04): cualquier dominio, no institucional. Solo forma básica.
+const CORREO_PERSONAL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CORREO_PERSONAL_MAX_LEN = 50; // alumno.correo_personal es VarChar(50)
 
 const DEPARTAMENTOS_VALIDOS = [
   'Sistemas Computacionales',
@@ -104,8 +107,38 @@ function validarBoleta(boleta) {
   }
 }
 
+/**
+ * CU-ADM-04 — correo personal del alumno. A diferencia de validarCorreoInstitucional, aquí el
+ * dominio es libre (gmail, outlook…): es el correo alterno del alumno, no el del IPN.
+ * El límite de 50 caracteres es el de la columna, no una regla de negocio.
+ */
+function validarCorreoPersonal(correo, { requerido = false } = {}) {
+  const valor = typeof correo === 'string' ? correo.trim() : '';
+
+  if (valor === '') {
+    if (requerido) {
+      const error = new Error('El correo personal es obligatorio.');
+      error.status = 400;
+      throw error;
+    }
+    return;
+  }
+
+  if (!CORREO_PERSONAL_REGEX.test(valor)) {
+    const error = new Error('El correo personal no tiene un formato válido.');
+    error.status = 400;
+    throw error;
+  }
+  if (valor.length > CORREO_PERSONAL_MAX_LEN) {
+    const error = new Error(`El correo personal no puede superar ${CORREO_PERSONAL_MAX_LEN} caracteres.`);
+    error.status = 400;
+    throw error;
+  }
+}
+
 module.exports = {
   validarNombreOApellidos,
+  validarCorreoPersonal,
   validarCorreoInstitucional,
   validarTelefono,
   validarDepartamento,

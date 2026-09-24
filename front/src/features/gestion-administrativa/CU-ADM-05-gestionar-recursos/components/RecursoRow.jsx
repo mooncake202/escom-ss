@@ -1,6 +1,7 @@
 import { RADIUS } from "@/themes/colors";
+import { formatFecha } from "../hooks/useGestionarRecursos";
 
-export function RecursoRow({ recurso, index, total, modo, recursoActivoId, onEditar, onEliminar, onCancelar, onConfirmarEliminar, C }) {
+export function RecursoRow({ recurso, index, total, modo, recursoActivoId, onEditar, onEliminar, onCancelar, onConfirmarEliminar, enviando, C }) {
   const eliminandoEste = modo === "eliminar" && recursoActivoId === recurso.id;
 
   return (
@@ -30,7 +31,7 @@ export function RecursoRow({ recurso, index, total, modo, recursoActivoId, onEdi
             {recurso.url}
           </a>
         </div>
-        <span style={{ fontSize: 12, color: C.textDisabled }}>{recurso.ultimaActualizacion}</span>
+        <span style={{ fontSize: 12, color: C.textDisabled }}>{formatFecha(recurso.ultimaActualizacion)}</span>
         <div style={{ display: "flex", gap: "0.5rem" }}>
           <button
             onClick={() => onEditar(recurso)}
@@ -75,7 +76,7 @@ export function RecursoRow({ recurso, index, total, modo, recursoActivoId, onEdi
               style={{ padding: "6px 14px", borderRadius: RADIUS.md, fontSize: 12, fontWeight: 500, cursor: "pointer", background: "transparent", border: `1px solid ${C.borderDefault}`, color: C.textMuted, fontFamily: "inherit" }}>
               Cancelar
             </button>
-            <button onClick={onConfirmarEliminar}
+            <button onClick={onConfirmarEliminar} disabled={enviando}
               style={{ padding: "6px 14px", borderRadius: RADIUS.md, fontSize: 12, fontWeight: 700, cursor: "pointer", background: C.danger, border: "none", color: "#fff", fontFamily: "inherit" }}>
               Sí, eliminar
             </button>

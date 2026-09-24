@@ -52,7 +52,7 @@ export default function BajaAlumnoProfesor() {
       return (
         <div style={{
           background: C.bgCard, borderRadius: RADIUS.lg,
-          border: `1px solid ${C.warning}`, overflow: "hidden",
+          border: `1px solid ${C.borderDefault}`, overflow: "hidden",
         }}>
           {/* Header alumno */}
           <div style={{
@@ -63,9 +63,9 @@ export default function BajaAlumnoProfesor() {
           }}>
             <div style={{
               width: 44, height: 44, borderRadius: "50%",
-              background: C.warningSoft,
+              background: C.accentSoft,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 15, fontWeight: 700, color: C.warning, flexShrink: 0,
+              fontSize: 15, fontWeight: 700, color: C.accentText, flexShrink: 0,
             }}>
               {alumnoSeleccionado.nombre.split(" ").slice(0, 2).map(w => w[0]).join("")}
             </div>
@@ -80,29 +80,40 @@ export default function BajaAlumnoProfesor() {
           </div>
 
           <div style={{ padding: "1.25rem 1.5rem" }}>
-            {/* Alerta de faltas */}
+            {/* Datos reales de AH, informativos: no condicionan ninguna de las dos acciones. */}
             <div style={{
               marginBottom: "1.5rem", padding: "14px 16px",
-              borderRadius: RADIUS.md, background: C.warningSoft,
-              border: `1px solid ${C.warning}`,
-              display: "flex", alignItems: "flex-start", gap: "0.75rem",
+              borderRadius: RADIUS.md, background: C.bgInput,
+              border: `1px solid ${C.borderDefault}`,
             }}>
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none"
-                stroke={C.warning} strokeWidth={2} strokeLinecap="round" style={{ flexShrink: 0, marginTop: 1 }}>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              <div>
-                <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 700, color: C.warning }}>
-                  Faltas acumuladas detectadas
-                </p>
-                <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-                  Este alumno tiene <strong style={{ color: C.warning }}>{alumnoSeleccionado.faltasAcumuladas} faltas acumuladas</strong>{" "}
-                  ({alumnoSeleccionado.faltasConsecutivas} consecutivas).
-                  Elige la acción a tomar:
-                </p>
+              <p style={{
+                margin: "0 0 10px", fontSize: 11, fontWeight: 700, color: C.textDisabled,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+              }}>
+                Situación actual del alumno
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "1.75rem" }}>
+                {[
+                  ["Faltas acumuladas", alumnoSeleccionado.faltasAcumuladas],
+                  ["Faltas consecutivas", alumnoSeleccionado.faltasConsecutivas],
+                  ["Horas netas", alumnoSeleccionado.horasNetas],
+                ].map(([etiqueta, valor]) => (
+                  <div key={etiqueta}>
+                    <p style={{
+                      margin: "0 0 2px", fontSize: 10, fontWeight: 700, color: C.textDisabled,
+                      textTransform: "uppercase", letterSpacing: "0.06em",
+                    }}>
+                      {etiqueta}
+                    </p>
+                    <p style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary }}>
+                      {valor}
+                    </p>
+                  </div>
+                ))}
               </div>
+              <p style={{ margin: "10px 0 0", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                Elige la acción que consideres. Ambas son independientes entre sí.
+              </p>
             </div>
 
             {/* Botones de acción */}
@@ -172,7 +183,7 @@ export default function BajaAlumnoProfesor() {
                     Enviar amonestación
                   </p>
                   <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>
-                    Notificar al alumno y reiniciar sus contadores de faltas.
+                    Enviarle una notificación con tus observaciones. No modifica sus faltas.
                   </p>
                 </div>
               </button>
@@ -232,7 +243,7 @@ export default function BajaAlumnoProfesor() {
   return (
     <DashboardLayout
       titulo="Solicitar baja de alumno"
-      subtitulo="CU-ADM-09 · Profesor"
+      subtitulo="Gestión de alumnos asignados"
       rol="profesor"
       usuario={nombreCompletoSesion(usuario)}
     >

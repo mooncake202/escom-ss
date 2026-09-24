@@ -123,10 +123,25 @@ export function useGestionarBajas() {
     if (errores.comentario) setErrores((prev) => ({ ...prev, comentario: null }));
   }
 
-  function moverAResueltas(id, estado) {
+  // Construye la tarjeta resuelta a partir de lo que devolvió el backend, para que aparezca
+  // completa en "Resueltas" sin esperar a una recarga.
+  //
+  // Las dos acciones devuelven formas distintas: rechazar manda la solicitud entera (con comentario
+  // y fecha_respuesta), mientras que aprobar solo confirma el resultado del borrado
+  // ({ id, estado, boleta, nombre, cupoLiberado, carpetaEliminada }). Por eso el comentario y la
+  // fecha se completan aquí con lo que ya conocemos en pantalla cuando el backend no los incluye.
+  function moverAResueltas(id, { estado, comentario: comentarioResuelto, fechaRespuesta }) {
     setLista((prev) => ({
       pendientes: prev.pendientes.filter((s) => s.id !== id),
-      resueltas: [{ ...seleccionada, estado, puedeResolverse: false, fechaRespuesta: new Date().toISOString() }, ...prev.resueltas],
+      resueltas: [{
+        ...seleccionada,
+        estado,
+        comentario: comentarioResuelto ?? null,
+        fechaRespuesta: fechaRespuesta ?? new Date().toISOString(),
+        puedeResolverse: false,
+        // Deja de estar en manos del Instituto en cuanto se resuelve.
+        enRevisionInstitucional: false,
+      }, ...prev.resueltas],
     }));
     setSeleccionada(null);
     setPanel("detalle");
@@ -139,7 +154,8 @@ export function useGestionarBajas() {
     try {
       const r = await aprobarSolicitudBaja(seleccionada.id, comentario.trim() || undefined);
       mostrarToast(`Baja aprobada. ${r.nombre} (${r.boleta}) fue eliminado del sistema y notificado por correo.`);
-      moverAResueltas(seleccionada.id, "aprobada");
+      // La respuesta de aprobar no trae comentario ni fecha: se usan los de esta pantalla.
+      moverAResueltas(seleccionada.id, { estado: r.estado, comentario: comentario.trim() || null });
     } catch (err) {
       if (err.code === "SOLICITUD_YA_RESUELTA" || err.status === 404) { recargar(); setSeleccionada(null); }
       setErrores({ accion: err.message });
@@ -158,9 +174,9 @@ export function useGestionarBajas() {
     setProcesando(true);
     setErrores({});
     try {
-      await rechazarSolicitudBaja(seleccionada.id, comentario.trim());
+      const r = await rechazarSolicitudBaja(seleccionada.id, comentario.trim());
       mostrarToast("Solicitud rechazada. El solicitante fue notificado.", "danger");
-      moverAResueltas(seleccionada.id, "rechazada");
+      moverAResueltas(seleccionada.id, r); // trae estado, comentario y fechaRespuesta reales
     } catch (err) {
       if (err.code === "SOLICITUD_YA_RESUELTA" || err.status === 404) { recargar(); setSeleccionada(null); }
       setErrores({ accion: err.message });

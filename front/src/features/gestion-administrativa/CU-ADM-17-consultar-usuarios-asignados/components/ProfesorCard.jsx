@@ -1,7 +1,8 @@
 import { RADIUS } from "@/themes/colors";
 
+// El esquema no tiene "id de empleado": bajo el nombre va el departamento, que sí existe.
 export function ProfesorCard({ profesor, onSeleccionar, C }) {
-  const total = profesor.alumnos.length;
+  const total = profesor.totalAlumnos;
 
   return (
     <div
@@ -30,9 +31,14 @@ export function ProfesorCard({ profesor, onSeleccionar, C }) {
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary, lineHeight: 1.3 }}>
-            {profesor.nombre}
+            {profesor.nombreCompleto}
           </p>
-          <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>{profesor.idEmpleado}</p>
+          <p style={{
+            margin: 0, fontSize: 11, color: C.textDisabled,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}>
+            {profesor.departamento}
+          </p>
         </div>
       </div>
 

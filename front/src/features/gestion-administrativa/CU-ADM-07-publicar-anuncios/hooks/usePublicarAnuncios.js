@@ -1,165 +1,128 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { obtenerMisAnuncios, publicarAnuncio } from "@/services/anunciosService";
+import { obtenerMisAlumnos } from "@/services/usuariosAsignadosService";
 
-const MOCKS = {
-  coordinacion: {
-    usuario: { nombre: "Lic. Morales Vega" },
-    tieneAlumnos: null,
-    alumnosAsignados: [],
-    anunciosIniciales: [
-      {
-        id: 1,
-        titulo: "Recordatorio: entrega de reporte parcial",
-        contenido: "Se les recuerda a todos los alumnos en servicio social que el reporte parcial del primer bimestre debe ser entregado a más tardar el viernes 30 de mayo de 2025. El reporte debe incluir las actividades realizadas, horas acumuladas y una breve descripción de los avances obtenidos.",
-        fechaHora: "20 de mayo de 2025, 10:15",
-      },
-      {
-        id: 2,
-        titulo: "Actualización de parámetros — periodo Ene–Jun 2025",
-        contenido: "Se informa que a partir del 15 de mayo de 2025, el sistema ha sido actualizado con los parámetros del periodo escolar Ene–Jun 2025. Las horas requeridas para la conclusión del servicio social se mantienen en 480 horas.",
-        fechaHora: "15 de mayo de 2025, 09:00",
-      },
-      {
-        id: 3,
-        titulo: "Bienvenida al periodo de servicio social Ene–Jun 2025",
-        contenido: "La Coordinación de Servicio Social da la bienvenida a todos los alumnos que inician su servicio social en este periodo. Ante cualquier duda, pueden acudir a las oficinas de coordinación en horario de 9:00 a 14:00 h.",
-        fechaHora: "13 de enero de 2025, 08:30",
-      },
-    ],
-    toastNuevo:    "Anuncio publicado correctamente.",
-    toastEditar:   "Anuncio actualizado correctamente.",
-    toastEliminar: (titulo) => `"${titulo}" eliminado.`,
-  },
-  profesor: {
-    usuario: { nombre: "Dr. Torres Vega" },
-    tieneAlumnos: true,
-    alumnosAsignados: [
-      { id: 1, nombre: "García López Ana",      boleta: "2022630001" },
-      { id: 2, nombre: "Hernández Ruiz Carlos", boleta: "2021630042" },
-      { id: 3, nombre: "Martínez Soto Diana",   boleta: "2022630078" },
-    ],
-    anunciosIniciales: [
-      {
-        id: 1,
-        titulo: "Sesión de seguimiento — semana del 19 de mayo",
-        contenido: "Les informo que tendremos una sesión de seguimiento el próximo miércoles 21 de mayo a las 11:00 h en el cubículo CB-03. Es importante que traigan su bitácora actualizada y tengan listo el avance de las actividades asignadas para revisión.",
-        fechaHora: "18 de mayo de 2025, 14:30",
-      },
-      {
-        id: 2,
-        titulo: "Cambio en el formato de bitácora semanal",
-        contenido: "A partir de esta semana, las bitácoras deben incluir una sección adicional de 'dificultades encontradas' y 'soluciones aplicadas'. Esto permitirá llevar un mejor registro del proceso de aprendizaje. El nuevo formato ya está disponible en el sistema.",
-        fechaHora: "10 de mayo de 2025, 09:45",
-      },
-      {
-        id: 3,
-        titulo: "Recordatorio: entrega de avance de proyecto",
-        contenido: "Les recuerdo que el avance parcial del proyecto debe estar documentado en el sistema antes del viernes. Revisen que sus actividades estén registradas correctamente y el acumulado de horas esté actualizado.",
-        fechaHora: "5 de mayo de 2025, 11:00",
-      },
-    ],
-    toastNuevo:    "Anuncio publicado. Tus alumnos ya pueden verlo.",
-    toastEditar:   "Anuncio actualizado correctamente.",
-    toastEliminar: (titulo) => `"${titulo}" eliminado. Ya no es visible para tus alumnos.`,
-  },
-};
-
-let nextId = 4;
+// CU-ADM-07 — publicar anuncios. Datos reales, sin mocks.
+//
+// NO hay editar ni eliminar: un anuncio publicado es registro histórico.
+// NO se eligen destinatarios: el alcance lo deriva el backend de las asignaciones vigentes.
+//   profesor    → todos sus alumnos asignados
+//   coordinación→ todos los alumnos asignados
+//
+// El autor y el origen los pone el backend a partir del token: aquí solo viajan título y contenido.
 
 const FORM_VACIO = { titulo: "", contenido: "" };
-
-function formatFechaHora(date) {
-  const fecha = date.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
-  const hora  = date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
-  return `${fecha}, ${hora}`;
-}
+export const MAX_TITULO = 150; // anuncio.titulo es VarChar(150); el backend lo revalida
 
 export function usePublicarAnuncios(rol) {
-  const mock = MOCKS[rol];
+  const esProfesor = rol === "profesor";
 
-  const [anuncios, setAnuncios]           = useState(mock.anunciosIniciales);
-  const [modo, setModo]                   = useState(null);
-  const [anuncioActivo, setAnuncioActivo] = useState(null);
-  const [form, setForm]                   = useState(FORM_VACIO);
-  const [errores, setErrores]             = useState({});
-  const [toast, setToast]                 = useState(null);
+  const [carga, setCarga] = useState({ estado: "cargando", error: null });
+  const [anuncios, setAnuncios] = useState([]);
+  const [alcance, setAlcance] = useState(null);   // nº de alumnos (solo profesor)
+  const [alumnos, setAlumnos] = useState([]);     // para la barra "Visible para" del profesor
+  const [intento, setIntento] = useState(0);
+
+  const [modo, setModo] = useState(null);         // null | 'nuevo'
+  const [form, setForm] = useState(FORM_VACIO);
+  const [errores, setErrores] = useState({});
+  const [enviando, setEnviando] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+
+    // El historial es lo esencial. La lista de alumnos solo alimenta la barra de alcance del
+    // profesor, así que si falla no se rompe la pantalla: se cae al conteo que da el backend.
+    const peticiones = esProfesor
+      ? [obtenerMisAnuncios(), obtenerMisAlumnos().catch(() => ({ alumnos: [] }))]
+      : [obtenerMisAnuncios()];
+
+    Promise.all(peticiones).then(
+      ([historial, misAlumnos]) => {
+        if (!vigente) return;
+        setAnuncios(historial.anuncios);
+        setAlcance(historial.alcance);
+        if (misAlumnos) setAlumnos(misAlumnos.alumnos);
+        setCarga({ estado: "listo", error: null });
+      },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+
+    return () => { vigente = false; };
+  }, [esProfesor, intento]);
+
+  function recargar() {
+    setCarga({ estado: "cargando", error: null });
+    setIntento((n) => n + 1);
+  }
 
   function mostrarToast(msg, tipo = "success") {
     setToast({ msg, tipo });
     setTimeout(() => setToast(null), 4000);
   }
 
+  // Un profesor sin alumnos asignados no tiene a quién publicar; el backend también lo impide.
+  const puedePublicar = !esProfesor || (alcance ?? 0) > 0;
+
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (errores[name]) setErrores(prev => ({ ...prev, [name]: null }));
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (errores[name]) setErrores((prev) => ({ ...prev, [name]: null }));
   }
 
   function validar() {
     const e = {};
-    if (!form.titulo.trim())    e.titulo    = "El título del anuncio es obligatorio.";
+    if (!form.titulo.trim()) e.titulo = "El título del anuncio es obligatorio.";
+    else if (form.titulo.trim().length > MAX_TITULO) {
+      e.titulo = `El título no puede pasar de ${MAX_TITULO} caracteres.`;
+    }
     if (!form.contenido.trim()) e.contenido = "El contenido del anuncio es obligatorio.";
     return e;
   }
 
   function abrirNuevo() {
+    if (!puedePublicar) return;
     setForm(FORM_VACIO);
     setErrores({});
-    setAnuncioActivo(null);
     setModo("nuevo");
-  }
-
-  function abrirEditar(a) {
-    setForm({ titulo: a.titulo, contenido: a.contenido });
-    setErrores({});
-    setAnuncioActivo(a);
-    setModo("editar");
-  }
-
-  function abrirEliminar(a) {
-    setAnuncioActivo(a);
-    setModo("eliminar");
   }
 
   function cancelar() {
     setModo(null);
-    setAnuncioActivo(null);
     setForm(FORM_VACIO);
     setErrores({});
   }
 
-  function handleGuardar() {
+  async function handleGuardar() {
+    if (enviando) return;
     const e = validar();
     if (Object.keys(e).length > 0) { setErrores(e); return; }
-    const fechaHora = formatFechaHora(new Date());
-    if (modo === "nuevo") {
-      setAnuncios(prev => [
-        { id: nextId++, titulo: form.titulo.trim(), contenido: form.contenido.trim(), fechaHora },
-        ...prev,
-      ]);
-      mostrarToast(mock.toastNuevo);
-    } else {
-      setAnuncios(prev => prev.map(a =>
-        a.id === anuncioActivo.id
-          ? { ...a, titulo: form.titulo.trim(), contenido: form.contenido.trim(), fechaHora }
-          : a
-      ));
-      mostrarToast(mock.toastEditar);
-    }
-    cancelar();
-  }
 
-  function handleEliminar() {
-    mostrarToast(mock.toastEliminar(anuncioActivo.titulo), "danger");
-    setAnuncios(prev => prev.filter(a => a.id !== anuncioActivo.id));
-    cancelar();
+    setEnviando(true);
+    try {
+      const { anuncio } = await publicarAnuncio({
+        titulo: form.titulo.trim(),
+        contenido: form.contenido.trim(),
+      });
+      // El backend devuelve el anuncio ya creado: se antepone sin volver a pedir el historial.
+      setAnuncios((prev) => [anuncio, ...prev]);
+      mostrarToast(esProfesor
+        ? "Anuncio publicado. Tus alumnos asignados ya pueden verlo."
+        : "Anuncio publicado correctamente.");
+      cancelar();
+    } catch (err) {
+      setErrores({ envio: err.message });
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return {
-    usuario:          mock.usuario,
-    tieneAlumnos:     mock.tieneAlumnos,
-    alumnosAsignados: mock.alumnosAsignados,
-    anuncios, modo, anuncioActivo, form, errores, toast,
-    abrirNuevo, abrirEditar, abrirEliminar,
-    cancelar, handleChange, handleGuardar, handleEliminar,
+    esProfesor,
+    carga, recargar,
+    anuncios, alcance, alumnos, puedePublicar,
+    modo, form, errores, enviando, toast,
+    abrirNuevo, cancelar, handleChange, handleGuardar,
   };
 }

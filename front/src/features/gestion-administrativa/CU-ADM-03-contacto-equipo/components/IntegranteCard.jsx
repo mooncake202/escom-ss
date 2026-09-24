@@ -1,16 +1,28 @@
 import { RADIUS } from "@/themes/colors";
 
+// Las tres carreras que admite el catálogo de alumnos.
 const CARRERA_LABEL = {
   ISC: "Ing. Sistemas Computacionales",
-  IA:  "Inteligencia Artificial",
+  IIA: "Ing. Inteligencia Artificial",
   LCD: "Lic. Ciencia de Datos",
 };
 
-export function IntegranteCard({ integrante, esTuPerfil, C }) {
+// El celular NO se muestra: es un dato personal de un tercero y el backend ni siquiera lo envía.
+//
+// Esta tarjeta solo pinta COMPAÑEROS: el alumno autenticado no aparece en la pantalla, así que ya
+// no existe el caso "este eres tú" ni su marca "(tú)".
+export function IntegranteCard({ integrante, C }) {
+  const iniciales = integrante.nombreCompleto
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("");
+
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
-      border: `1px solid ${esTuPerfil ? C.accent : C.borderDefault}`,
+      border: `1px solid ${C.borderDefault}`,
       overflow: "hidden",
     }}>
       {/* Encabezado */}
@@ -21,17 +33,17 @@ export function IntegranteCard({ integrante, esTuPerfil, C }) {
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: "50%",
-          background: esTuPerfil ? C.accent : C.accentSoft,
+          background: C.accentSoft,
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 13, fontWeight: 700,
-          color: esTuPerfil ? "#fff" : C.accentText,
+          color: C.accentText,
           flexShrink: 0,
         }}>
-          {integrante.nombre.split(" ").slice(0, 2).map(w => w[0]).join("")}
+          {iniciales}
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {integrante.nombre} {esTuPerfil && <span style={{ fontSize: 11, color: C.accentText, fontWeight: 500 }}>(tú)</span>}
+            {integrante.nombreCompleto}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>
             {CARRERA_LABEL[integrante.carrera] ?? integrante.carrera} · {integrante.boleta}
@@ -42,9 +54,8 @@ export function IntegranteCard({ integrante, esTuPerfil, C }) {
       {/* Datos de contacto */}
       <div style={{ padding: "0.5rem 0" }}>
         {[
-          { label: "Correo institucional", valor: integrante.correoInst },
+          { label: "Correo institucional", valor: integrante.correoInstitucional },
           { label: "Correo personal",      valor: integrante.correoPersonal },
-          { label: "Teléfono",             valor: integrante.telefono },
         ].map(({ label, valor }) => (
           <div key={label} style={{
             display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -54,7 +65,7 @@ export function IntegranteCard({ integrante, esTuPerfil, C }) {
             <span style={{ fontSize: 12, fontWeight: 600, color: C.textDisabled, flexShrink: 0 }}>
               {label}
             </span>
-            <span style={{ fontSize: 12, color: valor ? C.textPrimary : C.textDisabled, textAlign: "right", fontFamily: valor?.includes("@") ? "monospace" : "inherit" }}>
+            <span style={{ fontSize: 12, color: valor ? C.textPrimary : C.textDisabled, textAlign: "right", fontFamily: valor ? "monospace" : "inherit" }}>
               {valor ?? "No registrado"}
             </span>
           </div>

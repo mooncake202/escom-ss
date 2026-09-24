@@ -36,7 +36,11 @@ const NAV_ITEMS_ALUMNO = [
   { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
   { key: "calendario",  label: "Calendario",    path: "/alumno/calendario",             icon: "calendario" },
   { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
-  { key: "contacto",    label: "Mi profesor",   path: "/alumno/contacto-profesor",      icon: "contacto" },
+  { key: "recursos",    label: "Recursos",      path: "/alumno/recursos",               icon: "recursos" },
+  // Una sola entrada para toda la asignación del alumno: dentro se navega por pestañas entre su
+  // profesor responsable y su equipo. Antes eran dos entradas y una de ellas aparecía y desaparecía
+  // según la pantalla, lo que hacía saltar el menú.
+  { key: "asignacion",  label: "Mi asignación", path: "/alumno/mi-asignacion",          icon: "contacto" },
   { key: "bajaSS",      label: "Baja SS",       path: "/alumno/solicitar-baja",         icon: "userMinus" },
   { key: "institucion", label: "Coordinación",  path: "/alumno/contacto-institucional", icon: "institucion" },
   { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
@@ -52,6 +56,8 @@ const NAV_ITEMS_PROFESOR = [
   { key: "calendario",    label: "Calendario",         path: "/profesor/calendario",             icon: "calendario" },
   { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
   { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
+  { key: "recursos",      label: "Recursos",           path: "/profesor/recursos",               icon: "recursos" },
+  { key: "institucion",   label: "Contacto inst.",     path: "/profesor/contacto-institucional", icon: "institucion" },
   { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
   { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
 ];
@@ -80,7 +86,9 @@ const NAV_ITEMS = {
   coordinador: NAV_ITEMS_COORDINACION,
 };
 
-export function Sidebar({ rol = "profesor", enProyecto = false }) {
+// El menú depende SOLO del rol. Ninguna entrada aparece o desaparece según la pantalla en la que
+// esté el usuario: eso hacía que el menú saltara al navegar.
+export function Sidebar({ rol = "profesor" }) {
   const { C } = useTheme();
   const [expanded, setExpanded] = useState(() => localStorage.getItem("sidebarExpandido") === "true");
   const navigate  = useNavigate();
@@ -95,9 +103,7 @@ export function Sidebar({ rol = "profesor", enProyecto = false }) {
     });
   };
 
-  const items = (NAV_ITEMS[rol] ?? NAV_ITEMS.profesor).filter(
-  item => item.key !== "equipo" || enProyecto
-);
+  const items = NAV_ITEMS[rol] ?? NAV_ITEMS.profesor;
   const W_collapsed = 56;
   const W_expanded  = 220;
   const W = expanded ? W_expanded : W_collapsed;

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from './features/dashboard/dashboards'
 import { RutaProtegida } from './components/RutaProtegida'
 import { SocketProvider } from './context/SocketContext'
@@ -41,8 +41,11 @@ import RegistrarBitacora from './features/gestion-actividades/CU-AH-03-registrar
 import RevisarAvances from './features/gestion-actividades/CU-AH-04-revisar-avances/RevisarAvances'
 import AcumuladoHoras from './features/gestion-actividades/CU-AH-05-acumulado-horas/AcumuladoHoras'
 import HistorialActividades from './features/gestion-actividades/CU-AH-06-historial/HistorialActividades'
-import ContactoProfesor from './features/gestion-administrativa/CU-ADM-01-contacto-profesor/ContactoProfesor'
+// ADM-01 y ADM-03 se presentan como una sola sección con pestañas; sus paneles viven en sus
+// carpetas de CU y esta pantalla solo los organiza.
+import MiAsignacion from './features/gestion-administrativa/alumno-mi-asignacion/MiAsignacion'
 import GestionarRecursos from './features/gestion-administrativa/CU-ADM-05-gestionar-recursos/GestionarRecursos'
+import RecursosConsulta from './features/gestion-administrativa/CU-ADM-05-gestionar-recursos/RecursosConsulta'
 import PublicarAnuncios from './features/gestion-administrativa/CU-ADM-07-publicar-anuncios/PublicarAnuncios'
 import AnunciosSistema from './features/gestion-administrativa/CU-ADM-02-anuncios/AnunciosSistema'
 import ContactoInstitucional from './features/gestion-administrativa/CU-ADM-06-contacto-institucional/ContactoInstitucional'
@@ -68,7 +71,6 @@ import SolicitarOfertaIndividual from './features/gestion-ofertas/CU-PRO-01-soli
 import ConsultarOfertas        from './features/gestion-ofertas/CU-PRO-03-consultar-ofertas/ConsultarOfertas'
 
 
-//import ContactoEquipo from './features/gestion-administrativa/CU-ADM-03-contacto-equipo/ContactoEquipo'
 
 
 //LSS
@@ -209,11 +211,28 @@ function App() {
         } />
 
   {/* --  ADM-- */}
+        <Route path="/alumno/mi-asignacion" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><MiAsignacion /></RutaProtegida>
+        } />
+        {/* Rutas anteriores de ADM-01 y ADM-03: se conservan como redirección para que ningún
+            enlace o marcador guardado quede roto. El destino es el que exige la sesión. */}
         <Route path="/alumno/contacto-profesor" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><ContactoProfesor /></RutaProtegida>
+          <Navigate to="/alumno/mi-asignacion" replace />
+        } />
+        <Route path="/alumno/contacto-equipo" element={
+          <Navigate to="/alumno/mi-asignacion?seccion=equipo" replace />
         } />
         <Route path="/coordinacion/admin/recursos" element={
           <RutaProtegida roles={COORDINADOR}><GestionarRecursos /></RutaProtegida>
+        } />
+        {/* ADM-05: consulta en solo lectura. El alumno ASIGNADO y el profesor comparten la MISMA
+            pantalla; solo cambia el rol que se le pasa al layout. `alumno_sin_asignar` no entra:
+            los recursos son del servicio en curso, no del trámite de registro. */}
+        <Route path="/alumno/recursos" element={
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><RecursosConsulta rol="alumno_asignado" /></RutaProtegida>
+        } />
+        <Route path="/profesor/recursos" element={
+          <RutaProtegida roles={PROFESOR}><RecursosConsulta rol="profesor" /></RutaProtegida>
         } />
         <Route path="/coordinacion/admin/anuncios" element={
           <RutaProtegida roles={COORDINADOR}><PublicarAnuncios rol="coordinacion" /></RutaProtegida>
@@ -355,18 +374,17 @@ function App() {
 
 
         {/* --ADMIN-- */}
-        {/* Estas 4 no tienen prefijo /alumno /profesor /coordinacion en la
-            URL, así que no pude inferir el rol con certeza — las dejé solo
-            con "requiere sesión" (sin restricción de rol). Ajusta roles={...}
-            si sabes a quién le toca cada una. */}
+        {/* ADM-14: solo Coordinación registra la carta compromiso firmada. */}
         <Route path="/cartacompromisofirmada" element={
-          <RutaProtegida><CartaCompromisoFirmada /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><CartaCompromisoFirmada /></RutaProtegida>
         } />
+        {/* ADM-13: consulta del expediente documental. El alumno ve el suyo; Coordinación, el de
+            cualquiera. Ambas son de solo lectura. */}
         <Route path="/alumnoasignado-documentacion" element={
-          <RutaProtegida><DocumentosAlumnosAsignados /></RutaProtegida>
+          <RutaProtegida roles={ALUMNO_ASIGNADO}><DocumentosAlumnosAsignados /></RutaProtegida>
         } />
         <Route path="/coordinación-alumnoasignado-documentacion" element={
-          <RutaProtegida><DocumentosAlumnosAsignadosCoordinacion /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><DocumentosAlumnosAsignadosCoordinacion /></RutaProtegida>
         } />
         <Route path="/gestion-faltas" element={
           <RutaProtegida><GestionFaltas /></RutaProtegida>

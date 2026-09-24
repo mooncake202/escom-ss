@@ -1,30 +1,51 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  obtenerRecursos, crearRecurso, actualizarRecurso, eliminarRecurso,
+} from "@/services/recursosService";
 
-const COORDINACION = { nombre: "Lic. Morales Vega" };
+// CU-ADM-05 — Coordinación administra los recursos. Datos reales, sin mocks.
+//
+// El modelo NO tiene categoría y la interfaz tampoco la usa: el formulario es título + URL.
+// No se suben archivos; solo se administra el enlace.
 
-let nextId = 6;
-
-const RECURSOS_INICIALES = [
-  { id: 1, nombre: "Formato de solicitud de servicio social",  url: "https://www.escom.ipn.mx/formatos/solicitud-ss.pdf",       categoria: "Formatos",                   ultimaActualizacion: "15 de enero de 2026" },
-  { id: 2, nombre: "Guía de llenado del formato SISS",          url: "https://www.escom.ipn.mx/guias/siss.pdf",                  categoria: "Guías",                      ultimaActualizacion: "10 de febrero de 2026" },
-  { id: 3, nombre: "Carta compromiso alumno",                    url: "https://www.escom.ipn.mx/formatos/carta-compromiso.pdf",   categoria: "Documentos institucionales", ultimaActualizacion: "20 de diciembre de 2025" },
-  { id: 4, nombre: "Plantilla de reporte mensual",               url: "https://www.escom.ipn.mx/plantillas/reporte-mensual.docx", categoria: "Plantillas",                 ultimaActualizacion: "5 de enero de 2026" },
-  { id: 5, nombre: "Reglamento de servicio social ESCOM",        url: "https://www.escom.ipn.mx/reglamentos/ss.pdf",              categoria: "Documentos institucionales", ultimaActualizacion: "1 de octubre de 2025" },
-];
+export const MAX_NOMBRE = 150; // recurso.nombre VarChar(150); el backend lo revalida
+export const MAX_URL = 500;    // recurso.url    VarChar(500)
 
 const FORM_VACIO = { nombre: "", url: "" };
 
-function formatFecha(date) {
-  return date.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+/** "15 de enero de 2026" — la fecha llega en ISO desde el backend. */
+export function formatFecha(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
 }
 
 export function useGestionarRecursos() {
-  const [recursos, setRecursos]           = useState(RECURSOS_INICIALES);
-  const [modo, setModo]                   = useState(null); // "agregar" | "editar" | "eliminar" | null
+  const [carga, setCarga] = useState({ estado: "cargando", error: null });
+  const [recursos, setRecursos] = useState([]);
+  const [intento, setIntento] = useState(0);
+
+  const [modo, setModo] = useState(null); // "agregar" | "editar" | "eliminar" | null
   const [recursoActivo, setRecursoActivo] = useState(null);
-  const [form, setForm]                   = useState(FORM_VACIO);
-  const [errores, setErrores]             = useState({});
-  const [toast, setToast]                 = useState(null);
+  const [form, setForm] = useState(FORM_VACIO);
+  const [errores, setErrores] = useState({});
+  const [enviando, setEnviando] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    let vigente = true;
+    obtenerRecursos().then(
+      (r) => { if (vigente) { setRecursos(r.recursos); setCarga({ estado: "listo", error: null }); } },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [intento]);
+
+  function recargar() {
+    setCarga({ estado: "cargando", error: null });
+    setIntento((n) => n + 1);
+  }
 
   function mostrarToast(msg, tipo = "success") {
     setToast({ msg, tipo });
@@ -33,14 +54,23 @@ export function useGestionarRecursos() {
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
-    if (errores[name]) setErrores(prev => ({ ...prev, [name]: null }));
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (errores[name]) setErrores((prev) => ({ ...prev, [name]: null }));
   }
 
+  // Validación de cortesía: el backend vuelve a comprobar todo, incluido el esquema de la URL.
   function validar() {
     const e = {};
-    if (!form.nombre.trim()) e.nombre = "El título del recurso es obligatorio.";
-    if (!form.url.trim())    e.url    = "La URL es obligatoria.";
+    const nombre = form.nombre.trim();
+    const url = form.url.trim();
+
+    if (!nombre) e.nombre = "El título del recurso es obligatorio.";
+    else if (nombre.length > MAX_NOMBRE) e.nombre = `El título no puede pasar de ${MAX_NOMBRE} caracteres.`;
+
+    if (!url) e.url = "La URL es obligatoria.";
+    else if (url.length > MAX_URL) e.url = `La URL no puede pasar de ${MAX_URL} caracteres.`;
+    else if (!/^https?:\/\//i.test(url)) e.url = "La URL debe comenzar con http:// o https://";
+
     return e;
   }
 
@@ -52,7 +82,7 @@ export function useGestionarRecursos() {
   }
 
   function abrirEditar(recurso) {
-    setForm({ nombre: recurso.nombre, url: recurso.url || "" });
+    setForm({ nombre: recurso.nombre, url: recurso.url });
     setErrores({});
     setRecursoActivo(recurso);
     setModo("editar");
@@ -70,33 +100,80 @@ export function useGestionarRecursos() {
     setErrores({});
   }
 
-  function handleGuardar() {
+  const porNombre = (a, b) => a.nombre.localeCompare(b.nombre);
+
+  async function handleGuardar() {
+    if (enviando) return;
     const e = validar();
     if (Object.keys(e).length > 0) { setErrores(e); return; }
-    const fecha = formatFecha(new Date());
-    if (modo === "agregar") {
-      setRecursos(prev => [{ id: nextId++, nombre: form.nombre.trim(), url: form.url.trim(), ultimaActualizacion: fecha }, ...prev]);
-      mostrarToast("Recurso agregado correctamente.");
-    } else {
-      setRecursos(prev => prev.map(r => r.id === recursoActivo.id
-        ? { ...r, nombre: form.nombre.trim(), url: form.url.trim(), ultimaActualizacion: fecha }
-        : r
-      ));
-      mostrarToast("Recurso actualizado correctamente.");
+
+    const datos = { nombre: form.nombre.trim(), url: form.url.trim() };
+    setEnviando(true);
+    try {
+      if (modo === "agregar") {
+        const { recurso } = await crearRecurso(datos);
+        setRecursos((prev) => [...prev, recurso].sort(porNombre));
+        mostrarToast("Recurso agregado correctamente.");
+      } else {
+        const { recurso } = await actualizarRecurso(recursoActivo.id, datos);
+        setRecursos((prev) => prev.map((r) => (r.id === recurso.id ? recurso : r)).sort(porNombre));
+        mostrarToast("Recurso actualizado correctamente.");
+      }
+      cancelar();
+    } catch (err) {
+      setErrores({ envio: err.message });
+    } finally {
+      setEnviando(false);
     }
-    cancelar();
   }
 
-  function handleEliminar() {
-    setRecursos(prev => prev.filter(r => r.id !== recursoActivo.id));
-    mostrarToast(`"${recursoActivo.nombre}" eliminado.`, "danger");
-    cancelar();
+  async function handleEliminar() {
+    if (enviando) return;
+    setEnviando(true);
+    try {
+      await eliminarRecurso(recursoActivo.id);
+      setRecursos((prev) => prev.filter((r) => r.id !== recursoActivo.id));
+      mostrarToast(`"${recursoActivo.nombre}" eliminado.`, "danger");
+      cancelar();
+    } catch (err) {
+      setErrores({ envio: err.message });
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return {
-    coordinacion: COORDINACION,
-    recursos, modo, recursoActivo, form, errores, toast,
+    carga, recargar,
+    recursos, modo, recursoActivo, form, errores, enviando, toast,
     abrirAgregar, abrirEditar, abrirEliminar,
     cancelar, handleChange, handleGuardar, handleEliminar,
   };
+}
+
+// ── Vista de consulta (alumno asignado y profesor) ──────────────────────────
+
+/**
+ * Solo lectura: la misma lista que administra Coordinación, sin acciones. La comparten el alumno
+ * asignado y el profesor, porque el backend devuelve lo mismo para ambos.
+ */
+export function useRecursosConsulta() {
+  const [carga, setCarga] = useState({ estado: "cargando", error: null });
+  const [recursos, setRecursos] = useState([]);
+  const [intento, setIntento] = useState(0);
+
+  useEffect(() => {
+    let vigente = true;
+    obtenerRecursos().then(
+      (r) => { if (vigente) { setRecursos(r.recursos); setCarga({ estado: "listo", error: null }); } },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+    return () => { vigente = false; };
+  }, [intento]);
+
+  function recargar() {
+    setCarga({ estado: "cargando", error: null });
+    setIntento((n) => n + 1);
+  }
+
+  return { carga, recargar, recursos };
 }

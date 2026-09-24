@@ -53,9 +53,9 @@ export function useBajaAlumnoProfesor() {
     setMotivo("");
     setObservaciones("");
     setErrores({});
-    // Con faltas se ofrece elegir entre amonestar o dar de baja; sin faltas se va directo a la baja.
-    // No hay regla automática: el profesor da las oportunidades que considere.
-    setModo(alumno.faltasAcumuladas > 0 || alumno.faltasConsecutivas > 0 ? "selector" : "baja");
+    // Siempre el selector: amonestar y solicitar la baja son acciones INDEPENDIENTES y ninguna
+    // exige tener faltas. No hay regla automática — el profesor da las oportunidades que considere.
+    setModo("selector");
   }
 
   function elegirAccion(accion) {

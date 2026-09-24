@@ -1,133 +1,184 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  obtenerMisAlumnos,
+  obtenerProfesores,
+  obtenerAlumnosDeProfesor,
+  obtenerAlumnoAsignado,
+} from "@/services/usuariosAsignadosService";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
-const MOCK_PROFESOR     = { nombre: "Dr. Torres Vega",   id: "PTC-2024-0187" };
-const MOCK_COORDINACION = { nombre: "Lic. Morales Vega" };
-
-const ALUMNOS_TORRES = [
-  {
-    id: 1, nombre: "García López Ana",
-    boleta: "2022630001", carrera: "ISC",
-    correoInst: "agarcia0001@alumno.ipn.mx", creditos: 480,
-    correoAlt: "ana.garcia@gmail.com", telefono: "55 1234 5678",
-  },
-  {
-    id: 2, nombre: "Hernández Ruiz Carlos",
-    boleta: "2021630042", carrera: "LCD",
-    correoInst: "chernandez0042@alumno.ipn.mx", creditos: 320,
-    correoAlt: "carlos.hdz@hotmail.com", telefono: "55 9876 5432",
-  },
-  {
-    id: 3, nombre: "Martínez Soto Diana",
-    boleta: "2022630078", carrera: "ISC",
-    correoInst: "dmartinez0078@alumno.ipn.mx", creditos: 410,
-    correoAlt: "dianamtz@gmail.com", telefono: "55 5555 1234",
-  },
-];
-
-const MOCK_PROFESORES = [
-  {
-    id: 1, nombre: "Dr. Torres Vega", idEmpleado: "PTC-2024-0187",
-    alumnos: ALUMNOS_TORRES,
-  },
-  {
-    id: 2, nombre: "Dra. Ramírez Flores", idEmpleado: "PTC-2024-0203",
-    alumnos: [
-      {
-        id: 4, nombre: "López Torres Pedro",
-        boleta: "2020630115", carrera: "ISC",
-        correoInst: "plopez0115@alumno.ipn.mx", creditos: 510,
-        correoAlt: "pedro.lopez@gmail.com", telefono: "55 3344 5566",
-      },
-      {
-        id: 5, nombre: "Vargas Méndez Sofía",
-        boleta: "2022630201", carrera: "LCD",
-        correoInst: "svargas0201@alumno.ipn.mx", creditos: 390,
-        correoAlt: "sofia.vargas@outlook.com", telefono: "55 7788 9900",
-      },
-    ],
-  },
-  {
-    id: 3, nombre: "M.C. Gutiérrez Peña", idEmpleado: "PTC-2023-0156",
-    alumnos: [], // flujo alterno 2.1: profesor sin alumnos
-  },
-];
-
+// CU-ADM-17. Datos reales, solo lectura.
+//
+// Dos navegaciones sobre el mismo módulo:
+//   profesor    → nivel 1 sus alumnos, nivel 2 detalle
+//   coordinación→ nivel 1 profesores, nivel 2 alumnos de ese profesor, nivel 3 detalle
+//
+// El profesor nunca manda su id: el backend lo deriva del token. Coordinación sí elige profesor,
+// porque su CU es justamente navegar por todos.
+//
+// Las cargas de los niveles 2 y 3 se disparan desde el clic, no desde un efecto: así la navegación
+// es explícita y un clic rápido sobre otra tarjeta descarta la respuesta anterior (contador `turno`)
+// en vez de pintar datos de quien ya no está seleccionado.
 export function useConsultarUsuarios(rol) {
-  const [nivel, setNivel]         = useState(1);
+  const esProfesor = rol === "profesor";
+  const { usuario } = useSesion();
+
+  const [nivel, setNivel] = useState(1);
+  const [busqueda, setBusqueda] = useState("");
+  const [intento, setIntento] = useState(0);
+
+  // Nivel 1: alumnos propios (profesor) o profesores (coordinación).
+  const [carga, setCarga] = useState({ estado: "cargando", error: null });
+  const [profesores, setProfesores] = useState([]);
+  const [alumnos, setAlumnos] = useState([]);
+
+  // Nivel 2 de coordinación: alumnos del profesor elegido.
   const [profesorSel, setProfesorSel] = useState(null);
-  const [alumnoSel, setAlumnoSel]     = useState(null);
-  const [busqueda, setBusqueda]       = useState("");
+  const [cargaAlumnos, setCargaAlumnos] = useState({ estado: "inactivo", error: null });
 
-  const usuario = rol === "profesor" ? MOCK_PROFESOR : MOCK_COORDINACION;
+  // Detalle del alumno.
+  const [alumnoSel, setAlumnoSel] = useState(null);
+  const [detalle, setDetalle] = useState(null);
+  const [cargaDetalle, setCargaDetalle] = useState({ estado: "inactivo", error: null });
 
-  const alumnosActuales = rol === "profesor"
-    ? ALUMNOS_TORRES
-    : (profesorSel?.alumnos ?? []);
+  const turno = useRef(0);
+
+  // El estado inicial ya es "cargando" y `recargar` lo repone, así que el efecto no llama a
+  // setState de forma síncrona en su cuerpo.
+  useEffect(() => {
+    let vigente = true;
+    const pedir = esProfesor ? obtenerMisAlumnos : obtenerProfesores;
+
+    pedir().then(
+      (r) => {
+        if (!vigente) return;
+        if (esProfesor) setAlumnos(r.alumnos);
+        else setProfesores(r.profesores);
+        setCarga({ estado: "listo", error: null });
+      },
+      (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
+    );
+
+    return () => { vigente = false; };
+  }, [esProfesor, intento]);
+
+  function recargar() {
+    turno.current += 1;
+    setCarga({ estado: "cargando", error: null });
+    setProfesorSel(null);
+    setAlumnoSel(null);
+    setDetalle(null);
+    setCargaAlumnos({ estado: "inactivo", error: null });
+    setCargaDetalle({ estado: "inactivo", error: null });
+    setNivel(1);
+    setIntento((n) => n + 1);
+  }
 
   const profesoresFiltrados = useMemo(() => {
     const texto = busqueda.trim().toLowerCase();
-    if (!texto) return MOCK_PROFESORES;
-    return MOCK_PROFESORES.filter(p => p.nombre.toLowerCase().includes(texto));
-  }, [busqueda]);
+    if (!texto) return profesores;
+    return profesores.filter((p) => p.nombreCompleto.toLowerCase().includes(texto));
+  }, [profesores, busqueda]);
 
-  function handleSeleccionarProfesor(p) {
-    setProfesorSel(p);
+  async function seleccionarProfesor(profesor) {
+    const mio = ++turno.current;
+    setProfesorSel(profesor);
+    setAlumnos([]);
     setBusqueda("");
+    setNivel(2);
+    setCargaAlumnos({ estado: "cargando", error: null });
+
+    try {
+      const r = await obtenerAlumnosDeProfesor(profesor.id);
+      if (turno.current !== mio) return;
+      setAlumnos(r.alumnos);
+      setCargaAlumnos({ estado: "listo", error: null });
+    } catch (err) {
+      if (turno.current !== mio) return;
+      setCargaAlumnos({ estado: "error", error: err.message });
+    }
+  }
+
+  async function seleccionarAlumno(alumno) {
+    const mio = ++turno.current;
+    setAlumnoSel(alumno);
+    setDetalle(null);
+    setNivel(esProfesor ? 2 : 3);
+    setCargaDetalle({ estado: "cargando", error: null });
+
+    try {
+      const r = await obtenerAlumnoAsignado(alumno.boleta);
+      if (turno.current !== mio) return;
+      setDetalle(r);
+      setCargaDetalle({ estado: "listo", error: null });
+    } catch (err) {
+      if (turno.current !== mio) return;
+      setCargaDetalle({ estado: "error", error: err.message });
+    }
+  }
+
+  // Reintento del nivel en el que falló, sin perder la navegación.
+  function reintentarAlumnos() { if (profesorSel) seleccionarProfesor(profesorSel); }
+  function reintentarDetalle() { if (alumnoSel) seleccionarAlumno(alumnoSel); }
+
+  function navegar(destino) {
+    turno.current += 1;
+    if (destino <= 1) {
+      setProfesorSel(null);
+      setAlumnoSel(null);
+      setDetalle(null);
+      setCargaDetalle({ estado: "inactivo", error: null });
+      if (!esProfesor) {
+        setAlumnos([]);
+        setCargaAlumnos({ estado: "inactivo", error: null });
+      }
+      setNivel(1);
+      return;
+    }
+    // Volver al listado de alumnos: se conserva lo ya cargado del profesor elegido.
+    setAlumnoSel(null);
+    setDetalle(null);
+    setCargaDetalle({ estado: "inactivo", error: null });
     setNivel(2);
   }
 
-  function handleSeleccionarAlumno(a) {
-    setAlumnoSel(a);
-    setNivel(rol === "profesor" ? 2 : 3);
-  }
+  // [{ label, onClick? }] — el último sin onClick es el nivel actual.
+  const breadcrumbs = useMemo(() => {
+    const tituloAlumno = alumnoSel?.nombreCompleto ?? "Alumno";
 
-  function handleNavegar(nivelDestino) {
-    if (nivelDestino <= 1) {
-      setProfesorSel(null);
-      setAlumnoSel(null);
-      setNivel(1);
-    } else if (nivelDestino === 2) {
-      setAlumnoSel(null);
-      setNivel(2);
-    }
-  }
-
-  // Breadcrumbs: [{label, onClick?}] — último item sin onClick = nivel actual
-  const breadcrumbs = (() => {
-    if (rol === "profesor") {
+    if (esProfesor) {
       const items = [
         { label: "Inicio" },
-        nivel > 1
-          ? { label: "Mis alumnos", onClick: () => handleNavegar(1) }
-          : { label: "Mis alumnos" },
+        nivel > 1 ? { label: "Mis alumnos", onClick: () => navegar(1) } : { label: "Mis alumnos" },
       ];
-      if (nivel === 2 && alumnoSel) items.push({ label: alumnoSel.nombre });
+      if (nivel === 2 && alumnoSel) items.push({ label: tituloAlumno });
       return items;
     }
-    // coordinacion — 3 niveles
+
     const items = [
       { label: "Inicio" },
-      nivel > 1
-        ? { label: "Profesores", onClick: () => handleNavegar(1) }
-        : { label: "Profesores" },
+      nivel > 1 ? { label: "Profesores", onClick: () => navegar(1) } : { label: "Profesores" },
     ];
     if (nivel >= 2 && profesorSel) {
-      items.push(
-        nivel > 2
-          ? { label: profesorSel.nombre, onClick: () => handleNavegar(2) }
-          : { label: profesorSel.nombre }
-      );
+      items.push(nivel > 2
+        ? { label: profesorSel.nombreCompleto, onClick: () => navegar(2) }
+        : { label: profesorSel.nombreCompleto });
     }
-    if (nivel === 3 && alumnoSel) items.push({ label: alumnoSel.nombre });
+    if (nivel === 3 && alumnoSel) items.push({ label: tituloAlumno });
     return items;
-  })();
+    // `navegar` es estable en la práctica (solo usa setters y el ref); se omite a propósito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esProfesor, nivel, alumnoSel, profesorSel]);
 
   return {
-    usuario, nivel,
+    nombreUsuario: nombreCompletoSesion(usuario),
+    esProfesor, nivel,
+    carga, recargar,
     profesoresFiltrados, profesorSel,
-    alumnosActuales, alumnoSel,
+    alumnos, cargaAlumnos, reintentarAlumnos,
+    alumnoSel, detalle, cargaDetalle, reintentarDetalle,
     busqueda, setBusqueda,
-    handleSeleccionarProfesor, handleSeleccionarAlumno,
-    handleNavegar, breadcrumbs,
+    seleccionarProfesor, seleccionarAlumno, navegar,
+    breadcrumbs,
   };
 }
