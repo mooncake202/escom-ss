@@ -11,8 +11,13 @@ const {
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
   ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
   ESTADO_SOLICITUD_CARTA_TERMINO,
+  ESTADO_CARTA_SOLICITADA,
+  ESTADO_CARTA_LISTA_PARA_RECOGER,
+  ESTADO_CARTA_RECOGIDA,
+  ESTADO_LIBERACION_CARTA_RECOGIDA,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
+  exigirEstadoCarta,
 } = require('./lss.shared');
 const { calcularHorasNetas, LIMITE_HORAS_SERVICIO } = require('../ah/ah.shared');
 
@@ -199,7 +204,10 @@ async function iniciarEvaluacion(alumnoUsuarioId, reportesValidadosSiss) {
 /**
  * Mismo patrón que resolverAlumnoYSolicitud, pero además exige que ya
  * exista liberacion_proceso (CU-LSS-02 en adelante no tiene sentido sin
- * uno) y trae evaluacion_desempeno + sus revisiones, si existen.
+ * uno) y trae evaluacion_desempeno + sus revisiones, y carta_termino, si
+ * existen. Se reutiliza tal cual para CU-LSS-05 (carta_termino) — sin
+ * duplicar un resolver aparte solo por eso, mismo criterio de reuso ya
+ * usado en el resto de este archivo.
  */
 async function resolverConEvaluacion(alumnoUsuarioId) {
   const alumno = await prisma.alumno.findUnique({
@@ -209,7 +217,10 @@ async function resolverConEvaluacion(alumnoUsuarioId) {
         include: {
           oferta: { include: { profesor: true } },
           liberacion_proceso: {
-            include: { evaluacion_desempeno: { include: { revision_desempeno: true } } },
+            include: {
+              evaluacion_desempeno: { include: { revision_desempeno: true } },
+              carta_termino: true,
+            },
           },
         },
       },
@@ -354,7 +365,13 @@ async function confirmarSubidaSiss(alumnoUsuarioId) {
 
 /**
  * Cierre del Alterno D — exige ambos booleanos en true, avanza
- * liberacion_proceso.estado a 'solicitud_carta_termino' (CU-LSS-05).
+ * liberacion_proceso.estado a 'solicitud_carta_termino' (CU-LSS-05), y
+ * crea la fila carta_termino (estado='solicitada', fecha_solicitud=ahora)
+ * en la MISMA transacción — es el único punto real donde "se solicita" la
+ * carta, así que fecha_solicitud debe nacer aquí (campo obligatorio en el
+ * schema, sin default) y no en un paso posterior (CU-LSS-05/06), evitando
+ * una ventana de inconsistencia donde liberacion_proceso ya avanzó pero
+ * carta_termino todavía no existe.
  */
 async function solicitarCartaTermino(alumnoUsuarioId) {
   const { solicitud, proceso } = await resolverConEvaluacion(alumnoUsuarioId);
@@ -364,13 +381,67 @@ async function solicitarCartaTermino(alumnoUsuarioId) {
     throw crearError('Debes descargar tu evaluación y confirmar que ya la subiste al SISS antes de continuar.', 409);
   }
 
-  await prisma.liberacion_proceso.update({ where: { id: proceso.id }, data: { estado: ESTADO_SOLICITUD_CARTA_TERMINO } });
+  await prisma.$transaction([
+    prisma.liberacion_proceso.update({ where: { id: proceso.id }, data: { estado: ESTADO_SOLICITUD_CARTA_TERMINO } }),
+    prisma.carta_termino.create({
+      data: {
+        liberacion_proceso_id: proceso.id,
+        estado: ESTADO_CARTA_SOLICITADA,
+        carta_recogida: false,
+        fecha_solicitud: new Date(),
+      },
+    }),
+  ]);
 
   emitirResumenActualizadoAlumno(alumnoUsuarioId);
   const profesorUsuarioId = solicitud.oferta?.profesor?.usuario_id;
   if (profesorUsuarioId) emitirResumenActualizadoProfesor(profesorUsuarioId);
 
   return { mensaje: 'Solicitud de carta de término enviada.', estado: ESTADO_SOLICITUD_CARTA_TERMINO };
+}
+
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-05: consultar y confirmar la recogida de la carta de término.
+// NO construye ninguna lógica real de CU-LSS-06 (coordinación marcando la
+// carta como lista) — el seed de prueba simula ese paso mientras ese CU no
+// exista.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Flujo Principal — consulta pura, sin cambios en BD. Fail-safe a
+ * ESTADO_CARTA_SOLICITADA si por algún motivo la fila no existe todavía
+ * (no debería pasar, solicitarCartaTermino ya la crea).
+ */
+async function obtenerEstadoCarta(alumnoUsuarioId) {
+  const { proceso } = await resolverConEvaluacion(alumnoUsuarioId);
+  return { estado: proceso.carta_termino?.estado ?? ESTADO_CARTA_SOLICITADA };
+}
+
+/**
+ * Flujo Alterno — RN-LSS-16: rechazo real en backend (409) si coordinación
+ * todavía no marcó la carta como disponible, no solo bloqueo visual.
+ * RF-LSS-23: fecha de recogida registrada en carta_termino.fecha_recogida.
+ */
+async function confirmarRecogida(alumnoUsuarioId) {
+  const { solicitud, proceso } = await resolverConEvaluacion(alumnoUsuarioId);
+  exigirEstadoCarta(proceso.carta_termino, ESTADO_CARTA_LISTA_PARA_RECOGER, 'Tu carta de término todavía no está lista para recoger.');
+
+  await prisma.$transaction([
+    prisma.carta_termino.update({
+      where: { id: proceso.carta_termino.id },
+      data: { estado: ESTADO_CARTA_RECOGIDA, carta_recogida: true, fecha_recogida: new Date() },
+    }),
+    prisma.liberacion_proceso.update({
+      where: { id: proceso.id },
+      data: { estado: ESTADO_LIBERACION_CARTA_RECOGIDA, carta_termino_recogida: true },
+    }),
+  ]);
+
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+  const profesorUsuarioId = solicitud.oferta?.profesor?.usuario_id;
+  if (profesorUsuarioId) emitirResumenActualizadoProfesor(profesorUsuarioId);
+
+  return { mensaje: 'Recogida confirmada.', estado: ESTADO_LIBERACION_CARTA_RECOGIDA };
 }
 
 module.exports = {
@@ -381,4 +452,6 @@ module.exports = {
   marcarEvaluacionDescargada,
   confirmarSubidaSiss,
   solicitarCartaTermino,
+  obtenerEstadoCarta,
+  confirmarRecogida,
 };

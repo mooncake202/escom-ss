@@ -82,6 +82,26 @@ async function postCartaTermino(req, res) {
   }
 }
 
+// ── CU-LSS-05 ─────────────────────────────────────────────────
+
+async function getEstadoCarta(req, res) {
+  try {
+    const resultado = await lssAlumnoService.obtenerEstadoCarta(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener estado de carta de término:');
+  }
+}
+
+async function postConfirmarRecogida(req, res) {
+  try {
+    const resultado = await lssAlumnoService.confirmarRecogida(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al confirmar recogida de carta de término:');
+  }
+}
+
 module.exports = {
   getEstadoRequisitos,
   postIniciarEvaluacion,
@@ -90,4 +110,6 @@ module.exports = {
   getDescargarEvaluacion,
   postConfirmarSiss,
   postCartaTermino,
+  getEstadoCarta,
+  postConfirmarRecogida,
 };

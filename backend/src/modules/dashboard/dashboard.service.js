@@ -1,6 +1,6 @@
 const prisma = require('../../lib/prisma');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
-const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN } = require('../lss/lss.shared');
+const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN, ESTADO_CARTA_LISTA_PARA_RECOGER } = require('../lss/lss.shared');
 const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
 const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
 
@@ -97,12 +97,13 @@ async function resumenAlumno(usuarioId) {
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
       cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false, estadoLiberacion: null,
+      cartaTerminoListaParaRecoger: false,
     };
   }
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion] = await Promise.all([
+  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion, cartaTermino] = await Promise.all([
     // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
     // y ambas variantes de completada (antes contaba todo, bug reportado).
     prisma.actividad.count({ where: { solicitud_registro_id: solicitudId, estado: { in: ['sin_comenzar', 'en_progreso'] } } }),
@@ -120,6 +121,14 @@ async function resumenAlumno(usuarioId) {
     // esos módulos existan y emitan el evento genérico, este widget ya
     // reacciona solo (ya escucha resumen:actualizado), sin cambios aquí.
     obtenerEstadoRequisitos(usuarioId),
+    // Notificación calculada Tipo A de CU-LSS-05 (mismo criterio que
+    // bitacoraHoyPendiente arriba): basta con que exista una fila
+    // carta_termino en 'lista_para_recoger' — desaparece sola cuando el
+    // alumno confirma la recogida (ya no hay ninguna fila en ese estado).
+    prisma.carta_termino.findFirst({
+      where: { liberacion_proceso: { solicitud_registro_id: solicitudId } },
+      select: { estado: true },
+    }),
   ]);
 
   return {
@@ -147,6 +156,7 @@ async function resumenAlumno(usuarioId) {
     // necesita el botón "Ver proceso de liberación" del dashboard para
     // navegar a la ruta que corresponde al estado actual, no a una fija.
     estadoLiberacion: estadoLiberacion.yaExiste ? estadoLiberacion.estado : null,
+    cartaTerminoListaParaRecoger: cartaTermino?.estado === ESTADO_CARTA_LISTA_PARA_RECOGER,
   };
 }
 

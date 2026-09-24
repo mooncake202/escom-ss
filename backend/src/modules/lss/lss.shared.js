@@ -50,6 +50,20 @@ const ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION = 'devuelta_para_correccion';
 // que no existía en ningún lado del código antes de esta tarea.
 const ESTADO_SOLICITUD_CARTA_TERMINO = 'solicitud_carta_termino';
 
+// Catálogo de carta_termino.estado (CU-LSS-05/06) — 3 valores, confirmados
+// contra la ficha (RN-LSS-18/19), NO contra el mockup del frontend (que
+// usaba 'recibida' en vez de 'recogida' — corregido en esta tarea).
+const ESTADO_CARTA_SOLICITADA = 'solicitada';
+const ESTADO_CARTA_LISTA_PARA_RECOGER = 'lista_para_recoger';
+const ESTADO_CARTA_RECOGIDA = 'recogida';
+
+// liberacion_proceso.estado al que se avanza cuando el alumno confirma la
+// recogida de su carta (CU-LSS-05, Flujo Alterno) — nombre DISTINTO a
+// ESTADO_CARTA_RECOGIDA a propósito: son 2 catálogos separados
+// (carta_termino.estado vs liberacion_proceso.estado), aunque el valor de
+// este último literalmente se llama "carta_recogida" según la ficha.
+const ESTADO_LIBERACION_CARTA_RECOGIDA = 'carta_recogida';
+
 // Fuente canónica de los 7 factores del formulario real de CU-LSS-03
 // (confirmado contra el mockup FormEvaluacion.jsx, NO contra los párrafos
 // largos del .docx — decisión confirmada: el mock es la forma real con la
@@ -206,6 +220,20 @@ function exigirEstadoEvaluacion(evaluacion, estadoEsperado, mensaje) {
   }
 }
 
+/**
+ * Mismo patrón que exigirEstadoEvaluacion, para carta_termino (CU-LSS-05).
+ * RN-LSS-16: el alumno no puede confirmar recogida si `carta` es null (no
+ * debería pasar nunca en la práctica, ya que solicitarCartaTermino crea la
+ * fila) o si su estado no es exactamente el esperado.
+ */
+function exigirEstadoCarta(carta, estadoEsperado, mensaje) {
+  if (!carta || carta.estado !== estadoEsperado) {
+    const error = new Error(mensaje || 'Tu carta de término ya no está en el paso esperado.');
+    error.status = 409;
+    throw error;
+  }
+}
+
 module.exports = {
   sha256,
   ESTADO_EVALUACION_SOLICITADA,
@@ -217,6 +245,10 @@ module.exports = {
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
   ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
   ESTADO_SOLICITUD_CARTA_TERMINO,
+  ESTADO_CARTA_SOLICITADA,
+  ESTADO_CARTA_LISTA_PARA_RECOGER,
+  ESTADO_CARTA_RECOGIDA,
+  ESTADO_LIBERACION_CARTA_RECOGIDA,
   FACTORES_EVALUACION,
   VALORES_VALIDOS_FACTOR,
   SUMA_TOTAL_MAXIMA,
@@ -225,4 +257,5 @@ module.exports = {
   validarYCalcularPuntajes,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
+  exigirEstadoCarta,
 };

@@ -321,6 +321,7 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         C={C}
         slotsCalculados={[
           { mostrar: !!resumen.bitacoraHoyPendiente, mensaje: "Falta tu bitácora del día", ruta: "/alumno/bitacora", tipo: "urgente" },
+          { mostrar: !!resumen.cartaTerminoListaParaRecoger, mensaje: "Tu carta de término está lista para recoger.", ruta: "/alumno/seguimiento-carta-termino", tipo: "urgente" },
         ]}
         rutasPromovidas={["/alumno/horas"]}
       />

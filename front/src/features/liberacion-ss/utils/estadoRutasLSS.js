@@ -24,14 +24,19 @@ export const ESTADO_LSS_A_RUTA = {
   // cambian liberacion_proceso.estado, solo evaluacion_desempeno.
   evaluacion_solicitada: "/alumno/seguimiento-evaluacion",
 
-  // CU-LSS-02 (esta tarea) — real: lo escribe solicitarCartaTermino, al
+  // CU-LSS-02 — real: lo escribe solicitarCartaTermino, al
   // completar el Alterno D (descargó + subió a SISS + solicitó).
   solicitud_carta_termino: "/alumno/seguimiento-carta-termino",
 
-  // TODO(LSS-06): agregar aquí el/los estado(s) reales de carta término
-  // (una vez entregada) cuando ese CU exista.
-  // TODO(LSS-07): agregar aquí el/los estado(s) reales de integración de
-  // expediente cuando ese CU exista.
+  // CU-LSS-05 (esta tarea) — real: lo escribe confirmarRecogida al
+  // confirmar que ya recogió su carta de término. CU-LSS-07 (Integración
+  // de expediente) todavía no tiene lógica de backend propia, pero su
+  // pantalla YA existe como mockup real (IntegracionExpediente.jsx, con
+  // guardaLSS) — se apunta ahí en vez de inventar un placeholder.
+  carta_recogida: "/alumno/integracion-expediente",
+
+  // TODO(LSS-08/09): agregar aquí el/los estado(s) reales de evaluación de
+  // expediente/resolución cuando ese CU exista.
   // TODO(LSS-08/09): agregar aquí el/los estado(s) reales de evaluación de
   // expediente/resolución cuando ese CU exista.
   // 'expediente_en_revision' ya está reservado como nombre en

@@ -65,3 +65,12 @@ export async function descargarEvaluacion() {
   document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+// CU-LSS-05 — seguimiento de carta de término.
+export async function getEstadoCarta() {
+  return apiFetch("/alumno/carta-termino/estado");
+}
+
+export async function confirmarRecogidaCarta() {
+  return apiFetch("/alumno/carta-termino/confirmar", { method: "POST" });
+}
