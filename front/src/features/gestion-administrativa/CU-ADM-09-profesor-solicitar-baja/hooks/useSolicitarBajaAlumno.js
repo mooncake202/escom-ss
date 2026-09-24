@@ -18,7 +18,7 @@ export function useBajaAlumnoProfesor() {
   const [intento, setIntento] = useState(0);
 
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
-  const [modo, setModo] = useState(null); // null | selector | baja | amonestacion
+  const [modo, setModo] = useState(null); // null | selector | baja | amonestacion | seguimiento
   const [motivo, setMotivo] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [errores, setErrores] = useState({});
@@ -48,14 +48,16 @@ export function useBajaAlumnoProfesor() {
   }
 
   function seleccionarAlumno(alumno) {
-    if (!alumno || alumno.tieneBajaPendiente) return;
+    if (!alumno) return;
     setAlumnoSeleccionado(alumno);
     setMotivo("");
     setObservaciones("");
     setErrores({});
-    // Siempre el selector: amonestar y solicitar la baja son acciones INDEPENDIENTES y ninguna
-    // exige tener faltas. No hay regla automática — el profesor da las oportunidades que considere.
-    setModo("selector");
+    // Con una baja en curso la tarjeta SÍ se abre, pero en modo SEGUIMIENTO: solo consulta. No hay
+    // ninguna acción disponible ahí — resolver la baja es de Coordinación y el expediente lo aporta
+    // el alumno. Sin baja en curso, el selector de siempre: amonestar y solicitar la baja son
+    // acciones INDEPENDIENTES y ninguna exige tener faltas.
+    setModo(alumno.tieneBajaPendiente ? "seguimiento" : "selector");
   }
 
   function elegirAccion(accion) {

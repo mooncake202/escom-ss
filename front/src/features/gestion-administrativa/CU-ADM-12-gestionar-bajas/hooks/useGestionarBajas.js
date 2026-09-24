@@ -3,10 +3,13 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   listarSolicitudesBaja,
   obtenerSolicitudBaja,
+  obtenerExpedienteBaja,
+  marcarBajaEnRevision,
   aprobarSolicitudBaja,
   rechazarSolicitudBaja,
 } from "@/services/bajasService";
 import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
+import { usePdfAlmacenado } from "@/features/gestion-reportes/compartido/usePdfAlmacenado";
 
 export const VISTA = { PENDIENTES: "pendientes", RESUELTAS: "resueltas" };
 
@@ -37,6 +40,15 @@ export function useGestionarBajas() {
   const [errores, setErrores] = useState({});
   const [toast, setToast] = useState(null);
   const [procesando, setProcesando] = useState(false);
+
+  // Visor de PDF de Reportes (CU-REP-05/06): el expediente se pide con el token por apiFetchBlob y se
+  // muestra desde su object URL. Un <a href> directo al endpoint no llevaría el Authorization.
+  const { pdf, abrirPdf, cerrarPdf } = usePdfAlmacenado();
+
+  function handleVerExpediente() {
+    if (!seleccionada?.tieneExpediente) return;
+    abrirPdf(() => obtenerExpedienteBaja(seleccionada.id));
+  }
 
   // Solo las notificaciones PROPIAS de esta bandeja (patrón de CU-REP-06 y ADM-16).
   // Las de los demás coordinadores son suyas y no se tocan.
@@ -100,6 +112,7 @@ export function useGestionarBajas() {
     setPanel("detalle");
     setErrores({});
     setComentario("");
+    cerrarPdf(); // el PDF abierto pertenecía a otra solicitud
     try {
       const fresca = await obtenerSolicitudBaja(solicitud.id);
       setSeleccionada(fresca);
@@ -112,8 +125,9 @@ export function useGestionarBajas() {
     }
   }
 
-  // Aprobar NO ejecuta: abre la confirmación explícita, porque la aprobación borra al usuario
-  // y todo su proceso de forma irreversible.
+  // Aprobar NO ejecuta: abre la confirmación explícita, porque cancela el servicio y borra su
+  // avance de forma irreversible. Solo está disponible cuando la solicitud ya está en revisión;
+  // quien decide es el backend a través de `puedeAprobarse`.
   function handleAprobar() { setErrores({}); setPanel("confirmarAprobacion"); }
   function handleRechazar() { setComentario(""); setErrores({}); setPanel("rechazo"); }
   function handleCancelarAccion() { setPanel("detalle"); setErrores({}); }
@@ -127,8 +141,8 @@ export function useGestionarBajas() {
   // completa en "Resueltas" sin esperar a una recarga.
   //
   // Las dos acciones devuelven formas distintas: rechazar manda la solicitud entera (con comentario
-  // y fecha_respuesta), mientras que aprobar solo confirma el resultado del borrado
-  // ({ id, estado, boleta, nombre, cupoLiberado, carpetaEliminada }). Por eso el comentario y la
+  // y fecha_respuesta), mientras que aprobar solo confirma el resultado de la cancelación
+  // ({ id, estado, boleta, nombre, cupoLiberado, archivosEliminados }). Por eso el comentario y la
   // fecha se completan aquí con lo que ya conocemos en pantalla cuando el backend no los incluye.
   function moverAResueltas(id, { estado, comentario: comentarioResuelto, fechaRespuesta }) {
     setLista((prev) => ({
@@ -147,13 +161,39 @@ export function useGestionarBajas() {
     setPanel("detalle");
   }
 
+  /**
+   * pendiente → en_revision. No abre panel de confirmación: no destruye nada, solo turna el
+   * expediente a las autoridades y avisa al alumno. La solicitud sigue en la bandeja de pendientes,
+   * ahora con la etiqueta "En revisión".
+   */
+  async function handleEnviarARevision() {
+    if (procesando) return;
+    setProcesando(true);
+    setErrores({});
+    try {
+      const fresca = await marcarBajaEnRevision(seleccionada.id);
+      setSeleccionada(fresca);
+      setLista((prev) => ({
+        ...prev,
+        pendientes: prev.pendientes.map((s) => (s.id === fresca.id ? fresca : s)),
+      }));
+      mostrarToast("Solicitud turnada a las autoridades. El alumno ya fue notificado.");
+    } catch (err) {
+      if (err.code === "SOLICITUD_YA_RESUELTA" || err.status === 404) { recargar(); setSeleccionada(null); }
+      setErrores({ accion: err.message });
+      mostrarToast(err.message, "danger");
+    } finally {
+      setProcesando(false);
+    }
+  }
+
   async function handleConfirmarAprobacion() {
     if (procesando) return;
     setProcesando(true);
     setErrores({});
     try {
       const r = await aprobarSolicitudBaja(seleccionada.id, comentario.trim() || undefined);
-      mostrarToast(`Baja aprobada. ${r.nombre} (${r.boleta}) fue eliminado del sistema y notificado por correo.`);
+      mostrarToast(`Baja aprobada. Se canceló el servicio social de ${r.nombre} (${r.boleta}); conserva su cuenta y ya fue notificado.`);
       // La respuesta de aprobar no trae comentario ni fecha: se usan los de esta pantalla.
       moverAResueltas(seleccionada.id, { estado: r.estado, comentario: comentario.trim() || null });
     } catch (err) {
@@ -204,7 +244,8 @@ export function useGestionarBajas() {
     busqueda, setBusqueda, hayFiltroActivo, limpiarFiltros,
     comentario, errores,
     seleccionarSolicitud,
-    handleAprobar, handleRechazar, handleCancelarAccion,
+    pdf, handleVerExpediente, cerrarPdf,
+    handleEnviarARevision, handleAprobar, handleRechazar, handleCancelarAccion,
     handleComentarioChange,
     handleConfirmarAprobacion, handleConfirmarRechazo,
   };

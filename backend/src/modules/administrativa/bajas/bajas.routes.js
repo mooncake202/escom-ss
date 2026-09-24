@@ -2,8 +2,8 @@ const express = require('express');
 const { requireAuth, requireRole } = require('../../../middleware/auth.middleware');
 const {
   getMisAlumnos, postBajaProfesor, postAmonestacion,
-  getMiSolicitud, postBajaAlumno,
-  getSolicitudes, getSolicitud, getExpediente, postAprobar, postRechazar,
+  getMiSolicitud, postBajaAlumno, postCompletarExpediente,
+  getSolicitudes, getSolicitud, getExpediente, postEnRevision, postAprobar, postRechazar,
 } = require('./bajas.controller');
 
 const router = express.Router();
@@ -23,12 +23,16 @@ router.post('/amonestacion', requireAuth, requireRole('profesor'), postAmonestac
 // ── CU-ADM-11 · Alumno ──
 router.get('/mi-solicitud', requireAuth, requireRole('alumno_asignado'), getMiSolicitud);
 router.post('/alumno', requireAuth, requireRole('alumno_asignado'), postBajaAlumno);
+// Adjunta el expediente a la baja que pidió su profesor. Sin id: la solicitud sale del token.
+router.post('/alumno/expediente', requireAuth, requireRole('alumno_asignado'), postCompletarExpediente);
 
 // ── CU-ADM-12 · Coordinación ──
 // Las literales van antes que '/:id' para que la paramétrica no las capture.
 router.get('/', requireAuth, requireRole('coordinador'), getSolicitudes);
 router.get('/:id', requireAuth, requireRole('coordinador'), getSolicitud);
 router.get('/:id/expediente', requireAuth, requireRole('coordinador'), getExpediente);
+// La máquina de estados vive en el servicio: pendiente → en_revision → aprobada.
+router.post('/:id/en-revision', requireAuth, requireRole('coordinador'), postEnRevision);
 router.post('/:id/aprobar', requireAuth, requireRole('coordinador'), postAprobar);
 router.post('/:id/rechazar', requireAuth, requireRole('coordinador'), postRechazar);
 

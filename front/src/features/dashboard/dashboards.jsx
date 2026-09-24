@@ -307,35 +307,92 @@ function SlotNotificacionCalculada({ mostrar, mensaje, ruta, tipo = "info", navi
 // se navega — así una notificación general genuina (sin ruta, como
 // siempre ha sido el único caso soportado hasta ahora) sigue
 // comportándose igual que antes (solo onLeer, sin navegar).
+// CU-ADM-09/11/12 — alertas de BAJA para la franja superior.
+//
+// Se reparten en los dos mecanismos que ya existen aquí, sin duplicar reglas de negocio:
+//
+//   · EVENTOS (se solicitó, se turnó, se resolvió) ya son notificaciones persistentes que el módulo
+//     de bajas crea con su `ruta_relacionada`. Basta con PROMOVER esa ruta: ver RUTA_BAJA_*.
+//   · ESTADOS que deben seguir visibles aunque la notificación ya se haya leído: estos slots. La
+//     etapa la deriva el backend (`resumenBajaDelAlumno`); aquí no se interpreta ningún estado.
+const RUTA_BAJA_ALUMNO = "/alumno/solicitar-baja";
+const RUTA_BAJA_PROFESOR = "/profesor/solicitar-baja-alumno";
+const RUTA_BAJA_COORDINACION = "/coordinacion/gestionar-bajas";
+
+function slotsDeBajaAlumno(baja) {
+  if (!baja) return [];
+  return [
+    {
+      // Lo único que exige acción SUYA.
+      mostrar: !!baja.requiereExpediente,
+      mensaje: "Tu profesor solicitó tu baja del servicio social. Debes completar el expediente para "
+        + "continuar con el trámite.",
+      ruta: RUTA_BAJA_ALUMNO,
+      tipo: "urgente",
+    },
+    // Informativas: sin `ruta`, porque no hay nada que el alumno deba hacer. Desaparecen solas en
+    // cuanto la baja cambia de etapa, porque se derivan del estado y no de un evento.
+    {
+      mostrar: baja.etapa === "en_revision_autoridades",
+      mensaje: "Tu solicitud de baja está en revisión por las autoridades correspondientes.",
+      nota: "Aviso informativo · No se requiere ninguna acción de tu parte.",
+      tipo: "info",
+    },
+    {
+      mostrar: baja.etapa === "pendiente_coordinacion",
+      mensaje: "Tu solicitud de baja está en revisión por Coordinación.",
+      nota: "Aviso informativo · No se requiere ninguna acción de tu parte.",
+      tipo: "info",
+    },
+  ];
+}
+
+// Varias notificaciones llevan query (`?destacar=<id>`, que la pantalla destino usa para abrir la
+// ficha correcta), así que se promueve comparando solo la RUTA BASE. Al navegar se conserva la ruta
+// completa, con su query.
+const rutaBase = (ruta) => (ruta ?? "").split("?")[0];
+
 function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalculados = [], rutasPromovidas = [] }) {
   const generales = notificaciones.filter(
-    (n) => !n.ruta_relacionada || rutasPromovidas.includes(n.ruta_relacionada)
+    (n) => !n.ruta_relacionada || rutasPromovidas.includes(rutaBase(n.ruta_relacionada))
   );
 
   const items = [
     ...generales.map((n) => ({ key: `n-${n.id}`, tipo: n.tipo, mensaje: n.mensaje, ruta: n.ruta_relacionada, id: n.id })),
+    // Un slot SIN `ruta` es puramente informativo: no navega a ninguna parte. `nota` es la línea
+    // discreta que aclara que no hay nada que hacer.
     ...slotsCalculados
       .filter((s) => s.mostrar)
-      .map((s) => ({ key: `s-${s.ruta}`, tipo: s.tipo, mensaje: s.mensaje, ruta: s.ruta, id: null })),
+      .map((s, i) => ({ key: s.ruta ? `s-${s.ruta}` : `s-info-${i}`, tipo: s.tipo, mensaje: s.mensaje, ruta: s.ruta ?? null, nota: s.nota ?? null, id: null })),
   ];
 
   if (items.length === 0) return null;
 
   return (
     <div style={{ marginBottom: "1.25rem" }}>
-      {items.map((item) => (
-        <AlertBanner
-          key={item.key}
-          tipo={item.tipo}
-          C={C}
-          onClick={() => {
-            if (item.id) onLeer(item.id);
-            if (item.ruta) navigate(item.ruta);
-          }}
-        >
-          {item.mensaje}
-        </AlertBanner>
-      ))}
+      {items.map((item) => {
+        // Sin id que marcar y sin ruta a la que ir no hay nada que hacer al pulsar: el banner queda
+        // informativo. Así una alerta de "no requiere acción" no se comporta como un enlace.
+        const accionable = Boolean(item.id || item.ruta);
+        return (
+          <AlertBanner
+            key={item.key}
+            tipo={item.tipo}
+            C={C}
+            onClick={accionable ? () => {
+              if (item.id) onLeer(item.id);
+              if (item.ruta) navigate(item.ruta);
+            } : undefined}
+          >
+            {item.mensaje}
+            {item.nota && (
+              <span style={{ display: "block", marginTop: 3, fontSize: 11, opacity: 0.85, fontWeight: 400 }}>
+                {item.nota}
+              </span>
+            )}
+          </AlertBanner>
+        );
+      })}
     </div>
   );
 }
@@ -372,8 +429,11 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         C={C}
         slotsCalculados={[
           { mostrar: !!resumen.bitacoraHoyPendiente, mensaje: "Falta tu bitácora del día", ruta: "/alumno/bitacora", tipo: "urgente" },
+          ...slotsDeBajaAlumno(resumen.baja),
         ]}
-        rutasPromovidas={["/alumno/horas"]}
+        // '/alumno/horas': faltas (AH). RUTA_BAJA_ALUMNO: los avisos del trámite de baja, que por ser
+        // un proceso crítico se ven arriba y no solo dentro de la tarjeta de Administrativa.
+        rutasPromovidas={["/alumno/horas", RUTA_BAJA_ALUMNO]}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
@@ -571,8 +631,22 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
           {
             mostrar: (resumen.alumnosConFaltasCriticas ?? 0) > 0,
             mensaje: `Tienes ${resumen.alumnosConFaltasCriticas} alumno(s) con faltas criticas`,
-            ruta: "/profesor/solicitar-baja-alumno",
+            ruta: RUTA_BAJA_PROFESOR,
             tipo: "urgente",
+          },
+          // CU-ADM-09: seguimiento de las bajas que ÉL solicitó. Solo consulta: resolverlas es de
+          // Coordinación y el expediente lo aporta el alumno.
+          {
+            mostrar: (resumen.bajas?.esperandoExpediente ?? 0) > 0,
+            mensaje: `${resumen.bajas?.esperandoExpediente} baja(s) que solicitaste esperan que el alumno adjunte su expediente`,
+            ruta: RUTA_BAJA_PROFESOR,
+            tipo: "info",
+          },
+          {
+            mostrar: (resumen.bajas?.activas ?? 0) > 0,
+            mensaje: `${resumen.bajas.activas} alumno(s) con una solicitud de baja en curso`,
+            ruta: RUTA_BAJA_PROFESOR,
+            tipo: "info",
           },
           {
             mostrar: !!resumen.actividadesProximasACaducar,
@@ -593,6 +667,8 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             tipo: "urgente",
           },
         ]}
+        // Las resoluciones de las bajas que él solicitó llegan como notificación a esta ruta.
+        rutasPromovidas={[RUTA_BAJA_PROFESOR]}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
@@ -685,7 +761,36 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </p>
       </div>
 
-      <BloqueAlertasGenerales notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+      <BloqueAlertasGenerales
+        notificaciones={notificaciones}
+        onLeer={onLeerNotificacion}
+        navigate={navigate}
+        C={C}
+        slotsCalculados={[
+          // CU-ADM-12: los conteos los deriva el módulo de bajas con el MISMO criterio que su
+          // bandeja; aquí no se reimplementa su máquina de estados.
+          {
+            mostrar: (resumen.bajas?.porTurnar ?? 0) > 0,
+            mensaje: `${resumen.bajas?.porTurnar} solicitud(es) de baja con expediente listo para turnar a las autoridades`,
+            ruta: RUTA_BAJA_COORDINACION,
+            tipo: "urgente",
+          },
+          {
+            mostrar: (resumen.bajas?.sinExpediente ?? 0) > 0,
+            mensaje: `${resumen.bajas?.sinExpediente} solicitud(es) de baja esperan el expediente del alumno`,
+            ruta: RUTA_BAJA_COORDINACION,
+            tipo: "info",
+          },
+          {
+            mostrar: (resumen.bajas?.enRevision ?? 0) > 0,
+            mensaje: `${resumen.bajas?.enRevision} solicitud(es) de baja en revisión por las autoridades`,
+            ruta: RUTA_BAJA_COORDINACION,
+            tipo: "info",
+          },
+        ]}
+        // Las solicitudes nuevas llegan como notificación a la bandeja de bajas.
+        rutasPromovidas={[RUTA_BAJA_COORDINACION]}
+      />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem", marginBottom: "1.25rem" }}>
         {[

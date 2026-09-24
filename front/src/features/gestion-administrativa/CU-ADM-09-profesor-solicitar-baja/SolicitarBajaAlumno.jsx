@@ -3,6 +3,7 @@ import { DashboardLayout }             from "@/components/layout/DashboardLayout
 import { AlumnoSelectorCard }          from "./components/AlumnoSelectorCards";
 import { BajaForm }                    from "./components/BajaForm";
 import { AmonestacionForm }            from "./components/AmonestacionForm";
+import { SeguimientoBaja }             from "./components/SeguimientoBaja";
 import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
@@ -45,6 +46,11 @@ export default function BajaAlumnoProfesor() {
           </p>
         </div>
       );
+    }
+
+    // ── Alumno con una baja en curso: SOLO consulta del seguimiento ──
+    if (modo === "seguimiento") {
+      return <SeguimientoBaja alumno={alumnoSeleccionado} onCerrar={cerrar} C={C} />;
     }
 
     // ── Flujo Alterno 0.1: selector de acción (alumno con faltas) ──

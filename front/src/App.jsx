@@ -9,6 +9,7 @@ import { SocketProvider } from './context/SocketContext'
 
 //CRED
 import { AvisoSesionExpirada } from './components/AvisoSesionExpirada';
+import { CierreSesionPorBaja } from './components/CierreSesionPorBaja';
 import LoginPage from "./features/login/LoginPage";
 import RecuperarContraseña from "./features/login/CU-CRED-02-cambiar-contraseña/RecuperarContrasena";
 import EstablecerContrasena from "./features/login/CU-CRED-02-cambiar-contraseña/EstablecerContrasena";
@@ -109,6 +110,7 @@ function App() {
     <SocketProvider>
     <BrowserRouter>
       <AvisoSesionExpirada />
+      <CierreSesionPorBaja />
       <Routes>
         
         <Route path="/dashboard" element={

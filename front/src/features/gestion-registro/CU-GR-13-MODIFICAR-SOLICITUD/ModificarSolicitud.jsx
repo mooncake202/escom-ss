@@ -167,6 +167,29 @@ export default function ModificarSolicitud() {
         </div>
       </div>
 
+      {/* Origen BAJA APROBADA (CU-ADM-12). `origenBaja` lo deriva el backend de `estado_anterior`:
+          una baja NO es un rechazo, así que se explica como lo que es. En un rechazo definitivo
+          normal esta bandera es false y la pantalla queda exactamente como siempre. */}
+      {form.origenBaja && (
+        <div
+          style={{
+            maxWidth: 660,
+            margin: "0 auto 1rem",
+            padding: "1rem 1.25rem",
+            borderRadius: RADIUS.lg,
+            background: C.accentSoft,
+            border: `1px solid ${C.accent}`,
+          }}
+        >
+          <p style={{ margin: "0 0 4px", fontSize: 14, fontWeight: 700, color: C.accentText }}>
+            Servicio social dado de baja
+          </p>
+          <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.6 }}>
+            Tu baja fue aprobada. Puedes modificar tu solicitud y postularte nuevamente a una oferta.
+          </p>
+        </div>
+      )}
+
       {/* Card */}
       <div
         style={{

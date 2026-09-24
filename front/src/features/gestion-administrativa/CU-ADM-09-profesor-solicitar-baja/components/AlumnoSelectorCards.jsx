@@ -7,17 +7,21 @@ const CARRERA_LABEL = {
 };
 
 // `tieneBajaPendiente` lo calcula el backend; las faltas son datos reales de AH y solo informan.
+//
+// Una baja en curso NO deshabilita la tarjeta: el profesor puede abrirla para CONSULTAR el
+// seguimiento (solo lectura). Lo que no puede es volver a solicitar la baja, y eso lo impide el modo
+// "seguimiento" del hook, no un click bloqueado.
 export function AlumnoSelectorCard({ alumno, seleccionado, onSeleccionar, C }) {
-  const deshabilitado = alumno.tieneBajaPendiente;
+  const enBaja        = alumno.tieneBajaPendiente;
   const tieneFaltas   = alumno.faltasAcumuladas > 0 || alumno.faltasConsecutivas > 0;
 
   return (
     <div
-      onClick={() => !deshabilitado && onSeleccionar(alumno)}
+      onClick={() => onSeleccionar(alumno)}
       style={{
         padding: "1rem 1.25rem", borderRadius: RADIUS.lg,
-        cursor: deshabilitado ? "not-allowed" : "pointer",
-        opacity: deshabilitado ? 0.55 : 1,
+        cursor: "pointer",
+        opacity: 1,
         background: seleccionado ? C.navItemActive : C.bgCard,
         border: `1px solid ${
           seleccionado ? C.accent
@@ -52,17 +56,17 @@ export function AlumnoSelectorCard({ alumno, seleccionado, onSeleccionar, C }) {
         </div>
 
         {/* Badges de estado — en orden de prioridad */}
-        {alumno.tieneBajaPendiente && (
+        {enBaja && (
           <span style={{
             flexShrink: 0, padding: "2px 8px", borderRadius: RADIUS.full,
             background: C.warningSoft, color: C.warning,
             fontSize: 10, fontWeight: 700, whiteSpace: "nowrap",
           }}>
-            Baja solicitada
+            {alumno.baja?.etapa === "en_revision_autoridades" ? "Baja en revisión" : "Baja solicitada"}
           </span>
         )}
         {/* No hay insignia de "amonestado": la amonestación no deja historial, es solo un aviso. */}
-        {!alumno.tieneBajaPendiente && tieneFaltas && (
+        {!enBaja && tieneFaltas && (
           <span style={{
             flexShrink: 0, display: "inline-flex", alignItems: "center", gap: 3,
             padding: "2px 8px", borderRadius: RADIUS.full,

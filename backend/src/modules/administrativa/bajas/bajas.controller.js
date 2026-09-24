@@ -81,7 +81,9 @@ async function getMiSolicitud(req, res) {
   }
 }
 
-function postBajaAlumno(req, res) {
+// Las dos entradas del expediente comparten multer y sus errores: subirlo con la solicitud nueva
+// (ADM-11) y adjuntarlo a la que pidió el profesor (ADM-09 → ADM-11).
+function conExpedientePdf(req, res, continuar) {
   subirExpedienteBaja(req, res, async (errArchivo) => {
     if (errArchivo) {
       if (errArchivo.code === 'LIMIT_FILE_SIZE') {
@@ -93,6 +95,12 @@ function postBajaAlumno(req, res) {
       console.error('Error al procesar el expediente de baja:', errArchivo);
       return res.status(500).json({ message: 'Ocurrió un error al procesar el archivo.' });
     }
+    return continuar();
+  });
+}
+
+function postBajaAlumno(req, res) {
+  conExpedientePdf(req, res, async () => {
     try {
       const resultado = await bajasService.solicitarBajaAlumno({
         usuarioId: req.usuario.sub,
@@ -102,6 +110,22 @@ function postBajaAlumno(req, res) {
       return res.status(201).json(resultado);
     } catch (err) {
       return manejarError(err, res, 'Error al registrar la solicitud de baja del alumno:');
+    }
+  });
+}
+
+// El alumno completa con su expediente la baja que solicitó su profesor. No recibe id de solicitud:
+// sale de su token, así que no puede tocar la de nadie más.
+function postCompletarExpediente(req, res) {
+  conExpedientePdf(req, res, async () => {
+    try {
+      const resultado = await bajasService.completarExpedienteDeBaja({
+        usuarioId: req.usuario.sub,
+        archivoPdf: req.file,
+      });
+      return res.status(200).json(resultado);
+    } catch (err) {
+      return manejarError(err, res, 'Error al adjuntar el expediente de baja:');
     }
   });
 }
@@ -135,6 +159,18 @@ async function getExpediente(req, res) {
   }
 }
 
+async function postEnRevision(req, res) {
+  try {
+    const resultado = await bajasService.marcarEnRevision({
+      solicitudId: leerId(req),
+      coordinadorUsuarioId: req.usuario.sub,
+    });
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al marcar la solicitud de baja en revisión:');
+  }
+}
+
 async function postAprobar(req, res) {
   try {
     const resultado = await bajasService.aprobarSolicitud({
@@ -163,6 +199,6 @@ async function postRechazar(req, res) {
 
 module.exports = {
   getMisAlumnos, postBajaProfesor, postAmonestacion,
-  getMiSolicitud, postBajaAlumno,
-  getSolicitudes, getSolicitud, getExpediente, postAprobar, postRechazar,
+  getMiSolicitud, postBajaAlumno, postCompletarExpediente,
+  getSolicitudes, getSolicitud, getExpediente, postEnRevision, postAprobar, postRechazar,
 };

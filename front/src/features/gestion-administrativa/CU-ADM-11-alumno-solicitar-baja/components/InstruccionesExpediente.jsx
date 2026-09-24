@@ -4,7 +4,14 @@ import { RADIUS } from "@/themes/colors";
 // del Sistema Institucional de Servicio Social.
 const URL_SISS = "https://serviciosocial.ipn.mx/";
 
-export function InstruccionesExpediente({ C }) {
+/**
+ * Instrucciones para armar el expediente. Son las MISMAS para los dos orígenes; lo único que cambia
+ * es el paso 2 cuando la baja la pidió el profesor: el escrito debe citar su motivo.
+ *
+ * `motivoProfesor` llega solo en ese caso (`solicitud_baja.motivo` real). Si es null, se muestran las
+ * instrucciones de siempre.
+ */
+export function InstruccionesExpediente({ C, motivoProfesor = null }) {
   return (
     <div style={{
       background: C.bgCard, borderRadius: RADIUS.lg,
@@ -63,11 +70,27 @@ export function InstruccionesExpediente({ C }) {
           <p style={{ margin: "0 0 4px", fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
             Elabora tu escrito simple
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-            Redacta un escrito dirigido a la Comisión de Servicio Social explicando
-            brevemente por qué solicitas la baja. Debe incluir tu nombre completo,
-            firma y correo electrónico. No hay formato específico.
-          </p>
+          {motivoProfesor ? (
+            <>
+              <p style={{ margin: "0 0 8px", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                Redacta un escrito dirigido a la Comisión de Servicio Social. Debe incluir tu nombre
+                completo, firma y correo electrónico, y además citar el motivo que indicó tu profesor:
+              </p>
+              <p style={{
+                margin: 0, padding: "8px 12px", borderRadius: RADIUS.sm,
+                background: C.bgPage, border: `1px solid ${C.borderDefault}`,
+                fontSize: 12, color: C.textSecondary, lineHeight: 1.55,
+              }}>
+                Motivo de baja por parte de mi profesor: {motivoProfesor}
+              </p>
+            </>
+          ) : (
+            <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+              Redacta un escrito dirigido a la Comisión de Servicio Social explicando
+              brevemente por qué solicitas la baja. Debe incluir tu nombre completo,
+              firma y correo electrónico. No hay formato específico.
+            </p>
+          )}
         </div>
       </div>
 
@@ -96,8 +119,9 @@ export function InstruccionesExpediente({ C }) {
         </div>
       </div>
 
-      {/* Paso 4 — el oficio de baja lo emite Coordinación por su vía institucional:
-          NO se almacena en el sistema ni hay nada que descargar desde aquí. */}
+      {/* Paso 4 — el oficio de baja lo emite Coordinación por su vía institucional: NO se almacena en
+          el sistema ni hay nada que descargar desde aquí. Y este proceso ya NO manda correos: las
+          actualizaciones llegan como notificaciones dentro del sistema. */}
       <div style={{ display: "flex", gap: "0.875rem", marginBottom: "1rem" }}>
         <div style={{
           width: 24, height: 24, borderRadius: "50%", background: C.accentSoft,
@@ -109,9 +133,10 @@ export function InstruccionesExpediente({ C }) {
             Recibe la resolución de tu solicitud
           </p>
           <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-            Una vez enviado tu expediente, Coordinación dará seguimiento al proceso de baja.
-            Cuando exista una resolución, recibirás la información correspondiente y, en caso
-            de aprobación, el oficio de baja será enviado a tu correo institucional.
+            Una vez enviado tu expediente, Coordinación lo revisará y lo turnará a las autoridades
+            correspondientes. Recibirás una notificación en el sistema cuando tu solicitud entre en
+            revisión y cuando exista una resolución. El oficio de baja lo entrega Coordinación por su
+            vía institucional.
           </p>
         </div>
       </div>
@@ -123,7 +148,7 @@ export function InstruccionesExpediente({ C }) {
         fontSize: 12, color: C.warning, lineHeight: 1.5,
       }}>
         <strong>Tiempo estimado de resolución:</strong> Una vez enviada tu solicitud,
-        el tiempo de espera para recibir tu oficio de baja es aproximadamente
+        el tiempo de espera para la resolución de tu baja es aproximadamente
         de 1 a 3 meses hábiles.
       </div>
     </div>

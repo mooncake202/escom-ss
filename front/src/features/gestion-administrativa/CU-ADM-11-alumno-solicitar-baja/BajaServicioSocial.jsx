@@ -4,20 +4,42 @@ import { InstruccionesExpediente }   from "./components/InstruccionesExpediente"
 import { CargaExpediente }           from "./components/CargaExpediente";
 import { useBajaServicioSocial }     from "./hooks/useBajaServicioSocial";
 
-// Estados reales de solicitud_baja. Una baja APROBADA elimina la cuenta del alumno, así que
-// nunca puede verse desde esta pantalla: solo existen pendiente y rechazada.
+// Estados reales de solicitud_baja. Una baja APROBADA ya NO elimina la cuenta: la fila sobrevive y
+// puede aparecer en el historial si el alumno vuelve a estar asignado más adelante.
 const ESTADO_CONFIG = {
   pendiente: { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", border: "#f59e0b", texto: "Pendiente de revisión" },
+  en_revision: { color: "#0A4DB5", bg: "rgba(10,77,181,0.1)", border: "#0A4DB5", texto: "En revisión por las autoridades" },
   rechazada: { color: "#ef4444", bg: "rgba(239,68,68,0.1)",  border: "#ef4444", texto: "Rechazada" },
+  aprobada:  { color: "#22C55E", bg: "rgba(34,197,94,0.1)",  border: "#22C55E", texto: "Aprobada" },
+};
+
+// Vista de SEGUIMIENTO por etapa. La etapa la deriva el backend (`etapaDeBaja`): aquí no se vuelve a
+// interpretar ningún estado, solo se elige el texto.
+//
+// `pendiente_expediente` no aparece aquí a propósito: ese caso lo atiende el flujo de completar el
+// expediente (modoCompletar), que sí muestra formulario.
+const SEGUIMIENTO_POR_ETAPA = {
+  pendiente_coordinacion: {
+    titulo: "Solicitud de baja en revisión por Coordinación",
+    detalle: "Coordinación está revisando tu expediente. Si procede, lo turnará a las autoridades "
+      + "correspondientes.",
+    accion: "No necesitas realizar ninguna acción por el momento.",
+  },
+  en_revision_autoridades: {
+    titulo: "Solicitud de baja en revisión",
+    detalle: "Tu expediente fue enviado por Coordinación a las autoridades correspondientes.",
+    accion: "No necesitas realizar ninguna acción por el momento.",
+  },
 };
 
 const fechaLegible = (valor) => (valor
   ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
   : "—");
 
-// Solicitudes anteriores del alumno. Una APROBADA nunca llega aquí: al aprobarse se elimina su
-// cuenta. En la práctica son las RECHAZADAS, y lo importante es que pueda leer el motivo que
-// escribió Coordinación (`comentario`) para corregir y volver a solicitar.
+// Solicitudes anteriores del alumno. Lo habitual son las RECHAZADAS, y lo importante es que pueda
+// leer el motivo que escribió Coordinación (`comentario`) para corregir y volver a solicitar. Una
+// APROBADA puede aparecer aquí si el alumno retomó el servicio en otra oferta después de su baja:
+// mientras su baja está vigente no llega a esta pantalla, porque deja de ser 'alumno_asignado'.
 function HistorialSolicitudes({ solicitudes, C }) {
   if (solicitudes.length === 0) return null;
 
@@ -85,7 +107,8 @@ export default function BajaServicioSocial() {
   const { C } = useTheme();
   const {
     carga, recargar,
-    alumno, solicitudActiva, solicitud, historial, motivo, archivo, errores, enviando, enviado,
+    alumno, solicitudActiva, solicitud, modoCompletar, motivoProfesor,
+    historial, motivo, archivo, errores, enviando, enviado,
     handleMotivoChange, handleArchivoChange,
     handleSubmit, handleCancelar, handleIrInicio,
   } = useBajaServicioSocial();
@@ -116,9 +139,10 @@ export default function BajaServicioSocial() {
     );
   }
 
-  // ── Estado: ya existe solicitud activa ───────────────────────
+  // ── Estado: ya existe solicitud activa → SEGUIMIENTO, nunca el formulario ───
   if (solicitudActiva) {
     const cfg = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG.pendiente;
+    const seguimiento = SEGUIMIENTO_POR_ETAPA[solicitud.etapa] ?? SEGUIMIENTO_POR_ETAPA.pendiente_coordinacion;
     return (
       <DashboardLayout
         titulo="Solicitar baja del servicio social"
@@ -132,11 +156,13 @@ export default function BajaServicioSocial() {
             border: `1px solid ${cfg.border}`, padding: "2rem",
           }}>
             <p style={{ margin: "0 0 0.5rem", fontSize: 16, fontWeight: 700, color: C.textPrimary }}>
-              Solicitud de baja en proceso
+              {seguimiento.titulo}
             </p>
-            <p style={{ margin: "0 0 1.25rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
-              Ya tienes una solicitud de baja registrada. No es posible enviar una nueva
-              hasta que coordinación resuelva la actual.
+            <p style={{ margin: "0 0 0.5rem", fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
+              {seguimiento.detalle}
+            </p>
+            <p style={{ margin: "0 0 1.25rem", fontSize: 13, fontWeight: 600, color: C.textSecondary, lineHeight: 1.6 }}>
+              {seguimiento.accion}
             </p>
 
             {/* Estado actual */}
@@ -157,8 +183,18 @@ export default function BajaServicioSocial() {
               </span>
             </div>
 
-            <p style={{ margin: 0, fontSize: 12, color: C.textDisabled }}>
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.textDisabled }}>
               Fecha de envío: <strong style={{ color: C.textMuted }}>{fechaLegible(solicitud.fecha)}</strong>
+            </p>
+
+            <p style={{
+              margin: 0, padding: "10px 14px", borderRadius: RADIUS.md,
+              background: C.warningSoft, border: `1px solid ${C.warning}`,
+              fontSize: 12, color: C.warning, lineHeight: 1.5,
+            }}>
+              <strong>Tiempo estimado de resolución:</strong> de 1 a 3 meses hábiles. Recibirás una
+              notificación en el sistema cuando exista una resolución. No es posible enviar una nueva
+              solicitud hasta que se resuelva la actual.
             </p>
           </div>
 
@@ -198,7 +234,9 @@ export default function BajaServicioSocial() {
               Solicitud enviada
             </h3>
             <p style={{ margin: "0 0 0.25rem", fontSize: 14, color: C.textMuted }}>
-              Tu solicitud de baja fue registrada con estado:
+              {modoCompletar
+                ? "Tu expediente quedó adjunto a la solicitud de tu profesor, con estado:"
+                : "Tu solicitud de baja fue registrada con estado:"}
             </p>
             <span style={{
               display: "inline-block", margin: "0.5rem 0 1.25rem",
@@ -209,9 +247,10 @@ export default function BajaServicioSocial() {
               Pendiente de revisión
             </span>
             <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled, lineHeight: 1.6 }}>
-              Coordinación revisará tu expediente. El tiempo de resolución estimado
-              es de <strong style={{ color: C.textMuted }}>1 a 3 meses hábiles</strong>.
-              Recibirás una notificación en el sistema cuando haya una actualización.
+              Coordinación revisará tu expediente y lo turnará a las autoridades correspondientes.
+              El tiempo de resolución estimado es de{" "}
+              <strong style={{ color: C.textMuted }}>1 a 3 meses hábiles</strong>.
+              Recibirás una notificación en el sistema en cada actualización.
             </p>
             <button
               onClick={handleIrInicio}
@@ -264,8 +303,35 @@ export default function BajaServicioSocial() {
           </div>
         </div>
 
-        {/* Instrucciones */}
-        <InstruccionesExpediente C={C} />
+        {/* Baja iniciada por el PROFESOR: se reutiliza esta misma pantalla, avisando de dónde viene
+            la solicitud y mostrando el motivo real que él escribió. */}
+        {modoCompletar && (
+          <div style={{
+            background: "rgba(239,68,68,0.06)", borderRadius: RADIUS.lg,
+            border: `1px solid ${C.danger}`,
+            padding: "1.25rem 1.5rem", marginBottom: "1.25rem",
+          }}>
+            <p style={{ margin: "0 0 0.5rem", fontSize: 14, fontWeight: 700, color: C.danger }}>
+              Tu profesor ha solicitado tu baja del servicio social
+            </p>
+            <p style={{ margin: "0 0 0.875rem", fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+              Para continuar con el trámite debes armar y adjuntar tu expediente. No se creará una
+              solicitud nueva: el expediente se adjunta a la que ya registró tu profesor.
+            </p>
+            <p style={{
+              margin: "0 0 4px", fontSize: 11, fontWeight: 700, color: C.textDisabled,
+              textTransform: "uppercase", letterSpacing: "0.07em",
+            }}>
+              Motivo indicado por tu profesor:
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: C.textSecondary, lineHeight: 1.6 }}>
+              {motivoProfesor}
+            </p>
+          </div>
+        )}
+
+        {/* Instrucciones: las mismas para los dos orígenes; solo el paso 2 cita el motivo del profesor. */}
+        <InstruccionesExpediente C={C} motivoProfesor={motivoProfesor} />
 
         {/* Formulario */}
         <div style={{
@@ -274,10 +340,12 @@ export default function BajaServicioSocial() {
           padding: "1.25rem 1.5rem",
         }}>
           <p style={{ margin: "0 0 1.25rem", fontSize: 13, fontWeight: 700, color: C.textPrimary }}>
-            Datos de la solicitud
+            {modoCompletar ? "Adjunta tu expediente" : "Datos de la solicitud"}
           </p>
 
-          {/* Motivo: obligatorio, igual que el expediente */}
+          {/* Motivo: obligatorio SOLO cuando el alumno abre la solicitud. Si la abrió su profesor, el
+              motivo ya está guardado y no se vuelve a capturar. */}
+          {!modoCompletar && (
           <div style={{ marginBottom: "1.25rem" }}>
             <label style={{
               display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted,
@@ -303,6 +371,7 @@ export default function BajaServicioSocial() {
               <p style={{ margin: "6px 0 0", fontSize: 12, color: C.danger }}>{errores.motivo}</p>
             )}
           </div>
+          )}
 
           {/* Carga de expediente */}
           <CargaExpediente
@@ -338,7 +407,9 @@ export default function BajaServicioSocial() {
               opacity: enviando ? 0.6 : 1,
               background: C.danger, border: "none", color: "#fff", fontFamily: "inherit",
             }}>
-              {enviando ? "Enviando…" : "Enviar solicitud de baja"}
+              {enviando
+                ? "Enviando…"
+                : (modoCompletar ? "Enviar expediente" : "Enviar solicitud de baja")}
             </button>
           </div>
         </div>

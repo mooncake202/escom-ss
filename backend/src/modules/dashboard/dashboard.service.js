@@ -81,6 +81,13 @@ async function calcularBitacorasRevisionAtrasada(profesorId) {
   return false;
 }
 
+// CU-ADM-09/11/12: el estado de la baja lo resuelve el PROPIO módulo de bajas. El dashboard solo lo
+// pinta, así que aquí no se repite ninguna regla de esa máquina de estados.
+//
+// Se importa bajas.resumen (solo lectura, solo prisma) y NO bajas.service: ese arrastra gr.service y
+// con él la exigencia de JWT_SECRET, que el dashboard no necesita.
+const bajasService = require('../administrativa/bajas/bajas.resumen');
+
 async function resumenAlumno(usuarioId) {
   const alumno = await prisma.alumno.findUnique({
     where: { usuario_id: usuarioId },
@@ -98,6 +105,7 @@ async function resumenAlumno(usuarioId) {
       actividadesAsignadas: 0, reportesAprobados: 0,
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
+      baja: null,
     };
   }
 
@@ -114,6 +122,8 @@ async function resumenAlumno(usuarioId) {
     tieneJornadaPendienteDatos(solicitudId),
   ]);
 
+  const baja = await bajasService.resumenBajaDelAlumno({ usuarioId });
+
   return {
     horasAcumuladas: alumno.cumulo_horas_y_faltas?.horas_acumuladas ?? 0,
     // Horas netas/reales — SIEMPRE acumuladas menos rechazadas. horasAcumuladas
@@ -128,6 +138,8 @@ async function resumenAlumno(usuarioId) {
     jornadaSinTerminar,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
+    // null si no tiene ninguna baja en curso.
+    baja,
   };
 }
 
@@ -149,7 +161,7 @@ async function resumenProfesor(usuarioId) {
     };
   }
 
-const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades, bitacorasRevisionAtrasada] = await Promise.all([
+const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades, bajas, bitacorasRevisionAtrasada] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
     // final del proceso GR.
@@ -182,6 +194,7 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
       where: { estado: 'pendiente_revision', solicitud_registro: { oferta: { profesor_id: profesor.id } } },
     }),
     calcularAlertasActividadesProfesor(profesor.id),
+    bajasService.resumenBajasDelProfesor({ usuarioId }),
     calcularBitacorasRevisionAtrasada(profesor.id),
   ]);
 
@@ -201,6 +214,8 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     cubiculo: profesor.cubiculo,
     // Arreglo de 0 o 1 elemento para no romper el contrato con el frontend.
     caracteristicas: profesor.caracteristica ? [profesor.caracteristica.nombre.replace(/_/g, ' ')] : [],
+    // CU-ADM-09: seguimiento de las bajas de sus alumnos. Consultar, nunca resolver.
+    bajas,
   };
 
 }
@@ -228,6 +243,7 @@ async function resumenCoordinacion() {
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoMasReciente,
+    bajas,
   ] = await Promise.all([
     prisma.solicitud_registro.count(),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
@@ -235,6 +251,7 @@ async function resumenCoordinacion() {
     contarAlumnosConHorasCompletas(),
     prisma.liberacion_proceso.count({ where: { NOT: { estado: ESTADO_LSS_TERMINAL } } }),
     prisma.periodo_registro.findFirst({ orderBy: { id: 'desc' } }),
+    bajasService.resumenBajasDeCoordinacion(),
   ]);
 
   return {
@@ -249,6 +266,8 @@ async function resumenCoordinacion() {
     reportesPorRevisar: 0,
     reportesAprobadosMes: 0,
     ofertasPorValidar: 0,
+    // CU-ADM-12: mismo criterio de "activa" que la bandeja de bajas, resuelto por ese módulo.
+    bajas,
   };
 }
 

@@ -34,7 +34,8 @@ export default function GestionarBajas() {
     busqueda, setBusqueda, hayFiltroActivo, limpiarFiltros,
     comentario, errores,
     seleccionarSolicitud,
-    handleAprobar, handleRechazar, handleCancelarAccion,
+    pdf, handleVerExpediente, cerrarPdf,
+    handleEnviarARevision, handleAprobar, handleRechazar, handleCancelarAccion,
     handleComentarioChange,
     handleConfirmarAprobacion, handleConfirmarRechazo,
   } = useGestionarBajas();
@@ -180,6 +181,10 @@ export default function GestionarBajas() {
               comentario={comentario}
               errores={errores}
               procesando={procesando}
+              pdf={pdf}
+              onVerExpediente={handleVerExpediente}
+              onCerrarPdf={cerrarPdf}
+              onEnviarARevision={handleEnviarARevision}
               onAprobar={handleAprobar}
               onRechazar={handleRechazar}
               onCancelar={handleCancelarAccion}

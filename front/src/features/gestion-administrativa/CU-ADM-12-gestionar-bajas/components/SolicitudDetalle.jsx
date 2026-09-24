@@ -1,6 +1,6 @@
 import { RADIUS } from "@/themes/colors";
 import { ESTADO_CONFIG, ORIGEN_LABEL, fechaLegible } from "./estadosBaja";
-import { urlExpedienteBaja } from "@/services/bajasService";
+import { BotonVerPdf, VisorPdf } from "@/features/gestion-reportes/compartido/VisorPdf";
 
 function Dato({ etiqueta, children, C }) {
   return (
@@ -18,7 +18,8 @@ function Dato({ etiqueta, children, C }) {
 
 export function SolicitudDetalle({
   solicitud, panel, comentario, errores, procesando,
-  onAprobar, onRechazar, onCancelar, onComentarioChange,
+  pdf, onVerExpediente, onCerrarPdf,
+  onEnviarARevision, onAprobar, onRechazar, onCancelar, onComentarioChange,
   onConfirmarAprobacion, onConfirmarRechazo, C,
 }) {
   const cfg = ESTADO_CONFIG[solicitud.estado] ?? ESTADO_CONFIG.pendiente;
@@ -54,7 +55,7 @@ export function SolicitudDetalle({
             En revisión institucional
           </p>
           <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
-            El expediente está en manos de las autoridades del Instituto. Resuélvela aquí cuando
+            Envía el expediente a las autoridades correspondientes. Resuélvela aquí cuando
             recibas su respuesta; el oficio oficial se gestiona por correo institucional y no se
             almacena en la plataforma.
           </p>
@@ -94,25 +95,21 @@ export function SolicitudDetalle({
         <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.65 }}>{solicitud.motivo}</p>
       </div>
 
+      {/* El PDF se pide CON el token (mismo visor que CU-REP-05/06) y se muestra desde su object URL:
+          un enlace directo al endpoint no llevaría el Authorization y daría 401. */}
       <Dato etiqueta="Expediente" C={C}>
         {solicitud.tieneExpediente ? (
-          <a
-            href={urlExpedienteBaja(solicitud.id)}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              padding: "7px 14px", borderRadius: RADIUS.md,
-              background: C.bgInput, border: `1px solid ${C.accent}`,
-              color: C.accentText, fontSize: 12, fontWeight: 700, textDecoration: "none",
-            }}
-          >
-            Ver expediente (PDF)
-          </a>
+          <BotonVerPdf pdf={pdf} onVerPdf={onVerExpediente} C={C} etiqueta="Ver expediente PDF ↗" />
         ) : (
-          <p style={{ margin: 0, fontSize: 12, color: C.textDisabled, fontStyle: "italic" }}>
-            Sin expediente: las bajas solicitadas por el profesor no lo requieren.
-          </p>
+          <div>
+            <p style={{ margin: "0 0 2px", fontSize: 12, fontWeight: 700, color: C.warning }}>
+              Expediente pendiente
+            </p>
+            <p style={{ margin: 0, fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>
+              El alumno aún no ha adjuntado el expediente de baja. Debe adjuntarlo antes de que puedas
+              turnar la solicitud a las autoridades.
+            </p>
+          </div>
         )}
       </Dato>
 
@@ -144,27 +141,64 @@ export function SolicitudDetalle({
         <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.danger, lineHeight: 1.55 }}>{errores.accion}</p>
       )}
 
-      {/* ── Acciones ── */}
+      <VisorPdf
+        pdf={pdf}
+        titulo={`Expediente de baja · ${alumno.nombre}`}
+        tituloIframe="Expediente de baja"
+        onCerrar={onCerrarPdf}
+        C={C}
+      />
+
+      {/* ── Acciones ──
+          Qué se ofrece lo decide el BACKEND con puedeEnviarARevision / puedeAprobarse /
+          puedeRechazarse. La pantalla no reimplementa la máquina de estados:
+            pendiente   → "En revisión" (exige expediente) o "Rechazar"
+            en_revision → "Aprobar" (baja definitiva) o "Rechazar"
+          "Aprobar" NUNCA aparece mientras la solicitud siga pendiente. */}
       {!resuelta && panel === "detalle" && (
-        <div style={{ display: "flex", gap: "0.75rem" }}>
-          <button onClick={onRechazar} style={{
-            flex: 1, padding: "10px", borderRadius: RADIUS.md,
-            fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-            background: "transparent", border: `1px solid ${C.danger}`, color: C.danger,
-          }}>
-            Rechazar
-          </button>
-          <button onClick={onAprobar} style={{
-            flex: 2, padding: "10px", borderRadius: RADIUS.md,
-            fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-            background: C.accent, border: "none", color: "#fff",
-          }}>
-            Aprobar solicitud
-          </button>
-        </div>
+        <>
+          {solicitud.puedeEnviarARevision === false && solicitud.puedeAprobarse === false && (
+            <p style={{ margin: "0 0 0.75rem", fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>
+              Esta solicitud todavía no tiene expediente. El alumno debe adjuntarlo antes de que
+              puedas turnarla a las autoridades.
+            </p>
+          )}
+
+          <div style={{ display: "flex", gap: "0.75rem" }}>
+            {solicitud.puedeRechazarse && (
+              <button onClick={onRechazar} style={{
+                flex: 1, padding: "10px", borderRadius: RADIUS.md,
+                fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                background: "transparent", border: `1px solid ${C.danger}`, color: C.danger,
+              }}>
+                Rechazar
+              </button>
+            )}
+
+            {solicitud.puedeEnviarARevision && (
+              <button onClick={onEnviarARevision} disabled={procesando} style={{
+                flex: 2, padding: "10px", borderRadius: RADIUS.md,
+                fontSize: 13, fontWeight: 700, cursor: procesando ? "wait" : "pointer", fontFamily: "inherit",
+                background: C.accent, border: "none", color: "#fff",
+              }}>
+                {procesando ? "Turnando..." : "Marcar en revisión"}
+              </button>
+            )}
+
+            {solicitud.puedeAprobarse && (
+              <button onClick={onAprobar} style={{
+                flex: 2, padding: "10px", borderRadius: RADIUS.md,
+                fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                background: C.accent, border: "none", color: "#fff",
+              }}>
+                Aprobar solicitud
+              </button>
+            )}
+          </div>
+        </>
       )}
 
-      {/* ── Confirmación explícita: aprobar ELIMINA al usuario y todo su proceso, sin vuelta atrás ── */}
+      {/* ── Confirmación explícita: aprobar CANCELA el servicio social, conservando la cuenta ── */}
       {!resuelta && panel === "confirmarAprobacion" && (
         <div style={{
           padding: "1.25rem", borderRadius: RADIUS.md,
@@ -173,15 +207,18 @@ export function SolicitudDetalle({
           <p style={{ margin: "0 0 0.625rem", fontSize: 14, fontWeight: 700, color: C.danger }}>
             ¿Estás seguro de aprobar esta solicitud de baja?
           </p>
+          {/* El sistema de Bajas ya NO manda correos: nada aquí debe prometer uno. La mención al
+              "oficio oficial" del aviso de en_revision sí se conserva, porque ese es un trámite
+              institucional externo a la plataforma. */}
           <p style={{ margin: "0 0 0.875rem", fontSize: 12, color: C.textPrimary, lineHeight: 1.65 }}>
-            Al continuar, el usuario <strong>{alumno.nombre}</strong> ({alumno.boleta}) y toda la
-            información asociada a su proceso de servicio social serán eliminados permanentemente:
-            bitácoras, actividades, horas acumuladas, reportes, documentos y expedientes.{" "}
+            Se dará de baja el servicio social actual de <strong>{alumno.nombre}</strong>{" "}
+            ({alumno.boleta}). Se eliminará el avance asociado al servicio y se liberará su lugar en
+            la oferta.{" "}
             <strong style={{ color: C.danger }}>Esta acción no se puede revertir.</strong>
           </p>
           <p style={{ margin: "0 0 0.875rem", fontSize: 12, color: C.textMuted, lineHeight: 1.55 }}>
-            Se le avisará por correo. Si más adelante quiere retomar su servicio, deberá empezar
-            desde el registro de su cuenta.
+            La cuenta del alumno se conservará. Al iniciar sesión nuevamente podrá modificar su
+            solicitud y postularse a otra oferta.
           </p>
 
           <label style={{

@@ -1,12 +1,23 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { consultarMiSolicitudBaja, solicitarMiBaja } from "@/services/bajasService";
+import {
+  consultarMiSolicitudBaja,
+  solicitarMiBaja,
+  completarExpedienteDeMiBaja,
+} from "@/services/bajasService";
 
-// Datos reales del backend. Mientras la solicitud está pendiente, el alumno SIGUE su servicio con
-// normalidad (bitácoras, horas y reportes): la baja podría rechazarse, así que nada se congela.
+// Datos reales del backend. Mientras la solicitud está pendiente o en revisión, el alumno SIGUE su
+// servicio con normalidad (bitácoras, horas y reportes): la baja podría rechazarse, así que nada se
+// congela.
+//
+// Esta pantalla atiende DOS casos con la misma interfaz, según lo que diga el backend:
+//   1. El alumno abre su propia solicitud: captura motivo + expediente.
+//   2. Su profesor ya la abrió (`requiereExpedienteDelAlumno`): el motivo ya existe y solo falta que
+//      él adjunte el expediente a ESA solicitud. No se crea una segunda.
 //
 // El oficio o resolución oficial del Instituto no se sube ni se almacena aquí: ese trámite lo lleva
-// Coordinación por su vía institucional y puede tardar semanas.
+// Coordinación por su vía institucional y puede tardar semanas. Este proceso no manda correos: las
+// actualizaciones llegan como notificaciones dentro del sistema.
 export function useBajaServicioSocial() {
   const navigate = useNavigate();
 
@@ -54,17 +65,26 @@ export function useBajaServicioSocial() {
     setErrores((prev) => ({ ...prev, archivo: null }));
   }
 
+  const solicitudPendiente = datos?.solicitudPendiente ?? null;
+  // Lo decide el BACKEND, no la pantalla: baja pendiente, abierta por el profesor y sin expediente.
+  const modoCompletar = Boolean(solicitudPendiente?.requiereExpedienteDelAlumno);
+
   async function handleSubmit() {
     if (enviando) return;
     const e = {};
-    if (!motivo.trim()) e.motivo = "El motivo de la solicitud es obligatorio.";
+    // Al completar la baja del profesor el motivo ya está guardado: solo falta el expediente.
+    if (!modoCompletar && !motivo.trim()) e.motivo = "El motivo de la solicitud es obligatorio.";
     if (!archivo) e.archivo = "El expediente en PDF es obligatorio.";
     if (Object.keys(e).length > 0) { setErrores(e); return; }
 
     setEnviando(true);
     setErrores({});
     try {
-      await solicitarMiBaja({ motivo: motivo.trim(), archivo });
+      if (modoCompletar) {
+        await completarExpedienteDeMiBaja({ archivo });
+      } else {
+        await solicitarMiBaja({ motivo: motivo.trim(), archivo });
+      }
       setEnviado(true);
     } catch (err) {
       setErrores({ envio: err.message });
@@ -76,13 +96,14 @@ export function useBajaServicioSocial() {
   const handleCancelar = () => navigate("/dashboard");
   const handleIrInicio = () => navigate("/dashboard");
 
-  const solicitudPendiente = datos?.solicitudPendiente ?? null;
-
   return {
     carga, recargar,
     alumno: datos?.alumno ?? null,
-    solicitudActiva: Boolean(solicitudPendiente),
+    // "Activa" bloquea el formulario. Si lo que falta es SU expediente, no bloquea: lo habilita.
+    solicitudActiva: Boolean(solicitudPendiente) && !modoCompletar,
     solicitud: solicitudPendiente,
+    modoCompletar,
+    motivoProfesor: modoCompletar ? solicitudPendiente.motivo : null,
     historial: (datos?.historial ?? []).filter((h) => h.id !== solicitudPendiente?.id),
     motivo, archivo, errores, enviando, enviado,
     handleMotivoChange, handleArchivoChange,

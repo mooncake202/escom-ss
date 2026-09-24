@@ -2,6 +2,7 @@
 // Viven aquí y no junto a un componente para no romper fast-refresh.
 export const ESTADO_CONFIG = {
   pendiente: { label: "Pendiente", bg: "rgba(234,179,8,0.12)", color: "#ca8a04", border: "rgba(234,179,8,0.3)" },
+  en_revision: { label: "En revisión", bg: "rgba(10,77,181,0.12)", color: "#0A4DB5", border: "rgba(10,77,181,0.35)" },
   aprobada:  { label: "Aprobada",  bg: "rgba(34,197,94,0.12)", color: "#16A34A", border: "rgba(34,197,94,0.3)" },
   rechazada: { label: "Rechazada", bg: "rgba(239,68,68,0.12)", color: "#DC2626", border: "rgba(239,68,68,0.3)" },
 };

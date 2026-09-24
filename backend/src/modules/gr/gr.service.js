@@ -821,6 +821,12 @@ function dictamenTexto(codigo) {
  * CU-GR-13 — datos actuales del alumno para precargar el formulario de
  * modificación. oferta/periodo/motivacion regresan vacíos porque
  * iniciarModificarSolicitud ya los limpió.
+ *
+ * `origenBaja` distingue de dónde viene el alumno, para que la pantalla explique el motivo correcto:
+ *   - una BAJA aprobada (CU-ADM-12) deja 'modificar_reenviar' con estado_anterior 'alumno_asignado';
+ *   - un RECHAZO definitivo pasa por iniciarModificarSolicitud, que escribe
+ *     estado_anterior 'rechazada_definitivamente'.
+ * Es una derivación de un campo que ya existe: no añade columnas ni cambia ninguna transición.
  */
 async function obtenerInfoModificarSolicitud(usuarioId) {
   const alumno = await prisma.alumno.findUnique({
@@ -843,6 +849,7 @@ async function obtenerInfoModificarSolicitud(usuarioId) {
     creditos: alumno.creditos,
     semestre: alumno.semestre,
     tipoLiberacion: dictamenTexto(alumno.solicitud_registro.dictamen),
+    origenBaja: alumno.solicitud_registro.estado_anterior === 'alumno_asignado',
   };
 }
 
