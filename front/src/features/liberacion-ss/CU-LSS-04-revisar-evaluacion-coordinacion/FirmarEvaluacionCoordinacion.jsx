@@ -10,11 +10,15 @@ export default function FirmarEvaluacionCoordinacion() {
 
   const {
     alumnos,
+    cargando,
+    error,
     alumnoSeleccionado,
     seleccionarAlumno,
     estado,
     firmar,
     rechazar,
+    descargarPdf,
+    reintentar,
   } = useFirmarEvaluacionCoordinacion();
 
   return (
@@ -42,7 +46,34 @@ export default function FirmarEvaluacionCoordinacion() {
               maxWidth: 680
           }}>
 
-          {!alumnoSeleccionado && (
+          {/* Puntos 1+2: antes, un fallo al cargar la lista (red, backend
+              reiniciando, etc.) dejaba `alumnos` vacío SIN ningún indicio —
+              se veía indistinguible de "no hay nada pendiente" (o "roto",
+              según el reporte real). Ahora el error es visible aquí mismo,
+              con reintentar, sin necesitar seleccionar ningún alumno. */}
+          {error && !alumnoSeleccionado && (
+            <div style={{
+              marginBottom: "1.5rem",
+              padding: "1.25rem",
+              borderRadius: RADIUS.lg,
+              border: "1px solid rgba(185,28,28,0.3)",
+              background: "rgba(185,28,28,0.06)",
+            }}>
+              <p style={{ margin: "0 0 0.75rem", fontSize: 13, color: "#b91c1c" }}>{error}</p>
+              <button
+                onClick={reintentar}
+                style={{
+                  padding: "8px 16px", borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", background: "transparent", border: "1px solid rgba(185,28,28,0.3)",
+                  color: "#b91c1c", fontFamily: "inherit",
+                }}
+              >
+                Reintentar
+              </button>
+            </div>
+          )}
+
+          {!cargando && !error && !alumnoSeleccionado && (
             <div style={{
               display: "flex",
               flexDirection: "column",
@@ -135,10 +166,15 @@ export default function FirmarEvaluacionCoordinacion() {
                 </div>
               </div>
 
+              {error && (
+                <p style={{ color: "#b91c1c", fontSize: 13, marginBottom: "1rem" }}>{error}</p>
+              )}
+
               <VistaCoordinacion
                 estado={estado}
                 onFirmar={firmar}
                 onRechazar={rechazar}
+                onDescargarPdf={descargarPdf}
               />
             </>
           )}

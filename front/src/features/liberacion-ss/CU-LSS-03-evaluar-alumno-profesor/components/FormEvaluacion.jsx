@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme, RADIUS } from "@/themes/colors";
 
 const FACTORES = [
@@ -91,10 +91,15 @@ export function FormEvaluacion({ onGuardar }) {
   const completo = respondidos === FACTORES.length;
   const colores = completo ? colorPorTotal(total, MAX_TOTAL) : null;
 
-  const handleGuardar = () => {
-    if (!completo) return;
+  // El mock original definía handleGuardar pero nunca renderizaba un botón
+  // que lo llamara — el formulario nunca llegaba a EvaluarAlumnoProfesor.
+  // En vez de agregar un botón "Guardar" separado (no estaba en el diseño),
+  // se sincroniza el borrador automáticamente: "Firmar"/"Rechazar" (en
+  // FirmaPanel) ya leen el valor más reciente sin un paso intermedio.
+  useEffect(() => {
     onGuardar?.({ valores, observaciones, total });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valores, observaciones]);
 
   return (
     <div style={{
@@ -211,7 +216,10 @@ export function FormEvaluacion({ onGuardar }) {
         </span>
       </div>
 
-      {/* OBSERVACIONES */}
+      {/* OBSERVACIONES — van al PDF de la evaluación. Distinto del cuadro
+          "Motivo del rechazo" en FirmaPanel (mismo campo de BD por detrás,
+          observaciones_profesor, pero son flujos mutuamente excluyentes con
+          etiqueta e interfaz propias). */}
       <p style={{
         margin: "0 0 0.5rem",
         fontSize: 12,
@@ -220,7 +228,7 @@ export function FormEvaluacion({ onGuardar }) {
         letterSpacing: "0.08em",
         textTransform: "uppercase",
       }}>
-        Observaciones
+        Observaciones para el documento
       </p>
       <textarea
         value={observaciones}

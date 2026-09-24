@@ -1,10 +1,9 @@
 const prisma = require('../../lib/prisma');
 const { ESTADOS_REPORTE } = require('../reportes/reportes.shared');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
-
-const ESTADO_LSS_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
-const ESTADO_LSS_EVALUACION_SOLICITADA = 'evaluacion_solicitada';
-const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // último estado del flujo LSS
+const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN, ESTADO_CARTA_LISTA_PARA_RECOGER } = require('../lss/lss.shared');
+const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
+const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
 
 const ESTADOS_ACTIVOS = ['sin_comenzar', 'en_progreso'];
 
@@ -106,12 +105,15 @@ async function resumenAlumno(usuarioId) {
       ofertaNombre: null, periodoLabel: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
       baja: null,
+      cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false, estadoLiberacion: null,
+      cartaTerminoListaParaRecoger: false,
     };
   }
 
   const solicitudId = alumno.solicitud_registro.id;
 
-  const [actividadesAsignadas, reportesAprobados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar] = await Promise.all([
+  const [actividadesAsignadas, reportesEnviados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion, cartaTermino] = await Promise.all([
+
     // "Actividades activas" — SOLO sin_comenzar/en_progreso; excluye vencida
     // y ambas variantes de completada (antes contaba todo, bug reportado).
     prisma.actividad.count({ where: { solicitud_registro_id: solicitudId, estado: { in: ['sin_comenzar', 'en_progreso'] } } }),
@@ -120,6 +122,24 @@ async function resumenAlumno(usuarioId) {
     tieneActividadesPendientes(solicitudId),
     faltaBitacoraHoy(solicitudId),
     tieneJornadaPendienteDatos(solicitudId),
+    // Widget "Proceso de Liberación del Servicio Social" — reutiliza TAL
+    // CUAL la validación de RN-LSS-02 ya construida en CU-LSS-01, no la
+    // duplica. LIMITACIÓN CONOCIDA: los requisitos de reportes/oferta
+    // dependen de los módulos de Reportes/Ofertas, que todavía no existen y
+    // por lo tanto no emiten resumen:actualizado — si esos datos cambian
+    // por fuera del flujo actual (ej. ajuste manual en BD para pruebas), el
+    // widget no se refresca en vivo hasta recargar. No es un bug: en cuanto
+    // esos módulos existan y emitan el evento genérico, este widget ya
+    // reacciona solo (ya escucha resumen:actualizado), sin cambios aquí.
+    obtenerEstadoRequisitos(usuarioId),
+    // Notificación calculada Tipo A de CU-LSS-05 (mismo criterio que
+    // bitacoraHoyPendiente arriba): basta con que exista una fila
+    // carta_termino en 'lista_para_recoger' — desaparece sola cuando el
+    // alumno confirma la recogida (ya no hay ninguna fila en ese estado).
+    prisma.carta_termino.findFirst({
+      where: { liberacion_proceso: { solicitud_registro_id: solicitudId } },
+      select: { estado: true },
+    }),
   ]);
 
   const baja = await bajasService.resumenBajaDelAlumno({ usuarioId });
@@ -134,12 +154,24 @@ async function resumenAlumno(usuarioId) {
     actividadesAsignadas,
     reportesAprobados,
     actividadesPendientes,
-    bitacoraHoyPendiente,
+    // No tiene sentido pedirle al alumno su bitácora del día si ya completó
+    // sus 480h netas — mismo criterio ya usado en iniciarJornada y en el
+    // cron de faltas (limiteHorasAlcanzado sobre el cumulo ya cargado
+    // arriba, sin queries nuevas). jornadaSinTerminar NO se toca: sigue
+    // siendo un pendiente real sin importar el total acumulado.
+    bitacoraHoyPendiente: bitacoraHoyPendiente && !limiteHorasAlcanzado(alumno.cumulo_horas_y_faltas),
     jornadaSinTerminar,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
     // null si no tiene ninguna baja en curso.
     baja,
+    tieneProcesoLiberacionIniciado: estadoLiberacion.yaExiste,
+    cumpleRequisitosLiberacion: !estadoLiberacion.yaExiste && !!estadoLiberacion.cumpleTodos,
+    // Estado real de liberacion_proceso (null si aún no existe) — lo
+    // necesita el botón "Ver proceso de liberación" del dashboard para
+    // navegar a la ruta que corresponde al estado actual, no a una fija.
+    estadoLiberacion: estadoLiberacion.yaExiste ? estadoLiberacion.estado : null,
+    cartaTerminoListaParaRecoger: cartaTermino?.estado === ESTADO_CARTA_LISTA_PARA_RECOGER,
   };
 }
 
@@ -155,13 +187,24 @@ async function resumenProfesor(usuarioId) {
       alumnosAsignados: 0, cuposTotales: 0, ofertasActivas: 0,
       reportesPorRevisar: 0, bitacorasPorRevisar: 0, solicitudesPendientes: 0,
       alumnosConFaltasCriticas: 0,
+      alumnosConEvaluacionSolicitada: 0,
       actividadesProximasACaducar: false, alumnoSinActividades: false,
       bitacorasRevisionAtrasada: false,
       departamento: null, cubiculo: null, caracteristicas: [],
     };
   }
 
-const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltasCriticas, bitacorasPorRevisar, alertasActividades, bajas, bitacorasRevisionAtrasada] = await Promise.all([
+  const [
+    alumnosAsignados,
+    ofertasActivas,
+    solicitudesPendientes,
+    alumnosConFaltasCriticas,
+    alumnosConEvaluacionSolicitada,
+    bitacorasPorRevisar,
+    alertasActividades,
+    bajas,
+    bitacorasRevisionAtrasada,
+  ] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
     // final del proceso GR.
@@ -187,6 +230,11 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
         alumno: { solicitud_registro: { oferta: { profesor_id: profesor.id } } },
       },
     }),
+    // RF-LSS-02/RF-LSS-04: notificación calculada — cuántos alumnos de este
+    // profesor tienen una evaluación de desempeño solicitada (CU-LSS-01)
+    // esperando a que el profesor la revise (CU-LSS-03, no construido
+    // todavía). Cálculo real vive en lss/lss-profesor.service.js.
+    contarAlumnosConEvaluacionSolicitada(profesor.id),
     // CU-AH-04 no está construido todavía (revisar/aprobar/rechazar sigue
     // mockeado en el frontend) — pero el CONTEO en sí ya es real: cuántas
     // bitácoras de sus alumnos están en 'pendiente_revision'.
@@ -207,6 +255,7 @@ const [alumnosAsignados, ofertasActivas, solicitudesPendientes, alumnosConFaltas
     ofertasActivas,
     solicitudesPendientes,
     alumnosConFaltasCriticas,
+    alumnosConEvaluacionSolicitada,
     // TODO: requiere convención de estado de CU-REP — todavía no construido.
     reportesPorRevisar: 0,
     bitacorasPorRevisar,
@@ -240,6 +289,7 @@ async function resumenCoordinacion() {
     alumnosRegistrados,
     expedientesEnRevision,
     evaluacionesPendientes,
+    evaluacionesPendientesDictamen,
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoMasReciente,
@@ -248,6 +298,11 @@ async function resumenCoordinacion() {
     prisma.solicitud_registro.count(),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EVALUACION_SOLICITADA } }),
+    // CU-LSS-03/04: evaluaciones que el profesor ya registró y esperan el
+    // dictamen de coordinación — distinto de evaluacionesPendientes (ese
+    // cuenta liberacion_proceso.estado, una fase mucho más amplia que
+    // incluye alumnos que ni siquiera tienen evaluacion_desempeno todavía).
+    prisma.evaluacion_desempeno.count({ where: { estado: ESTADO_EVALUACION_PENDIENTE_DICTAMEN } }),
     contarAlumnosConHorasCompletas(),
     prisma.liberacion_proceso.count({ where: { NOT: { estado: ESTADO_LSS_TERMINAL } } }),
     prisma.periodo_registro.findFirst({ orderBy: { id: 'desc' } }),
@@ -258,6 +313,7 @@ async function resumenCoordinacion() {
     alumnosRegistrados,
     expedientesEnRevision,
     evaluacionesPendientes,
+    evaluacionesPendientesDictamen,
     alumnosConHorasCompletas,
     alumnosEnProcesoLiberacion,
     periodoLabel: formatearPeriodo(periodoMasReciente),

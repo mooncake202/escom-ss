@@ -1,6 +1,8 @@
 import { useTheme, GRADIENTS } from "@/themes/colors";
 
-const PASOS = [
+// Fallback por si algún caller no pasa pasosCustom — ProcesoLSSLayout.jsx
+// ya manda sus 6 pasos reales por esta prop.
+const PASOS_DEFAULT = [
   { id: 1, label: "Requisitos" },
   { id: 2, label: "Evaluación de desempeño" },
   { id: 3, label: "Carta término" },
@@ -45,8 +47,9 @@ const EstadoIcon = ({ estado, C }) => {
   );
 };
 
-export function ProcesoSidebarLSS({ pasoActual = 1 }) {
+export function ProcesoSidebarLSS({ pasoActual = 1, pasosCustom }) {
   const { C } = useTheme();
+  const PASOS = pasosCustom ?? PASOS_DEFAULT;
 
   return (
     <aside style={{
@@ -73,7 +76,7 @@ export function ProcesoSidebarLSS({ pasoActual = 1 }) {
 
       {/* Pasos */}
       <nav style={{ padding: "1rem" }}>
-        {PASOS.map((paso, idx) => {
+        {PASOS.map((paso) => {
           const estado =
             paso.id < pasoActual
               ? "completado"

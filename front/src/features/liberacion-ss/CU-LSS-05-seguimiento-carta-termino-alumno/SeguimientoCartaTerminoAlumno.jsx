@@ -1,18 +1,18 @@
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
+import { calcularPasoActual } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/utils/pasoLSS";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { useCartaTerminoAlumno } from "./hooks/useCartaTerminoAlumno";
 import { useState } from "react";
 
-const MOCK = {
-  usuario: "García López Juan Carlos",
-};
-
 // ——— Badge de estado ————————————————————————————————
+// Valores reales de carta_termino.estado (ficha, RN-LSS-18/19) — 'recogida',
+// NO 'recibida' (el mockup original usaba ese nombre, corregido aquí).
 function EstadoBadge({ estado, C }) {
   const map = {
     solicitada:         { label: "En espera",          color: C.textMuted,  bg: C.bgInput },
     lista_para_recoger: { label: "Lista para recoger", color: "#15803d",    bg: "rgba(21,128,61,0.10)" },
-    recibida:           { label: "Recibida",            color: C.success,    bg: C.successSoft },
+    recogida:           { label: "Recogida",            color: C.success,    bg: C.successSoft },
   };
   const { label, color, bg } = map[estado] ?? map.solicitada;
   return (
@@ -53,7 +53,7 @@ function VistaEsperando({ C }) {
 }
 
 // ——— Caso 2: Carta lista, alumno debe recogerla y confirmar ———
-function VistaListaParaRecoger({ onConfirmar, C }) {
+function VistaListaParaRecoger({ onConfirmar, accionEnCurso, C }) {
   const [checked, setChecked] = useState(false);
 
   return (
@@ -97,7 +97,7 @@ function VistaListaParaRecoger({ onConfirmar, C }) {
 
       {/* Botón continuar */}
       <button
-        disabled={!checked}
+        disabled={!checked || accionEnCurso}
         onClick={onConfirmar}
         style={{
           width: "100%",
@@ -105,7 +105,7 @@ function VistaListaParaRecoger({ onConfirmar, C }) {
           borderRadius: RADIUS.md,
           fontSize: 14,
           fontWeight: 600,
-          cursor: !checked ? "not-allowed" : "pointer",
+          cursor: !checked || accionEnCurso ? "not-allowed" : "pointer",
           background: !checked ? C.borderDefault : GRADIENTS.primary,
           border: "none",
           color: "#fff",
@@ -115,14 +115,14 @@ function VistaListaParaRecoger({ onConfirmar, C }) {
           transition: "all 0.2s",
         }}
       >
-        Continuar con mi expediente →
+        {accionEnCurso ? "Procesando..." : "Continuar con mi expediente →"}
       </button>
     </div>
   );
 }
 
-// ——— Caso 3: Alumno ya confirmó recepción ———
-function VistaRecibida({ C }) {
+// ——— Caso 3: Alumno ya confirmó recogida ———
+function VistaRecogida({ C }) {
   return (
     <div style={{
       padding: "1.25rem 1.5rem",
@@ -144,12 +144,12 @@ function VistaRecibida({ C }) {
       </div>
       <div>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>
-          Carta de término recibida
+          Carta de término recogida
         </p>
         <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textMuted }}>
           Ya puedes continuar con la creación de tu expediente.
         </p>
-        
+
       </div>
     </div>
   );
@@ -158,35 +158,45 @@ function VistaRecibida({ C }) {
 // ——— Página principal ————————————————————————————————
 export default function SeguimientoCartaTerminoAlumno() {
   const { C } = useTheme();
-  const { estado, confirmarEntrega } = useCartaTerminoAlumno();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
+  const { cargando, estado, error, accionEnCurso, confirmarEntrega } = useCartaTerminoAlumno();
 
   return (
     <ProcesoLSSLayout
-      pasoActual={3}
+      pasoActual={calcularPasoActual("solicitud_carta_termino")}
       titulo="Carta de término"
       subtitulo="Seguimiento de carta de término"
       rol="alumno"
-      usuario={MOCK.usuario}
+      usuario={nombreAlumno}
     >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
+        {cargando ? (
+          <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+        ) : (
+          <>
+            {/* Encabezado */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
+              <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
+                Carta de término
+              </h2>
+              <EstadoBadge estado={estado} C={C} />
+            </div>
 
-        {/* Encabezado */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.35rem" }}>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
-            Carta de término
-          </h2>
-          <EstadoBadge estado={estado} C={C} />
-        </div>
+            <p style={{ margin: "0 0 2rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
+              Sigue los pasos para obtener tu carta de término y continuar con tu expediente de liberación.
+            </p>
 
-        <p style={{ margin: "0 0 2rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-          Sigue los pasos para obtener tu carta de término y continuar con tu expediente de liberación.
-        </p>
+            {/* Contenido según estado */}
+            {estado === "solicitada"         && <VistaEsperando C={C} />}
+            {estado === "lista_para_recoger" && <VistaListaParaRecoger onConfirmar={confirmarEntrega} accionEnCurso={accionEnCurso} C={C} />}
+            {estado === "recogida"           && <VistaRecogida C={C} />}
 
-        {/* Contenido según estado */}
-        {estado === "solicitada"         && <VistaEsperando C={C} />}
-        {estado === "lista_para_recoger" && <VistaListaParaRecoger onConfirmar={confirmarEntrega} C={C} />}
-        {estado === "recibida"           && <VistaRecibida C={C} />}
-
+            {error && (
+              <p style={{ marginTop: "1rem", fontSize: 12, color: C.danger }}>{error}</p>
+            )}
+          </>
+        )}
       </div>
     </ProcesoLSSLayout>
   );

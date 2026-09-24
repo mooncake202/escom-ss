@@ -1,10 +1,8 @@
-import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
+import { useTheme, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
 import { useConsultarConstanciaTermino } from "./hooks/useConsultarConstanciaTermino";
-
-const MOCK = {
-  usuario: "Ana Karen Lagarza Ortega",
-};
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { TextoConEnlaces } from "@/components/ui/TextoConEnlaces";
 
 // ——— Vista: constancia pendiente ——————————————————————
 function VistaPendiente({ C }) {
@@ -22,7 +20,7 @@ function VistaPendiente({ C }) {
       </h3>
       <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.6, maxWidth: 400, marginInline: "auto" }}>
         Coordinación está generando tu constancia de término de servicio social.
-        Recibirás una notificación cuando esté lista para descargar.
+        Recibirás una notificación cuando esté lista.
       </p>
 
       <div style={{
@@ -44,157 +42,32 @@ function VistaPendiente({ C }) {
   );
 }
 
-// ——— Vista: constancia disponible ————————————————————
-function VistaDisponible({ archivoConstancia, onDescargar, C }) {
+// ——— Vista: mensaje de la constancia disponible ————————————————
+// CORRECCIÓN ARQUITECTÓNICA: ya no hay ningún archivo que descargar de
+// nuestro sistema — coordinación redacta un mensaje de texto libre (con
+// un enlace a una plataforma externa embebido). El mensaje ES el
+// contenido principal de esta pantalla, no un botón de descarga.
+function VistaMensaje({ mensaje, C }) {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
-      <div style={{ textAlign: "center", paddingTop: "0rem", marginBottom: "1rem" }}>
+      <div style={{ textAlign: "center", marginBottom: "1.5rem" }}>
         <div style={{ fontSize: 40, marginBottom: "1rem" }}>🎉</div>
         <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.success }}>
           ¡Tu constancia está lista!
         </h2>
-        <p style={{ margin: 0, fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-          Coordinación ha emitido tu constancia de término de servicio social.
-          Ya puedes descargarla.
-        </p>
       </div>
 
-      {/* Tarjeta del archivo */}
       <div style={{
         background: C.bgCard,
         borderRadius: RADIUS.lg,
         border: `1px solid ${C.borderSubtle}`,
-        padding: "1.25rem 1.5rem",
-        marginBottom: "1.25rem",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
+        padding: "1.5rem",
       }}>
-        <div style={{
-          width: 44,
-          height: 44,
-          borderRadius: RADIUS.md,
-          background: "rgba(37,99,235,0.10)",
-          border: "1px solid rgba(37,99,235,0.2)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 22,
-          flexShrink: 0,
-        }}>
-          📄
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
-            Constancia de término
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textDisabled, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {archivoConstancia?.nombre ?? "CONSTANCIA_TERMINO_SS.pdf"}
-          </p>
-        </div>
-        <div style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#15803d",
-          background: "rgba(21,128,61,0.10)",
-          border: "1px solid rgba(21,128,61,0.25)",
-          whiteSpace: "nowrap",
-        }}>
-          Disponible
-        </div>
-      </div>
-
-      <button
-        onClick={onDescargar}
-        style={{
-          width: "100%",
-          padding: "13px",
-          borderRadius: RADIUS.md,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          background: GRADIENTS.primary,
-          border: "none",
-          color: "#fff",
-          fontFamily: "inherit",
-          boxShadow: SHADOWS.accent,
-          marginBottom: "1.5rem",
-        }}
-      >
-        ⬇ Descargar constancia de término
-      </button>
-
-      <p style={{ margin: 0, fontSize: 14, color: C.textMuted, lineHeight: 1.6, marginBottom: "0.5rem" }}>
-          Además se muestran aquí los otros documentos enviados por coordinación durante el proceso de liberación, para que puedas consultarlos cuando quieras.
+        <p style={{ margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700, color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          Mensaje de coordinación
         </p>
-      
-      <div style={{
-        background: C.bgCard,
-        borderRadius: RADIUS.lg,
-        border: `1px solid ${C.borderSubtle}`,
-        padding: "1.25rem 1.5rem",
-        marginBottom: "1.25rem",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}>
-        <div style={{
-          width: 44,
-          height: 44,
-          borderRadius: RADIUS.md,
-          background: "rgba(37,99,235,0.10)",
-          border: "1px solid rgba(37,99,235,0.2)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 22,
-          flexShrink: 0,
-        }}>
-          📄
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
-            Evaluacion de Rendimiento
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textDisabled, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {archivoConstancia?.nombre ?? "Evaluacion_Rendimiento.pdf"}
-          </p>
-        </div>
-        <div style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#15803d",
-          background: "rgba(21,128,61,0.10)",
-          border: "1px solid rgba(21,128,61,0.25)",
-          whiteSpace: "nowrap",
-        }}>
-          Disponible
-        </div>
+        <TextoConEnlaces texto={mensaje} style={{ fontSize: 14, color: C.textPrimary, lineHeight: 1.6 }} />
       </div>
-
-      <button
-        onClick={onDescargar}
-        style={{
-          width: "100%",
-          padding: "13px",
-          borderRadius: RADIUS.md,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          background: GRADIENTS.primary,
-          border: "none",
-          color: "#fff",
-          fontFamily: "inherit",
-          boxShadow: SHADOWS.accent,
-          marginBottom: "1.5rem",
-        }}
-      >
-        ⬇ Descargar 
-      </button>
     </div>
   );
 }
@@ -202,32 +75,36 @@ function VistaDisponible({ archivoConstancia, onDescargar, C }) {
 // ——— Página principal ——————————————————————————————————
 export default function ConsultarConstanciaTermino() {
   const { C } = useTheme();
-  const { estado, archivoConstancia, descargar } = useConsultarConstanciaTermino();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
+  const { cargando, estado, mensaje, error } = useConsultarConstanciaTermino();
+
+  if (cargando) {
+    return (
+      <ProcesoLSSLayout pasoActual={6} titulo="Constancia de término" rol="alumno" usuario={nombreAlumno}>
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </ProcesoLSSLayout>
+    );
+  }
 
   return (
     <ProcesoLSSLayout
       pasoActual={6}
       titulo="Constancia de término"
-      subtitulo="CU-LSS-10"
       rol="alumno"
-      usuario={MOCK.usuario}
+      usuario={nombreAlumno}
     >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
         <h2 style={{ margin: "0 0 0.35rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
           Constancia de término de servicio social
         </h2>
         <p style={{ margin: "0 0 2rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-          Aquí podrás descargar tu constancia oficial una vez que coordinación la haya emitido.
+          Aquí verás el mensaje de coordinación una vez que tu constancia esté lista.
         </p>
 
         {estado === "pendiente" && <VistaPendiente C={C} />}
-        {estado === "disponible" && (
-          <VistaDisponible
-            archivoConstancia={archivoConstancia}
-            onDescargar={descargar}
-            C={C}
-          />
-        )}
+        {estado === "disponible" && <VistaMensaje mensaje={mensaje} C={C} />}
+        {error && <p style={{ marginTop: "1rem", fontSize: 12, color: C.danger, textAlign: "center" }}>{error}</p>}
       </div>
     </ProcesoLSSLayout>
   );

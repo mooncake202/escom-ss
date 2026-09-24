@@ -10,6 +10,7 @@ import {
 } from "@/services/notificacionesService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 import { useAnunciosRecientes, tiempoRelativo } from "@/features/gestion-administrativa/CU-ADM-02-anuncios/hooks/useAnunciosRecientes";
+import { ESTADO_LSS_A_RUTA, RUTA_LSS_FALLBACK, RUTA_LSS_SIN_PROCESO } from "@/features/liberacion-ss/utils/estadoRutasLSS";
 
 // Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
 // revisado contra el catálogo completo de Parte 2. `carta:*` no tiene campo
@@ -46,6 +47,9 @@ const EVENTOS_POR_ROL = {
     "oferta:reenviada",
     "reporte:nuevo",
     "resumen:actualizado",
+    "documentacion:pendiente", "documentacion:decidida",
+    "expediente:pendiente_revision", "expediente:decidido",
+    "resumen:actualizado", // CU-LSS-03/04: evaluacionesPendientesDictamen
   ],
 };
 import { ModalBienvenidaAlumnoAsignado } from "@/features/gestion-registro/components/ModalBienvenidaAlumnoAsignado";
@@ -428,12 +432,27 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
         navigate={navigate}
         C={C}
         slotsCalculados={[
-          { mostrar: !!resumen.bitacoraHoyPendiente, mensaje: "Falta tu bitácora del día", ruta: "/alumno/bitacora", tipo: "urgente" },
+          {
+            mostrar: !!resumen.bitacoraHoyPendiente,
+            mensaje: "Falta tu bitácora del día",
+            ruta: "/alumno/bitacora",
+            tipo: "urgente",
+          },
           ...slotsDeBajaAlumno(resumen.baja),
+          {
+            mostrar: !!resumen.cartaTerminoListaParaRecoger,
+            mensaje: "Tu carta de término está lista para recoger.",
+            ruta: "/alumno/seguimiento-carta-termino",
+            tipo: "urgente",
+          },
         ]}
-        // '/alumno/horas': faltas (AH). RUTA_BAJA_ALUMNO: los avisos del trámite de baja, que por ser
-        // un proceso crítico se ven arriba y no solo dentro de la tarjeta de Administrativa.
-        rutasPromovidas={["/alumno/horas", RUTA_BAJA_ALUMNO]}
+        rutasPromovidas={[
+          "/alumno/horas",
+          RUTA_BAJA_ALUMNO,
+          "/alumno/seguimiento-evaluacion",
+          "/alumno/estado-resolucion",
+          "/alumno/consultar-constancia-termino",
+        ]}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
@@ -502,32 +521,63 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
 
         {/* CU-LSS */}
         <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C}>
-          <div style={{ padding: "10px 10px 4px" }}>
-            <div style={{
-              background: C.bgInput, borderRadius: RADIUS.md, padding: "12px 14px",
-              display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-              border: `1px dashed ${C.borderDefault}`,
-            }}>
-              <div style={{
-                width: 38, height: 38, borderRadius: RADIUS.sm, background: C.bgPage,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                <Icon name="flag" size={17} color={C.textDisabled} />
+          {/* Widget de estado — desaparece por completo en cuanto el alumno
+              ya tiene un liberacion_proceso (CU-LSS-02 en adelante, que
+              mostraría su avance real, no está construido todavía). */}
+          {!resumen.tieneProcesoLiberacionIniciado && (
+              <div style={{ padding: "10px 10px 4px" }}>
+                <div style={{
+                  background: resumen.cumpleRequisitosLiberacion ? C.successSoft : C.bgInput,
+                  borderRadius: RADIUS.md, padding: "12px 14px",
+                  display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+                  border: `1px dashed ${resumen.cumpleRequisitosLiberacion ? C.success : C.borderDefault}`,
+                }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: RADIUS.sm, background: C.bgPage,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <Icon name={resumen.cumpleRequisitosLiberacion ? "check" : "flag"} size={17} color={resumen.cumpleRequisitosLiberacion ? C.success : C.textDisabled} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: resumen.cumpleRequisitosLiberacion ? C.success : C.textMuted }}>
+                      {resumen.cumpleRequisitosLiberacion ? "¡Ya puedes iniciar tu proceso!" : "Proceso no iniciado"}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDisabled }}>
+                      {resumen.cumpleRequisitosLiberacion
+                        ? "Cumples todos los requisitos — continúa para solicitar tu evaluación de desempeño."
+                        : "Debes cumplir 480 hrs y tener tus reportes y oferta en regla."}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
+                    <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasNetas ?? 0}/480</span>
+                  </div>
+                  <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.textMuted }}>Proceso no iniciado</div>
-                <div style={{ fontSize: 12, color: C.textDisabled }}>Debes cumplir 480 hrs y tener 6 reportes aprobados</div>
-              </div>
-            </div>
-            <div style={{ marginBottom: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textDisabled, marginBottom: 3 }}>
-                <span>Requisito de horas</span><span style={{ color: C.accentText, fontWeight: 700 }}>{resumen.horasNetas ?? 0}/480</span>
-              </div>
-              <ProgressBar value={resumen.horasNetas ?? 0} max={480} color={C.textDisabled} C={C} />
-            </div>
-          </div>
-          <ActionItem icon="arrow"  {...T.slate} label="Ver proceso de liberación" desc="Disponible al cumplir los requisitos" onClick={() => navigate("/alumno/iniciar-proceso-evaluacion")} C={C} />
-          <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          )}
+          {/* Botón del estado 2 — cumple requisitos pero AÚN no existe
+              liberacion_proceso: lleva a CREAR uno (CU-LSS-01). Distinto del
+              botón de "Ver proceso" de abajo (ese es para cuando ya existe
+              un proceso que consultar). */}
+          {resumen.cumpleRequisitosLiberacion && (
+            <>
+              <ActionItem icon="arrow" {...T.slate} label="Iniciar proceso de liberación" desc="Solicita tu evaluación de desempeño y comienza tu proceso" onClick={() => navigate(RUTA_LSS_SIN_PROCESO)} C={C} />
+              <SlotNotificacion ruta={RUTA_LSS_SIN_PROCESO} notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+            </>
+          )}
+          {/* Botón "Ver proceso" — INDEPENDIENTE del widget de arriba, con la
+              condición casi inversa a propósito: se muestra SIEMPRE que ya
+              exista un liberacion_proceso (sin importar su estado), para que
+              el alumno pueda consultarlo. Si no existe, no hay nada que ver
+              todavía — el widget de arriba ya cubre ese caso. */}
+          {resumen.tieneProcesoLiberacionIniciado && (
+            <>
+              <ActionItem icon="arrow" {...T.slate} label="Ver proceso de liberación" desc="Consulta el estado de tu evaluación de desempeño" onClick={() => navigate(ESTADO_LSS_A_RUTA[resumen.estadoLiberacion] || RUTA_LSS_FALLBACK)} C={C} />
+              <SlotNotificacion ruta="/alumno/iniciar-proceso-evaluacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+            </>
+          )}
           <ActionItem icon="folder" {...T.slate} label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/alumnoasignado-documentacion")} C={C} />
           <SlotNotificacion ruta="/alumnoasignado-documentacion" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
         </Section>
@@ -647,6 +697,16 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
             mensaje: `${resumen.bajas.activas} alumno(s) con una solicitud de baja en curso`,
             ruta: RUTA_BAJA_PROFESOR,
             tipo: "info",
+          },
+          {
+            // RF-LSS-02/RF-LSS-04: notificación calculada (Tipo A) — mientras
+            // exista al menos un alumno con evaluación de desempeño
+            // solicitada (CU-LSS-01), esperando revisión del profesor
+            // (CU-LSS-03, todavía no construido).
+            mostrar: (resumen.alumnosConEvaluacionSolicitada ?? 0) > 0,
+            mensaje: "Tienes alumnos con evaluación de desempeño pendiente.",
+            ruta: "/profesor/evaluar-alumno",
+            tipo: "urgente",
           },
           {
             mostrar: !!resumen.actividadesProximasACaducar,
@@ -787,8 +847,16 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
             ruta: RUTA_BAJA_COORDINACION,
             tipo: "info",
           },
+
+          // CU-LSS-03/04: evaluación enviada por el profesor y pendiente
+          // de dictamen por Coordinación.
+          {
+            mostrar: (resumen.evaluacionesPendientesDictamen ?? 0) > 0,
+            mensaje: "Tienes evaluaciones de desempeño pendientes de dictaminar.",
+            ruta: "/coordinacion/revisar-evaluacion-alumno",
+            tipo: "urgente",
+          },
         ]}
-        // Las solicitudes nuevas llegan como notificación a la bandeja de bajas.
         rutasPromovidas={[RUTA_BAJA_COORDINACION]}
       />
 
@@ -882,6 +950,19 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
           <ActionItem icon="document" {...T.blue}    label="Gestionar carta de término"         desc="Carta lista para entregar" onClick={() => navigate("/coordinacion/estado-carta-termino")} C={C} />
           <ActionItem icon="folder"   {...T.teal}    label="Dictaminar expediente"              desc="Expediente en revisión" onClick={() => navigate("/coordinacion/evaluacion-expediente")} C={C} />
           <SlotNotificacion ruta="/coordinacion/evaluacion-expediente" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* RF-LSS-32 — Tipo A calculada (CU-LSS-07): resumen.expedientesEnRevision
+              ya se calculaba desde antes en dashboard.service.js (contaba
+              liberacion_proceso.estado='expediente_en_revision', un valor
+              reservado que nadie escribía todavía) — CU-LSS-07 ya lo escribe,
+              así que este slot cobra vida sin tocar el backend del dashboard. */}
+          <SlotNotificacionCalculada
+            mostrar={(resumen.expedientesEnRevision ?? 0) > 0}
+            mensaje="Hay expedientes de liberación pendientes de dictaminar."
+            ruta="/coordinacion/evaluacion-expediente"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="check"    {...T.green}   label="Gestionar constancia de término"    desc="Constancia pendiente de emisión" onClick={() => navigate("/coordinacion/gestion-constancia-termino")} C={C} />
           <ActionItem icon="folder" {...T.slate}  label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/coordinación-alumnoasignado-documentacion")} C={C} />
         </Section>

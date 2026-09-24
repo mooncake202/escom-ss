@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 const MOCK = {
   usuario: "Admin Coordinación",
-  
+
 };
 
 // ——— Sub-componentes ————————————————————————————
@@ -17,7 +17,7 @@ const MOCK = {
 function ResumenDocumentos({ C }) {
   const docs = [
     { label: "Expediente", nombre: "LAGARZA_ORTEGA_ANA_KAREN_2022630667.pdf" }
-    
+
   ];
 
   return (
@@ -240,10 +240,10 @@ function VistaRechazado({ observacionesGuardadas, rol, C, navigate}) {
             color: "#fff",
             fontFamily: "inherit",
             boxShadow: SHADOWS.accent,
-            
+
           }}
         >
-          
+
           Corregir y reenviar expediente →
         </button>
       )}
@@ -295,7 +295,7 @@ export default function RevisionResolucion({ rol }) {
   // Pantallas de resolución final
   if (estado === "aprobado") {
     return (
-      <Layout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
+      <Layout pasoActual={5} titulo="Revisión y resolución" rol={rol} usuario={MOCK.usuario}>
         <VistaAprobado rol={rol} C={C} />
       </Layout>
     );
@@ -303,7 +303,7 @@ export default function RevisionResolucion({ rol }) {
 
   if (estado === "rechazado") {
     return (
-      <Layout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-05" rol={rol} usuario={MOCK.usuario}>
+      <Layout pasoActual={5} titulo="Revisión y resolución"  rol={rol} usuario={MOCK.usuario}>
         <VistaRechazado observacionesGuardadas={observacionesGuardadas} rol={rol} C={C} navigate={navigate} />
       </Layout>
     );
@@ -313,7 +313,7 @@ export default function RevisionResolucion({ rol }) {
     <Layout
       pasoActual={5}
       titulo="Revisión y resolución"
-      subtitulo="CU-LSS-05"
+
       rol={rol}
       usuario={MOCK.usuario}
     >

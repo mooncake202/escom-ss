@@ -1,12 +1,26 @@
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 import { useIntegracionExpediente } from "./hooks/useIntegracionExpediente";
 
-const MOCK = {
-  usuario: "García López Juan Carlos",
-  rol: "alumno",
-};
+// ——— Banner informativo fijo de SISS (texto confirmado, sin verificación de backend) ———
+function BannerSiss({ C }) {
+  return (
+    <div style={{
+      padding: "12px 14px",
+      borderRadius: RADIUS.md,
+      marginBottom: "1.5rem",
+      background: "rgba(234,179,8,0.08)",
+      border: "1px solid rgba(234,179,8,0.3)",
+    }}>
+      <p style={{ margin: 0, fontSize: 12, color: "#b45309", lineHeight: 1.5 }}>
+        📌 Debes subir al SISS tu carta de término, reportes mensuales, reporte global, reporte de desempeño
+        y todos los documentos que te pida el sistema, hasta que tu estatus cambie a <strong>DOCUMENTOS COMPLETOS</strong>.
+      </p>
+    </div>
+  );
+}
 
 // ——— Sub-componentes ————————————————————————————
 
@@ -34,18 +48,6 @@ function DocumentoUpload({ doc, archivo, error, onSubir, onQuitar, C }) {
             {doc.descripcion}
           </p>
         </div>
-        {!doc.requerido && (
-          <span style={{
-            fontSize: 11,
-            fontWeight: 600,
-            color: C.textDisabled,
-            background: C.bgInput,
-            padding: "2px 8px",
-            borderRadius: 999,
-          }}>
-            Opcional
-          </span>
-        )}
       </div>
 
       {/* Zona upload */}
@@ -89,13 +91,13 @@ function DocumentoUpload({ doc, archivo, error, onSubir, onQuitar, C }) {
         }}>
           <input
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png"
+            accept=".pdf,application/pdf"
             style={{ display: "none" }}
             onChange={e => onSubir(e.target.files?.[0])}
           />
           <span style={{ fontSize: 20 }}>📎</span>
           <span style={{ fontSize: 13, color: C.textMuted }}>
-            Seleccionar archivo · PDF máx. 5 MB
+            Seleccionar archivo · Solo PDF
           </span>
         </label>
       )}
@@ -108,15 +110,24 @@ function DocumentoUpload({ doc, archivo, error, onSubir, onQuitar, C }) {
 }
 
 // ——— Página principal ——————————————————————————————
+// CU-LSS-07 SOLO integra/envía el expediente — nunca muestra estado de
+// revisión/resolución (corrección de alcance: esa responsabilidad es de
+// CU-LSS-08, /alumno/estado-resolucion, a donde se navega tras el envío
+// exitoso). Esta pantalla solo puede mostrar el formulario, para el envío
+// inicial o el reenvío tras un rechazo (RN-LSS-23).
 
 export default function IntegracionExpediente() {
   const { C } = useTheme();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
   const {
+    cargando,
+    info,
     documentosConfig,
     archivos,
     errores,
+    error,
     loading,
-    enviado,
     subirArchivo,
     quitarArchivo,
     requeridosCompletos,
@@ -124,60 +135,25 @@ export default function IntegracionExpediente() {
     enviarExpediente,
   } = useIntegracionExpediente();
 
-  // Cuántos documentos requeridos están completos
-  const requeridos = documentosConfig.filter(d => d.requerido);
-  const requeridosCargados = requeridos.filter(d => archivos[d.id]).length;
-
-  if (enviado) {
+  if (cargando) {
     return (
-      <ProcesoLSSLayout
-        pasoActual={4}
-        titulo="Integración de expedienteeeee"
-        subtitulo="CU-LSS-07"
-        rol={MOCK.rol}
-        usuario={MOCK.usuario}
-      >
-        <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
-          <div style={{ fontSize: 52, marginBottom: "1rem" }}>📁</div>
-          <h2 style={{ margin: "0 0 0.5rem", fontSize: 22, fontWeight: 700, color: C.success }}>
-            Expediente enviado
-          </h2>
-          <p style={{ margin: "0 0 0.5rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
-            Tu expediente fue enviado correctamente. Coordinación lo revisará y recibirás una notificación con el resultado.
-          </p>
-          <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled }}>
-            Puedes consultar el estado desde tu panel principal.
-          </p>
-          <button
-            style={{
-              padding: "12px 32px",
-              borderRadius: RADIUS.md,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              background: GRADIENTS.primary,
-              border: "none",
-              color: "#fff",
-              fontFamily: "inherit",
-              boxShadow: SHADOWS.accent,
-            }}
-          >
-            Ver estado de mi solicitud
-          </button>
-        </div>
+      <ProcesoLSSLayout pasoActual={4} titulo="Integración de expediente" rol="alumno" usuario={nombreAlumno}>
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
       </ProcesoLSSLayout>
     );
   }
 
+  // estado === 'sin_enviar' (Flujo Principal) o 'rechazado' (Flujo Alterno
+  // 1.1, RN-LSS-23) — mismo formulario en ambos casos, reemplaza TODOS los
+  // documentos siempre. ('en_revision'/'aprobado' nunca se ven aquí: el
+  // guardia de ruta ya redirige a /alumno/estado-resolucion antes de que
+  // esta pantalla monte, y enviarExpediente navega para allá explícito
+  // justo después de un envío exitoso.)
   return (
-    <ProcesoLSSLayout
-      pasoActual={4}
-      titulo="Integración de expediente"
-      subtitulo="CU-LSS-07 - Alumno"
-      rol={MOCK.rol}
-      usuario={MOCK.usuario}
-    >
+    <ProcesoLSSLayout pasoActual={4} titulo="Integración de expediente"  rol="alumno" usuario={nombreAlumno}>
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
+
+        <BannerSiss C={C} />
 
         {/* Título */}
         <h2 style={{ margin: "0 0 0.35rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
@@ -185,11 +161,26 @@ export default function IntegracionExpediente() {
         </h2>
         <p style={{ margin: "0 0 2rem", fontSize: 14, color: C.textMuted, lineHeight: 1.6 }}>
           Sube los documentos requeridos para integrar tu expediente de liberación.
-          El sistema validará el formato y tamaño de cada archivo.
+          El sistema validará el formato de cada archivo y el tamaño del expediente combinado.
         </p>
 
-        {/* Progreso */}
-        
+        {/* RF-LSS-38: observaciones de rechazo de coordinación (Flujo Alterno 1.1) */}
+        {info?.estado === "rechazado" && (
+          <div style={{
+            padding: "14px 16px",
+            borderRadius: RADIUS.md,
+            marginBottom: "1.5rem",
+            background: "rgba(220,38,38,0.07)",
+            border: `1px solid ${C.danger}`,
+          }}>
+            <p style={{ margin: "0 0 4px", fontSize: 12, fontWeight: 700, color: C.danger, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Expediente rechazado
+            </p>
+            <p style={{ margin: 0, fontSize: 13, color: C.textPrimary, lineHeight: 1.5 }}>
+              {info.observacionesRechazo || "Coordinación rechazó tu expediente. Corrige y vuelve a enviar todos los documentos."}
+            </p>
+          </div>
+        )}
 
         {/* Lista documentos */}
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
@@ -219,6 +210,10 @@ export default function IntegracionExpediente() {
             Una vez enviado el expediente, coordinación lo revisará en los próximos días hábiles.
           </p>
         </div>
+
+        {error && (
+          <p style={{ marginBottom: "1rem", fontSize: 12, color: C.danger }}>{error}</p>
+        )}
 
         {/* Botón */}
         <button

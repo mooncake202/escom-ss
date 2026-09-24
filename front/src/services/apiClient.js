@@ -4,24 +4,41 @@ const MENSAJE_NO_DISPONIBLE = "El servicio no está disponible temporalmente. In
 
 async function pedir(path, options) {
   const token = localStorage.getItem("token");
+  const { timeoutMs, ...fetchOptions } = options;
+
+  // Timeout opcional para operaciones que pueden quedarse esperando
+  // indefinidamente, por ejemplo subidas grandes de archivos.
+  const controller = timeoutMs ? new AbortController() : null;
+  const temporizador = controller
+    ? setTimeout(() => controller.abort(), timeoutMs)
+    : null;
 
   try {
     return await fetch(`${API_URL}${path}`, {
-      ...options,
+      ...fetchOptions,
+      ...(controller ? { signal: controller.signal } : {}),
       headers: {
         // Si el body es FormData (subida de archivos), NO se fuerza
         // Content-Type: application/json — el navegador debe poner su
-        // propio "multipart/form-data; boundary=..." automáticamente. Si
-        // lo sobrescribiéramos, el backend no podría parsear los archivos.
-        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
+        // propio "multipart/form-data; boundary=..." automáticamente.
+        ...(fetchOptions.body instanceof FormData
+          ? {}
+          : { "Content-Type": "application/json" }),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(options.headers || {}),
+        ...(fetchOptions.headers || {}),
       },
     });
-  } catch {
-    // Excepción E3 (varias fichas de GR), caso 1: fetch() nunca llegó a
-    // tener respuesta — sin conexión, DNS, servidor totalmente inalcanzable.
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(
+        "La operación tardó demasiado y fue cancelada. Verifica tu conexión e intenta de nuevo."
+      );
+    }
+
+    // Excepción E3: fetch() nunca llegó a tener respuesta.
     throw new Error(MENSAJE_NO_DISPONIBLE);
+  } finally {
+    if (temporizador) clearTimeout(temporizador);
   }
 }
 
