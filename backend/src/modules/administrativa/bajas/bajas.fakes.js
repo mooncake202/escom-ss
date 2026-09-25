@@ -59,7 +59,21 @@ function crearBd({
     borrados: [],
   };
 
-  const registrar = (modelo, operacion, datos) => bd.escrituras.push({ modelo, operacion, ...datos });
+  // `enTransaccion` permite a las pruebas comprobar que dos escrituras ocurrieron dentro del MISMO
+  // $transaction, no solo que ambas ocurrieron.
+  let dentroDeTransaccion = false;
+  const registrar = (modelo, operacion, datos) => bd.escrituras.push({
+    modelo, operacion, enTransaccion: dentroDeTransaccion, ...datos,
+  });
+
+  // Claves de bd que son DATOS (no bitácora de la prueba): son las que se restauran si una
+  // transacción falla, para que el rollback del fake sea real y la atomicidad se pueda probar.
+  const CLAVES_DE_DATOS = [
+    'usuarios', 'alumnos', 'profesores', 'ofertas', 'solicitudesRegistro', 'bajas', 'documentos',
+    'cumulos', 'bitacoras', 'actividades', 'reportes', 'reportesGlobales', 'revisionesMensuales',
+    'revisionesGlobales', 'registrosBitacora', 'liberaciones', 'evaluaciones', 'revisionesDesempeno',
+    'cartasTermino', 'carreras', 'periodos', 'coordinadores',
+  ];
 
   const usuarioDe = (id) => bd.usuarios.find((u) => u.id === id) ?? null;
   const ofertaDe = (id) => bd.ofertas.find((o) => o.id === id) ?? null;
@@ -291,6 +305,8 @@ function crearBd({
         return filas.map((b) => clonar(bajaConRelaciones(b, include)));
       },
       create: async ({ data, include }) => {
+        // Para probar que un fallo del create revierte lo demás de su transacción.
+        if (bd.fallarCreacionBaja) throw Object.assign(new Error('fallo simulado al crear la baja'), { code: 'P2002' });
         const fila = { id: Math.max(0, ...bd.bajas.map((b) => b.id)) + 1, ...data };
         bd.bajas.push(fila);
         registrar('solicitud_baja', 'create', { data });
@@ -377,7 +393,24 @@ function crearBd({
     get: (_, propiedad) => {
       // Las dos formas reales: callback (bajas) y array de promesas (CU-GR-13).
       if (propiedad === '$transaction') {
-        return async (arg) => (Array.isArray(arg) ? Promise.all(arg) : arg(prisma));
+        return async (arg) => {
+          if (Array.isArray(arg)) return Promise.all(arg);
+
+          // Rollback real: se guarda una copia profunda de los datos y se restaura si el callback
+          // lanza, igual que haría la BD. Sin esto no se puede distinguir "atómico" de "las dos
+          // escrituras ocurrieron una después de otra".
+          const respaldo = Object.fromEntries(CLAVES_DE_DATOS.map((k) => [k, clonar(bd[k])]));
+          const anidada = dentroDeTransaccion;
+          dentroDeTransaccion = true;
+          try {
+            return await arg(prisma);
+          } catch (err) {
+            for (const k of CLAVES_DE_DATOS) bd[k] = respaldo[k];
+            throw err;
+          } finally {
+            dentroDeTransaccion = anidada;
+          }
+        };
       }
       if (propiedad === '$queryRaw') {
         return async (_textos, profesorId) => {
@@ -416,8 +449,11 @@ const baja = ({ id = 1, boleta = '2022630001', solicitanteId = 10, estado = 'pen
 const documento = ({ id = 1, boleta = '2022630001', creadorId = 10, estado = 'en_revision', tipo = 'expediente_baja', ruta = '2022630001/abc.enc' } = {}) =>
   ({ id, alumno_id: boleta, creador_id: creadorId, tipo_documento: tipo, estado_documento: estado, ruta_archivo: ruta, fecha_creacion: new Date() });
 
-const cumulo = ({ boleta = '2022630001', horas = 40, rechazadas = 0, faltas = 3, consecutivas = 2 } = {}) =>
-  ({ alumno_id: boleta, horas_acumuladas: horas, horas_rechazadas: rechazadas, faltas_acumuladas: faltas, faltas_consecutivas: consecutivas });
+// `puntero` = fecha_ultima_evaluacion_faltas, el día ya evaluado por el cron de AH. Arranca con un
+// valor REAL (no null) a propósito: así las pruebas pueden distinguir entre el reinicio que lo
+// conserva (amonestación / solicitud del profesor) y el que lo anula (baja aprobada).
+const cumulo = ({ boleta = '2022630001', horas = 40, rechazadas = 0, faltas = 3, consecutivas = 2, puntero = new Date('2026-09-23T00:00:00Z') } = {}) =>
+  ({ alumno_id: boleta, horas_acumuladas: horas, horas_rechazadas: rechazadas, faltas_acumuladas: faltas, faltas_consecutivas: consecutivas, fecha_ultima_evaluacion_faltas: puntero });
 
 const carrera = ({ id = 1, nombre = 'Ingeniería en Sistemas Computacionales' } = {}) => ({ id, nombre });
 

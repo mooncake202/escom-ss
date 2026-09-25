@@ -223,9 +223,68 @@ test('ADM-09: crear la solicitud NO toca al alumno, ni la oferta, ni los cupos',
   assert.deepEqual(escriturasA('usuario'), []);
 });
 
+test('ADM-09: solicitar la baja reinicia los contadores de faltas, igual que la amonestación', async () => {
+  await servicio.solicitarBajaProfesor({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, motivo: 'Faltas reiteradas.' });
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 0);
+  assert.equal(bd.cumulos[0].faltas_consecutivas, 0);
+});
+
+test('ADM-09: solicitar la baja CONSERVA el puntero de faltas y las horas', async () => {
+  const punteroAntes = bd.cumulos[0].fecha_ultima_evaluacion_faltas;
+
+  await servicio.solicitarBajaProfesor({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, motivo: 'x' });
+
+  assert.deepEqual(bd.cumulos[0].fecha_ultima_evaluacion_faltas, punteroAntes, 'el cron no debe recobrar');
+  assert.equal(bd.cumulos[0].horas_acumuladas, 40);
+  assert.equal(bd.cumulos[0].horas_rechazadas, 0);
+});
+
+// Atomicidad: el create y el reinicio van en la MISMA transacción, así que un fallo no puede dejar
+// una baja solicitada con las faltas intactas ni las faltas perdonadas sin baja.
+test('ADM-09: el create y el reinicio de faltas ocurren en la MISMA transacción', async () => {
+  await servicio.solicitarBajaProfesor({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, motivo: 'x' });
+
+  const enTx = bd.escrituras.filter((e) => e.enTransaccion);
+  const modelos = enTx.map((e) => e.modelo);
+  assert.ok(modelos.includes('solicitud_baja'), 'el create va en transacción');
+  assert.ok(modelos.includes('cumulo_horas_y_faltas'), 'el reinicio va en la misma transacción');
+});
+
+test('ADM-09: si el create de la baja falla, las faltas NO se reinician', async () => {
+  bd.fallarCreacionBaja = true;
+
+  await assert.rejects(
+    servicio.solicitarBajaProfesor({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, motivo: 'x' }),
+  );
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 3, 'la transacción no dejó el reinicio a medias');
+  assert.equal(bd.cumulos[0].faltas_consecutivas, 2);
+  assert.equal(bd.bajas.length, 0);
+});
+
+test('ADM-09: solicitar la baja no falla si el alumno no tiene fila de cúmulo', async () => {
+  montar({ cumulos: [] });
+
+  const r = await servicio.solicitarBajaProfesor({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, motivo: 'x' });
+
+  assert.ok(r.id, 'la solicitud sí se crea');
+  assert.equal(bd.bajas.length, 1);
+});
+
+test('ADM-09: un profesor ajeno no reinicia las faltas de un alumno que no es suyo', async () => {
+  await assert.rejects(
+    servicio.solicitarBajaProfesor({ usuarioId: U_OTRO_PROF, alumnoBoleta: BOLETA, motivo: 'x' }),
+    (err) => err.status === 404,
+  );
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 3);
+  assert.deepEqual(escriturasA('cumulo_horas_y_faltas'), []);
+});
+
 // ── Amonestación ──
 
-test('amonestación: crea UNA notificación al alumno y nada más', async () => {
+test('amonestación: crea UNA notificación al alumno y no genera ninguna baja', async () => {
   await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'Registra tu bitácora a diario.' });
 
   assert.equal(bd.notificaciones.length, 1);
@@ -235,12 +294,97 @@ test('amonestación: crea UNA notificación al alumno y nada más', async () => 
   assert.equal(bd.bajas.length, 0);
 });
 
-test('amonestación: NO modifica los contadores de faltas de AH', async () => {
+// ── Reinicio de faltas de AH (integración AH ↔ Bajas) ──
+//
+// Amonestar y solicitar la baja son las dos acciones del profesor que cierran el ciclo de aviso, así
+// que reinician el conteo. Con eso se apaga sola la alerta de "faltas críticas" del dashboard, que se
+// DERIVA de estos contadores (faltas_consecutivas>=5 O faltas_acumuladas>=18).
+
+test('amonestación: reinicia AMBOS contadores de faltas', async () => {
+  const c = bd.cumulos[0];
+  assert.equal(c.faltas_acumuladas, 3, 'punto de partida');
+  assert.equal(c.faltas_consecutivas, 2, 'punto de partida');
+
   await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'aviso' });
 
-  const c = bd.cumulos[0];
-  assert.equal(c.faltas_acumuladas, 3, 'las faltas acumuladas no se tocan');
-  assert.equal(c.faltas_consecutivas, 2, 'las faltas consecutivas no se reinician');
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 0);
+  assert.equal(bd.cumulos[0].faltas_consecutivas, 0);
+});
+
+// La que protege contra el recobro: si el puntero se anulara, contabilizarFaltasDiarias reevaluaría
+// desde fecha_inicio y volvería a cobrar esa misma noche las faltas perdonadas.
+test('amonestación: CONSERVA fecha_ultima_evaluacion_faltas', async () => {
+  const punteroAntes = bd.cumulos[0].fecha_ultima_evaluacion_faltas;
+  assert.ok(punteroAntes, 'el fixture debe traer un puntero real para que la prueba valga');
+
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'aviso' });
+
+  assert.deepEqual(bd.cumulos[0].fecha_ultima_evaluacion_faltas, punteroAntes);
+  // Y que ni siquiera se mencione en el `data` enviado: no basta con que el valor coincida.
+  const escritura = escriturasA('cumulo_horas_y_faltas').at(-1);
+  assert.deepEqual(Object.keys(escritura.data).sort(), ['faltas_acumuladas', 'faltas_consecutivas']);
+});
+
+test('amonestación: CONSERVA las horas acumuladas y rechazadas', async () => {
+  bd.cumulos[0].horas_rechazadas = 8;
+
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'aviso' });
+
+  assert.equal(bd.cumulos[0].horas_acumuladas, 40, 'el alumno sí trabajó esas horas');
+  assert.equal(bd.cumulos[0].horas_rechazadas, 8);
+});
+
+test('amonestación: es idempotente — amonestar dos veces no rompe nada', async () => {
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'primera' });
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'segunda' });
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 0);
+  assert.equal(bd.cumulos[0].faltas_consecutivas, 0);
+  assert.equal(bd.notificaciones.length, 2);
+});
+
+test('amonestación: no falla si el alumno todavía no tiene fila de cúmulo', async () => {
+  // AH la crea con un upsert perezoso: puede no existir. `updateMany` devuelve count 0 sin lanzar.
+  montar({ cumulos: [] });
+
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'aviso' });
+
+  assert.equal(bd.cumulos.length, 0);
+  assert.equal(bd.notificaciones.length, 1, 'la amonestación sí se envía');
+  assert.equal(escriturasA('cumulo_horas_y_faltas').at(-1).count, 0);
+});
+
+test('amonestación: el reinicio NO alcanza al cúmulo de otro alumno', async () => {
+  const OTRA = '2022630099';
+  montar({ cumulos: [cumulo(), cumulo({ boleta: OTRA, faltas: 7, consecutivas: 4 })] });
+
+  await servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: 'aviso' });
+
+  const otro = bd.cumulos.find((c) => c.alumno_id === OTRA);
+  assert.equal(otro.faltas_acumuladas, 7, 'el otro alumno no se toca');
+  assert.equal(otro.faltas_consecutivas, 4);
+  // Y el `where` apunta a una sola boleta, no a un conjunto.
+  assert.equal(escriturasA('cumulo_horas_y_faltas').at(-1).where.alumno_id, BOLETA);
+});
+
+test('amonestación: un alumno ajeno falla ANTES de reiniciar nada', async () => {
+  await assert.rejects(
+    servicio.amonestarAlumno({ usuarioId: U_OTRO_PROF, alumnoBoleta: BOLETA, observaciones: 'aviso' }),
+    (err) => err.status === 404 && err.code === 'ALUMNO_NO_ASIGNADO',
+  );
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 3, 'sin tocar');
+  assert.equal(bd.cumulos[0].faltas_consecutivas, 2);
+  assert.deepEqual(escriturasA('cumulo_horas_y_faltas'), []);
+});
+
+test('amonestación: observaciones vacías fallan ANTES de reiniciar', async () => {
+  await assert.rejects(
+    servicio.amonestarAlumno({ usuarioId: U_PROFESOR, alumnoBoleta: BOLETA, observaciones: '   ' }),
+    (err) => err.status === 400,
+  );
+
+  assert.equal(bd.cumulos[0].faltas_acumuladas, 3);
   assert.deepEqual(escriturasA('cumulo_horas_y_faltas'), []);
 });
 

@@ -275,6 +275,35 @@ async function asegurarAlumnoDelProfesor(profesorId, boleta) {
   return solicitud;
 }
 
+/**
+ * Reinicia el conteo de faltas de AH cuando el profesor ACTÚA sobre el alumno (amonestación de
+ * CU-ADM-09 o solicitud de baja): la advertencia ya se dio, así que la cuenta arranca de nuevo.
+ * Con esto también se apaga sola la alerta de "faltas críticas" del dashboard del profesor, que se
+ * DERIVA de estos dos contadores (faltas_consecutivas>=5 O faltas_acumuladas>=18) y no de ninguna
+ * bandera persistida.
+ *
+ * `fecha_ultima_evaluacion_faltas` NO se toca, y es deliberado: es el puntero del día ya evaluado
+ * por contabilizarFaltasDiarias (ah.cron.js). Ponerlo en null haría que el cron reevaluara desde
+ * `fecha_inicio` del periodo y volviera a cobrar esa misma noche las faltas que se acaban de
+ * perdonar. Conservándolo, el cron sigue desde el día siguiente y solo cuenta faltas NUEVAS.
+ *
+ * Las horas tampoco se tocan: el alumno sí trabajó esas jornadas.
+ *
+ * Ojo, no confundir con el reinicio de `aprobarSolicitud`: ese es el del borrado parcial, cancela el
+ * servicio completo y SÍ pone las horas en 0 y el puntero en null, porque el siguiente servicio
+ * arranca con otro `fecha_inicio`. Son dos operaciones distintas y deben seguir siéndolo.
+ *
+ * `updateMany` en vez de `update`: AH crea el cúmulo con un upsert perezoso, así que un alumno
+ * puede no tener fila todavía. `update` lanzaría P2025; `updateMany` devuelve count 0 sin ruido.
+ * Es idempotente y no escribe nada de AH que AH no escriba ya.
+ */
+function reiniciarFaltasDeAlumno(alumnoBoleta, tx = prisma) {
+  return tx.cumulo_horas_y_faltas.updateMany({
+    where: { alumno_id: alumnoBoleta },
+    data: { faltas_acumuladas: 0, faltas_consecutivas: 0 },
+  });
+}
+
 async function solicitarBajaProfesor({ usuarioId, alumnoBoleta, motivo }) {
   const motivoLimpio = limpiar(motivo);
   if (motivoLimpio === '') throw crearError('El motivo de la solicitud es obligatorio.', 400);
@@ -287,18 +316,29 @@ async function solicitarBajaProfesor({ usuarioId, alumnoBoleta, motivo }) {
   }
 
   // Sin expediente: la baja pedida por el profesor es una decisión administrativa, no documental.
-  const creada = await prisma.solicitud_baja.create({
-    data: {
-      alumno_id: alumnoBoleta,
-      solicitante_id: usuarioId,
-      coordinador_id: null,
-      documento_id: null,
-      estado: ESTADO_PENDIENTE,
-      motivo: motivoLimpio,
-      fecha: new Date(),
-      fecha_respuesta: null,
-      comentario: null,
-    },
+  //
+  // El create y el reinicio de faltas van en la MISMA transacción: si una fallara sola quedaría una
+  // baja solicitada con las faltas intactas (o las faltas perdonadas sin baja). Las notificaciones
+  // se quedan fuera y después, como en el resto del módulo, para que un fallo al avisar no revierta
+  // lo ya escrito.
+  const creada = await prisma.$transaction(async (tx) => {
+    const solicitudBaja = await tx.solicitud_baja.create({
+      data: {
+        alumno_id: alumnoBoleta,
+        solicitante_id: usuarioId,
+        coordinador_id: null,
+        documento_id: null,
+        estado: ESTADO_PENDIENTE,
+        motivo: motivoLimpio,
+        fecha: new Date(),
+        fecha_respuesta: null,
+        comentario: null,
+      },
+    });
+
+    await reiniciarFaltasDeAlumno(alumnoBoleta, tx);
+
+    return solicitudBaja;
   });
 
   await avisarACoordinacion(creada, {
@@ -330,6 +370,11 @@ async function amonestarAlumno({ usuarioId, alumnoBoleta, observaciones }) {
 
   const profesor = await perfilProfesor(usuarioId);
   const solicitud = await asegurarAlumnoDelProfesor(profesor.id, alumnoBoleta);
+
+  // Ya validado que el alumno es de este profesor: la amonestación es la advertencia formal, así que
+  // el conteo de faltas arranca de nuevo. Va ANTES de notificar (si la escritura falla, no se avisa
+  // de un reinicio que no ocurrió). No necesita transacción: es la única escritura de la función.
+  await reiniciarFaltasDeAlumno(alumnoBoleta);
 
   await crearNotificacion({
     usuarioId: solicitud.alumno.usuario_id,
