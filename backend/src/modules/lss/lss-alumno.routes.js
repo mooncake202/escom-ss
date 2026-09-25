@@ -17,7 +17,6 @@ const {
   postSolicitarConstancia,
   postCorregirExpedienteLss,
   getEstadoConstancia,
-  getDescargarConstancia,
 } = require('./lss-alumno.controller');
 
 const router = express.Router();
@@ -49,6 +48,5 @@ router.post('/expediente/corregir', requireAuth, requireRole('alumno_asignado'),
 
 // CU-LSS-10 — consultar/descargar la constancia de término.
 router.get('/constancia-termino/estado', requireAuth, requireRole('alumno_asignado'), getEstadoConstancia);
-router.get('/constancia-termino/descargar', requireAuth, requireRole('alumno_asignado'), getDescargarConstancia);
 
 module.exports = router;

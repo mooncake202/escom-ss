@@ -117,8 +117,9 @@ export async function listarSolicitudesConstancia() {
   return apiFetch("/coordinador/constancia-termino/pendientes");
 }
 
-export async function emitirConstancia(liberacionProcesoId, archivoPdf) {
-  const formData = new FormData();
-  formData.append("archivo", archivoPdf);
-  return apiFetch(`/coordinador/constancia-termino/${liberacionProcesoId}/emitir`, { method: "POST", body: formData });
+export async function emitirConstancia(liberacionProcesoId, mensaje) {
+  return apiFetch(`/coordinador/constancia-termino/${liberacionProcesoId}/emitir`, {
+    method: "POST",
+    body: JSON.stringify({ mensaje }),
+  });
 }

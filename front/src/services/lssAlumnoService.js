@@ -140,38 +140,10 @@ export async function corregirExpedienteLss() {
   return apiFetch("/alumno/expediente/corregir", { method: "POST" });
 }
 
-// CU-LSS-10 — consultar/descargar la constancia de término.
+// CU-LSS-10 — consultar el mensaje de la constancia de término.
+// CORRECCIÓN ARQUITECTÓNICA: ya no hay ningún archivo que descargar de
+// nuestro sistema — la constancia es un mensaje de texto libre (con
+// enlace a una plataforma externa embebido) que el alumno lee directo.
 export async function getEstadoConstancia() {
   return apiFetch("/alumno/constancia-termino/estado");
-}
-
-/**
- * Mismo patrón <a download> ya corregido en descargarExpedienteLss — lee
- * el nombre real del header Content-Disposition en vez de hardcodearlo.
- */
-export async function descargarConstancia() {
-  const token = localStorage.getItem("token");
-  let res;
-  try {
-    res = await fetch(`${API_URL}/alumno/constancia-termino/descargar`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    throw new Error("El servicio no está disponible temporalmente. Intenta de nuevo más tarde.");
-  }
-
-  if (!res.ok) {
-    const json = await res.json().catch(() => ({}));
-    throw new Error(json.message || "No se pudo descargar la constancia de término.");
-  }
-
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
-  const enlace = document.createElement("a");
-  enlace.href = url;
-  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "constancia-termino.pdf";
-  document.body.appendChild(enlace);
-  enlace.click();
-  document.body.removeChild(enlace);
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

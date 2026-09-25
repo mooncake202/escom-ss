@@ -244,9 +244,13 @@ async function dictaminarAprobado(coordinadorUsuarioId, evaluacionId, ipFirma = 
 
   try {
     await prisma.$transaction([
+      // Bug real encontrado: quedaba en 'vigente' (el mismo valor que ya
+      // traía desde que el profesor firmó) — nunca reflejaba que
+      // coordinación ya dio el visto bueno final. Mismo patrón que
+      // dictaminarExpedienteAprobado (LSS-09), que sí usa 'aprobado'.
       prisma.documento.update({
         where: { id: evaluacion.documento_id },
-        data: { ruta_archivo: rutaRelativaNueva, estado_documento: 'vigente', aprobado_por_id: coordinador.id },
+        data: { ruta_archivo: rutaRelativaNueva, estado_documento: 'aprobado', aprobado_por_id: coordinador.id },
       }),
       prisma.evaluacion_desempeno.update({
         where: { id: evaluacion.id },
@@ -629,27 +633,30 @@ async function dictaminarExpedienteRechazado(coordinadorUsuarioId, documentoId, 
 // en CU-LSS-04/06/09 (resolverCoordinador/emitirResumenActualizado/
 // notificar, reutilizados tal cual). A diferencia de LSS-04/09, aquí SÍ
 // se sigue la ficha al pie de la letra: liberacion_proceso.estado avanza
-// a 'constancia_disponible' (decisión confirmada por el usuario). La
-// constancia es un PDF que coordinación SUBE MANUALMENTE (no generado
-// con plantilla, a diferencia de la evaluación de desempeño).
+// a 'constancia_disponible' (decisión confirmada por el usuario).
+//
+// CORRECCIÓN ARQUITECTÓNICA (confirmada por el usuario, reemplaza el
+// diseño anterior de esta tarea): la constancia NO es un archivo que
+// nuestro sistema suba/cifre/sirva — coordinación redacta un MENSAJE DE
+// TEXTO LIBRE (con un enlace a serviciosocialconstancias.ipn.mx embebido
+// dentro del texto) que el alumno lee directo en LSS-10 y usa para ir a
+// descargar su constancia FUERA de nuestro sistema. Se descartó por
+// completo el mecanismo de archivo/cifrado/documento que se había
+// construido antes para este tipo — el resto de la infraestructura de
+// cifrado (expediente_lss, evaluación) no se toca, sigue siendo válida
+// para esos otros tipos.
 // ─────────────────────────────────────────────────────────────
 
-const TIPO_DOCUMENTO_CONSTANCIA_TERMINO = 'constancia_termino';
-
-// Mismo criterio de duplicación ya usado en todo el proyecto (RN de
-// separación por módulo) — idéntica a esPdfValido en lss-alumno.service.js.
-function esPdfValido(buffer) {
-  return !!buffer && buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
-}
+const LIMITE_MENSAJE_CONSTANCIA_CARACTERES = 3000;
 
 /**
  * RN-LSS-35 (matiz distinto a LSS-04/09): NO hay guardia de "ya
- * dictaminado" — el coordinador puede corregir cuantas veces necesite.
- * El único guardia real es que el alumno haya llegado al punto correcto
- * del proceso: 'solicitud_constancia_termino' (primera emisión) o ya
- * 'constancia_disponible' (corrección posterior). Cualquier otro estado
- * (el alumno ni siquiera ha solicitado su constancia todavía) se
- * rechaza.
+ * dictaminado" — el coordinador puede corregir/reenviar el mensaje
+ * cuantas veces necesite. El único guardia real es que el alumno haya
+ * llegado al punto correcto del proceso: 'solicitud_constancia_termino'
+ * (primera emisión) o ya 'constancia_disponible' (corrección posterior).
+ * Cualquier otro estado (el alumno ni siquiera ha solicitado su
+ * constancia todavía) se rechaza.
  */
 function exigirListoParaConstancia(proceso) {
   if (proceso.estado !== ESTADO_SOLICITUD_CONSTANCIA_TERMINO && proceso.estado !== ESTADO_CONSTANCIA_DISPONIBLE) {
@@ -664,8 +671,8 @@ function exigirListoParaConstancia(proceso) {
  * ['solicitud_constancia_termino', 'constancia_disponible'] — sin filtro
  * de asignación (mismo criterio que listarEvaluacionesPendientesDictamen/
  * listarSolicitudesCartaTermino/listarExpedientesPendientes). Incluye
- * `emitida` (ya tiene documento constancia_termino o no) para que el
- * frontend distinga "emisión inicial" de "corrección".
+ * `mensajeActual` para que el frontend distinga "emisión inicial" de
+ * "corrección" y pre-cargue el textarea con el texto ya enviado.
  */
 async function listarSolicitudesConstanciaPendientes() {
   const procesos = await prisma.liberacion_proceso.findMany({
@@ -681,13 +688,6 @@ async function listarSolicitudesConstanciaPendientes() {
     orderBy: { id: 'asc' },
   });
 
-  const boletas = procesos.map((p) => p.solicitud_registro.alumno.boleta);
-  const documentos = await prisma.documento.findMany({
-    where: { tipo_documento: TIPO_DOCUMENTO_CONSTANCIA_TERMINO, alumno_id: { in: boletas } },
-    select: { alumno_id: true, nombre_expediente: true },
-  });
-  const emitidaPorBoleta = new Map(documentos.map((d) => [d.alumno_id, d.nombre_expediente]));
-
   return procesos.map((proceso) => {
     const solicitud = proceso.solicitud_registro;
     return {
@@ -698,20 +698,19 @@ async function listarSolicitudesConstanciaPendientes() {
         ? `${solicitud.oferta.profesor.usuario.nombre} ${solicitud.oferta.profesor.usuario.apellidos}`
         : null,
       oferta: solicitud.oferta?.nombre_proyecto ?? null,
-      emitida: emitidaPorBoleta.has(solicitud.alumno.boleta),
-      nombreConstancia: emitidaPorBoleta.get(solicitud.alumno.boleta) ?? null,
+      emitida: !!proceso.mensaje_constancia_termino,
+      mensajeActual: proceso.mensaje_constancia_termino,
     };
   });
 }
 
 /**
  * Flujo Principal (emisión inicial) Y Flujo Alterno 2.2/2.3 (corrección)
- * — misma función para ambos, la lógica de sobreescritura (update si ya
- * existe, create si no) lo maneja naturalmente. Mismo patrón de
- * cifrado/carpeta/borrado-solo-tras-confirmar que subirExpedienteLss
- * (LSS-07).
+ * — misma función para ambos, un simple UPDATE de texto no necesita
+ * distinguir "existe o no" (a diferencia del archivo, que sí necesitaba
+ * create/update + borrar el viejo).
  */
-async function emitirConstancia(coordinadorUsuarioId, liberacionProcesoId, archivoPdf) {
+async function enviarMensajeConstancia(coordinadorUsuarioId, liberacionProcesoId, mensaje) {
   await resolverCoordinador(coordinadorUsuarioId); // RN-LSS-32.
 
   const proceso = await prisma.liberacion_proceso.findUnique({
@@ -722,59 +721,23 @@ async function emitirConstancia(coordinadorUsuarioId, liberacionProcesoId, archi
 
   exigirListoParaConstancia(proceso);
 
-  if (!esPdfValido(archivoPdf?.buffer)) {
-    throw crearError('El archivo no es un PDF válido.', 400);
+  const mensajeLimpio = (mensaje || '').trim();
+  if (!mensajeLimpio) {
+    throw crearError('Debes escribir un mensaje.', 422, 'MENSAJE_REQUERIDO');
+  }
+  if (mensajeLimpio.length > LIMITE_MENSAJE_CONSTANCIA_CARACTERES) {
+    throw crearError(`El mensaje no puede superar ${LIMITE_MENSAJE_CONSTANCIA_CARACTERES} caracteres.`, 422, 'MENSAJE_MUY_LARGO');
   }
 
-  const alumno = proceso.solicitud_registro.alumno;
-  const nombreConstancia = `${alumno.boleta}_CONSTANCIA_TERMINO.pdf`;
-  const carpetaAlumno = path.join(RUTA_BASE_DOCUMENTOS, alumno.boleta);
-  fs.mkdirSync(carpetaAlumno, { recursive: true });
-  const rutaRelativa = path.join(alumno.boleta, generarNombreSeguro());
-  fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa), cifrarBuffer(archivoPdf.buffer));
-
-  const documentoExistente = await prisma.documento.findFirst({
-    where: { alumno_id: alumno.boleta, tipo_documento: TIPO_DOCUMENTO_CONSTANCIA_TERMINO },
+  await prisma.liberacion_proceso.update({
+    where: { id: proceso.id },
+    data: { mensaje_constancia_termino: mensajeLimpio, estado: ESTADO_CONSTANCIA_DISPONIBLE },
   });
-  const rutaViejaABorrar = documentoExistente?.ruta_archivo ?? null;
-  const ahora = new Date();
 
-  try {
-    await prisma.$transaction([
-      documentoExistente
-        ? prisma.documento.update({
-            where: { id: documentoExistente.id },
-            data: { ruta_archivo: rutaRelativa, nombre_expediente: nombreConstancia, fecha_creacion: ahora, creador_id: coordinadorUsuarioId },
-          })
-        : prisma.documento.create({
-            data: {
-              alumno_id: alumno.boleta,
-              creador_id: coordinadorUsuarioId,
-              tipo_documento: TIPO_DOCUMENTO_CONSTANCIA_TERMINO,
-              fecha_creacion: ahora,
-              estado_documento: 'disponible',
-              ruta_archivo: rutaRelativa,
-              nombre_expediente: nombreConstancia,
-            },
-          }),
-      prisma.liberacion_proceso.update({
-        where: { id: proceso.id },
-        data: { estado: ESTADO_CONSTANCIA_DISPONIBLE },
-      }),
-    ]);
-  } catch (err) {
-    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa)); } catch {}
-    throw crearError('Ocurrió un error al procesar la constancia.', 500);
-  }
-
-  if (rutaViejaABorrar) {
-    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaViejaABorrar)); } catch {}
-  }
-
-  const alumnoUsuarioId = alumno.usuario_id;
+  const alumnoUsuarioId = proceso.solicitud_registro.alumno.usuario_id;
   await notificar(alumnoUsuarioId, 'Tu constancia de término ya está disponible para descargar.', '/alumno/consultar-constancia-termino');
 
-  return { mensaje: 'Constancia de término emitida correctamente.', estado: ESTADO_CONSTANCIA_DISPONIBLE };
+  return { mensaje: 'Mensaje de constancia de término enviado correctamente.', estado: ESTADO_CONSTANCIA_DISPONIBLE };
 }
 
 module.exports = {
@@ -789,5 +752,5 @@ module.exports = {
   dictaminarExpedienteAprobado,
   dictaminarExpedienteRechazado,
   listarSolicitudesConstanciaPendientes,
-  emitirConstancia,
+  enviarMensajeConstancia,
 };

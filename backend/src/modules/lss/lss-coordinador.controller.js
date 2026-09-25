@@ -1,4 +1,3 @@
-const multer = require('multer');
 const lssCoordinadorService = require('./lss-coordinador.service');
 
 // Mismo patrón de manejo de errores que lss-profesor.controller.js
@@ -131,38 +130,15 @@ async function getSolicitudesConstancia(req, res) {
   }
 }
 
-// Mismo límite genérico ya usado en GR para un solo documento PDF (sin
-// combinar) — gr.controller.js:98 (LIMITE_TAMANO_BYTES, 1.5 MB).
-const LIMITE_CONSTANCIA_BYTES = 1.5 * 1024 * 1024;
-
-const uploadConstancia = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: LIMITE_CONSTANCIA_BYTES },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype !== 'application/pdf') return cb(new Error('SOLO_PDF'));
-    cb(null, true);
-  },
-}).single('archivo');
-
-function postEmitirConstancia(req, res) {
-  uploadConstancia(req, res, async (err) => {
-    if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ message: 'El archivo excede el tamaño máximo permitido (1.5 MB).' });
-      }
-      if (err.message === 'SOLO_PDF') {
-        return res.status(400).json({ message: 'Solo se permiten archivos en formato PDF.' });
-      }
-      console.error('Error al procesar el archivo de la constancia de término:', err);
-      return res.status(500).json({ message: 'Ocurrió un error al procesar el archivo.' });
-    }
-    try {
-      const resultado = await lssCoordinadorService.emitirConstancia(req.usuario.sub, req.params.id, req.file);
-      return res.status(200).json(resultado);
-    } catch (error) {
-      return manejarError(error, res, 'Error al emitir constancia de término:');
-    }
-  });
+// CU-LSS-11 (rediseño): mensaje de texto libre en vez de archivo —
+// JSON simple, sin multer.
+async function postEnviarMensajeConstancia(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.enviarMensajeConstancia(req.usuario.sub, req.params.id, req.body.mensaje);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al enviar mensaje de constancia de término:');
+  }
 }
 
 module.exports = {
@@ -177,5 +153,5 @@ module.exports = {
   postDictaminarExpedienteAprobado,
   postDictaminarExpedienteRechazado,
   getSolicitudesConstancia,
-  postEmitirConstancia,
+  postEnviarMensajeConstancia,
 };

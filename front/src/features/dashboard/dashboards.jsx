@@ -323,7 +323,18 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
           { mostrar: !!resumen.bitacoraHoyPendiente, mensaje: "Falta tu bitácora del día", ruta: "/alumno/bitacora", tipo: "urgente" },
           { mostrar: !!resumen.cartaTerminoListaParaRecoger, mensaje: "Tu carta de término está lista para recoger.", ruta: "/alumno/seguimiento-carta-termino", tipo: "urgente" },
         ]}
-        rutasPromovidas={["/alumno/horas"]}
+        rutasPromovidas={[
+          "/alumno/horas",
+          // Auditoría LSS: 7 de las 8 notificaciones Tipo B del módulo
+          // (LSS-03/04/09/11) nunca aparecían en ningún lado del
+          // dashboard porque su ruta_relacionada no estaba promovida —
+          // el evento #6 (LSS-06, carta lista) NO se agrega aquí a
+          // propósito, sigue siendo Tipo A calculada (decisión ya
+          // confirmada, sin cambios).
+          "/alumno/seguimiento-evaluacion",
+          "/alumno/estado-resolucion",
+          "/alumno/consultar-constancia-termino",
+        ]}
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>

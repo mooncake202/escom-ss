@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useGestionarConstanciaTermino } from "./hooks/useGestionarConstanciaTermino";
+import { TextoConEnlaces } from "@/components/ui/TextoConEnlaces";
 
 // ——— Badge de estado ————————————————————————————————
 function EstadoBadge({ estado }) {
@@ -76,10 +77,25 @@ function ListaAlumnos({ alumnos, seleccionado, onSeleccionar, C }) {
   );
 }
 
+const textareaStyle = (C) => ({
+  width: "100%", minHeight: 140, padding: "12px 14px", borderRadius: RADIUS.md,
+  border: `1px solid ${C.borderDefault}`, background: C.bgInput, color: C.textPrimary,
+  fontSize: 13, fontFamily: "inherit", boxSizing: "border-box", outline: "none",
+  resize: "vertical", lineHeight: 1.5,
+});
+
 // ——— Contenido principal según estado ————————————————
-function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onArchivo, onEmitir, C }) {
+function VistaGestion({ alumno, estadoAlumno, loading, error, onEnviar, C }) {
+  const [texto, setTexto] = useState("");
   const [corrigiendo, setCorrigiendo] = useState(false);
-  const [nuevoArchivo, setNuevoArchivo] = useState(null);
+
+  // Al cambiar de alumno (o al llegar uno ya emitido), resetea el
+  // formulario — si ya existe un mensaje previo, pre-carga el textarea de
+  // corrección con el texto actual para que coordinación pueda editarlo.
+  useEffect(() => {
+    setTexto("");
+    setCorrigiendo(false);
+  }, [alumno?.id]);
 
   if (!alumno) {
     return (
@@ -104,54 +120,44 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
           background: "rgba(234,179,8,0.07)", border: "1px solid rgba(234,179,8,0.25)",
           fontSize: 12, color: "#b45309", lineHeight: 1.5,
         }}>
-          ⏳ Pendiente de emisión por coordinación
+          ⏳ Pendiente de envío por coordinación
         </div>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted, lineHeight: 1.6 }}>
           Este alumno completó su servicio social y solicita su constancia de término.
-          Sube el archivo PDF firmado para que el alumno pueda descargarlo.
+          Escribe el mensaje que recibirá, incluyendo el enlace a la plataforma donde puede descargarla.
         </p>
         <div style={{ background: C.bgCard, borderRadius: RADIUS.lg, border: `1px solid ${C.borderSubtle}`, padding: "1.25rem 1.5rem" }}>
           <p style={{ margin: "0 0 0.75rem", fontSize: 12, fontWeight: 700, color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            Subir constancia (PDF)
+            Mensaje para el alumno
           </p>
-          <label style={{
-            display: "flex", flexDirection: "column", alignItems: "center",
-            justifyContent: "center", gap: 8, padding: "1.5rem", borderRadius: RADIUS.md,
-            border: `2px dashed ${archivoSubido ? C.accentText : C.borderDefault}`,
-            background: archivoSubido ? "rgba(59,130,246,0.04)" : C.bgInput,
-            cursor: "pointer", transition: "border-color 0.2s",
-          }}>
-            <span style={{ fontSize: 28 }}>{archivoSubido ? "📄" : "📂"}</span>
-            {archivoSubido ? (
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.accentText, textAlign: "center" }}>{archivoSubido.nombre}</p>
-            ) : (
-              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, textAlign: "center" }}>Haz clic para seleccionar el archivo PDF de la constancia</p>
-            )}
-            <input type="file" accept="application/pdf" onChange={onArchivo} style={{ display: "none" }} />
-          </label>
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Ej: Tu constancia ya está lista. Descárgala en https://serviciosocialconstancias.ipn.mx usando tu boleta y CURP."
+            style={textareaStyle(C)}
+          />
           {error && <p style={{ margin: "0.5rem 0 0", fontSize: 12, color: C.danger }}>{error}</p>}
         </div>
         <button
-          onClick={() => onEmitir()}
-          disabled={!archivoSubido || loading}
+          onClick={() => onEnviar(texto)}
+          disabled={!texto.trim() || loading}
           style={{
             width: "100%", padding: "12px", borderRadius: RADIUS.md,
             fontSize: 14, fontWeight: 600,
-            cursor: !archivoSubido || loading ? "not-allowed" : "pointer",
-            background: !archivoSubido || loading ? C.borderDefault : GRADIENTS.primary,
-            border: "none", color: !archivoSubido || loading ? C.textDisabled : "#fff",
-            fontFamily: "inherit", boxShadow: !archivoSubido || loading ? "none" : SHADOWS.accent,
+            cursor: !texto.trim() || loading ? "not-allowed" : "pointer",
+            background: !texto.trim() || loading ? C.borderDefault : GRADIENTS.primary,
+            border: "none", color: !texto.trim() || loading ? C.textDisabled : "#fff",
+            fontFamily: "inherit", boxShadow: !texto.trim() || loading ? "none" : SHADOWS.accent,
             transition: "background 0.2s",
           }}
         >
-          {loading ? "Emitiendo..." : "Emitir constancia al alumno →"}
+          {loading ? "Enviando..." : "Enviar mensaje al alumno →"}
         </button>
       </div>
     );
   }
 
   if (estadoAlumno === "emitida") {
-    const constancia = alumno?.constancia;
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
 
@@ -167,40 +173,28 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
             display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
           }}>✔</div>
           <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>Constancia emitida correctamente</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#15803d" }}>Mensaje enviado correctamente</p>
             <p style={{ margin: "4px 0 0", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-              El alumno ya puede descargar su constancia de término desde su portal.
+              El alumno ya puede ver este mensaje desde su portal.
             </p>
           </div>
         </div>
 
-        {/* Archivo emitido */}
-        {constancia && (
-          <div style={{
-            background: C.bgCard, borderRadius: RADIUS.lg,
-            border: `1px solid ${C.borderSubtle}`, padding: "1rem 1.25rem",
-            display: "flex", alignItems: "center", gap: 12,
-          }}>
-            <span style={{ fontSize: 20 }}>📄</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>Constancia de término</p>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textDisabled, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {constancia.nombre}
-              </p>
-            </div>
-            <div style={{
-              padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 700,
-              color: "#15803d", background: "rgba(21,128,61,0.10)", border: "1px solid rgba(21,128,61,0.25)", whiteSpace: "nowrap",
-            }}>
-              Emitida
-            </div>
-          </div>
-        )}
+        {/* Mensaje actual */}
+        <div style={{
+          background: C.bgCard, borderRadius: RADIUS.lg,
+          border: `1px solid ${C.borderSubtle}`, padding: "1rem 1.25rem",
+        }}>
+          <p style={{ margin: "0 0 0.5rem", fontSize: 11, fontWeight: 700, color: C.accentText, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            Mensaje actual
+          </p>
+          <TextoConEnlaces texto={alumno.mensajeActual} style={{ fontSize: 13, color: C.textPrimary }} />
+        </div>
 
-        {/* Botón corregir / zona de resubida */}
+        {/* Botón corregir / zona de reenvío */}
         {!corrigiendo ? (
           <button
-            onClick={() => setCorrigiendo(true)}
+            onClick={() => { setTexto(alumno.mensajeActual || ""); setCorrigiendo(true); }}
             style={{
               width: "100%", padding: "12px", borderRadius: RADIUS.md,
               fontSize: 14, fontWeight: 600, cursor: "pointer",
@@ -208,27 +202,20 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
               color: C.textSecondary, fontFamily: "inherit",
             }}
           >
-            Corregir constancia
+            Corregir mensaje
           </button>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            <label style={{
-              display: "flex", flexDirection: "column", alignItems: "center",
-              justifyContent: "center", gap: 8, padding: "1.5rem", borderRadius: RADIUS.md,
-              border: `2px dashed ${nuevoArchivo ? C.accentText : C.borderDefault}`,
-              background: nuevoArchivo ? "rgba(59,130,246,0.04)" : C.bgInput,
-              cursor: "pointer",
-            }}>
-              <span style={{ fontSize: 28 }}>{nuevoArchivo ? "📄" : "📂"}</span>
-              <p style={{ margin: 0, fontSize: 13, textAlign: "center", color: nuevoArchivo ? C.accentText : C.textMuted, fontWeight: nuevoArchivo ? 600 : 400 }}>
-                {nuevoArchivo ? nuevoArchivo.name : "Selecciona el nuevo PDF"}
-              </p>
-              <input type="file" accept="application/pdf" onChange={e => setNuevoArchivo(e.target.files[0] ?? null)} style={{ display: "none" }} />
-            </label>
+            <textarea
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              style={textareaStyle(C)}
+            />
+            {error && <p style={{ margin: 0, fontSize: 12, color: C.danger }}>{error}</p>}
 
             <div style={{ display: "flex", gap: 8 }}>
               <button
-                onClick={() => { setCorrigiendo(false); setNuevoArchivo(null); }}
+                onClick={() => { setCorrigiendo(false); setTexto(""); }}
                 style={{
                   flex: 1, padding: "10px", borderRadius: RADIUS.md,
                   border: `1px solid ${C.borderDefault}`, background: "transparent",
@@ -238,18 +225,18 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
                 Cancelar
               </button>
               <button
-                onClick={() => { onEmitir(nuevoArchivo); setCorrigiendo(false); setNuevoArchivo(null); }}
-                disabled={!nuevoArchivo}
+                onClick={async () => { await onEnviar(texto); setCorrigiendo(false); }}
+                disabled={!texto.trim() || loading}
                 style={{
                   flex: 2, padding: "10px", borderRadius: RADIUS.md, border: "none",
-                  background: nuevoArchivo ? GRADIENTS.primary : C.borderDefault,
-                  color: nuevoArchivo ? "#fff" : C.textDisabled,
-                  cursor: nuevoArchivo ? "pointer" : "not-allowed",
+                  background: texto.trim() && !loading ? GRADIENTS.primary : C.borderDefault,
+                  color: texto.trim() && !loading ? "#fff" : C.textDisabled,
+                  cursor: texto.trim() && !loading ? "pointer" : "not-allowed",
                   fontWeight: 600, fontFamily: "inherit",
-                  boxShadow: nuevoArchivo ? SHADOWS.accent : "none",
+                  boxShadow: texto.trim() && !loading ? SHADOWS.accent : "none",
                 }}
               >
-                Volver a emitir →
+                {loading ? "Reenviando..." : "Volver a enviar →"}
               </button>
             </div>
           </div>
@@ -265,8 +252,8 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
 export default function GestionarConstanciaTermino() {
   const { C } = useTheme();
   const {
-    alumnos, alumnoSeleccionado, estadoAlumno, archivoSubido,
-    loading, error, seleccionarAlumno, manejarArchivo, emitirConstancia,
+    alumnos, alumnoSeleccionado, estadoAlumno,
+    loading, error, seleccionarAlumno, enviarMensaje,
   } = useGestionarConstanciaTermino();
 
   return (
@@ -300,11 +287,9 @@ export default function GestionarConstanciaTermino() {
             <VistaGestion
               alumno={alumnoSeleccionado}
               estadoAlumno={estadoAlumno}
-              archivoSubido={archivoSubido}
               loading={loading}
               error={error}
-              onArchivo={manejarArchivo}
-              onEmitir={emitirConstancia}
+              onEnviar={enviarMensaje}
               C={C}
             />
           </div>

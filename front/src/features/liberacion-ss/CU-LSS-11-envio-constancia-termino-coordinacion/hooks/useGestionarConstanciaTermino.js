@@ -3,32 +3,22 @@ import { listarSolicitudesConstancia, emitirConstancia } from "@/services/lssCoo
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 // Estados derivados de `emitida` (backend): false -> "solicitada" (pendiente
-// de emisión), true -> "emitida" (ya tiene documento, puede corregirse).
+// de envío), true -> "emitida" (ya tiene mensaje, puede corregirse).
 // Mismo criterio ya usado en mapearAlumno de LSS-04/06/09.
 function mapearAlumno(s) {
   return {
     id: s.liberacionProcesoId,
     nombre: s.nombreCompleto,
     estado: s.emitida ? "emitida" : "solicitada",
-    constancia: s.emitida ? { nombre: s.nombreConstancia } : null,
+    mensajeActual: s.mensajeActual,
     profesor: s.profesorNombre,
     proyecto: s.oferta,
   };
 }
 
-// RN-LSS-33: solo PDF — mismo criterio ya usado en el resto del proyecto
-// (el backend valida magic bytes; esto es solo feedback inmediato).
-function validarArchivo(archivo) {
-  if (archivo.type !== "application/pdf") {
-    return "Solo se permiten archivos en formato PDF.";
-  }
-  return null;
-}
-
 export function useGestionarConstanciaTermino() {
   const [alumnos, setAlumnos] = useState([]);
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
-  const [archivoSubido, setArchivoSubido] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const { socket } = useSocket();
@@ -40,8 +30,7 @@ export function useGestionarConstanciaTermino() {
       setAlumnos(mapeados);
       setError("");
       // Mismo criterio que LSS-04/06/09: mantiene sincronizado al alumno
-      // seleccionado si sigue en el listado (ej. tras emitir, pasa de
-      // "solicitada" a "emitida" sin perder la selección).
+      // seleccionado si sigue en el listado.
       setAlumnoSeleccionado((prev) => {
         if (!prev) return prev;
         return mapeados.find((a) => a.id === prev.id) || null;
@@ -66,7 +55,6 @@ export function useGestionarConstanciaTermino() {
 
   const seleccionarAlumno = (alumno) => {
     setAlumnoSeleccionado(alumno);
-    setArchivoSubido(null);
     setError("");
   };
 
@@ -74,39 +62,18 @@ export function useGestionarConstanciaTermino() {
     ? alumnos.find((a) => a.id === alumnoSeleccionado.id)?.estado
     : null;
 
-  const manejarArchivo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const errorMsg = validarArchivo(file);
-    if (errorMsg) {
-      setError(errorMsg);
-      setArchivoSubido(null);
-      return;
-    }
-    setError("");
-    setArchivoSubido({ nombre: file.name, archivo: file });
-  };
-
-  // Misma función sirve para emisión inicial y para corrección (RN-LSS-35,
-  // sin ningún guardia que la bloquee) — `archivoCorreccion` opcional lo
-  // usa la zona de "Corregir constancia" del JSX (mismo patrón ya
-  // construido en el mockup).
-  const emitir = async (archivoCorreccion) => {
-    const archivo = archivoCorreccion ?? archivoSubido?.archivo;
-    if (!alumnoSeleccionado || !archivo) return;
-    const errorMsg = validarArchivo(archivo);
-    if (errorMsg) {
-      setError(errorMsg);
-      return;
-    }
+  // RN-LSS-35: sin ningún guardia que bloquee corregir/reenviar — misma
+  // función sirve para emisión inicial y corrección, el backend ya lo
+  // maneja como un simple UPDATE.
+  const enviarMensaje = async (texto) => {
+    if (!alumnoSeleccionado || !texto?.trim()) return;
     setLoading(true);
     setError("");
     try {
-      await emitirConstancia(alumnoSeleccionado.id, archivo);
-      setArchivoSubido(null);
+      await emitirConstancia(alumnoSeleccionado.id, texto.trim());
       await cargar();
     } catch (err) {
-      setError(err.message || "No se pudo emitir la constancia de término.");
+      setError(err.message || "No se pudo enviar el mensaje de la constancia de término.");
     } finally {
       setLoading(false);
     }
@@ -116,11 +83,9 @@ export function useGestionarConstanciaTermino() {
     alumnos,
     alumnoSeleccionado,
     estadoAlumno,
-    archivoSubido,
     loading,
     error,
     seleccionarAlumno,
-    manejarArchivo,
-    emitirConstancia: emitir,
+    enviarMensaje,
   };
 }

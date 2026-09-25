@@ -553,6 +553,12 @@ model liberacion_proceso {
   carta_termino_recogida  Boolean?
   expediente_enviado      Boolean?
   observaciones_rechazo   String?  @db.Text
+  // CU-LSS-11: mensaje de texto libre que coordinación redacta (incluye el
+  // enlace a serviciosocialconstancias.ipn.mx embebido en el texto) — la
+  // constancia NO es un archivo que suba nuestro sistema, es un mensaje que
+  // dirige al alumno a una plataforma externa. Mismo patrón simple que
+  // observaciones_rechazo (campo de texto directo, sin tabla aparte).
+  mensaje_constancia_termino String? @db.Text
 
   solicitud_registro solicitud_registro @relation(fields: [solicitud_registro_id], references: [id], onDelete: Cascade)
 

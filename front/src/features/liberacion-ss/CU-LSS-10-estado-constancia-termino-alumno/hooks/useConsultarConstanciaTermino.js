@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { getEstadoConstancia, descargarConstancia } from "@/services/lssAlumnoService";
+import { getEstadoConstancia } from "@/services/lssAlumnoService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
-// Estados reales (derivados de la existencia del documento en backend):
-// pendiente:   coordinación aún no ha subido la constancia
-// disponible:  constancia lista para descargar
+// Estados reales (derivados de la existencia del mensaje en backend):
+// pendiente:   coordinación aún no ha redactado el mensaje
+// disponible:  mensaje listo, con el enlace a la plataforma externa
 
 export function useConsultarConstanciaTermino() {
   const [cargando, setCargando] = useState(true);
   const [estado, setEstado] = useState("pendiente");
-  const [nombreConstancia, setNombreConstancia] = useState(null);
+  const [mensaje, setMensaje] = useState(null);
   const [error, setError] = useState(null);
   const { socket } = useSocket();
 
@@ -17,7 +17,7 @@ export function useConsultarConstanciaTermino() {
     try {
       const data = await getEstadoConstancia();
       setEstado(data.estado);
-      setNombreConstancia(data.nombreConstancia);
+      setMensaje(data.mensaje);
       setError(null);
     } catch (err) {
       setError(err.message || "No se pudo cargar el estado de tu constancia de término.");
@@ -30,9 +30,9 @@ export function useConsultarConstanciaTermino() {
     cargar();
   }, [cargar]);
 
-  // RN-LSS-30: coordinación emite la constancia de forma asíncrona
-  // (CU-LSS-11, no construido todavía) — mismo patrón de refresco en vivo
-  // ya usado en todo el módulo.
+  // RN-LSS-30: coordinación redacta el mensaje de forma asíncrona
+  // (CU-LSS-11) — mismo patrón de refresco en vivo ya usado en todo el
+  // módulo.
   useEffect(() => {
     if (!socket) return;
     const handler = () => cargar();
@@ -42,20 +42,10 @@ export function useConsultarConstanciaTermino() {
 
   useSocketReconectado(cargar);
 
-  const descargar = async () => {
-    setError(null);
-    try {
-      await descargarConstancia();
-    } catch (err) {
-      setError(err.message || "No se pudo descargar tu constancia de término.");
-    }
-  };
-
   return {
     cargando,
     estado,
-    nombreConstancia,
+    mensaje,
     error,
-    descargar,
   };
 }

@@ -212,20 +212,6 @@ async function getEstadoConstancia(req, res) {
   }
 }
 
-async function getDescargarConstancia(req, res) {
-  try {
-    const { buffer, nombreExpediente } = await lssAlumnoService.descargarConstancia(req.usuario.sub);
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
-    return res.status(200).send(buffer);
-  } catch (err) {
-    const status = err.status || 500;
-    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
-    if (status === 500) console.error('Error al descargar constancia de término:', err);
-    return res.status(status).json({ message });
-  }
-}
-
 module.exports = {
   getEstadoRequisitos,
   postIniciarEvaluacion,
@@ -243,5 +229,4 @@ module.exports = {
   postSolicitarConstancia,
   postCorregirExpedienteLss,
   getEstadoConstancia,
-  getDescargarConstancia,
 };
