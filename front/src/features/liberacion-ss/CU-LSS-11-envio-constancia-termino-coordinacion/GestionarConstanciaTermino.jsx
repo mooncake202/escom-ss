@@ -132,7 +132,7 @@ function VistaGestion({ alumno, estadoAlumno, archivoSubido, loading, error, onA
           {error && <p style={{ margin: "0.5rem 0 0", fontSize: 12, color: C.danger }}>{error}</p>}
         </div>
         <button
-          onClick={onEmitir}
+          onClick={() => onEmitir()}
           disabled={!archivoSubido || loading}
           style={{
             width: "100%", padding: "12px", borderRadius: RADIUS.md,
@@ -292,10 +292,6 @@ export default function GestionarConstanciaTermino() {
                   <p style={{ margin: "2px 0 0", fontSize: 16, fontWeight: 600, color: C.textPrimary }}>{alumnoSeleccionado.nombre}</p>
                   <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>Profesor: {alumnoSeleccionado.profesor}</p>
                   <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>Proyecto: {alumnoSeleccionado.proyecto}</p>
-                  <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>Fecha de solicitud: {alumnoSeleccionado.fechaSolicitud}</p>
-                  {alumnoSeleccionado?.fechaEnvio != null && (
-                    <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>Fecha de envío: {alumnoSeleccionado.fechaEnvio}</p>
-                  )}
                 </div>
                 <EstadoBadge estado={estadoAlumno} />
               </div>

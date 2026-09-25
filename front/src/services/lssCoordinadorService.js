@@ -46,7 +46,7 @@ export async function descargarParaRevision(evaluacionId) {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
-  enlace.download = "evaluacion-desempeno.pdf";
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "evaluacion-desempeno.pdf";
   document.body.appendChild(enlace);
   enlace.click();
   document.body.removeChild(enlace);
@@ -110,4 +110,15 @@ export async function descargarExpediente(documentoId) {
   enlace.click();
   document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// CU-LSS-11 — gestionar estado de la constancia de término.
+export async function listarSolicitudesConstancia() {
+  return apiFetch("/coordinador/constancia-termino/pendientes");
+}
+
+export async function emitirConstancia(liberacionProcesoId, archivoPdf) {
+  const formData = new FormData();
+  formData.append("archivo", archivoPdf);
+  return apiFetch(`/coordinador/constancia-termino/${liberacionProcesoId}/emitir`, { method: "POST", body: formData });
 }

@@ -11,6 +11,8 @@ const {
   getDescargarExpediente,
   postDictaminarExpedienteAprobado,
   postDictaminarExpedienteRechazado,
+  getSolicitudesConstancia,
+  postEmitirConstancia,
 } = require('./lss-coordinador.controller');
 
 const router = express.Router();
@@ -30,5 +32,9 @@ router.get('/expediente/pendientes', requireAuth, requireRole('coordinador'), ge
 router.get('/expediente/:id/descargar', requireAuth, requireRole('coordinador'), getDescargarExpediente);
 router.post('/expediente/:id/aprobar', requireAuth, requireRole('coordinador'), postDictaminarExpedienteAprobado);
 router.post('/expediente/:id/rechazar', requireAuth, requireRole('coordinador'), postDictaminarExpedienteRechazado);
+
+// CU-LSS-11 — gestionar estado de la constancia de término.
+router.get('/constancia-termino/pendientes', requireAuth, requireRole('coordinador'), getSolicitudesConstancia);
+router.post('/constancia-termino/:id/emitir', requireAuth, requireRole('coordinador'), postEmitirConstancia);
 
 module.exports = router;

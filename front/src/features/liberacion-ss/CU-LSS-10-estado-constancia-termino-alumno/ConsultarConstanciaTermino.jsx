@@ -1,10 +1,7 @@
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
 import { useConsultarConstanciaTermino } from "./hooks/useConsultarConstanciaTermino";
-
-const MOCK = {
-  usuario: "Ana Karen Lagarza Ortega",
-};
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 // ——— Vista: constancia pendiente ——————————————————————
 function VistaPendiente({ C }) {
@@ -45,7 +42,7 @@ function VistaPendiente({ C }) {
 }
 
 // ——— Vista: constancia disponible ————————————————————
-function VistaDisponible({ archivoConstancia, onDescargar, C }) {
+function VistaDisponible({ nombreConstancia, onDescargar, C }) {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto" }}>
       <div style={{ textAlign: "center", paddingTop: "0rem", marginBottom: "1rem" }}>
@@ -89,7 +86,7 @@ function VistaDisponible({ archivoConstancia, onDescargar, C }) {
             Constancia de término
           </p>
           <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textDisabled, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {archivoConstancia?.nombre ?? "CONSTANCIA_TERMINO_SS.pdf"}
+            {nombreConstancia ?? "CONSTANCIA_TERMINO.pdf"}
           </p>
         </div>
         <div style={{
@@ -125,76 +122,6 @@ function VistaDisponible({ archivoConstancia, onDescargar, C }) {
       >
         ⬇ Descargar constancia de término
       </button>
-
-      <p style={{ margin: 0, fontSize: 14, color: C.textMuted, lineHeight: 1.6, marginBottom: "0.5rem" }}>
-          Además se muestran aquí los otros documentos enviados por coordinación durante el proceso de liberación, para que puedas consultarlos cuando quieras.
-        </p>
-      
-      <div style={{
-        background: C.bgCard,
-        borderRadius: RADIUS.lg,
-        border: `1px solid ${C.borderSubtle}`,
-        padding: "1.25rem 1.5rem",
-        marginBottom: "1.25rem",
-        display: "flex",
-        alignItems: "center",
-        gap: 14,
-      }}>
-        <div style={{
-          width: 44,
-          height: 44,
-          borderRadius: RADIUS.md,
-          background: "rgba(37,99,235,0.10)",
-          border: "1px solid rgba(37,99,235,0.2)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 22,
-          flexShrink: 0,
-        }}>
-          📄
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
-            Evaluacion de Rendimiento
-          </p>
-          <p style={{ margin: "2px 0 0", fontSize: 11, color: C.textDisabled, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {archivoConstancia?.nombre ?? "Evaluacion_Rendimiento.pdf"}
-          </p>
-        </div>
-        <div style={{
-          padding: "3px 10px",
-          borderRadius: 999,
-          fontSize: 11,
-          fontWeight: 700,
-          color: "#15803d",
-          background: "rgba(21,128,61,0.10)",
-          border: "1px solid rgba(21,128,61,0.25)",
-          whiteSpace: "nowrap",
-        }}>
-          Disponible
-        </div>
-      </div>
-
-      <button
-        onClick={onDescargar}
-        style={{
-          width: "100%",
-          padding: "13px",
-          borderRadius: RADIUS.md,
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer",
-          background: GRADIENTS.primary,
-          border: "none",
-          color: "#fff",
-          fontFamily: "inherit",
-          boxShadow: SHADOWS.accent,
-          marginBottom: "1.5rem",
-        }}
-      >
-        ⬇ Descargar 
-      </button>
     </div>
   );
 }
@@ -202,15 +129,24 @@ function VistaDisponible({ archivoConstancia, onDescargar, C }) {
 // ——— Página principal ——————————————————————————————————
 export default function ConsultarConstanciaTermino() {
   const { C } = useTheme();
-  const { estado, archivoConstancia, descargar } = useConsultarConstanciaTermino();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
+  const { cargando, estado, nombreConstancia, error, descargar } = useConsultarConstanciaTermino();
+
+  if (cargando) {
+    return (
+      <ProcesoLSSLayout pasoActual={6} titulo="Constancia de término" rol="alumno" usuario={nombreAlumno}>
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </ProcesoLSSLayout>
+    );
+  }
 
   return (
     <ProcesoLSSLayout
       pasoActual={6}
       titulo="Constancia de término"
-      
       rol="alumno"
-      usuario={MOCK.usuario}
+      usuario={nombreAlumno}
     >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
         <h2 style={{ margin: "0 0 0.35rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>
@@ -223,11 +159,12 @@ export default function ConsultarConstanciaTermino() {
         {estado === "pendiente" && <VistaPendiente C={C} />}
         {estado === "disponible" && (
           <VistaDisponible
-            archivoConstancia={archivoConstancia}
+            nombreConstancia={nombreConstancia}
             onDescargar={descargar}
             C={C}
           />
         )}
+        {error && <p style={{ marginTop: "1rem", fontSize: 12, color: C.danger, textAlign: "center" }}>{error}</p>}
       </div>
     </ProcesoLSSLayout>
   );

@@ -372,7 +372,10 @@ async function marcarEvaluacionDescargada(alumnoUsuarioId) {
     emitirResumenActualizadoAlumno(alumnoUsuarioId);
   }
 
-  return descifrarBuffer(bufferCifrado);
+  // Bug real encontrado (auditoría de nombres de archivo LSS): faltaba
+  // exponer el nombre real al frontend — mismo patrón ya corregido en
+  // descargarExpedienteLss/descargarConstancia.
+  return { buffer: descifrarBuffer(bufferCifrado), nombreExpediente: documento.nombre_expediente };
 }
 
 /**
@@ -757,6 +760,60 @@ async function corregirExpedienteLss(alumnoUsuarioId) {
   return { mensaje: 'Vuelve a integrar y enviar tu expediente.', estado: ESTADO_LIBERACION_CARTA_RECOGIDA };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-10: consultar estado y descargar la constancia de término
+// (actor: Alumno). NO construye ninguna lógica real de CU-LSS-11
+// (coordinación emitiendo la constancia) — la constancia es un PDF que
+// coordinación SUBE MANUALMENTE (a diferencia de la evaluación de
+// desempeño, que sí se genera con plantilla), simulado mientras tanto por
+// el seed sembrar-constancia-termino-prueba.js. Sin cambios en BD en este
+// CU (confirmado con el usuario, coincide con la ficha) —
+// liberacion_proceso.estado no se toca en ninguna de las 2 funciones.
+// ─────────────────────────────────────────────────────────────
+
+const TIPO_DOCUMENTO_CONSTANCIA_TERMINO = 'constancia_termino';
+
+/**
+ * RN-LSS-30: la existencia misma de la fila documento (tipo_documento=
+ * 'constancia_termino') para este alumno ES la señal de disponibilidad —
+ * no se necesita ningún campo de estado adicional (confirmado: el CU no
+ * agrega ninguno, y el modelo real no tiene nada más que sirva para esto).
+ */
+async function obtenerEstadoConstancia(alumnoUsuarioId) {
+  const { alumno } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
+  const documento = await prisma.documento.findFirst({
+    where: { alumno_id: alumno.boleta, tipo_documento: TIPO_DOCUMENTO_CONSTANCIA_TERMINO },
+  });
+  return { estado: documento ? 'disponible' : 'pendiente', nombreConstancia: documento?.nombre_expediente ?? null };
+}
+
+/**
+ * RN-LSS-31: el alumno solo puede descargar SU PROPIA constancia — se
+ * cumple estructuralmente (no por una verificación explícita): este
+ * endpoint nunca recibe un id de documento, siempre deriva la boleta del
+ * propio JWT (req.usuario.sub -> alumnoUsuarioId), así que es imposible
+ * pedir la de otro alumno por esta vía. Mismo patrón que
+ * descargarExpedienteLss.
+ */
+async function descargarConstancia(alumnoUsuarioId) {
+  const { alumno } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
+  const documento = await prisma.documento.findFirst({
+    where: { alumno_id: alumno.boleta, tipo_documento: TIPO_DOCUMENTO_CONSTANCIA_TERMINO },
+  });
+  if (!documento) {
+    throw crearError('Todavía no tienes una constancia de término disponible.', 404);
+  }
+
+  let bufferCifrado;
+  try {
+    bufferCifrado = fs.readFileSync(path.join(RUTA_BASE_DOCUMENTOS, documento.ruta_archivo));
+  } catch (err) {
+    throw crearError('El archivo ya no está disponible.', 404);
+  }
+
+  return { buffer: descifrarBuffer(bufferCifrado), nombreExpediente: documento.nombre_expediente };
+}
+
 module.exports = {
   obtenerEstadoRequisitos,
   iniciarEvaluacion,
@@ -773,4 +830,6 @@ module.exports = {
   obtenerEstadoExpediente,
   solicitarConstanciaTermino,
   corregirExpedienteLss,
+  obtenerEstadoConstancia,
+  descargarConstancia,
 };

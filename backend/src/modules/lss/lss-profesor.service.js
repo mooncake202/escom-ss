@@ -207,6 +207,13 @@ async function crearEvaluacionEnTransaccion({ solicitud, proceso, profesor, esta
         fecha_creacion: new Date(),
         estado_documento: 'pendiente',
         ruta_archivo: rutaRelativa,
+        // Bug real encontrado (auditoría de nombres de archivo LSS): este
+        // documento nunca tenía nombre_expediente asignado, dejando la
+        // descarga (LSS-02/04) sin Content-Disposition. Sin formato
+        // específico en la ficha para este tipo de documento — patrón
+        // genérico BOLETA_TIPO-DE-DOCUMENTO, mismo estilo que
+        // BOLETA_CONSTANCIA_TERMINO (LSS-11).
+        nombre_expediente: `${solicitud.alumno_id}_EVALUACION_DESEMPENO.pdf`,
       },
     });
 

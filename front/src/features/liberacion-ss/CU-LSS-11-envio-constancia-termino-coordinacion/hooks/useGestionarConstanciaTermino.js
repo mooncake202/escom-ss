@@ -1,23 +1,68 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { listarSolicitudesConstancia, emitirConstancia } from "@/services/lssCoordinadorService";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
-const ALUMNOS_MOCK = [
-  { id: 1, nombre: "Lagarza Ortega Ana Karen",        estado: "solicitada",   constancia: null, fechaSolicitud: "2024-06-01", fechaEnvio: null, profesor : "Dr. Smith", proyecto: "Desarrollo de app móvil" },
-  { id: 2, nombre: "Martínez López José Luis",         estado: "solicitada",   constancia: null, fechaSolicitud: "2024-06-02", fechaEnvio: null, profesor : "Dr. Johnson", proyecto: "Investigación de mercado" },
-  { id: 3, nombre: "Hernández Ruiz María Fernanda",    estado: "emitida",      constancia: { nombre: "CONSTANCIA_HERNANDEZ_RUIZ_MARIA_FERNANDA.pdf" }, fechaSolicitud: "2024-06-03", fechaEnvio: "2024-06-10", profesor : "Dr. Williams", proyecto: "Desarrollo de app web" },
-  { id: 4, nombre: "Torres Vega Carlos Eduardo",       estado: "emitida",      constancia: { nombre: "CONSTANCIA_TORRES_VEGA_CARLOS_EDUARDO.pdf" }, fechaSolicitud: "2024-06-04", fechaEnvio: "2024-06-11", profesor : "Dr. Brown", proyecto: "Diseño de interfaz" },
-  { id: 5, nombre: "Ramírez Castillo Diana Paola",     estado: "solicitada",   constancia: null, fechaSolicitud: "2024-06-05", fechaEnvio: null, profesor : "Dr. Davis", proyecto: "Análisis de datos" },
-];
+// Estados derivados de `emitida` (backend): false -> "solicitada" (pendiente
+// de emisión), true -> "emitida" (ya tiene documento, puede corregirse).
+// Mismo criterio ya usado en mapearAlumno de LSS-04/06/09.
+function mapearAlumno(s) {
+  return {
+    id: s.liberacionProcesoId,
+    nombre: s.nombreCompleto,
+    estado: s.emitida ? "emitida" : "solicitada",
+    constancia: s.emitida ? { nombre: s.nombreConstancia } : null,
+    profesor: s.profesorNombre,
+    proyecto: s.oferta,
+  };
+}
 
-// Estados: solicitada → emitida
-// solicitada: el alumno solicitó su constancia, coordinación debe subirla
-// emitida:    coordinación subió el archivo, el alumno ya puede descargarlo
+// RN-LSS-33: solo PDF — mismo criterio ya usado en el resto del proyecto
+// (el backend valida magic bytes; esto es solo feedback inmediato).
+function validarArchivo(archivo) {
+  if (archivo.type !== "application/pdf") {
+    return "Solo se permiten archivos en formato PDF.";
+  }
+  return null;
+}
 
 export function useGestionarConstanciaTermino() {
-  const [alumnos, setAlumnos]                       = useState(ALUMNOS_MOCK);
+  const [alumnos, setAlumnos] = useState([]);
   const [alumnoSeleccionado, setAlumnoSeleccionado] = useState(null);
-  const [archivoSubido, setArchivoSubido]           = useState(null);
-  const [loading, setLoading]                       = useState(false);
-  const [error, setError]                           = useState("");
+  const [archivoSubido, setArchivoSubido] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { socket } = useSocket();
+
+  const cargar = useCallback(async () => {
+    try {
+      const data = await listarSolicitudesConstancia();
+      const mapeados = data.map(mapearAlumno);
+      setAlumnos(mapeados);
+      setError("");
+      // Mismo criterio que LSS-04/06/09: mantiene sincronizado al alumno
+      // seleccionado si sigue en el listado (ej. tras emitir, pasa de
+      // "solicitada" a "emitida" sin perder la selección).
+      setAlumnoSeleccionado((prev) => {
+        if (!prev) return prev;
+        return mapeados.find((a) => a.id === prev.id) || null;
+      });
+    } catch (err) {
+      setError(err.message || "No se pudo cargar la lista de solicitudes.");
+    }
+  }, []);
+
+  useEffect(() => {
+    cargar();
+  }, [cargar]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handler = () => cargar();
+    socket.on("resumen:actualizado", handler);
+    return () => socket.off("resumen:actualizado", handler);
+  }, [socket, cargar]);
+
+  useSocketReconectado(cargar);
 
   const seleccionarAlumno = (alumno) => {
     setAlumnoSeleccionado(alumno);
@@ -26,37 +71,45 @@ export function useGestionarConstanciaTermino() {
   };
 
   const estadoAlumno = alumnoSeleccionado
-    ? alumnos.find(a => a.id === alumnoSeleccionado.id)?.estado
+    ? alumnos.find((a) => a.id === alumnoSeleccionado.id)?.estado
     : null;
 
   const manejarArchivo = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.type !== "application/pdf") {
-      setError("Solo se permiten archivos PDF.");
+    const errorMsg = validarArchivo(file);
+    if (errorMsg) {
+      setError(errorMsg);
+      setArchivoSubido(null);
       return;
     }
     setError("");
-    setArchivoSubido({ nombre: file.name, url: URL.createObjectURL(file) });
+    setArchivoSubido({ nombre: file.name, archivo: file });
   };
 
-  const emitirConstancia = async () => {
-    if (!alumnoSeleccionado || !archivoSubido) return;
+  // Misma función sirve para emisión inicial y para corrección (RN-LSS-35,
+  // sin ningún guardia que la bloquee) — `archivoCorreccion` opcional lo
+  // usa la zona de "Corregir constancia" del JSX (mismo patrón ya
+  // construido en el mockup).
+  const emitir = async (archivoCorreccion) => {
+    const archivo = archivoCorreccion ?? archivoSubido?.archivo;
+    if (!alumnoSeleccionado || !archivo) return;
+    const errorMsg = validarArchivo(archivo);
+    if (errorMsg) {
+      setError(errorMsg);
+      return;
+    }
     setLoading(true);
-    await new Promise(r => setTimeout(r, 900));
-
-    setAlumnos(prev =>
-      prev.map(a =>
-        a.id === alumnoSeleccionado.id
-          ? { ...a, estado: "emitida", constancia: archivoSubido }
-          : a
-      )
-    );
-    setAlumnoSeleccionado(prev =>
-      prev ? { ...prev, estado: "emitida", constancia: archivoSubido } : prev
-    );
-    setArchivoSubido(null);
-    setLoading(false);
+    setError("");
+    try {
+      await emitirConstancia(alumnoSeleccionado.id, archivo);
+      setArchivoSubido(null);
+      await cargar();
+    } catch (err) {
+      setError(err.message || "No se pudo emitir la constancia de término.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {
@@ -68,6 +121,6 @@ export function useGestionarConstanciaTermino() {
     error,
     seleccionarAlumno,
     manejarArchivo,
-    emitirConstancia,
+    emitirConstancia: emitir,
   };
 }

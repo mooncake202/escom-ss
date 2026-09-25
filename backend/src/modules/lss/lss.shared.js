@@ -263,6 +263,11 @@ function exigirEstadoExpedienteLss(documentoExpediente, mensaje) {
 // usuario (no inventado).
 const ESTADO_SOLICITUD_CONSTANCIA_TERMINO = 'solicitud_constancia_termino';
 
+// liberacion_proceso.estado al que se avanza cuando coordinación emite la
+// constancia (CU-LSS-11) — a diferencia de LSS-04/09, aquí SÍ se sigue la
+// ficha al pie de la letra (decisión confirmada por el usuario).
+const ESTADO_CONSTANCIA_DISPONIBLE = 'constancia_disponible';
+
 module.exports = {
   sha256,
   ESTADO_EVALUACION_SOLICITADA,
@@ -282,6 +287,7 @@ module.exports = {
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO,
   ESTADO_SOLICITUD_CONSTANCIA_TERMINO,
+  ESTADO_CONSTANCIA_DISPONIBLE,
   FACTORES_EVALUACION,
   VALORES_VALIDOS_FACTOR,
   SUMA_TOTAL_MAXIMA,

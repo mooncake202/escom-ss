@@ -45,6 +45,12 @@ export const ESTADO_LSS_A_RUTA = {
   // estado de constancia) ya existe como mockup real
   // (ConsultarEstadoConstanciaTermino, con guardaLSS).
   solicitud_constancia_termino: "/alumno/consultar-constancia-termino",
+
+  // CU-LSS-11 — real: lo escribe emitirConstancia (coordinación). Misma
+  // ruta que 'solicitud_constancia_termino' — LSS-10 decide internamente
+  // pendiente/disponible según la existencia del documento, así que
+  // ambos estados corresponden a la misma pantalla.
+  constancia_disponible: "/alumno/consultar-constancia-termino",
 };
 
 /**

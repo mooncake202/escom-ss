@@ -60,7 +60,7 @@ export async function descargarEvaluacion() {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
-  enlace.download = "evaluacion-desempeno.pdf";
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "evaluacion-desempeno.pdf";
   document.body.appendChild(enlace);
   enlace.click();
   document.body.removeChild(enlace);
@@ -138,4 +138,40 @@ export async function solicitarConstanciaTermino() {
 
 export async function corregirExpedienteLss() {
   return apiFetch("/alumno/expediente/corregir", { method: "POST" });
+}
+
+// CU-LSS-10 — consultar/descargar la constancia de término.
+export async function getEstadoConstancia() {
+  return apiFetch("/alumno/constancia-termino/estado");
+}
+
+/**
+ * Mismo patrón <a download> ya corregido en descargarExpedienteLss — lee
+ * el nombre real del header Content-Disposition en vez de hardcodearlo.
+ */
+export async function descargarConstancia() {
+  const token = localStorage.getItem("token");
+  let res;
+  try {
+    res = await fetch(`${API_URL}/alumno/constancia-termino/descargar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new Error("El servicio no está disponible temporalmente. Intenta de nuevo más tarde.");
+  }
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || "No se pudo descargar la constancia de término.");
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "constancia-termino.pdf";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

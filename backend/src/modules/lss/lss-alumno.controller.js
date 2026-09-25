@@ -54,8 +54,9 @@ async function postReenviarEvaluacion(req, res) {
 // mismo patrón que gr-coordinador.controller.js:getDescargarDocumento.
 async function getDescargarEvaluacion(req, res) {
   try {
-    const buffer = await lssAlumnoService.marcarEvaluacionDescargada(req.usuario.sub);
+    const { buffer, nombreExpediente } = await lssAlumnoService.marcarEvaluacionDescargada(req.usuario.sub);
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
     return res.status(200).send(buffer);
   } catch (err) {
     const status = err.status || 500;
@@ -200,6 +201,31 @@ async function postCorregirExpedienteLss(req, res) {
   }
 }
 
+// ── CU-LSS-10 ─────────────────────────────────────────────────
+
+async function getEstadoConstancia(req, res) {
+  try {
+    const resultado = await lssAlumnoService.obtenerEstadoConstancia(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener estado de la constancia de término:');
+  }
+}
+
+async function getDescargarConstancia(req, res) {
+  try {
+    const { buffer, nombreExpediente } = await lssAlumnoService.descargarConstancia(req.usuario.sub);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
+    return res.status(200).send(buffer);
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al descargar constancia de término:', err);
+    return res.status(status).json({ message });
+  }
+}
+
 module.exports = {
   getEstadoRequisitos,
   postIniciarEvaluacion,
@@ -216,4 +242,6 @@ module.exports = {
   getEstadoExpediente,
   postSolicitarConstancia,
   postCorregirExpedienteLss,
+  getEstadoConstancia,
+  getDescargarConstancia,
 };
