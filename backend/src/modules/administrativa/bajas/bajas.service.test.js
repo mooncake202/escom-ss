@@ -879,6 +879,31 @@ test('ADM-12 aprobar: el alumno deja de ocupar cupo del PROFESOR por su nuevo es
   assert.equal(await contarCuposOcupados(1), 0);
 });
 
+// El hito de LSS a partir del cual el alumno ya concluyó: `solicitud_constancia_termino`, cuando
+// Coordinación aprobó su expediente de liberación y él pidió su constancia. Se ejercita contra el
+// `contarCuposOcupados` REAL de lib/cupos.js, no contra una copia del criterio.
+test('cupos: el alumno deja de ocupar cupo del profesor desde solicitud_constancia_termino', async () => {
+  const { contarCuposOcupados } = require('../../../lib/cupos');
+
+  montar({});
+  const sr = () => bd.solicitudesRegistro[0];
+
+  // Sin proceso de liberación, y mientras el expediente se revisa, el alumno sigue ocupando.
+  assert.equal(sr().liberacion, null);
+  assert.equal(await contarCuposOcupados(1), 1, 'sin liberación: ocupa');
+
+  sr().liberacion = 'expediente_en_revision';
+  assert.equal(await contarCuposOcupados(1), 1, 'expediente en revisión: sigue ocupando');
+
+  sr().liberacion = 'solicitud_constancia_termino';
+  assert.equal(await contarCuposOcupados(1), 0, 'ya concluyó: libera');
+
+  // Y NO vuelve a ocupar cuando Coordinación le emite la constancia (CU-LSS-11). Con un hito de un
+  // solo valor, este caso volvería a contarlo como ocupante.
+  sr().liberacion = 'constancia_disponible';
+  assert.equal(await contarCuposOcupados(1), 0, 'constancia emitida: sigue liberado');
+});
+
 for (const estado of ['cerrada', 'concluida', 'rechazada', 'pendiente_revision']) {
   test(`ADM-12 aprobar: NO devuelve cupo si la oferta está ${estado}`, async () => {
     montar({ ofertas: [oferta({ estado })], bajas: [bajaEnRevision({ solicitanteId: U_PROFESOR })] });

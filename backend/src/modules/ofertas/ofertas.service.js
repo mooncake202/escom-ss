@@ -6,6 +6,7 @@ const {
   ofertaPuedeRecibirAlumno,
   contarCuposOcupados,
   obtenerSolicitudesOcupandoOfertas,
+  ESTADOS_LSS_LIBERAN_CUPO,
 } = require('../../lib/cupos');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
 const { normalizarNombreCarrera } = require('./ofertas.carreras');
@@ -564,11 +565,11 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
   }
 
   // Solicitudes o alumnos que todavía mantienen viva la oferta: no cuentan las
-  // rechazadas ni los alumnos que ya terminaron su servicio (estado terminal LSS).
+  // rechazadas ni los alumnos que ya concluyeron su servicio (ver ESTADOS_LSS_LIBERAN_CUPO).
   const procesosActivos = oferta.solicitud_registro.filter(
     (s) =>
       !ESTADOS_RECHAZO_SOLICITUD.includes(s.estado_solicitud) &&
-      s.liberacion_proceso?.estado !== ESTADO_LSS_TERMINAL
+      !ESTADOS_LSS_LIBERAN_CUPO.includes(s.liberacion_proceso?.estado)
   ).length;
 
   if (procesosActivos > 0) {
@@ -600,8 +601,14 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
 }
 
 // CU-PRO-04: Concluir ofertas automáticamente (RN-PRO-18/19/20)
-// TODO ADM/LSS: excluir bajas aprobadas y confirmar el estado terminal de liberación
-const ESTADO_LSS_TERMINAL = 'constancia_disponible'; // mismo valor que usa dashboard.service.js
+//
+// El hito por el que un alumno cuenta como terminado es UNO —'solicitud_constancia_termino'— y ya no
+// es un literal local: se toma de lib/cupos.js, el MISMO criterio con el que se cuentan los cupos
+// ocupados del profesor, para que el cierre de la oferta y la liberación de capacidad no puedan
+// desincronizarse. `ESTADOS_LSS_LIBERAN_CUPO` añade a ese hito el estado posterior de LSS, que solo
+// conserva la condición de "ya liberado" (ver la explicación completa en lib/cupos.js).
+//
+// TODO ADM: excluir bajas aprobadas (pendiente de integración con el módulo de Bajas).
 
 async function revisarConclusionAutomatica() {
   const ofertas = await prisma.oferta_servicio.findMany({
@@ -627,19 +634,28 @@ async function revisarConclusionAutomatica() {
     if (oferta.tipo_oferta === 'individual') {
       debeConcluir = oferta.cupos_disponibles === 0
         && alumnosActivos.length === 1
-        && alumnosActivos[0].liberacion_proceso?.estado === ESTADO_LSS_TERMINAL;
+        && ESTADOS_LSS_LIBERAN_CUPO.includes(alumnosActivos[0].liberacion_proceso?.estado);
     } else {
       const cuposLlenos = oferta.cupos_disponibles === 0;
       const todosTerminaron = alumnosActivos.length > 0 &&
-        alumnosActivos.every((s) => s.liberacion_proceso?.estado === ESTADO_LSS_TERMINAL);
+        alumnosActivos.every((s) => ESTADOS_LSS_LIBERAN_CUPO.includes(s.liberacion_proceso?.estado));
       debeConcluir = cuposLlenos && todosTerminaron;
     }
 
     if (debeConcluir) {
-      await prisma.oferta_servicio.update({
-        where: { id: oferta.id },
+      // Condicionado a que la oferta SIGA 'aprobada' en el instante de escribir — mismo patrón CAS
+      // que decidirOferta más arriba. Entre el findMany del inicio y este update pueden pasar
+      // minutos, y en esa ventana el profesor puede cerrarla a mano (CU-PRO: 'cerrada'). Sin esta
+      // guarda, el cron pisaría su decisión con 'concluida'. La única transición que puede aplicar
+      // es 'aprobada' → 'concluida'; cualquier otro estado concurrente la deja intacta.
+      const { count } = await prisma.oferta_servicio.updateMany({
+        where: { id: oferta.id, estado_oferta: 'aprobada' },
         data: { estado_oferta: 'concluida' },
       });
+
+      // count=0: alguien más ya movió la oferta y su decisión gana. No se notifica ni se cuenta una
+      // conclusión que no ocurrió. No es un error: es el resultado legítimo de la carrera.
+      if (count === 0) continue;
 
       await invalidarCacheOfertas();
 

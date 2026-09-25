@@ -8,7 +8,13 @@
 
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../../gr/gr.shared');
 
-const ESTADO_LSS_TERMINAL = 'constancia_disponible';
+// Copia deliberada de ESTADOS_LSS_LIBERAN_CUPO (lib/cupos.js): no se importa de ahí porque ese
+// módulo hace require('./prisma') y este archivo se carga ANTES de que el test sustituya el prisma
+// global. La prueba de consistencia afirma que ambos coinciden.
+//
+// El HITO de liberación es solo el primero ('solicitud_constancia_termino'); el segundo es el estado
+// posterior de LSS, que únicamente conserva la condición de "ya liberado".
+const ESTADOS_LSS_LIBERAN_CUPO = ['solicitud_constancia_termino', 'constancia_disponible'];
 
 const CATALOGO = [
   { id: 1, nombre: 'Investigador', incremento_cupos: 1 },
@@ -65,7 +71,7 @@ function crearBd({ profesores = [], solicitudes = [], ocupantes = [] } = {}) {
 
   // Mismo criterio que WHERE_SOLICITUD_OCUPA_CUPO en lib/cupos.js.
   const ocupaCupo = (o) => ESTADOS_QUE_OCUPAN_CUPO_PROFESOR.includes(o.estado_solicitud)
-    && (o.liberacion == null || o.liberacion !== ESTADO_LSS_TERMINAL);
+    && (o.liberacion == null || !ESTADOS_LSS_LIBERAN_CUPO.includes(o.liberacion));
 
   const modelos = {
     profesor: {
@@ -199,4 +205,4 @@ const solicitud = ({ id = 1, profesorId = 1, caracteristicaId = null, estado = '
 // n alumnos ocupando cupo de ese profesor, en un estado real de los que ocupan.
 const ocupantes = (profesorId, n) => Array.from({ length: n }, () => ({ profesorId, estado_solicitud: 'alumno_asignado', liberacion: null }));
 
-module.exports = { crearBd, profesor, solicitud, ocupantes, CATALOGO };
+module.exports = { crearBd, profesor, solicitud, ocupantes, CATALOGO, ESTADOS_LSS_LIBERAN_CUPO };

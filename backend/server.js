@@ -145,3 +145,9 @@ app.use('/coordinador', require('./src/modules/ah/ah-coordinador.routes'));
 // visible, mismo criterio que el cron de AH.
 const { inicializarCronGR } = require('./src/modules/gr/gr.cron');
 inicializarCronGR();
+
+// Ofertas (CU-PRO-04) — Cron de conclusión automática de ofertas (00:00 UTC diario). Estaba
+// definido y exportado pero nunca se llamaba, así que la conclusión automática no corría; se
+// arranca aquí con el mismo criterio explícito que los crons de AH y GR.
+const { iniciarCronConclusionOfertas } = require('./src/modules/ofertas/PRO/ofertas.cron');
+iniciarCronConclusionOfertas();

@@ -1,12 +1,27 @@
 const prisma = require('./prisma');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../modules/gr/gr.shared');
 
-// Estado terminal de la liberación del servicio social (módulo LSS, de Karen —
-// mismo literal que dashboard.service.js). Un alumno con este estado concluyó
-// correctamente y YA NO ocupa capacidad del profesor (NO reabre cupos_disponibles
-// de la oferta). LSS todavía no lo escribe: el filtro queda listo y no tiene
-// efecto hasta que exista alguna fila con este valor.
-const ESTADO_LSS_TERMINAL = 'constancia_disponible';
+// HAY UN SOLO HITO DE LIBERACIÓN: `liberacion_proceso.estado = 'solicitud_constancia_termino'`.
+//
+// Ese es el momento —y el único— en que el alumno deja de ocupar capacidad del profesor: para
+// llegar ahí, Coordinación ya aprobó su expediente de liberación (CU-LSS-09) y él ya pidió su
+// constancia. Lo que queda después es trámite, no servicio.
+//
+// Liberar NO reabre `cupos_disponibles` de la oferta: solo libera el límite global del profesor.
+// Una baja aprobada sí devuelve el lugar de la oferta, y eso vive en el módulo de Bajas.
+//
+// `constancia_disponible` NO es un segundo hito: es el estado al que LSS avanza DESPUÉS (CU-LSS-11,
+// cuando Coordinación emite la constancia). Aparece en esta lista con un único propósito técnico —
+// CONSERVAR la condición de "ya liberado" cuando el proceso sigue adelante. Si no estuviera, el
+// alumno liberaría su lugar al pedir la constancia y volvería a contarse como ocupante al
+// recibirla. Por eso el filtro usa `notIn` y no `not`.
+//
+// Es decir: un disparador de negocio ('solicitud_constancia_termino') y un estado posterior que
+// hereda la condición ('constancia_disponible').
+//
+// ADM/Ofertas solo CONSULTA estos valores; no los escribe nadie fuera de LSS.
+const HITO_LSS_LIBERA_CUPO = 'solicitud_constancia_termino';
+const ESTADOS_LSS_LIBERAN_CUPO = [HITO_LSS_LIBERA_CUPO, 'constancia_disponible'];
 
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
@@ -16,13 +31,13 @@ function crearError(mensaje, status = 400, code) {
 }
 
 // Fragmento `where` de "esta solicitud ocupa capacidad del profesor": está en
-// un estado que ocupa, Y no concluyó su liberación. `is: null` cubre las
-// solicitudes sin liberacion_proceso (la relación es 1:1 opcional).
+// un estado que ocupa, Y todavía no alcanzó el hito de liberación. `is: null`
+// cubre las solicitudes sin liberacion_proceso (la relación es 1:1 opcional).
 const WHERE_SOLICITUD_OCUPA_CUPO = {
   estado_solicitud: { in: ESTADOS_QUE_OCUPAN_CUPO_PROFESOR },
   OR: [
     { liberacion_proceso: { is: null } },
-    { liberacion_proceso: { is: { estado: { not: ESTADO_LSS_TERMINAL } } } },
+    { liberacion_proceso: { is: { estado: { notIn: ESTADOS_LSS_LIBERAN_CUPO } } } },
   ],
 };
 
@@ -121,6 +136,10 @@ async function asegurarCapacidadProfesor(profesor, tx = prisma) {
 }
 
 module.exports = {
+  // Se exportan para que ofertas.service.js (cierre manual y conclusión automática) use EXACTAMENTE
+  // el mismo criterio que el conteo de cupos, en vez de repetir los literales.
+  HITO_LSS_LIBERA_CUPO,
+  ESTADOS_LSS_LIBERAN_CUPO,
   contarCuposOcupados,
   obtenerSolicitudesOcupandoOfertas,
   obtenerCuposDisponiblesProfesor,

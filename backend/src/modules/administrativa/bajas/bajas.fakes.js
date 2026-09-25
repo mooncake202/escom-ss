@@ -13,7 +13,14 @@
 
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../../gr/gr.shared');
 
-const ESTADO_LSS_TERMINAL = 'constancia_disponible';
+// Copia deliberada de ESTADOS_LSS_LIBERAN_CUPO (lib/cupos.js): no se importa de ahí porque ese
+// módulo hace require('./prisma') y este archivo se carga ANTES de que el test sustituya el prisma
+// global. La prueba "el fake replica el criterio real de cupos" afirma que ambos coinciden, así que
+// una desincronización falla de inmediato en vez de pasar inadvertida.
+//
+// El HITO de liberación es solo el primero ('solicitud_constancia_termino'); el segundo es el estado
+// posterior de LSS, que únicamente conserva la condición de "ya liberado".
+const ESTADOS_LSS_LIBERAN_CUPO = ['solicitud_constancia_termino', 'constancia_disponible'];
 const clonar = (x) => (x === null || x === undefined ? x : JSON.parse(JSON.stringify(x)));
 
 function crearBd({
@@ -94,7 +101,7 @@ function crearBd({
   };
 
   const ocupaCupo = (sr) => ESTADOS_QUE_OCUPAN_CUPO_PROFESOR.includes(sr.estado_solicitud)
-    && (sr.liberacion == null || sr.liberacion !== ESTADO_LSS_TERMINAL);
+    && (sr.liberacion == null || !ESTADOS_LSS_LIBERAN_CUPO.includes(sr.liberacion));
 
   // Reproduce el árbol de CASCADE real del schema.
   function borrarUsuarioEnCascada(usuarioId) {
@@ -417,4 +424,6 @@ const carrera = ({ id = 1, nombre = 'Ingeniería en Sistemas Computacionales' } 
 const periodo = ({ id = 1, fechaMaxExpediente = new Date('2027-01-15T00:00:00Z') } = {}) =>
   ({ id, fecha_max_expediente: fechaMaxExpediente });
 
-module.exports = { crearBd, usuario, alumno, profesor, oferta, solicitudRegistro, baja, documento, cumulo, carrera, periodo };
+// ESTADOS_LSS_LIBERAN_CUPO se exporta solo para que la prueba de consistencia lo compare contra el
+// de lib/cupos.js; no es parte del fake que usen los tests de negocio.
+module.exports = { crearBd, usuario, alumno, profesor, oferta, solicitudRegistro, baja, documento, cumulo, carrera, periodo, ESTADOS_LSS_LIBERAN_CUPO };
