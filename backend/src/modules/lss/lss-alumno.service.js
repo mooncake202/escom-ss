@@ -2,7 +2,8 @@ const fs = require('fs');
 const path = require('path');
 const prisma = require('../../lib/prisma');
 const { emitirAUsuario } = require('../../sockets/socket.server');
-const { descifrarBuffer } = require('../../lib/fileEncryption');
+const { descifrarBuffer, cifrarBuffer, generarNombreSeguro } = require('../../lib/fileEncryption');
+const { unirPdfs } = require('../../lib/pdfExpediente');
 const { crearError, validarReportesValidadosSiss } = require('./validators');
 const {
   ESTADO_EVALUACION_SOLICITADA,
@@ -15,9 +16,13 @@ const {
   ESTADO_CARTA_LISTA_PARA_RECOGER,
   ESTADO_CARTA_RECOGIDA,
   ESTADO_LIBERACION_CARTA_RECOGIDA,
+  ESTADO_EXPEDIENTE_EN_REVISION,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
   exigirEstadoCarta,
+  exigirEstadoExpedienteLss,
 } = require('./lss.shared');
 const { calcularHorasNetas, LIMITE_HORAS_SERVICIO } = require('../ah/ah.shared');
 
@@ -36,6 +41,29 @@ function emitirResumenActualizadoProfesor(profesorUsuarioId) {
     emitirAUsuario(profesorUsuarioId, 'resumen:actualizado', {});
   } catch (err) {
     console.error('Error al emitir resumen:actualizado (profesor, lss):', err.message);
+  }
+}
+
+/**
+ * Mismo patrón exacto que emitirATodosLosCoordinadores en gr.service.js —
+ * duplicado a propósito (RN de separación por módulo). Coordinación ve TODO
+ * sin noción de "asignación" (mismo criterio que LSS-04/06), y la
+ * infraestructura de sockets no tiene salas por rol todavía, así que se
+ * emite individualmente a cada coordinador existente. Fail-open: nunca
+ * tumba la operación de negocio que lo llama.
+ */
+async function emitirATodosLosCoordinadores(evento, datos) {
+  try {
+    const coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+    for (const c of coordinadores) {
+      try {
+        emitirAUsuario(c.usuario_id, evento, datos);
+      } catch (err) {
+        console.error(`Error al emitir ${evento} a coordinador ${c.usuario_id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error(`Error al listar coordinadores para emitir ${evento}:`, err.message);
   }
 }
 
@@ -444,6 +472,198 @@ async function confirmarRecogida(alumnoUsuarioId) {
   return { mensaje: 'Recogida confirmada.', estado: ESTADO_LIBERACION_CARTA_RECOGIDA };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-07: gestionar integración de expediente (actor: Alumno).
+// Reutiliza el mecanismo YA PROBADO de GR (CU-GR-10, subirExpediente en
+// gr.service.js) — unirPdfs de backend/src/lib/pdfExpediente.js (genérico,
+// sin cambios), y el mismo criterio de cifrado/nombre/carpeta que el resto
+// del proyecto. NO reutiliza comprimirPdfGhostscript (GR la usa por su
+// límite de 2MB con compresión en cascada; aquí el límite es 1MB y el
+// usuario no pidió compresión — si el combinado excede, se rechaza).
+//
+// Diseño de estados (confirmado con el usuario): liberacion_proceso.estado
+// se queda fijo en 'expediente_en_revision' durante TODO el sub-ciclo
+// 07→08→09 (mismo criterio que 'evaluacion_solicitada' en 02→03→04) — la
+// granularidad real vive en documento.estado_documento
+// ('en_revision'/'rechazado'/'aprobado').
+// ─────────────────────────────────────────────────────────────
+
+// Mismo criterio de duplicación ya usado en todo el proyecto (RN de
+// separación por módulo) — idéntica a esPdfValido en gr.service.js.
+function esPdfValido(buffer) {
+  return !!buffer && buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-';
+}
+
+const LIMITE_EXPEDIENTE_LSS_BYTES = 1 * 1024 * 1024; // 1 MB — RN-LSS-25 (desviación intencional de la ficha, confirmada por el usuario: NO son 2MB).
+
+/**
+ * Trae alumno+usuario (para el nombre del expediente), solicitud_registro
+ * (campo `dictamen`, RN-LSS-22), liberacion_proceso, y el documento
+ * expediente_lss más reciente si existe (alumno_id + tipo_documento, mismo
+ * patrón "findFirst sin orderBy" ya usado en GR — nunca hay más de uno,
+ * siempre se sobreescribe).
+ */
+async function resolverParaExpediente(alumnoUsuarioId) {
+  const alumno = await prisma.alumno.findUnique({
+    where: { usuario_id: alumnoUsuarioId },
+    include: { usuario: true, solicitud_registro: { include: { liberacion_proceso: true } } },
+  });
+  if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de servicio social.', 404);
+
+  const solicitud = alumno.solicitud_registro;
+  const proceso = solicitud.liberacion_proceso;
+  if (!proceso) throw crearError('No tienes un proceso de liberación iniciado.', 404);
+
+  const documentoExpediente = await prisma.documento.findFirst({ where: { alumno_id: alumno.boleta, tipo_documento: 'expediente_lss' } });
+
+  return { alumno, solicitud, proceso, documentoExpediente };
+}
+
+// RN-LSS-24 (desviación intencional de la ficha, confirmada por el
+// usuario): BOLETA_PATERNO_MATERNO_NOMBRE(S) — boleta AL INICIO, en vez de
+// al final como decía la ficha original.
+function nombreExpedienteLss(alumno) {
+  const [apellidoPaterno, apellidoMaterno = ''] = alumno.usuario.apellidos.trim().split(/\s+/);
+  const nombreLimpio = alumno.usuario.nombre.trim().replace(/\s+/g, '_');
+  return `${alumno.boleta}_${apellidoPaterno}_${apellidoMaterno}_${nombreLimpio}.pdf`;
+}
+
+function estadoExpedienteVisible(documentoExpediente) {
+  if (!documentoExpediente) return 'sin_enviar';
+  return documentoExpediente.estado_documento; // 'en_revision' | 'rechazado' | 'aprobado'
+}
+
+/**
+ * Flujo Principal, datos previos a mostrar la pantalla — RN-LSS-22
+ * (requiereDictamen), RF-LSS-38 (observaciones de rechazo).
+ */
+async function obtenerInfoExpediente(alumnoUsuarioId) {
+  const { alumno, solicitud, proceso, documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+
+  return {
+    estado: estadoExpedienteVisible(documentoExpediente),
+    requiereDictamen: solicitud.dictamen !== null,
+    nombreExpedienteSugerido: nombreExpedienteLss(alumno),
+    observacionesRechazo: documentoExpediente?.estado_documento === ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO ? (proceso.observaciones_rechazo ?? null) : null,
+  };
+}
+
+/**
+ * Flujo Principal / Flujo Alterno 1.1 (reenvío tras rechazo, RN-LSS-23):
+ * mismo mecanismo exacto en ambos casos — siempre se reemplazan TODOS los
+ * documentos, nunca solo el que causó el rechazo.
+ */
+async function subirExpedienteLss(alumnoUsuarioId, archivos) {
+  const { cartaCompromiso, cartaTermino, dictamen } = archivos;
+
+  const { alumno, solicitud, proceso, documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+
+  exigirEstadoExpedienteLss(documentoExpediente, 'Tu expediente ya fue enviado y no se puede modificar en este momento.');
+
+  // RN-LSS-21.
+  if (!cartaCompromiso || !cartaTermino) {
+    throw crearError('Debes adjuntar la carta compromiso y la carta de término.');
+  }
+
+  // RN-LSS-22: el dictamen solo es obligatorio si se declaró en CU-GR-01.
+  const requiereDictamen = solicitud.dictamen !== null;
+  if (requiereDictamen && !dictamen) {
+    throw crearError('Debes adjuntar tu documento de dictamen.');
+  }
+
+  // Orden fijo (sin desviación respecto a la ficha): carta_compromiso -> carta_termino -> dictamen (si aplica).
+  const documentosOrdenados = [
+    { clave: 'cartaCompromiso', archivo: cartaCompromiso },
+    { clave: 'cartaTermino', archivo: cartaTermino },
+    ...(requiereDictamen ? [{ clave: 'dictamen', archivo: dictamen }] : []),
+  ];
+
+  for (const { archivo } of documentosOrdenados) {
+    if (!esPdfValido(archivo.buffer)) {
+      throw crearError('Alguno de los archivos no es un PDF válido.');
+    }
+  }
+
+  let pdfUnido;
+  try {
+    pdfUnido = await unirPdfs(documentosOrdenados.map((d) => d.archivo.buffer));
+  } catch (err) {
+    console.error('Error al unir los PDFs del expediente LSS:', err);
+    throw crearError('No se pudieron combinar los documentos. Verifica que todos sean PDFs válidos.', 500);
+  }
+
+  // RN-LSS-25 (1MB, sin compresión — desviación intencional confirmada, no se usa Ghostscript aquí).
+  if (pdfUnido.length > LIMITE_EXPEDIENTE_LSS_BYTES) {
+    throw crearError('El expediente combinado supera 1 MB. Reduce el tamaño de tus documentos e intenta de nuevo.', 400, 'EXPEDIENTE_MUY_GRANDE');
+  }
+
+  const nombreExpediente = nombreExpedienteLss(alumno);
+  const carpetaAlumno = path.join(RUTA_BASE_DOCUMENTOS, alumno.boleta);
+  fs.mkdirSync(carpetaAlumno, { recursive: true });
+  const rutaRelativa = path.join(alumno.boleta, generarNombreSeguro());
+  fs.writeFileSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa), cifrarBuffer(pdfUnido));
+
+  const ahora = new Date();
+  let rutaViejaABorrar = null;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (documentoExpediente) {
+        rutaViejaABorrar = documentoExpediente.ruta_archivo;
+        await tx.documento.update({
+          where: { id: documentoExpediente.id },
+          data: { ruta_archivo: rutaRelativa, nombre_expediente: nombreExpediente, estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION, creador_id: alumnoUsuarioId, fecha_creacion: ahora, aprobado_por_id: null },
+        });
+      } else {
+        await tx.documento.create({
+          data: { alumno_id: alumno.boleta, creador_id: alumnoUsuarioId, tipo_documento: 'expediente_lss', fecha_creacion: ahora, estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION, ruta_archivo: rutaRelativa, nombre_expediente: nombreExpediente },
+        });
+      }
+      await tx.liberacion_proceso.update({
+        where: { id: proceso.id },
+        data: { estado: ESTADO_EXPEDIENTE_EN_REVISION, observaciones_rechazo: null },
+      });
+    });
+  } catch (err) {
+    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaRelativa)); } catch {}
+    throw crearError('Ocurrió un error al procesar tu expediente.', 500);
+  }
+
+  if (rutaViejaABorrar) {
+    try { fs.unlinkSync(path.join(RUTA_BASE_DOCUMENTOS, rutaViejaABorrar)); } catch {}
+  }
+
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+  const profesorUsuarioId = solicitud.oferta?.profesor?.usuario_id;
+  if (profesorUsuarioId) emitirResumenActualizadoProfesor(profesorUsuarioId);
+  // Bug real encontrado en vivo: faltaba este emit — coordinación nunca se
+  // enteraba en tiempo real de un expediente nuevo (RF-LSS-32, la
+  // notificación calculada del dashboard solo se refrescaba al recargar).
+  await emitirATodosLosCoordinadores('resumen:actualizado', {});
+
+  return { mensaje: 'Tu expediente fue enviado correctamente y será revisado por Coordinación.', estado: ESTADO_EXPEDIENTE_EN_REVISION };
+}
+
+/**
+ * Ver/descargar el expediente propio ya enviado — descifrado en memoria,
+ * mismo patrón que marcarEvaluacionDescargada (LSS-02) / descargarParaRevision (LSS-04).
+ */
+async function descargarExpedienteLss(alumnoUsuarioId) {
+  const { documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+  if (!documentoExpediente) {
+    throw crearError('Todavía no has enviado tu expediente.', 404);
+  }
+
+  let bufferCifrado;
+  try {
+    bufferCifrado = fs.readFileSync(path.join(RUTA_BASE_DOCUMENTOS, documentoExpediente.ruta_archivo));
+  } catch (err) {
+    throw crearError('El archivo ya no está disponible.', 404);
+  }
+
+  return descifrarBuffer(bufferCifrado);
+}
+
 module.exports = {
   obtenerEstadoRequisitos,
   iniciarEvaluacion,
@@ -454,4 +674,7 @@ module.exports = {
   solicitarCartaTermino,
   obtenerEstadoCarta,
   confirmarRecogida,
+  obtenerInfoExpediente,
+  subirExpedienteLss,
+  descargarExpedienteLss,
 };

@@ -13,6 +13,9 @@ const {
   ESTADO_EVALUACION_PENDIENTE_DICTAMEN,
   ESTADO_EVALUACION_APROBADO_COORDINADOR,
   ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
+  ESTADO_CARTA_SOLICITADA,
+  ESTADO_CARTA_LISTA_PARA_RECOGER,
+  exigirEstadoCarta,
 } = require('./lss.shared');
 
 // ─────────────────────────────────────────────────────────────
@@ -345,9 +348,93 @@ async function dictaminarRechazado(coordinadorUsuarioId, evaluacionId, motivoRec
   return { mensaje: 'Evaluación devuelta para corrección.', estado: ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-06: gestionar estado de carta de término (actor: Coordinador).
+// Mismo criterio que CU-LSS-04: coordinación ve TODO, sin noción de
+// "asignación" — reutiliza resolverCoordinador/emitirResumenActualizado
+// ya definidos arriba en este mismo archivo.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * TODOS los alumnos con una fila carta_termino, en cualquiera de los 3
+ * estados — sin filtro de asignación (mismo criterio que
+ * listarEvaluacionesPendientesDictamen).
+ */
+async function listarSolicitudesCartaTermino() {
+  const cartas = await prisma.carta_termino.findMany({
+    include: {
+      liberacion_proceso: {
+        include: {
+          solicitud_registro: {
+            include: {
+              alumno: { include: { usuario: true } },
+              oferta: { include: { profesor: { include: { usuario: true } } } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { fecha_solicitud: 'asc' },
+  });
+
+  return cartas.map((carta) => {
+    const solicitud = carta.liberacion_proceso.solicitud_registro;
+    return {
+      liberacionProcesoId: carta.liberacion_proceso_id,
+      boleta: solicitud.alumno.boleta,
+      nombreCompleto: `${solicitud.alumno.usuario.nombre} ${solicitud.alumno.usuario.apellidos}`,
+      profesorNombre: solicitud.oferta?.profesor
+        ? `${solicitud.oferta.profesor.usuario.nombre} ${solicitud.oferta.profesor.usuario.apellidos}`
+        : null,
+      oferta: solicitud.oferta?.nombre_proyecto ?? null,
+      estado: carta.estado,
+      fechaSolicitud: carta.fecha_solicitud,
+      fechaDisponible: carta.fecha_disponible,
+      fechaRecogida: carta.fecha_recogida,
+    };
+  });
+}
+
+/**
+ * RN-LSS-17: solo coordinador (resolverCoordinador ya lo exige — 404 si el
+ * usuario autenticado no tiene perfil de coordinador; requireRole en la
+ * ruta ya filtra por rol antes de llegar aquí). RN-LSS-19: el flujo solo
+ * avanza — exigirEstadoCarta rechaza (409) si la carta no está
+ * exactamente en 'solicitada'.
+ */
+async function marcarCartaListaParaRecoger(coordinadorUsuarioId, liberacionProcesoId) {
+  await resolverCoordinador(coordinadorUsuarioId);
+
+  const carta = await prisma.carta_termino.findUnique({
+    where: { liberacion_proceso_id: Number(liberacionProcesoId) },
+    include: {
+      liberacion_proceso: {
+        include: { solicitud_registro: { include: { alumno: true } } },
+      },
+    },
+  });
+
+  exigirEstadoCarta(carta, ESTADO_CARTA_SOLICITADA, 'Esta carta de término ya no está en el paso de solicitada.');
+
+  await prisma.carta_termino.update({
+    where: { id: carta.id },
+    data: { estado: ESTADO_CARTA_LISTA_PARA_RECOGER, fecha_disponible: new Date() },
+  });
+
+  // Solo el emit — la notificación visible es la Tipo A calculada, ya
+  // construida en CU-LSS-05 (resumenAlumno.cartaTerminoListaParaRecoger),
+  // no se crea ninguna fila `notificacion` nueva aquí.
+  const alumnoUsuarioId = carta.liberacion_proceso.solicitud_registro.alumno.usuario_id;
+  emitirResumenActualizado(alumnoUsuarioId);
+
+  return { mensaje: 'Carta de término marcada como lista para recoger.', estado: ESTADO_CARTA_LISTA_PARA_RECOGER };
+}
+
 module.exports = {
   listarEvaluacionesPendientesDictamen,
   descargarParaRevision,
   dictaminarAprobado,
   dictaminarRechazado,
+  listarSolicitudesCartaTermino,
+  marcarCartaListaParaRecoger,
 };

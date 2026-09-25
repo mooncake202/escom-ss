@@ -234,6 +234,30 @@ function exigirEstadoCarta(carta, estadoEsperado, mensaje) {
   }
 }
 
+// Catálogo de documento.estado_documento para tipo_documento='expediente_lss'
+// (CU-LSS-07/08/09). 'en_revision' ya es un valor genérico reutilizado tal
+// cual de GR (mismo significado). Los otros 2 son valores NUEVOS, reservados
+// para cuando LSS-08 (rechazo) y LSS-09 (aprobación) existan de verdad.
+const ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION = 'en_revision';
+const ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO = 'rechazado';
+const ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO = 'aprobado';
+
+/**
+ * RN-LSS-26: el expediente no puede volver a revisión si ya fue aprobado.
+ * A diferencia de exigirEstadoEvaluacion/exigirEstadoCarta (que exigen UN
+ * estado exacto), aquí el conjunto de estados PERMITIDOS para enviar/
+ * reenviar es: no existe documento todavía (primer envío) O existe y está
+ * 'rechazado' (RN-LSS-23, reenvío tras rechazo). Bloquea si está
+ * 'en_revision' (ya enviado, esperando dictamen) o 'aprobado'.
+ */
+function exigirEstadoExpedienteLss(documentoExpediente, mensaje) {
+  if (documentoExpediente && documentoExpediente.estado_documento !== ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO) {
+    const error = new Error(mensaje || 'Tu expediente ya fue enviado y no se puede modificar en este momento.');
+    error.status = 409;
+    throw error;
+  }
+}
+
 module.exports = {
   sha256,
   ESTADO_EVALUACION_SOLICITADA,
@@ -249,6 +273,9 @@ module.exports = {
   ESTADO_CARTA_LISTA_PARA_RECOGER,
   ESTADO_CARTA_RECOGIDA,
   ESTADO_LIBERACION_CARTA_RECOGIDA,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO,
   FACTORES_EVALUACION,
   VALORES_VALIDOS_FACTOR,
   SUMA_TOTAL_MAXIMA,
@@ -258,4 +285,5 @@ module.exports = {
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
   exigirEstadoCarta,
+  exigirEstadoExpedienteLss,
 };

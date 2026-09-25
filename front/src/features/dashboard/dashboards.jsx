@@ -753,6 +753,19 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
           <ActionItem icon="document" {...T.blue}    label="Gestionar carta de término"         desc="Carta lista para entregar" onClick={() => navigate("/coordinacion/estado-carta-termino")} C={C} />
           <ActionItem icon="folder"   {...T.teal}    label="Dictaminar expediente"              desc="Expediente en revisión" onClick={() => navigate("/coordinacion/evaluacion-expediente")} C={C} />
           <SlotNotificacion ruta="/coordinacion/evaluacion-expediente" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* RF-LSS-32 — Tipo A calculada (CU-LSS-07): resumen.expedientesEnRevision
+              ya se calculaba desde antes en dashboard.service.js (contaba
+              liberacion_proceso.estado='expediente_en_revision', un valor
+              reservado que nadie escribía todavía) — CU-LSS-07 ya lo escribe,
+              así que este slot cobra vida sin tocar el backend del dashboard. */}
+          <SlotNotificacionCalculada
+            mostrar={(resumen.expedientesEnRevision ?? 0) > 0}
+            mensaje="Hay expedientes de liberación pendientes de dictaminar."
+            ruta="/coordinacion/evaluacion-expediente"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="check"    {...T.green}   label="Gestionar constancia de término"    desc="Constancia pendiente de emisión" onClick={() => navigate("/coordinacion/gestion-constancia-termino")} C={C} />
           <ActionItem icon="folder" {...T.slate}  label="Documentos del servicio" desc="Ve los documentos históricos del servicio" onClick={() => navigate("/coordinación-alumnoasignado-documentacion")} C={C} />
         </Section>

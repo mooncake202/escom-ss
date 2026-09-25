@@ -28,20 +28,20 @@ export const ESTADO_LSS_A_RUTA = {
   // completar el Alterno D (descargó + subió a SISS + solicitó).
   solicitud_carta_termino: "/alumno/seguimiento-carta-termino",
 
-  // CU-LSS-05 (esta tarea) — real: lo escribe confirmarRecogida al
-  // confirmar que ya recogió su carta de término. CU-LSS-07 (Integración
-  // de expediente) todavía no tiene lógica de backend propia, pero su
-  // pantalla YA existe como mockup real (IntegracionExpediente.jsx, con
-  // guardaLSS) — se apunta ahí en vez de inventar un placeholder.
+  // CU-LSS-05 — real: lo escribe confirmarRecogida al confirmar que ya
+  // recogió su carta de término. CU-LSS-07 (Integración de expediente) es
+  // real (IntegracionExpediente.jsx + subirExpedienteLss) — se apunta ahí
+  // mientras el alumno todavía no ha enviado su expediente.
   carta_recogida: "/alumno/integracion-expediente",
 
-  // TODO(LSS-08/09): agregar aquí el/los estado(s) reales de evaluación de
-  // expediente/resolución cuando ese CU exista.
-  // TODO(LSS-08/09): agregar aquí el/los estado(s) reales de evaluación de
-  // expediente/resolución cuando ese CU exista.
-  // 'expediente_en_revision' ya está reservado como nombre en
-  // lss.shared.js, pero AÚN NADIE lo escribe — no se mapea a una ruta
-  // todavía, a propósito, hasta confirmar contra qué CU real corresponde.
+  // CU-LSS-08 (corrección de alcance: antes apuntaba de vuelta a la propia
+  // pantalla de LSS-07, mezclando responsabilidades) — real: lo escribe
+  // subirExpedienteLss. CU-LSS-07 SOLO integra/envía; consultar el estado
+  // de la revisión/resolución es responsabilidad de CU-LSS-08, que ya
+  // existe como mockup real (EstadoResolucionAlumno.jsx, con guardaLSS) —
+  // se apunta ahí en vez de inventar un placeholder.
+  expediente_en_revision: "/alumno/estado-resolucion",
+
   // TODO(LSS-10/11): agregar aquí el/los estado(s) reales de constancia de
   // término cuando ese CU exista. 'constancia_disponible' — mismo caso.
 };

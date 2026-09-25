@@ -10,6 +10,9 @@ const {
   postCartaTermino,
   getEstadoCarta,
   postConfirmarRecogida,
+  getInfoExpediente,
+  postSubirExpedienteLss,
+  getDescargarExpedienteLss,
 } = require('./lss-alumno.controller');
 
 const router = express.Router();
@@ -28,5 +31,10 @@ router.post('/evaluacion/carta-termino', requireAuth, requireRole('alumno_asigna
 // CU-LSS-05 — consultar/confirmar recogida de la carta de término.
 router.get('/carta-termino/estado', requireAuth, requireRole('alumno_asignado'), getEstadoCarta);
 router.post('/carta-termino/confirmar', requireAuth, requireRole('alumno_asignado'), postConfirmarRecogida);
+
+// CU-LSS-07 — integración de expediente.
+router.get('/expediente/info', requireAuth, requireRole('alumno_asignado'), getInfoExpediente);
+router.post('/expediente/subir', requireAuth, requireRole('alumno_asignado'), postSubirExpedienteLss);
+router.get('/expediente/descargar', requireAuth, requireRole('alumno_asignado'), getDescargarExpedienteLss);
 
 module.exports = router;

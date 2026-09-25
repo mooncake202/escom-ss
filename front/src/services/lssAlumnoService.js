@@ -74,3 +74,47 @@ export async function getEstadoCarta() {
 export async function confirmarRecogidaCarta() {
   return apiFetch("/alumno/carta-termino/confirmar", { method: "POST" });
 }
+
+// CU-LSS-07 — integración de expediente.
+export async function getInfoExpediente() {
+  return apiFetch("/alumno/expediente/info");
+}
+
+export async function subirExpedienteLss({ cartaCompromiso, cartaTermino, dictamen }) {
+  const formData = new FormData();
+  formData.append("cartaCompromiso", cartaCompromiso);
+  formData.append("cartaTermino", cartaTermino);
+  if (dictamen) formData.append("dictamen", dictamen);
+  return apiFetch("/alumno/expediente/subir", { method: "POST", body: formData });
+}
+
+/**
+ * Mismo patrón <a download> ya usado en descargarEvaluacion — evita el
+ * bloqueo de pop-up por pérdida de gesto de usuario tras el await.
+ */
+export async function descargarExpedienteLss() {
+  const token = localStorage.getItem("token");
+  let res;
+  try {
+    res = await fetch(`${API_URL}/alumno/expediente/descargar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new Error("El servicio no está disponible temporalmente. Intenta de nuevo más tarde.");
+  }
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || "No se pudo descargar el expediente.");
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = "expediente.pdf";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}

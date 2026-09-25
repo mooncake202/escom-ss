@@ -51,3 +51,12 @@ export async function descargarParaRevision(evaluacionId) {
   document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
+
+// CU-LSS-06 — gestionar estado de carta de término.
+export async function listarSolicitudesCartaTermino() {
+  return apiFetch("/coordinador/carta-termino/solicitudes");
+}
+
+export async function marcarCartaLista(liberacionProcesoId) {
+  return apiFetch(`/coordinador/carta-termino/${liberacionProcesoId}/marcar-lista`, { method: "POST" });
+}

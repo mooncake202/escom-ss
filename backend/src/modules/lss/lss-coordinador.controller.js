@@ -53,9 +53,31 @@ async function postDictaminarRechazado(req, res) {
   }
 }
 
+// ── CU-LSS-06 ─────────────────────────────────────────────────
+
+async function getSolicitudesCartaTermino(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.listarSolicitudesCartaTermino();
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al listar solicitudes de carta de término:');
+  }
+}
+
+async function postMarcarCartaLista(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.marcarCartaListaParaRecoger(req.usuario.sub, req.params.id);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al marcar carta de término como lista:');
+  }
+}
+
 module.exports = {
   getEvaluacionesPendientesDictamen,
   getDescargarParaRevision,
   postDictaminarAprobado,
   postDictaminarRechazado,
+  getSolicitudesCartaTermino,
+  postMarcarCartaLista,
 };

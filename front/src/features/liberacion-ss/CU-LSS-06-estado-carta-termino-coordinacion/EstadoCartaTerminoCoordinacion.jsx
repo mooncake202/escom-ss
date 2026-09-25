@@ -4,11 +4,13 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useEstadoCartaTerminoCoordinacion } from "./hooks/useEstadoCartaTerminoCoordinacion";
 
 // ——— Badge de estado ————————————————————————————————
+// Valores reales de carta_termino.estado (ficha, RN-LSS-18/19) — 'recogida',
+// NO 'recibida' (el mockup original usaba ese nombre, corregido aquí).
 function EstadoBadge({ estado, C }) {
   const map = {
     solicitada:         { label: "En espera",          color: "#b45309",  bg: "rgba(234,179,8,0.10)",   border: "rgba(234,179,8,0.25)"   },
     lista_para_recoger: { label: "Lista para recoger", color: "#15803d",  bg: "rgba(21,128,61,0.10)",   border: "rgba(21,128,61,0.25)"   },
-    recibida:           { label: "Recibida",            color: "#2563eb",  bg: "rgba(37,99,235,0.10)",   border: "rgba(37,99,235,0.25)"   },
+    recogida:           { label: "Recogida",            color: "#2563eb",  bg: "rgba(37,99,235,0.10)",   border: "rgba(37,99,235,0.25)"   },
   };
   const s = map[estado] ?? map.solicitada;
   return (
@@ -123,7 +125,7 @@ function ListaAlumnos({ alumnos, seleccionado, onSeleccionar, C }) {
 }
 
 // ——— Contenido principal según estado del alumno ————
-function VistaEstadoCarta({ estadoAlumno, alumno, onMarcarLista, C }) {
+function VistaEstadoCarta({ estadoAlumno, alumno, onMarcarLista, accionEnCurso, C }) {
 
   // Sin alumno seleccionado
   if (!alumno) {
@@ -194,21 +196,23 @@ function VistaEstadoCarta({ estadoAlumno, alumno, onMarcarLista, C }) {
 
         <button
           onClick={onMarcarLista}
+          disabled={accionEnCurso}
           style={{
             width: "100%",
             padding: "12px",
             borderRadius: RADIUS.md,
             fontSize: 14,
             fontWeight: 600,
-            cursor: "pointer",
+            cursor: accionEnCurso ? "wait" : "pointer",
             background: GRADIENTS.primary,
             border: "none",
             color: "#fff",
             fontFamily: "inherit",
             boxShadow: SHADOWS.accent,
+            opacity: accionEnCurso ? 0.7 : 1,
           }}
         >
-          Marcar carta como lista para recoger →
+          {accionEnCurso ? "Procesando..." : "Marcar carta como lista para recoger →"}
         </button>
       </div>
     );
@@ -247,8 +251,8 @@ function VistaEstadoCarta({ estadoAlumno, alumno, onMarcarLista, C }) {
     );
   }
 
-  // Estado: recibida → proceso completo
-  if (estadoAlumno === "recibida") {
+  // Estado: recogida → proceso completo
+  if (estadoAlumno === "recogida") {
     return (
       <div style={{
         padding: "1.25rem 1.5rem",
@@ -289,11 +293,22 @@ export default function EstadoCartaTerminoCoordinacion() {
 
   const {
     alumnos,
+    cargando,
+    error,
+    accionEnCurso,
     alumnoSeleccionado,
     seleccionarAlumno,
     estadoAlumno,
     marcarCartaLista,
   } = useEstadoCartaTerminoCoordinacion();
+
+  if (cargando) {
+    return (
+      <DashboardLayout titulo="Carta de término" subtitulo="Vista de coordinación" rol="coordinacion" usuario="Coordinación">
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout
@@ -302,6 +317,9 @@ export default function EstadoCartaTerminoCoordinacion() {
       rol="coordinacion"
       usuario="Coordinación"
     >
+      {error && (
+        <p style={{ marginBottom: "1rem", fontSize: 13, color: C.danger }}>{error}</p>
+      )}
       <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
 
         {/* SIDEBAR */}
@@ -379,6 +397,7 @@ export default function EstadoCartaTerminoCoordinacion() {
             estadoAlumno={estadoAlumno}
             alumno={alumnoSeleccionado}
             onMarcarLista={marcarCartaLista}
+            accionEnCurso={accionEnCurso}
             C={C}
           />
 
