@@ -8,6 +8,7 @@ const PASO_POR_ESTADO = {
   solicitud_carta_termino: 3, // CU-LSS-02 — evaluación completa, carta término solicitada
   carta_recogida: 4, // CU-LSS-05 (esta tarea) — carta de término ya recogida, avanza a Integración Expediente
   expediente_en_revision: 5, // ya referenciado en dashboard.service.js (resumenCoordinacion)
+  solicitud_constancia_termino: 6, // CU-LSS-08 (esta tarea) — expediente aprobado, constancia solicitada
   constancia_disponible: 6,  // estado terminal del flujo LSS
 };
 

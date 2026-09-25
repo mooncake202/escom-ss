@@ -1,4 +1,5 @@
 import { apiFetch, API_URL } from "./apiClient";
+import { nombreDesdeContentDisposition } from "./descargaUtils";
 
 // CU-LSS-01 — iniciar evaluación de desempeño.
 export async function getEstadoRequisitos() {
@@ -85,7 +86,11 @@ export async function subirExpedienteLss({ cartaCompromiso, cartaTermino, dictam
   formData.append("cartaCompromiso", cartaCompromiso);
   formData.append("cartaTermino", cartaTermino);
   if (dictamen) formData.append("dictamen", dictamen);
-  return apiFetch("/alumno/expediente/subir", { method: "POST", body: formData });
+  // timeoutMs: bug real encontrado con un archivo de 6.9MB que se quedaba
+  // colgado sin ninguna respuesta — sin esto, una subida grande cuya
+  // conexión se estanca deja al usuario viendo "Enviando expediente..."
+  // para siempre, sin error ni éxito.
+  return apiFetch("/alumno/expediente/subir", { method: "POST", body: formData, timeoutMs: 45000 });
 }
 
 /**
@@ -112,9 +117,25 @@ export async function descargarExpedienteLss() {
   const url = URL.createObjectURL(blob);
   const enlace = document.createElement("a");
   enlace.href = url;
-  enlace.download = "expediente.pdf";
+  // Bug real encontrado: sin leer Content-Disposition, la descarga se
+  // guardaba con un nombre genérico ("expediente.pdf") en vez del real
+  // (BOLETA_PATERNO_MATERNO_NOMBRE.pdf, ya generado por el backend).
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "expediente.pdf";
   document.body.appendChild(enlace);
   enlace.click();
   document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// CU-LSS-08 — consultar estado de resolución del expediente.
+export async function getEstadoExpediente() {
+  return apiFetch("/alumno/expediente/estado");
+}
+
+export async function solicitarConstanciaTermino() {
+  return apiFetch("/alumno/expediente/solicitar-constancia", { method: "POST" });
+}
+
+export async function corregirExpedienteLss() {
+  return apiFetch("/alumno/expediente/corregir", { method: "POST" });
 }

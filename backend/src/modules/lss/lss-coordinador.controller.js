@@ -73,6 +73,51 @@ async function postMarcarCartaLista(req, res) {
   }
 }
 
+// ── CU-LSS-09 ─────────────────────────────────────────────────
+
+async function getExpedientesPendientes(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.listarExpedientesPendientes();
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al listar expedientes pendientes:');
+  }
+}
+
+// No usa manejarError en el camino feliz: la respuesta exitosa es binaria
+// (el PDF), no JSON — mismo patrón que getDescargarParaRevision.
+async function getDescargarExpediente(req, res) {
+  try {
+    const { buffer, nombreExpediente } = await lssCoordinadorService.descargarExpedienteParaRevision(req.usuario.sub, req.params.id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
+    return res.status(200).send(buffer);
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error al descargar expediente para revisión:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+async function postDictaminarExpedienteAprobado(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.dictaminarExpedienteAprobado(req.usuario.sub, req.params.id);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al aprobar dictamen de expediente:');
+  }
+}
+
+async function postDictaminarExpedienteRechazado(req, res) {
+  try {
+    const resultado = await lssCoordinadorService.dictaminarExpedienteRechazado(req.usuario.sub, req.params.id, req.body.observaciones);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al rechazar dictamen de expediente:');
+  }
+}
+
 module.exports = {
   getEvaluacionesPendientesDictamen,
   getDescargarParaRevision,
@@ -80,4 +125,8 @@ module.exports = {
   postDictaminarRechazado,
   getSolicitudesCartaTermino,
   postMarcarCartaLista,
+  getExpedientesPendientes,
+  getDescargarExpediente,
+  postDictaminarExpedienteAprobado,
+  postDictaminarExpedienteRechazado,
 };

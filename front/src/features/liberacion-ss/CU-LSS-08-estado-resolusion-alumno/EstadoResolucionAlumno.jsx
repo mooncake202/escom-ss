@@ -1,11 +1,7 @@
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLSSLayout } from "../CU-LSS-01-Iniciar-proceso-evaluacion-desempeño/components/ProcesoLSSLayout";
 import { useEstadoResolucionAlumno } from "./hooks/useEstadoResolucionAlumno";
-import { useNavigate } from "react-router-dom";
-
-const MOCK = {
-  usuario: "Ana Karen Lagarza Ortega",
-};
+import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 // ——— Vista: expediente en revisión ————————————————————
 function VistaEnRevision({ C }) {
@@ -30,7 +26,7 @@ function VistaEnRevision({ C }) {
 }
 
 // ——— Vista: expediente aprobado ————————————————————
-function VistaAprobado({ C }) {
+function VistaAprobado({ onSolicitarConstancia, accionEnCurso, C }) {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", textAlign: "center", paddingTop: "4rem" }}>
       <div style={{ fontSize: 52, marginBottom: "1rem" }}>🎓</div>
@@ -41,27 +37,30 @@ function VistaAprobado({ C }) {
         Tu expediente fue revisado y aprobado. Has completado exitosamente tu servicio social.
       </p>
       <button
+        onClick={onSolicitarConstancia}
+        disabled={accionEnCurso}
         style={{
           padding: "12px 32px",
           borderRadius: RADIUS.md,
           fontSize: 14,
           fontWeight: 600,
-          cursor: "pointer",
+          cursor: accionEnCurso ? "wait" : "pointer",
           background: GRADIENTS.primary,
           border: "none",
           color: "#fff",
           fontFamily: "inherit",
           boxShadow: SHADOWS.accent,
+          opacity: accionEnCurso ? 0.7 : 1,
         }}
       >
-        Solicitar constancia de término
+        {accionEnCurso ? "Procesando..." : "Solicitar constancia de término"}
       </button>
     </div>
   );
 }
 
 // ——— Vista: expediente rechazado ——————————————————————
-function VistaRechazado({ observacionesGuardadas, C, navigate }) {
+function VistaRechazado({ observacionesGuardadas, onCorregirYReenviar, accionEnCurso, C }) {
   return (
     <div style={{ maxWidth: 560, margin: "0 auto", paddingTop: "2rem" }}>
       <div style={{ textAlign: "center", marginBottom: "2rem" }}>
@@ -99,22 +98,24 @@ function VistaRechazado({ observacionesGuardadas, C, navigate }) {
       )}
 
       <button
-        onClick={() => navigate("/alumno/integracion-expediente")}
+        onClick={onCorregirYReenviar}
+        disabled={accionEnCurso}
         style={{
           width: "100%",
           padding: "12px",
           borderRadius: RADIUS.md,
           fontSize: 14,
           fontWeight: 600,
-          cursor: "pointer",
+          cursor: accionEnCurso ? "wait" : "pointer",
           background: GRADIENTS.primary,
           border: "none",
           color: "#fff",
           fontFamily: "inherit",
           boxShadow: SHADOWS.accent,
+          opacity: accionEnCurso ? 0.7 : 1,
         }}
       >
-        Corregir y reenviar expediente →
+        {accionEnCurso ? "Procesando..." : "Corregir y reenviar expediente →"}
       </button>
     </div>
   );
@@ -123,21 +124,40 @@ function VistaRechazado({ observacionesGuardadas, C, navigate }) {
 // ——— Página principal ——————————————————————————————————
 export default function EstadoResolucionAlumno() {
   const { C } = useTheme();
-  const navigate = useNavigate();
-  const { estado, observacionesGuardadas } = useEstadoResolucionAlumno();
+  const { usuario: sesion } = useSesion();
+  const nombreAlumno = nombreCompletoSesion(sesion);
+  const {
+    cargando,
+    estado,
+    observacionesGuardadas,
+    error,
+    accionEnCurso,
+    solicitarConstancia,
+    corregirYReenviar,
+  } = useEstadoResolucionAlumno();
+
+  if (cargando) {
+    return (
+      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución" rol="alumno" usuario={nombreAlumno}>
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </ProcesoLSSLayout>
+    );
+  }
 
   if (estado === "aprobado") {
     return (
-      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-08" rol="alumno" usuario={MOCK.usuario}>
-        <VistaAprobado C={C} />
+      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución"  rol="alumno" usuario={nombreAlumno}>
+        <VistaAprobado onSolicitarConstancia={solicitarConstancia} accionEnCurso={accionEnCurso} C={C} />
+        {error && <p style={{ marginTop: "1rem", fontSize: 12, color: C.danger, textAlign: "center" }}>{error}</p>}
       </ProcesoLSSLayout>
     );
   }
 
   if (estado === "rechazado") {
     return (
-      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución" subtitulo="CU-LSS-08" rol="alumno" usuario={MOCK.usuario}>
-        <VistaRechazado observacionesGuardadas={observacionesGuardadas} C={C} navigate={navigate} />
+      <ProcesoLSSLayout pasoActual={5} titulo="Revisión y resolución"  rol="alumno" usuario={nombreAlumno}>
+        <VistaRechazado observacionesGuardadas={observacionesGuardadas} onCorregirYReenviar={corregirYReenviar} accionEnCurso={accionEnCurso} C={C} />
+        {error && <p style={{ marginTop: "1rem", fontSize: 12, color: C.danger, textAlign: "center" }}>{error}</p>}
       </ProcesoLSSLayout>
     );
   }
@@ -146,9 +166,9 @@ export default function EstadoResolucionAlumno() {
     <ProcesoLSSLayout
       pasoActual={5}
       titulo="Revisión y resolución"
-      subtitulo="CU-LSS-08"
+      
       rol="alumno"
-      usuario={MOCK.usuario}
+      usuario={nombreAlumno}
     >
       <div style={{ maxWidth: 620, margin: "0 auto" }}>
         <h2 style={{ margin: "0 0 0.35rem", fontSize: 22, fontWeight: 700, color: C.textPrimary }}>

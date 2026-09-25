@@ -258,6 +258,11 @@ function exigirEstadoExpedienteLss(documentoExpediente, mensaje) {
   }
 }
 
+// liberacion_proceso.estado al que se avanza cuando el alumno solicita su
+// constancia de término (CU-LSS-08, Alterno B) — real, confirmado por el
+// usuario (no inventado).
+const ESTADO_SOLICITUD_CONSTANCIA_TERMINO = 'solicitud_constancia_termino';
+
 module.exports = {
   sha256,
   ESTADO_EVALUACION_SOLICITADA,
@@ -276,6 +281,7 @@ module.exports = {
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION,
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO,
+  ESTADO_SOLICITUD_CONSTANCIA_TERMINO,
   FACTORES_EVALUACION,
   VALORES_VALIDOS_FACTOR,
   SUMA_TOTAL_MAXIMA,

@@ -22,7 +22,13 @@ const app = express();
 
 app.set('trust proxy', true);
 
-app.use(cors());
+// exposedHeaders: sin esto, el navegador SÍ recibe el header
+// Content-Disposition en la respuesta, pero JavaScript (fetch) no puede
+// leerlo en peticiones cross-origin — no está en la lista de headers
+// "safelisted" por CORS. Bug real encontrado: las descargas de expediente
+// LSS ponían el nombre real en Content-Disposition pero el frontend nunca
+// podía leerlo, y terminaba guardando el archivo con un nombre genérico.
+app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
 app.use(express.json());
 
 //app.use("/api/ofertas", ofertasRoutes);

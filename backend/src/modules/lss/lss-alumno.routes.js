@@ -13,6 +13,9 @@ const {
   getInfoExpediente,
   postSubirExpedienteLss,
   getDescargarExpedienteLss,
+  getEstadoExpediente,
+  postSolicitarConstancia,
+  postCorregirExpedienteLss,
 } = require('./lss-alumno.controller');
 
 const router = express.Router();
@@ -36,5 +39,10 @@ router.post('/carta-termino/confirmar', requireAuth, requireRole('alumno_asignad
 router.get('/expediente/info', requireAuth, requireRole('alumno_asignado'), getInfoExpediente);
 router.post('/expediente/subir', requireAuth, requireRole('alumno_asignado'), postSubirExpedienteLss);
 router.get('/expediente/descargar', requireAuth, requireRole('alumno_asignado'), getDescargarExpedienteLss);
+
+// CU-LSS-08 — consultar estado de resolución del expediente.
+router.get('/expediente/estado', requireAuth, requireRole('alumno_asignado'), getEstadoExpediente);
+router.post('/expediente/solicitar-constancia', requireAuth, requireRole('alumno_asignado'), postSolicitarConstancia);
+router.post('/expediente/corregir', requireAuth, requireRole('alumno_asignado'), postCorregirExpedienteLss);
 
 module.exports = router;

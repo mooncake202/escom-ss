@@ -25,12 +25,21 @@ const DOCUMENTOS_CONFIG_BASE = [
   },
 ];
 
+// Mismo límite que el backend (lss-alumno.controller.js,
+// LIMITE_ARCHIVO_EXPEDIENTE_LSS_BYTES) — validado aquí también para dar
+// feedback inmediato, antes de siquiera intentar el envío (bug real
+// encontrado con un archivo de 6.9MB que se quedaba colgado sin este check).
+const LIMITE_ARCHIVO_EXPEDIENTE_LSS_BYTES = 1 * 1024 * 1024; // 1 MB por archivo individual.
+
 // RN-LSS-20: solo PDF real (el backend valida magic bytes; esto es solo
 // para no dejar que el alumno intente subir algo que de entrada se sabe
 // que se va a rechazar).
 function validarArchivo(archivo) {
   if (archivo.type !== "application/pdf") {
     return "Solo se permiten archivos en formato PDF.";
+  }
+  if (archivo.size > LIMITE_ARCHIVO_EXPEDIENTE_LSS_BYTES) {
+    return "El archivo excede el tamaño máximo permitido (1 MB por documento).";
   }
   return null;
 }

@@ -3,7 +3,7 @@ const path = require('path');
 const prisma = require('../../lib/prisma');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { descifrarBuffer, cifrarBuffer, generarNombreSeguro } = require('../../lib/fileEncryption');
-const { unirPdfs } = require('../../lib/pdfExpediente');
+const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 const { crearError, validarReportesValidadosSiss } = require('./validators');
 const {
   ESTADO_EVALUACION_SOLICITADA,
@@ -19,6 +19,8 @@ const {
   ESTADO_EXPEDIENTE_EN_REVISION,
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION,
   ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO,
+  ESTADO_SOLICITUD_CONSTANCIA_TERMINO,
   exigirEstadoLiberacion,
   exigirEstadoEvaluacion,
   exigirEstadoCarta,
@@ -477,9 +479,11 @@ async function confirmarRecogida(alumnoUsuarioId) {
 // Reutiliza el mecanismo YA PROBADO de GR (CU-GR-10, subirExpediente en
 // gr.service.js) — unirPdfs de backend/src/lib/pdfExpediente.js (genérico,
 // sin cambios), y el mismo criterio de cifrado/nombre/carpeta que el resto
-// del proyecto. NO reutiliza comprimirPdfGhostscript (GR la usa por su
-// límite de 2MB con compresión en cascada; aquí el límite es 1MB y el
-// usuario no pidió compresión — si el combinado excede, se rechaza).
+// del proyecto. SÍ reutiliza comprimirPdfGhostscript (ampliación confirmada
+// por el usuario tras encontrar el bug de archivos grandes): a diferencia
+// de GR, que hace hasta 2 intentos en cascada (/ebook, luego /screen) sobre
+// su límite de 2MB, aquí es UN SOLO intento con '/ebook' sobre el límite de
+// 1MB — si tras ese único intento sigue superando 1MB, se rechaza.
 //
 // Diseño de estados (confirmado con el usuario): liberacion_proceso.estado
 // se queda fijo en 'expediente_en_revision' durante TODO el sub-ciclo
@@ -592,9 +596,23 @@ async function subirExpedienteLss(alumnoUsuarioId, archivos) {
     throw crearError('No se pudieron combinar los documentos. Verifica que todos sean PDFs válidos.', 500);
   }
 
-  // RN-LSS-25 (1MB, sin compresión — desviación intencional confirmada, no se usa Ghostscript aquí).
+  // RN-LSS-25: si el combinado supera 1MB, se intenta UN SOLO pase de
+  // compresión con Ghostscript ('/ebook', mismo mecanismo que GR pero sin
+  // su cascada a '/screen') antes de rechazar — ampliación confirmada por
+  // el usuario tras el bug de archivos grandes en CU-LSS-07.
   if (pdfUnido.length > LIMITE_EXPEDIENTE_LSS_BYTES) {
-    throw crearError('El expediente combinado supera 1 MB. Reduce el tamaño de tus documentos e intenta de nuevo.', 400, 'EXPEDIENTE_MUY_GRANDE');
+    try {
+      pdfUnido = await comprimirPdfGhostscript(pdfUnido, '/ebook');
+    } catch (err) {
+      console.error('Error al comprimir el expediente LSS con Ghostscript:', err);
+      // Fail-open: si Ghostscript falla, se sigue con el buffer original y
+      // se deja que la validación de tamaño de abajo decida (no se rompe
+      // el flujo por un problema del compresor).
+    }
+  }
+
+  if (pdfUnido.length > LIMITE_EXPEDIENTE_LSS_BYTES) {
+    throw crearError('El expediente combinado supera 1 MB, incluso después de intentar comprimirlo. Reduce el tamaño de tus documentos e intenta de nuevo.', 400, 'EXPEDIENTE_MUY_GRANDE');
   }
 
   const nombreExpediente = nombreExpedienteLss(alumno);
@@ -619,9 +637,14 @@ async function subirExpedienteLss(alumnoUsuarioId, archivos) {
           data: { alumno_id: alumno.boleta, creador_id: alumnoUsuarioId, tipo_documento: 'expediente_lss', fecha_creacion: ahora, estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION, ruta_archivo: rutaRelativa, nombre_expediente: nombreExpediente },
         });
       }
+      // Corrección retroactiva (CU-LSS-08): observaciones_rechazo YA NO se
+      // limpia aquí. Confirmado contra el patrón real de GR
+      // (gr-coordinador.service.js:358) — motivo_rechazo solo se limpia al
+      // APROBAR definitivamente, nunca al reenviar. Se queda visible hasta
+      // que coordinación (CU-LSS-09, no existe todavía) decida.
       await tx.liberacion_proceso.update({
         where: { id: proceso.id },
-        data: { estado: ESTADO_EXPEDIENTE_EN_REVISION, observaciones_rechazo: null },
+        data: { estado: ESTADO_EXPEDIENTE_EN_REVISION },
       });
     });
   } catch (err) {
@@ -661,7 +684,77 @@ async function descargarExpedienteLss(alumnoUsuarioId) {
     throw crearError('El archivo ya no está disponible.', 404);
   }
 
-  return descifrarBuffer(bufferCifrado);
+  // Bug real encontrado: el nombre real (BOLETA_PATERNO_MATERNO_NOMBRE.pdf,
+  // ya generado y guardado en documento.nombre_expediente) nunca se
+  // exponía al frontend — la descarga se guardaba con un nombre genérico.
+  return { buffer: descifrarBuffer(bufferCifrado), nombreExpediente: documentoExpediente.nombre_expediente };
+}
+
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-08: consultar estado del expediente y actuar sobre la resolución
+// (actor: Alumno). NO construye ninguna lógica real de CU-LSS-09
+// (coordinación dictaminando) — solo lee lo que ese CU futuro produzca
+// (simulado por el seed sembrar-dictamen-expediente-prueba.js mientras no
+// exista), y las 2 acciones que le corresponden al alumno sobre eso.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Flujo Principal — consulta pura, sin cambios en BD.
+ */
+async function obtenerEstadoExpediente(alumnoUsuarioId) {
+  const { proceso, documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+  return {
+    estado: estadoExpedienteVisible(documentoExpediente),
+    observacionesRechazo: documentoExpediente?.estado_documento === ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO ? (proceso.observaciones_rechazo ?? null) : null,
+  };
+}
+
+/**
+ * Alterno B — RN: solo se puede solicitar constancia si el expediente
+ * está realmente 'aprobado' (guardia real, no solo visual).
+ */
+async function solicitarConstanciaTermino(alumnoUsuarioId) {
+  const { proceso, documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+
+  if (documentoExpediente?.estado_documento !== ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO) {
+    throw crearError('Tu expediente todavía no ha sido aprobado.', 409);
+  }
+
+  await prisma.liberacion_proceso.update({
+    where: { id: proceso.id },
+    data: { estado: ESTADO_SOLICITUD_CONSTANCIA_TERMINO },
+  });
+
+  emitirResumenActualizadoAlumno(alumnoUsuarioId);
+
+  return { mensaje: 'Solicitud de constancia de término enviada.', estado: ESTADO_SOLICITUD_CONSTANCIA_TERMINO };
+}
+
+/**
+ * Alterno C — "Corregir y reenviar": mismo mecanismo exacto que
+ * corregirExpediente de GR (gr.service.js) — investigado y confirmado
+ * (Paso 1, CU-LSS-08): SÍ hay un cambio real de BD aquí, aunque NO se
+ * toque `documento` (se queda 'rechazado' hasta el reenvío real, que
+ * subirExpedienteLss ya maneja). Solo cambia la FASE
+ * (liberacion_proceso.estado) de vuelta a 'carta_recogida' — la misma
+ * que ya usa CU-LSS-07 — para que la guarda de ruta (RutaProtegida
+ * guardaLSS) permita reingresar a esa pantalla. Sin este cambio real, un
+ * navigate() ciego sería rebotado de inmediato por la guarda, que sigue
+ * viendo liberacion_proceso.estado='expediente_en_revision'.
+ */
+async function corregirExpedienteLss(alumnoUsuarioId) {
+  const { proceso, documentoExpediente } = await resolverParaExpediente(alumnoUsuarioId);
+
+  if (documentoExpediente?.estado_documento !== ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO) {
+    throw crearError('Tu expediente no está en estado de rechazo — no hay nada que corregir.', 409);
+  }
+
+  await prisma.liberacion_proceso.update({
+    where: { id: proceso.id },
+    data: { estado: ESTADO_LIBERACION_CARTA_RECOGIDA },
+  });
+
+  return { mensaje: 'Vuelve a integrar y enviar tu expediente.', estado: ESTADO_LIBERACION_CARTA_RECOGIDA };
 }
 
 module.exports = {
@@ -677,4 +770,7 @@ module.exports = {
   obtenerInfoExpediente,
   subirExpedienteLss,
   descargarExpedienteLss,
+  obtenerEstadoExpediente,
+  solicitarConstanciaTermino,
+  corregirExpedienteLss,
 };

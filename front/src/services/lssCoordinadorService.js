@@ -1,4 +1,5 @@
 import { apiFetch, API_URL } from "./apiClient";
+import { nombreDesdeContentDisposition } from "./descargaUtils";
 
 // CU-LSS-04 — dictaminar evaluación de desempeño (actor: Coordinador).
 
@@ -59,4 +60,54 @@ export async function listarSolicitudesCartaTermino() {
 
 export async function marcarCartaLista(liberacionProcesoId) {
   return apiFetch(`/coordinador/carta-termino/${liberacionProcesoId}/marcar-lista`, { method: "POST" });
+}
+
+// CU-LSS-09 — dictaminar expediente.
+export async function listarExpedientesPendientes() {
+  return apiFetch("/coordinador/expediente/pendientes");
+}
+
+export async function dictaminarExpedienteAprobado(documentoId) {
+  return apiFetch(`/coordinador/expediente/${documentoId}/aprobar`, { method: "POST" });
+}
+
+export async function dictaminarExpedienteRechazado(documentoId, observaciones) {
+  return apiFetch(`/coordinador/expediente/${documentoId}/rechazar`, {
+    method: "POST",
+    body: JSON.stringify({ observaciones }),
+  });
+}
+
+/**
+ * Mismo patrón <a download> ya usado en descargarParaRevision — evita el
+ * bloqueo de pop-up por pérdida de gesto de usuario tras el await.
+ */
+export async function descargarExpediente(documentoId) {
+  const token = localStorage.getItem("token");
+  let res;
+  try {
+    res = await fetch(`${API_URL}/coordinador/expediente/${documentoId}/descargar`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    throw new Error("El servicio no está disponible temporalmente. Intenta de nuevo más tarde.");
+  }
+
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.message || "No se pudo descargar el expediente.");
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  // Bug real encontrado (mismo que en lssAlumnoService.js): sin leer
+  // Content-Disposition, la descarga se guardaba con el nombre genérico
+  // "expediente.pdf" en vez del real (BOLETA_PATERNO_MATERNO_NOMBRE.pdf).
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "expediente.pdf";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

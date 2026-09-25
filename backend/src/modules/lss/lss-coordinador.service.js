@@ -15,6 +15,9 @@ const {
   ESTADO_EVALUACION_DEVUELTA_PARA_CORRECCION,
   ESTADO_CARTA_SOLICITADA,
   ESTADO_CARTA_LISTA_PARA_RECOGER,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO,
+  ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO,
   exigirEstadoCarta,
 } = require('./lss.shared');
 
@@ -430,6 +433,192 @@ async function marcarCartaListaParaRecoger(coordinadorUsuarioId, liberacionProce
   return { mensaje: 'Carta de término marcada como lista para recoger.', estado: ESTADO_CARTA_LISTA_PARA_RECOGER };
 }
 
+// ─────────────────────────────────────────────────────────────
+// CU-LSS-09: dictaminar expediente (actor: Coordinador). Mismo esquema
+// exacto ya usado en CU-LSS-04 (dictaminar evaluación de desempeño) —
+// reutiliza resolverCoordinador/emitirResumenActualizado/notificar ya
+// definidos arriba en este mismo archivo.
+//
+// DECISIÓN CONFIRMADA (corrige una contradicción real de la ficha contra
+// el diseño ya establecido en todo el módulo): la ficha dice que
+// liberacion_proceso.estado debe cambiar a 'expediente_aprobado'/
+// 'expediente_rechazado' — eso ROMPERÍA la guarda de ruta ya construida
+// y verificada en CU-LSS-08 (que depende de que liberacion_proceso.estado
+// se quede fijo en 'expediente_en_revision' durante todo este sub-ciclo,
+// mismo criterio que 'evaluacion_solicitada' en 02→03→04). Aquí SOLO
+// cambia documento.estado_documento y liberacion_proceso.observaciones_rechazo
+// — el cambio real de liberacion_proceso.estado a
+// 'solicitud_constancia_termino' ya lo maneja el ALUMNO en CU-LSS-08
+// (ya construido), no coordinación aquí.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Trae el documento expediente_lss con todo lo necesario para
+ * dictaminar/descargar/notificar: alumno+usuario, profesor+usuario (para
+ * el listado), y liberacion_proceso (para observaciones_rechazo).
+ */
+async function resolverExpediente(documentoId) {
+  const documento = await prisma.documento.findUnique({
+    where: { id: Number(documentoId) },
+    include: {
+      alumno: {
+        include: {
+          usuario: true,
+          solicitud_registro: {
+            include: {
+              oferta: { include: { profesor: { include: { usuario: true } } } },
+              liberacion_proceso: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!documento || documento.tipo_documento !== 'expediente_lss') {
+    throw crearError('Expediente no encontrado.', 404);
+  }
+  return documento;
+}
+
+/**
+ * Guardia de "no modificar ya dictaminado" (mismo criterio de seguridad
+ * ya usado en todo el módulo, aunque la ficha no lo declare explícito
+ * como RN separada) — 409 si el documento ya no está 'en_revision'.
+ */
+function exigirExpedienteEnRevision(documento) {
+  if (documento.estado_documento !== ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION) {
+    throw crearError('Este expediente ya fue dictaminado y no se puede modificar.', 409, 'EXPEDIENTE_YA_DICTAMINADO');
+  }
+}
+
+function alumnoDeExpediente(documento) {
+  return documento.alumno;
+}
+
+function liberacionProcesoDeExpediente(documento) {
+  return documento.alumno.solicitud_registro.liberacion_proceso;
+}
+
+/**
+ * TODOS los expedientes en 'en_revision' — sin filtro de asignación
+ * (RN-LSS-28, mismo criterio que listarEvaluacionesPendientesDictamen).
+ */
+async function listarExpedientesPendientes() {
+  const documentos = await prisma.documento.findMany({
+    where: { tipo_documento: 'expediente_lss', estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION },
+    include: {
+      alumno: {
+        include: {
+          usuario: true,
+          solicitud_registro: {
+            include: { oferta: { include: { profesor: { include: { usuario: true } } } } },
+          },
+        },
+      },
+    },
+    orderBy: { fecha_creacion: 'asc' },
+  });
+
+  return documentos.map((doc) => {
+    const solicitud = doc.alumno.solicitud_registro;
+    return {
+      documentoId: doc.id,
+      boleta: doc.alumno.boleta,
+      nombreCompleto: `${doc.alumno.usuario.nombre} ${doc.alumno.usuario.apellidos}`,
+      profesorNombre: solicitud?.oferta?.profesor
+        ? `${solicitud.oferta.profesor.usuario.nombre} ${solicitud.oferta.profesor.usuario.apellidos}`
+        : null,
+      oferta: solicitud?.oferta?.nombre_proyecto ?? null,
+      nombreExpediente: doc.nombre_expediente,
+      fechaEnvio: doc.fecha_creacion,
+    };
+  });
+}
+
+/**
+ * Coordinación revisa el expediente ANTES de dictaminar — mismo patrón de
+ * descifrado en memoria ya usado en descargarParaRevision (LSS-04).
+ */
+async function descargarExpedienteParaRevision(coordinadorUsuarioId, documentoId) {
+  await resolverCoordinador(coordinadorUsuarioId);
+  const documento = await resolverExpediente(documentoId);
+
+  let bufferCifrado;
+  try {
+    bufferCifrado = fs.readFileSync(path.join(RUTA_BASE_DOCUMENTOS, documento.ruta_archivo));
+  } catch (err) {
+    throw crearError('El archivo ya no está disponible.', 404);
+  }
+
+  // Mismo bug real que en descargarExpedienteLss (alumno): el nombre real
+  // nunca se exponía al frontend.
+  return { buffer: descifrarBuffer(bufferCifrado), nombreExpediente: documento.nombre_expediente };
+}
+
+/**
+ * Flujo Principal — aprueba: documento.estado_documento='aprobado',
+ * limpia observaciones_rechazo previas. liberacion_proceso.estado SIN
+ * CAMBIO (ver nota de diseño arriba).
+ */
+async function dictaminarExpedienteAprobado(coordinadorUsuarioId, documentoId) {
+  const coordinador = await resolverCoordinador(coordinadorUsuarioId);
+  const documento = await resolverExpediente(documentoId);
+  exigirExpedienteEnRevision(documento);
+
+  const proceso = liberacionProcesoDeExpediente(documento);
+
+  await prisma.$transaction([
+    prisma.documento.update({
+      where: { id: documento.id },
+      data: { estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO, aprobado_por_id: coordinador.id },
+    }),
+    prisma.liberacion_proceso.update({
+      where: { id: proceso.id },
+      data: { observaciones_rechazo: null },
+    }),
+  ]);
+
+  const alumnoUsuarioId = alumnoDeExpediente(documento).usuario_id;
+  await notificar(alumnoUsuarioId, 'Coordinación aprobó tu expediente. Ya puedes solicitar tu constancia de término.', '/alumno/estado-resolucion');
+
+  return { mensaje: 'Expediente aprobado correctamente.', estado: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_APROBADO };
+}
+
+/**
+ * Flujo Alterno — rechaza: RN-LSS-29 (observaciones obligatorias),
+ * documento.estado_documento='rechazado', observaciones_rechazo=texto.
+ * liberacion_proceso.estado SIN CAMBIO (ver nota de diseño arriba) — el
+ * alumno vuelve a la fase de formulario (CU-LSS-07) a través de su propia
+ * acción "Corregir y reenviar" (CU-LSS-08, ya construido), no aquí.
+ */
+async function dictaminarExpedienteRechazado(coordinadorUsuarioId, documentoId, observacionesRechazo) {
+  await resolverCoordinador(coordinadorUsuarioId);
+  const documento = await resolverExpediente(documentoId);
+  exigirExpedienteEnRevision(documento);
+
+  if (!observacionesRechazo || !observacionesRechazo.trim()) {
+    throw crearError('Debes indicar las observaciones del rechazo.', 422, 'OBSERVACIONES_REQUERIDAS');
+  }
+
+  const proceso = liberacionProcesoDeExpediente(documento);
+
+  await prisma.$transaction([
+    prisma.documento.update({
+      where: { id: documento.id },
+      data: { estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO },
+    }),
+    prisma.liberacion_proceso.update({
+      where: { id: proceso.id },
+      data: { observaciones_rechazo: observacionesRechazo },
+    }),
+  ]);
+
+  const alumnoUsuarioId = alumnoDeExpediente(documento).usuario_id;
+  await notificar(alumnoUsuarioId, `Coordinación rechazó tu expediente: ${observacionesRechazo}`, '/alumno/estado-resolucion');
+
+  return { mensaje: 'Expediente rechazado.', estado: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO };
+}
+
 module.exports = {
   listarEvaluacionesPendientesDictamen,
   descargarParaRevision,
@@ -437,4 +626,8 @@ module.exports = {
   dictaminarRechazado,
   listarSolicitudesCartaTermino,
   marcarCartaListaParaRecoger,
+  listarExpedientesPendientes,
+  descargarExpedienteParaRevision,
+  dictaminarExpedienteAprobado,
+  dictaminarExpedienteRechazado,
 };

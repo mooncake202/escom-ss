@@ -159,14 +159,44 @@ function postSubirExpedienteLss(req, res) {
 
 async function getDescargarExpedienteLss(req, res) {
   try {
-    const buffer = await lssAlumnoService.descargarExpedienteLss(req.usuario.sub);
+    const { buffer, nombreExpediente } = await lssAlumnoService.descargarExpedienteLss(req.usuario.sub);
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
     return res.status(200).send(buffer);
   } catch (err) {
     const status = err.status || 500;
     const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
     if (status === 500) console.error('Error al descargar expediente LSS:', err);
     return res.status(status).json({ message });
+  }
+}
+
+// ── CU-LSS-08 ─────────────────────────────────────────────────
+
+async function getEstadoExpediente(req, res) {
+  try {
+    const resultado = await lssAlumnoService.obtenerEstadoExpediente(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener estado del expediente LSS:');
+  }
+}
+
+async function postSolicitarConstancia(req, res) {
+  try {
+    const resultado = await lssAlumnoService.solicitarConstanciaTermino(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al solicitar constancia de término:');
+  }
+}
+
+async function postCorregirExpedienteLss(req, res) {
+  try {
+    const resultado = await lssAlumnoService.corregirExpedienteLss(req.usuario.sub);
+    return res.status(200).json(resultado);
+  } catch (err) {
+    return manejarError(err, res, 'Error al corregir expediente LSS:');
   }
 }
 
@@ -183,4 +213,7 @@ module.exports = {
   getInfoExpediente,
   postSubirExpedienteLss,
   getDescargarExpedienteLss,
+  getEstadoExpediente,
+  postSolicitarConstancia,
+  postCorregirExpedienteLss,
 };

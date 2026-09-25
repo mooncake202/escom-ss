@@ -122,7 +122,7 @@ function ListaAlumnos({ alumnos, seleccionado, onSeleccionar, C }) {
 }
 
 // ——— Documentos del expediente ————————————————————————
-function ResumenDocumentos({ alumno, C }) {
+function ResumenDocumentos({ alumno, onDescargar, C }) {
   return (
     <div style={{
       background: C.bgCard,
@@ -142,31 +142,38 @@ function ResumenDocumentos({ alumno, C }) {
         Documentos del expediente
       </p>
 
-      <div style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "10px 12px",
-        borderRadius: RADIUS.md,
-        background: C.bgInput,
-        border: `1px solid ${C.borderSubtle}`,
-      }}>
+      <button
+        onClick={onDescargar}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "10px 12px",
+          borderRadius: RADIUS.md,
+          background: C.bgInput,
+          border: `1px solid ${C.borderSubtle}`,
+          cursor: "pointer",
+          textAlign: "left",
+          fontFamily: "inherit",
+        }}
+      >
         <span style={{ fontSize: 16 }}>📄</span>
         <div>
           <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary }}>
-            Expediente
+            Descargar expediente
           </p>
           <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
             {alumno.expediente}
           </p>
         </div>
-      </div>
+      </button>
     </div>
   );
 }
 
 // ——— Contenido principal según estado del alumno ————
-function VistaEvaluacion({ alumno, estadoAlumno, observaciones, loading, onObservaciones, onAprobar, onRechazar, C }) {
+function VistaEvaluacion({ alumno, estadoAlumno, observaciones, loading, onObservaciones, onAprobar, onRechazar, onDescargar, C }) {
 
   // Sin alumno seleccionado
   if (!alumno) {
@@ -200,7 +207,7 @@ function VistaEvaluacion({ alumno, estadoAlumno, observaciones, loading, onObser
 
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-        <ResumenDocumentos alumno={alumno} C={C} />
+        <ResumenDocumentos alumno={alumno} onDescargar={onDescargar} C={C} />
 
         {/* Observaciones */}
         <div style={{
@@ -358,23 +365,37 @@ export default function EvaluacionExpedienteCoordinacion() {
 
   const {
     alumnos,
+    cargando,
+    error,
     alumnoSeleccionado,
     estadoAlumno,
     observaciones,
     loading,
     seleccionarAlumno,
     setObservaciones,
+    descargar,
     aprobar,
     rechazar,
   } = useEvaluacionExpedienteCoordinacion();
 
+  if (cargando) {
+    return (
+      <DashboardLayout titulo="Evaluación de expediente"  rol="coordinacion" usuario="Coordinación">
+        <p style={{ textAlign: "center", color: C.textMuted, fontSize: 13, paddingTop: "3rem" }}>Cargando...</p>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       titulo="Evaluación de expediente"
-      subtitulo="CU-LSS-09"
+      
       rol="coordinacion"
       usuario="Coordinación"
     >
+      {error && (
+        <p style={{ marginBottom: "1rem", fontSize: 13, color: C.danger }}>{error}</p>
+      )}
       <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
 
         {/* SIDEBAR */}
@@ -456,6 +477,7 @@ export default function EvaluacionExpedienteCoordinacion() {
             onObservaciones={setObservaciones}
             onAprobar={aprobar}
             onRechazar={rechazar}
+            onDescargar={descargar}
             C={C}
           />
 

@@ -34,16 +34,17 @@ export const ESTADO_LSS_A_RUTA = {
   // mientras el alumno todavía no ha enviado su expediente.
   carta_recogida: "/alumno/integracion-expediente",
 
-  // CU-LSS-08 (corrección de alcance: antes apuntaba de vuelta a la propia
-  // pantalla de LSS-07, mezclando responsabilidades) — real: lo escribe
-  // subirExpedienteLss. CU-LSS-07 SOLO integra/envía; consultar el estado
-  // de la revisión/resolución es responsabilidad de CU-LSS-08, que ya
-  // existe como mockup real (EstadoResolucionAlumno.jsx, con guardaLSS) —
-  // se apunta ahí en vez de inventar un placeholder.
+  // CU-LSS-07/08 — real: lo escribe subirExpedienteLss (envío/reenvío) y se
+  // mantiene fijo durante todo el sub-ciclo 07→08→09 (mismo criterio que
+  // 'evaluacion_solicitada' en 02→03→04) — cubre en_revision/aprobado/
+  // rechazado, todos vistos desde CU-LSS-08 (EstadoResolucionAlumno.jsx).
   expediente_en_revision: "/alumno/estado-resolucion",
 
-  // TODO(LSS-10/11): agregar aquí el/los estado(s) reales de constancia de
-  // término cuando ese CU exista. 'constancia_disponible' — mismo caso.
+  // CU-LSS-08 (esta tarea) — real: lo escribe solicitarConstanciaTermino,
+  // al confirmar que el expediente está aprobado. CU-LSS-10 (Consultar
+  // estado de constancia) ya existe como mockup real
+  // (ConsultarEstadoConstanciaTermino, con guardaLSS).
+  solicitud_constancia_termino: "/alumno/consultar-constancia-termino",
 };
 
 /**
