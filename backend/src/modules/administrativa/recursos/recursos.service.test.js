@@ -80,13 +80,17 @@ test('ADM-05: ultimaActualizacion cae en fecha_registro cuando nunca se ha edita
   assert.equal(editado.ultimaActualizacion, editado.fechaActualizacion, 'con edición usa la de edición');
 });
 
-test('ADM-05: el DTO no expone coordinador_id ni inventa una categoría', async () => {
+// `tipo` sí forma parte del DTO desde que existe el enum TipoRecurso: es el código con el que el
+// sistema ubica un recurso puntual (el link de constancia de créditos de CU-GR-01) sin depender de
+// su nombre libre. `categoria` sigue sin existir, y `coordinador_id` sigue sin exponerse.
+test('ADM-05: el DTO expone `tipo` pero no coordinador_id ni una categoría inventada', async () => {
   const { recursos } = await servicio.listar();
   for (const r of recursos) {
     assert.deepEqual(Object.keys(r).sort(), [
-      'fechaActualizacion', 'fechaRegistro', 'id', 'nombre', 'ultimaActualizacion', 'url',
+      'fechaActualizacion', 'fechaRegistro', 'id', 'nombre', 'tipo', 'ultimaActualizacion', 'url',
     ]);
     assert.equal('categoria' in r, false, 'el modelo no tiene categoría');
+    assert.equal('coordinador_id' in r, false, 'no se expone quién lo registró');
   }
 });
 

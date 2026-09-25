@@ -45,12 +45,18 @@ function rolesDe(metodo, path) {
   return [...conRoles.__roles].sort();
 }
 
-test('ADM-05: la LECTURA la comparten alumno asignado, profesor y coordinación', () => {
-  assert.deepEqual(rolesDe('GET', '/'), ['alumno_asignado', 'coordinador', 'profesor']);
+// Regla vigente: la lectura del CATÁLOGO es exclusiva de coordinación. El acceso de alumno asignado
+// y profesor se retiró por decisión explícita (ya no está en la tabla de acciones por rol), tal como
+// documenta recursos.routes.js.
+test('ADM-05: la LECTURA del catálogo es exclusiva de coordinación', () => {
+  assert.deepEqual(rolesDe('GET', '/'), ['coordinador']);
 });
 
-test('ADM-05: el profesor SÍ puede consultar los recursos', () => {
-  assert.ok(rolesDe('GET', '/').includes('profesor'));
+test('ADM-05: ni el profesor ni el alumno asignado pueden consultar el catálogo', () => {
+  const roles = rolesDe('GET', '/');
+  for (const rol of ['profesor', 'alumno_asignado']) {
+    assert.equal(roles.includes(rol), false, `${rol} ya no consulta el catálogo`);
+  }
 });
 
 test('ADM-05: alumno_sin_asignar NO puede consultar los recursos', () => {
@@ -82,9 +88,28 @@ test('ADM-05: ningún alumno ni profesor puede escribir', () => {
   }
 });
 
-test('ADM-05: no existe ninguna ruta sin control de rol', () => {
+// Una sola ruta es pública a propósito: CU-GR-01 la consulta ANTES de que el alumno tenga cuenta,
+// así que no puede exigir rol. Expone únicamente la URL de ese recurso puntual, nunca el catálogo.
+// Se enumera aquí de forma explícita para que cualquier OTRA ruta sin `requireRole` siga fallando.
+const RUTAS_PUBLICAS_POR_DISENO = ['/publico/constancia-creditos'];
+
+test('ADM-05: no existe ninguna ruta sin control de rol, salvo la pública declarada', () => {
   for (const capa of router.stack.filter((c) => c.route)) {
+    if (RUTAS_PUBLICAS_POR_DISENO.includes(capa.route.path)) continue;
     const tieneRoles = capa.route.stack.some((s) => s.handle.__roles);
     assert.ok(tieneRoles, `${capa.route.path} quedó sin requireRole`);
   }
+});
+
+test('ADM-05: la ruta pública existe, es solo GET y no exige rol', () => {
+  const capa = router.stack.find((c) => c.route && c.route.path === '/publico/constancia-creditos');
+  assert.ok(capa, 'la ruta pública de CU-GR-01 debe existir');
+  assert.deepEqual(Object.keys(capa.route.methods), ['get'], 'solo lectura');
+  assert.equal(capa.route.stack.some((s) => s.handle.__roles), false, 'es pública a propósito');
+});
+
+// El catálogo completo NO debe quedar accesible sin autenticación por la puerta de la ruta pública.
+test('ADM-05: la ruta pública no es el catálogo', () => {
+  assert.notEqual('/publico/constancia-creditos', '/');
+  assert.deepEqual(rolesDe('GET', '/'), ['coordinador'], 'el catálogo sigue protegido');
 });

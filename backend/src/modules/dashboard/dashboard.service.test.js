@@ -1,5 +1,11 @@
 // Resumen del dashboard: la parte de reportes del alumno y la característica vigente del
 // profesor. Prisma falso (el servicio usa el prisma global).
+//
+// Llave de prueba ANTES de requerir nada: dashboard.service.js importa los servicios de LSS, que
+// requieren sockets/socket.server.js → lib/jwt.js, y ese último LANZA al cargarse si no encuentra
+// JWT_SECRET. Aquí no se firma ni se verifica ningún token: el valor solo existe para que la cadena
+// de imports pueda resolverse. Mismo patrón que ah-*.service.test.js y los tests de Reportes.
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'secreto-de-pruebas';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
