@@ -1,6 +1,9 @@
 // Constantes del módulo Reportes. No importa nada de AH, GR, ADM ni Ofertas.
 
 const path = require('path');
+// Solo para nombrar el número de renglones del Control de Asistencia en un mensaje de bloqueo. La plantilla es un
+// módulo puro de medidas, sin dependencias propias, así que no introduce ciclo ni carga nada pesado.
+const { TABLA: TABLA_ASISTENCIA } = require('./reportes.plantilla.asistencia');
 
 // Misma carpeta que usa GR para los documentos cifrados: <boleta>/... (documento.ruta_archivo es relativa a ella).
 // Reportes guarda ahí los PDF en <boleta>/Reportes/<uuid>.pdf y la rúbrica del alumno en <boleta>/Rubrica/rubrica.enc.
@@ -113,6 +116,10 @@ function nombreInstitucionalCarrera(codigo) {
 // reporte global.
 const HORAS_MINIMAS_REPORTE_GLOBAL = 480;
 
+// Renglones del Control de Asistencia (página 2): el formato oficial tiene exactamente 24 y no crece. Se toma de la
+// plantilla para que el mensaje de bloqueo nunca contradiga al formato real.
+const FILAS_CONTROL_ASISTENCIA = TABLA_ASISTENCIA.filas.cantidad;
+
 const MOTIVOS_BLOQUEO = Object.freeze({
   SIN_PERIODO_OFICIAL: 'SIN_PERIODO_OFICIAL',
   INICIO_SERVICIO_FIN_DE_SEMANA: 'INICIO_SERVICIO_FIN_DE_SEMANA',
@@ -121,6 +128,9 @@ const MOTIVOS_BLOQUEO = Object.freeze({
   FECHA_FIN_NO_DISPONIBLE: 'FECHA_FIN_NO_DISPONIBLE',
   PERIODO_NO_CERRADO: 'PERIODO_NO_CERRADO',
   SIN_BITACORAS_APROBADAS: 'SIN_BITACORAS_APROBADAS',
+  // Más jornadas contabilizables en el periodo que renglones en el Control de Asistencia. Solo ocurre con datos
+  // inconsistentes; se informa como bloqueo (con mensaje) para no dejar que la preparación lance y tumbe la pantalla.
+  DEMASIADAS_BITACORAS_EN_EL_PERIODO: 'DEMASIADAS_BITACORAS_EN_EL_PERIODO',
   REPORTE_YA_EXISTE: 'REPORTE_YA_EXISTE',
   // Reporte global (CU-REP-07).
   HORAS_INSUFICIENTES: 'HORAS_INSUFICIENTES',
@@ -146,6 +156,9 @@ const MENSAJES_BLOQUEO = Object.freeze({
     'El periodo de este reporte todavía no está disponible para generarse: debe pasar el primer día hábil administrativo posterior a su fecha de término.',
   [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]:
     'No hay bitácoras aprobadas en el periodo de este reporte.',
+  [MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO]:
+    `El periodo de este reporte tiene más de ${FILAS_CONTROL_ASISTENCIA} jornadas registradas y el formato oficial `
+    + 'solo admite ese número. Solicita a coordinación que lo corrija.',
   [MOTIVOS_BLOQUEO.REPORTE_YA_EXISTE]:
     'Ya existe un reporte para este periodo.',
   [MOTIVOS_BLOQUEO.HORAS_INSUFICIENTES]:
@@ -208,6 +221,7 @@ module.exports = {
   TIPO_DOCUMENTO_REPORTE_MENSUAL,
   TIPO_DOCUMENTO_REPORTE_GLOBAL,
   HORAS_MINIMAS_REPORTE_GLOBAL,
+  FILAS_CONTROL_ASISTENCIA,
   ESTADO_DOCUMENTO_VIGENTE,
   TIPO_REVISOR_ALUMNO,
   TIPO_REVISOR_PROFESOR,
