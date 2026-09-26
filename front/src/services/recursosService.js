@@ -19,6 +19,11 @@ export function obtenerUrlSiss() {
   return apiFetch("/recursos/publico/siss");
 }
 
+// CU-GR-05: mismo patrón que SISS — el alumno ya tiene sesión en este punto del flujo.
+export function obtenerUrlSeguroSocial() {
+  return apiFetch("/recursos/publico/seguro-social");
+}
+
 export function crearRecurso({ nombre, url, tipo }) {
   return apiFetch("/recursos", { method: "POST", body: JSON.stringify({ nombre, url, tipo: tipo || null }) });
 }
