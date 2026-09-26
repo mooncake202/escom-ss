@@ -52,7 +52,7 @@ export default function SolicitarRegistroOferta() {
           background: C.warningSoft, border: `1px solid ${C.warning}`,
           color: C.warning, fontSize: 13,
         }}>
-          <strong>Aviso:</strong> Los cupos solicitados son una referencia inicial sujeta a los cupos que dispone.
+          Los cupos que indiques no pueden superar tu capacidad total de alumnos. Si los excedes, la oferta no podrá registrarse.
         </div>
 
         {errores.general && (
@@ -98,7 +98,7 @@ export default function SolicitarRegistroOferta() {
             error={errores.cuposTotal}
           >
             <input type="number" name="cuposTotal" value={form.cuposTotal} onChange={handleChange}
-              min={2} placeholder="Ej. 3"
+              min={2} max={6} placeholder="Ej. 3"
               style={{ ...inputStyle(!!errores.cuposTotal), maxWidth: 160 }} />
           </CampoFormulario>
 

@@ -53,7 +53,7 @@ export function FormCorreccion({ oferta, form, errores, onChange, onToggleCarrer
         <div>
           <label style={labelStyle}>Cupos <span style={{ color: C.danger }}>*</span></label>
           <input
-            name="cupos" type="number" min={2}
+            name="cupos" type="number" min={2} max={6}
             value={form.cupos} onChange={onChange}
             style={inputStyle(!!errores.cupos)}
           />

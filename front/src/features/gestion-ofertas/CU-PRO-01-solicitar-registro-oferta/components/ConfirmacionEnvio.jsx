@@ -35,7 +35,7 @@ export function ConfirmacionEnvio({ tipo = "proyecto", onVolver }) {
       </span>
       <p style={{ margin: "0 0 2rem", fontSize: 13, color: C.textDisabled }}>
         {esProyecto
-          ? "Coordinación revisará la solicitud y recibirás una notificación. Los cupos indicados están sujetos a tus cupos disponibles."
+          ? "Coordinación revisará la solicitud y recibirás una notificación. Los cupos indicados no exceden tu capacidad total de alumnos."
           : "Coordinación revisará la solicitud y recibirás una notificación. La oferta no será visible para los alumnos hasta entonces."}
       </p>
       <button onClick={onVolver} style={{
