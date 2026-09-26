@@ -3,7 +3,7 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useOfertaIndividual } from "./hooks/useOfertaIndividual";
 import { ConfirmacionEnvio } from "./components/ConfirmacionEnvio";
-import { CarreraSelector } from "./components/CarreraSelector";
+import { CarreraSelector } from "@/features/gestion-ofertas/components/CarreraSelector";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 
 export default function SolicitarOfertaIndividual() {

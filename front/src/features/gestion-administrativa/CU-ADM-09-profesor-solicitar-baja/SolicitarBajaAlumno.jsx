@@ -1,17 +1,12 @@
 import { useTheme, RADIUS }           from "@/themes/colors";
 import { DashboardLayout }             from "@/components/layout/DashboardLayout";
+import { etiquetaCarrera }             from "@/features/gestion-administrativa/utils/carreraLabel";
 import { AlumnoSelectorCard }          from "./components/AlumnoSelectorCards";
 import { BajaForm }                    from "./components/BajaForm";
 import { AmonestacionForm }            from "./components/AmonestacionForm";
 import { SeguimientoBaja }             from "./components/SeguimientoBaja";
 import { useBajaAlumnoProfesor }       from "./hooks/useSolicitarBajaAlumno";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
-
-const CARRERA_LABEL = {
-  ISC: "Ing. Sistemas Computacionales",
-  IA:  "Inteligencia Artificial",
-  LCD: "Lic. Ciencia de Datos",
-};
 
 export default function BajaAlumnoProfesor() {
   const { C } = useTheme();
@@ -80,7 +75,7 @@ export default function BajaAlumnoProfesor() {
                 {alumnoSeleccionado.nombre}
               </p>
               <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>
-                {CARRERA_LABEL[alumnoSeleccionado.carrera] ?? alumnoSeleccionado.carrera} · {alumnoSeleccionado.boleta}
+                {etiquetaCarrera(alumnoSeleccionado.carrera)} · {alumnoSeleccionado.boleta}
               </p>
             </div>
           </div>

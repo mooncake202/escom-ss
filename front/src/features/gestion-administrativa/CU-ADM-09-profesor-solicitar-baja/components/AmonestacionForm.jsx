@@ -1,10 +1,5 @@
 import { RADIUS } from "@/themes/colors";
-
-const CARRERA_LABEL = {
-  ISC: "Ing. Sistemas Computacionales",
-  IA:  "Inteligencia Artificial",
-  LCD: "Lic. Ciencia de Datos",
-};
+import { etiquetaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 export function AmonestacionForm({ alumno, observaciones, errores, onObservacionesChange, onSubmit, onCancelar, enviando, C }) {
   return (
@@ -32,7 +27,7 @@ export function AmonestacionForm({ alumno, observaciones, errores, onObservacion
             {alumno.nombre}
           </p>
           <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>
-            {CARRERA_LABEL[alumno.carrera] ?? alumno.carrera} · {alumno.boleta}
+            {etiquetaCarrera(alumno.carrera)} · {alumno.boleta}
           </p>
         </div>
         <span style={{

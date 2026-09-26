@@ -1,11 +1,5 @@
 import { RADIUS } from "@/themes/colors";
-
-// Las tres carreras que admite el catálogo de alumnos.
-const CARRERA_LABEL = {
-  ISC: "Ing. Sistemas Computacionales",
-  IIA: "Ing. Inteligencia Artificial",
-  LCD: "Lic. Ciencia de Datos",
-};
+import { etiquetaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 // El celular NO se muestra: es un dato personal de un tercero y el backend ni siquiera lo envía.
 //
@@ -46,7 +40,7 @@ export function IntegranteCard({ integrante, C }) {
             {integrante.nombreCompleto}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>
-            {CARRERA_LABEL[integrante.carrera] ?? integrante.carrera} · {integrante.boleta}
+            {etiquetaCarrera(integrante.carrera)} · {integrante.boleta}
           </p>
         </div>
       </div>

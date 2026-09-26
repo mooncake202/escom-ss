@@ -7,12 +7,3 @@ export function formatearAvance(creditos) {
   return `${Number.isInteger(n) ? n : n.toFixed(2)}%`;
 }
 
-// Las tres carreras del catálogo.
-const CARRERA_LABEL = {
-  ISC: "Ing. Sistemas Computacionales",
-  IIA: "Ing. Inteligencia Artificial",
-  LCD: "Lic. Ciencia de Datos",
-};
-
-// Si apareciera una clave fuera del catálogo se muestra tal cual, sin inventar un nombre.
-export const etiquetaCarrera = (carrera) => CARRERA_LABEL[carrera] ?? carrera ?? "—";

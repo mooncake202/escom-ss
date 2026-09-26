@@ -17,9 +17,16 @@ const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
 // global. La prueba de consistencia afirma que ambos coinciden.
 const ESTADOS_LSS_LIBERAN_CUPO = ['solicitud_constancia_termino', 'constancia_disponible'];
 
+// Catálogo real de la tabla `carrera` en esta rama: la sigla de Inteligencia Artificial es IIA.
+const CATALOGO_CARRERAS = Object.freeze([
+  { id: 1, nombre: 'ISC' },
+  { id: 2, nombre: 'LCD' },
+  { id: 3, nombre: 'IIA' },
+]);
+
 const clonar = (x) => (x === null || x === undefined ? x : JSON.parse(JSON.stringify(x)));
 
-function crearBd({ profesores = [], ofertas = [], ocupantes = [] } = {}) {
+function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CATALOGO_CARRERAS } = {}) {
   const bd = {
     profesores: profesores.map((p) => ({ ...p })),
     ofertas: ofertas.map((o) => ({ ...o })),
@@ -28,6 +35,11 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [] } = {}) {
     // Bitácora de escrituras, para afirmar qué se tocó y qué NO.
     escrituras: [],
     locks: [],
+    // Catálogo de `carrera`. Por defecto el real de esta rama: el código de IA es IIA.
+    carreras: carreras.map((c) => ({ ...c })),
+    // Cada `nombre.in` que llegó a carrera.findMany, para afirmar que el valor se normalizó ANTES
+    // de la búsqueda (es el único punto donde se puede observar el alias en acción).
+    consultasCarrera: [],
     // Gancho para simular una escritura concurrente: se dispara DENTRO del $queryRaw del lock, antes
     // de leer cupos_totales. Permite probar que la guarda compara contra el valor leído bajo el lock
     // y no contra una lectura anterior. Se asigna sobre `bd` desde el test.
@@ -56,7 +68,13 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [] } = {}) {
 
   const modelos = {
     profesor: {
-      findUnique: async ({ where }) => clonar(profesorDe(where.id)),
+      // Se busca por `id` (capacidad, reenvío) o por `usuario_id` (el controller resuelve el perfil
+      // desde el JWT). Mismo criterio que caracteristicas.fakes.js.
+      findUnique: async ({ where }) => clonar(
+        where.id !== undefined
+          ? profesorDe(where.id)
+          : bd.profesores.find((p) => p.usuario_id === where.usuario_id) ?? null,
+      ),
       update: async ({ where, data }) => {
         const p = profesorDe(where.id);
         Object.assign(p, data);
@@ -71,6 +89,18 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [] } = {}) {
       },
       // Aplica el `where` COMPLETO, incluido el estado de origen: así el test ejercita la guarda CAS
       // real y no una versión permisiva.
+      create: async ({ data }) => {
+        const fila = { id: Math.max(0, ...bd.ofertas.map((o) => o.id)) + 1, ...data };
+        bd.escrituras.push({ modelo: 'oferta_servicio', operacion: 'create', data });
+        bd.ofertas.push(fila);
+        return clonar(fila);
+      },
+      update: async ({ where, data }) => {
+        const o = bd.ofertas.find((x) => x.id === where.id);
+        Object.assign(o, data);
+        bd.escrituras.push({ modelo: 'oferta_servicio', operacion: 'update', where, data });
+        return clonar(o);
+      },
       updateMany: async ({ where, data }) => {
         const afectadas = bd.ofertas.filter((o) => (
           o.id === where.id
@@ -87,6 +117,23 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [] } = {}) {
       count: async ({ where }) => bd.ocupantes
         .filter((o) => o.profesorId === where.oferta.profesor_id && ocupaCupo(o)).length,
     },
+    carrera: {
+      findMany: async ({ where = {}, orderBy } = {}) => {
+        const buscados = where.nombre?.in;
+        bd.consultasCarrera.push(buscados ? [...buscados] : null);
+        let filas = buscados ? bd.carreras.filter((c) => buscados.includes(c.nombre)) : [...bd.carreras];
+        if (orderBy?.nombre === 'asc') filas = [...filas].sort((a, b) => a.nombre.localeCompare(b.nombre));
+        return clonar(filas);
+      },
+    },
+    deseo_de_carrera: {
+      deleteMany: async ({ where }) => {
+        bd.escrituras.push({ modelo: 'deseo_de_carrera', operacion: 'deleteMany', where });
+        return { count: 0 };
+      },
+    },
+    // Solo para que la emisión por socket (fail-open) no tenga que tocar la BD real.
+    coordinador: { findMany: async () => [] },
   };
 
   const prisma = new Proxy({}, {
@@ -150,5 +197,6 @@ const ocupantes = (profesorId, n) => Array.from(
 );
 
 module.exports = {
-  crearBd, profesor, ofertaProyecto, ofertaIndividual, ocupantes, ESTADOS_LSS_LIBERAN_CUPO,
+  crearBd, profesor, ofertaProyecto, ofertaIndividual, ocupantes,
+  CATALOGO_CARRERAS, ESTADOS_LSS_LIBERAN_CUPO,
 };

@@ -3,6 +3,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { useExpedienteCoordinacion } from "./hooks/useExpediente";
 import { FichaAlumno, BarraProgreso, ListaPorEtapas, VisorDocumento } from "./components/ExpedientePanel";
+import { codigoCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 // CU-ADM-13 — Coordinación consulta el expediente documental de cualquier alumno asignado.
 // Solo lectura: no sube, no aprueba, no elimina. (Subir la carta firmada es CU-ADM-14.)
@@ -41,7 +42,7 @@ function AlumnoItem({ alumno, activo, onClick, C }) {
           {alumno.nombreCompleto}
         </p>
         <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
-          {alumno.boleta} · {alumno.carrera}
+          {alumno.boleta} · {codigoCarrera(alumno.carrera)}
         </p>
       </div>
 

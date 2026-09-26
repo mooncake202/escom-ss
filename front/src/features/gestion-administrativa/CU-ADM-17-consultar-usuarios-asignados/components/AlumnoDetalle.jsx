@@ -1,5 +1,6 @@
 import { RADIUS } from "@/themes/colors";
-import { formatearAvance, etiquetaCarrera } from "./formato";
+import { formatearAvance } from "./formato";
+import { etiquetaCarrera, codigoCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 const CAMPO = ({ label, value, C }) => (
   <div style={{
@@ -57,7 +58,7 @@ export function AlumnoDetalle({ detalle, mostrarProfesor, C }) {
               fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: RADIUS.full,
               background: C.bgInput, border: `1px solid ${C.borderDefault}`, color: C.textMuted,
             }}>
-              {alumno.carrera}
+              {codigoCarrera(alumno.carrera)}
             </span>
             <span style={{
               fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: RADIUS.full,

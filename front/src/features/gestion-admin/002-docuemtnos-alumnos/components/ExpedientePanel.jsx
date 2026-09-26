@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTheme, GRADIENTS, RADIUS } from "@/themes/colors";
 import { iconoDeDocumento, etiquetaResponsable, formatFecha, porcentajeProgreso } from "../hooks/expedienteData";
+import { etiquetaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 // Piezas compartidas por la vista del alumno y la de coordinación (CU-ADM-13).
 // SOLO CONSULTA: aquí no hay subir, aprobar, rechazar ni eliminar.
@@ -32,7 +33,7 @@ export function FichaAlumno({ alumno, C }) {
         {alumno.nombreCompleto}
       </p>
       <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>
-        {alumno.boleta} · {alumno.carrera}
+        {alumno.boleta} · {etiquetaCarrera(alumno.carrera)}
       </p>
 
       {datos.length > 0 && (

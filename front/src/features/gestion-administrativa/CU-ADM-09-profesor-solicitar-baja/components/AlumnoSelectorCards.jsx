@@ -1,10 +1,5 @@
 import { RADIUS } from "@/themes/colors";
-
-const CARRERA_LABEL = {
-  ISC: "Ing. Sistemas Computacionales",
-  IA:  "Inteligencia Artificial",
-  LCD: "Lic. Ciencia de Datos",
-};
+import { etiquetaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 // `tieneBajaPendiente` lo calcula el backend; las faltas son datos reales de AH y solo informan.
 //
@@ -51,7 +46,7 @@ export function AlumnoSelectorCard({ alumno, seleccionado, onSeleccionar, C }) {
             {alumno.nombre}
           </p>
           <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>
-            {CARRERA_LABEL[alumno.carrera] ?? alumno.carrera} · {alumno.boleta}
+            {etiquetaCarrera(alumno.carrera)} · {alumno.boleta}
           </p>
         </div>
 

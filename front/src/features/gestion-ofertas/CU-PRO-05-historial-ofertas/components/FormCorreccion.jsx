@@ -1,10 +1,5 @@
 import { useTheme, RADIUS } from "@/themes/colors";
-
-const CARRERAS = [
-  { key: "ISC", label: "ISC — Ingeniería en Sistemas Computacionales" },
-  { key: "LCD", label: "LCD — Licenciatura en Ciencia de Datos" },
-  { key: "IIA", label: "IIA — Ingeniería en Inteligencia Artificial" },
-];
+import { CarreraSelector } from "@/features/gestion-ofertas/components/CarreraSelector";
 
 export function FormCorreccion({ oferta, form, errores, onChange, onToggleCarrera, onCancelar, onSubmit }) {
   const { C } = useTheme();
@@ -63,25 +58,11 @@ export function FormCorreccion({ oferta, form, errores, onChange, onToggleCarrer
 
       <div style={{ padding: "0.875rem", borderRadius: RADIUS.md, background: C.bgInput, border: `1px solid ${C.borderDefault}` }}>
         <p style={{ ...labelStyle, marginBottom: 8 }}>Perfil de carrera deseado</p>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-          {CARRERAS.map(({ key, label }) => {
-            const checked = form.carreras?.includes(key);
-            return (
-              <label key={key} style={{
-                display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-                padding: "6px 8px", borderRadius: RADIUS.md,
-                background: checked ? C.accentSoft : "transparent",
-                border: `1px solid ${checked ? C.accent : "transparent"}`,
-              }}>
-                <input
-                  type="checkbox" checked={checked} onChange={() => onToggleCarrera(key)}
-                  style={{ accentColor: C.accent, width: 14, height: 14, cursor: "pointer" }}
-                />
-                <span style={{ fontSize: 12, color: checked ? C.textPrimary : C.textMuted }}>{label}</span>
-              </label>
-            );
-          })}
-        </div>
+        <CarreraSelector
+          value={form.carreras ?? []}
+          onToggle={onToggleCarrera}
+          error={errores.carreras}
+        />
       </div>
 
       <div style={{ display: "flex", gap: "0.625rem" }}>

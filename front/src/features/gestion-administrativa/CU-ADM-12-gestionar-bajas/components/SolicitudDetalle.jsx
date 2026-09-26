@@ -1,6 +1,7 @@
 import { RADIUS } from "@/themes/colors";
 import { ESTADO_CONFIG, ORIGEN_LABEL, fechaLegible } from "./estadosBaja";
 import { BotonVerPdf, VisorPdf } from "@/features/gestion-reportes/compartido/VisorPdf";
+import { codigoCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 function Dato({ etiqueta, children, C }) {
   return (
@@ -41,7 +42,7 @@ export function SolicitudDetalle({
           </span>
         </div>
         <p style={{ margin: 0, fontSize: 12, color: C.textMuted }}>
-          {alumno.boleta} · {alumno.carrera} · {alumno.correo}
+          {alumno.boleta} · {codigoCarrera(alumno.carrera)} · {alumno.correo}
         </p>
       </div>
 
