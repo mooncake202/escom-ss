@@ -6,6 +6,7 @@ const {
   ofertaPuedeRecibirAlumno,
   contarCuposOcupados,
   obtenerSolicitudesOcupandoOfertas,
+  bloquearProfesor,
   ESTADOS_LSS_LIBERAN_CUPO,
 } = require('../../lib/cupos');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
@@ -189,26 +190,55 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
 
     await validarCapacidadParaTramitarOferta(oferta.profesor_id);
 
-    // Condicionado a que SIGA pendiente_revision en el instante de escribir — cierra la ventana
-    // de carrera entre el chequeo de arriba y este update: si otro coordinador ya decidió sobre
-    // esta misma oferta mientras se validaba, count=0 y no se aplica ningún cambio.
-    const { count } = await prisma.oferta_servicio.updateMany({
-      where: { id: ofertaId, estado_oferta: 'pendiente_revision' },
-      data: {
-        estado_oferta: 'aprobada',
-        motivo_rechazo: null,
-        programa_SISS: programaSISS,
-        nombre_SISS: actividadSISS,
-        coordinador_id: coordinadorId,
-      },
-    });
+    // El tope de la oferta se fijó al crearla o reenviarla contra la capacidad de ESE momento, pero
+    // una característica aprobada por ADM puede haberla bajado mientras la oferta esperaba revisión
+    // (Características baja cupos_totales sin tocar jamás oferta_servicio, por diseño). Así que la
+    // invariante cupos_ofertados <= cupos_totales se revalida aquí, con el valor vigente.
+    await prisma.$transaction(async (tx) => {
+      // PRIMERA sentencia de la transacción: SELECT ... FOR UPDATE sobre la fila del profesor, el
+      // mismo patrón de GR, Bajas y Características. Devuelve cupos_totales leído bajo el lock, de
+      // modo que ninguna aprobación de característica pueda colarse entre leer y comparar.
+      const profesorBloqueado = await bloquearProfesor(oferta.profesor_id, tx);
 
-    if (count === 0) {
-      throw Object.assign(
-        new Error('Esta oferta ya fue revisada por otro coordinador mientras la consultabas.'),
-        { status: 409 }
-      );
-    }
+      // Solo proyecto: una oferta individual tiene cupos_ofertados NULL y 1 lugar fijo, nunca puede
+      // exceder la capacidad por su propio tamaño. Se exige entero para que un NULL/undefined no
+      // entre a la comparación.
+      if (oferta.tipo_oferta === 'proyecto' && Number.isInteger(oferta.cupos_ofertados)) {
+        if (oferta.cupos_ofertados > profesorBloqueado.cupos_totales) {
+          // 409 y la oferta se queda en pendiente_revision: rechazarla es una decisión del
+          // coordinador, con su propio motivo, no un efecto automático de esta guarda.
+          throw Object.assign(
+            new Error(
+              `No se puede aprobar: la oferta ofrece ${oferta.cupos_ofertados} cupos y la capacidad `
+              + `actual del profesor es de ${profesorBloqueado.cupos_totales}. El profesor debe `
+              + `corregir la oferta, o puedes rechazarla indicando el motivo.`
+            ),
+            { status: 409 }
+          );
+        }
+      }
+
+      // Condicionado a que SIGA pendiente_revision en el instante de escribir — cierra la ventana
+      // de carrera entre el chequeo de arriba y este update: si otro coordinador ya decidió sobre
+      // esta misma oferta mientras se validaba, count=0 y no se aplica ningún cambio.
+      const { count } = await tx.oferta_servicio.updateMany({
+        where: { id: ofertaId, estado_oferta: 'pendiente_revision' },
+        data: {
+          estado_oferta: 'aprobada',
+          motivo_rechazo: null,
+          programa_SISS: programaSISS,
+          nombre_SISS: actividadSISS,
+          coordinador_id: coordinadorId,
+        },
+      });
+
+      if (count === 0) {
+        throw Object.assign(
+          new Error('Esta oferta ya fue revisada por otro coordinador mientras la consultabas.'),
+          { status: 409 }
+        );
+      }
+    });
 
     const actualizada = await prisma.oferta_servicio.findUnique({ where: { id: ofertaId } });
 
