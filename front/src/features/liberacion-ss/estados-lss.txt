@@ -1,0 +1,118 @@
+ESTADOS DEL MODULO LSS (Liberacion de Servicio Social)
+========================================================
+
+1) liberacion_proceso.estado (ESTADO MACRO)
+--------------------------------------------
+Este campo es el que usa la guarda de ruta (RutaProtegida guardaLSS) para decidir a que pantalla mandar al alumno. Solo cambia en puntos concretos del flujo, nunca en cada micro-accion.
+
+Estado: (sin proceso / null)
+Disparador: Alumno cumple requisitos y dispara "Iniciar evaluacion" en CU-LSS-01
+Pasa a: evaluacion_solicitada
+
+Estado: evaluacion_solicitada
+Disparador: Se mantiene fijo durante todo el sub-ciclo CU-LSS-02 -> 03 -> 04 (solicitud enviada, profesor evalua/rechaza/corrige, coordinador dictamina). El detalle fino de en que parte del sub-ciclo va esta en evaluacion_desempeno.estado, no aqui.
+Pasa a: carta_recogida (cuando el alumno confirma que ya recogio su carta de termino, CU-LSS-05)
+
+Estado: carta_recogida
+Disparador: Alumno confirma recogida de carta de termino (CU-LSS-05). Tambien es el estado en el que el alumno sube su expediente (CU-LSS-07) antes de enviarlo.
+Pasa a: expediente_en_revision (cuando el alumno envia el expediente completo en CU-LSS-07)
+
+Estado: expediente_en_revision
+Disparador: Se mantiene fijo durante todo el sub-ciclo CU-LSS-07 -> 08 -> 09 (expediente enviado, coordinador revisa/rechaza/aprueba). El detalle fino vive en documento.estado_documento (expediente_lss), no aqui. Si el coordinador rechaza, el estado NO cambia, sigue en expediente_en_revision (el alumno ve el rechazo via documento.estado_documento='rechazado' + observaciones_rechazo); si el alumno corrige y reenvia (CU-LSS-08), regresa primero a carta_recogida (vuelve a la fase de subir expediente) y luego a expediente_en_revision otra vez al reenviar.
+Pasa a: solicitud_constancia_termino (cuando el expediente ya esta aprobado y el alumno solicita su constancia, CU-LSS-08/10)
+
+Estado: solicitud_constancia_termino
+Disparador: Alumno solicita constancia de termino una vez que su expediente esta aprobado (parte de CU-LSS-08/10)
+Pasa a: constancia_disponible (cuando coordinacion envia el mensaje con el link de la constancia, CU-LSS-11 — este es el UNICO punto donde COORDINACION mueve liberacion_proceso.estado directamente, por decision explicita de apegarse a la documentacion)
+
+Estado: constancia_disponible
+Disparador: Coordinador envia el mensaje con el enlace de descarga (CU-LSS-11)
+Pasa a: (estado final del proceso, no hay mas transiciones)
+
+Nota: liberacion_proceso tambien tiene el campo observaciones_rechazo (texto libre) que se usa tanto para el rechazo de expediente (CU-LSS-09) como en general para mostrarle al alumno el motivo cuando algo se rechaza; se limpia (null) solo cuando el coordinador aprueba, nunca al reenviar.
+
+Nota 2: constancia ya NO es un documento subido — es liberacion_proceso.mensaje_constancia_termino (texto libre con un link), por la correccion de arquitectura de CU-LSS-10/11.
+
+
+2) evaluacion_desempeno.estado (SUB-CICLO, CU-LSS-02/03/04)
+--------------------------------------------------------------
+Este campo vive dentro del sub-ciclo mientras liberacion_proceso.estado se queda fijo en evaluacion_solicitada.
+
+Estado: solicitada
+Disparador: Alumno solicita su evaluacion de desempeno (CU-LSS-02)
+Pasa a: pendiente_dictamen (si el profesor registra la evaluacion con documento firmado, CU-LSS-03) o rechazada_por_siss (si el profesor la rechaza sin generar documento, CU-LSS-03 alterno)
+
+Estado: pendiente_dictamen
+Disparador: Profesor registra/firma la evaluacion con su rubrica (CU-LSS-03)
+Pasa a: aprobado_coordinador (si coordinador aprueba, CU-LSS-04) o devuelta_para_correccion (si coordinador rechaza, CU-LSS-04 — unico camino de rechazo real: siempre dirigido al profesor, nunca al alumno)
+
+Estado: rechazada_por_siss
+Disparador: Profesor rechaza la solicitud sin generar documento (CU-LSS-03 alterno; no requiere que el profesor tenga rubrica registrada)
+Pasa a: (el alumno puede reenviar la solicitud, CU-LSS-02, lo que la regresa a solicitada)
+
+Estado: devuelta_para_correccion
+Disparador: Coordinador rechaza el dictamen (CU-LSS-04, unico camino de rechazo, dirigido al profesor)
+Pasa a: pendiente_dictamen (cuando el profesor corrige y reenvia, CU-LSS-03 "corregirYReenviar")
+
+Estado: aprobado_coordinador
+Disparador: Coordinador aprueba el dictamen (CU-LSS-04) — aqui tambien se agrega el sello de coordinacion sobre el PDF ya firmado por el profesor
+Pasa a: (fin del sub-ciclo; el alumno puede avanzar a solicitar su carta de termino, CU-LSS-05)
+
+
+3) carta_termino.estado (SUB-CICLO, CU-LSS-05/06)
+-----------------------------------------------------
+Catalogo real de 3 valores (ojo: es "recogida", no "recibida").
+
+Estado: solicitada
+Disparador: Se crea automaticamente cuando la evaluacion queda aprobada por coordinacion (fin del sub-ciclo 2)
+Pasa a: lista_para_recoger (cuando coordinacion marca que la carta ya esta lista, CU-LSS-06)
+
+Estado: lista_para_recoger
+Disparador: Coordinador marca la carta como lista para recoger (CU-LSS-06)
+Pasa a: recogida (cuando el alumno confirma que ya la recogio en persona, CU-LSS-05)
+
+Estado: recogida
+Disparador: Alumno confirma recogida de su carta de termino (CU-LSS-05) — este es el mismo evento que dispara el cambio de liberacion_proceso.estado a carta_recogida
+Pasa a: (fin del sub-ciclo)
+
+
+4) documento.estado_documento (para expediente_lss y evaluacion_desempeno)
+------------------------------------------------------------------------------
+La tabla generica "documento" se reutiliza para varios tipos; el estado_documento tiene distinto significado/ciclo segun el tipo_documento.
+
+--- tipo_documento = expediente_lss (CU-LSS-07/08/09) ---
+
+Estado: en_revision
+Disparador: Alumno envia su expediente completo (CU-LSS-07)
+Pasa a: rechazado (si coordinador rechaza, CU-LSS-09) o aprobado (si coordinador aprueba, CU-LSS-09)
+
+Estado: rechazado
+Disparador: Coordinador rechaza el expediente con observaciones (CU-LSS-09)
+Pasa a: en_revision (cuando el alumno corrige y reenvia el conjunto completo, CU-LSS-08 — mismo patron que GR: el boton "corregir" primero regresa liberacion_proceso.estado a carta_recogida, y al reenviar via CU-LSS-07 se vuelve a poner documento en en_revision)
+
+Estado: aprobado
+Disparador: Coordinador aprueba el expediente (CU-LSS-09)
+Pasa a: (fin de este sub-ciclo; habilita que el alumno solicite su constancia de termino)
+
+--- tipo_documento = evaluacion_desempeno (CU-LSS-02/03/04) ---
+
+Estado: pendiente
+Disparador: Se crea el documento cuando el profesor registra/firma la evaluacion (CU-LSS-03)
+Pasa a: aprobado (cuando coordinador aprueba el dictamen y sella el documento, CU-LSS-04)
+
+Nota: el bug encontrado y corregido fue que dictaminarAprobado (evaluacion) dejaba el documento en 'pendiente' en vez de actualizarlo a 'aprobado' — ya corregido con 1 linea, igual que el flujo paralelo de expediente.
+
+Nota importante: cuando el profesor rechaza por SISS (CU-LSS-03 alterno, evaluacion_desempeno.estado='rechazada_por_siss') NO se crea ningun documento — evaluacion_desempeno.documento_id se queda null (por eso ese campo es opcional/nullable en el schema).
+
+
+5) Constancia de termino (CU-LSS-10/11) — YA NO es un documento
+--------------------------------------------------------------------
+Ya no pasa por la tabla "documento" ni tiene su propio estado_documento. Es simplemente:
+
+liberacion_proceso.mensaje_constancia_termino: texto libre escrito por el coordinador (incluye normalmente un link a serviciosocialconstancias.ipn.mx). Se muestra al alumno tal cual, de forma segura (nunca como HTML crudo, solo se detectan y convierten URLs en links reales).
+
+El "estado" de este sub-ciclo es simplemente el macro-estado liberacion_proceso.estado:
+- solicitud_constancia_termino = el alumno ya pidio su constancia, esperando que coordinacion envie el mensaje
+- constancia_disponible = coordinacion ya envio el mensaje con el link, el alumno ya lo puede ver/usar
+
+Coordinador puede corregir el mensaje despues de enviado (sobreescribe el mismo campo de texto), sin que eso cambie el estado macro (se queda en constancia_disponible).
