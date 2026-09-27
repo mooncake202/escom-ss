@@ -329,3 +329,237 @@ test('PRO-02: una notificación caída no convierte en éxito una decisión que 
   assert.deepEqual(notificaciones, []);
   assert.deepEqual(emitidos, [], 'sin decisión no hay aviso');
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Se persiste el MISMO valor recortado que se validó
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Antes, las tres entradas de texto se validaban con trim() pero se guardaban crudas: un valor con
+// espacios alrededor quedaba en BD con ellos. Mismo criterio que ya aplicamos en CU-PRO-01.
+
+test('PRO-02: aprobar persiste Programa y Actividad SISS recortados', async () => {
+  montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 5 })] });
+
+  await servicio.decidirOferta(1, 'aprobar', null, {
+    programaSISS: '   ESCOM - S.S. PARA APOYO AL AREA ACADÉMICA   ',
+    actividadSISS: '\n \t AYUDAR ACTIVIDADES PROPIAS DEL DEPARTAMENTO \t \n',
+  }, COORDINADOR_ID);
+
+  assert.equal(ofertaEnBd().programa_SISS, 'ESCOM - S.S. PARA APOYO AL AREA ACADÉMICA');
+  assert.equal(ofertaEnBd().nombre_SISS, 'AYUDAR ACTIVIDADES PROPIAS DEL DEPARTAMENTO');
+  // El texto que le llega al profesor usa el mismo valor recortado.
+  assert.match(notificaciones[0].mensaje, /Programa SISS: "ESCOM - S\.S\. PARA APOYO AL AREA ACADÉMICA"/);
+  assert.match(notificaciones[0].mensaje, /Actividad SISS: "AYUDAR ACTIVIDADES PROPIAS DEL DEPARTAMENTO"/);
+});
+
+test('PRO-02: rechazar persiste el motivo recortado', async () => {
+  montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+
+  await servicio.decidirOferta(1, 'rechazar', '   Faltan actividades concretas.   ', null, COORDINADOR_ID);
+
+  assert.equal(ofertaEnBd().motivo_rechazo, 'Faltan actividades concretas.');
+  assert.match(notificaciones[0].mensaje, /Motivo: Faltan actividades concretas\.$/);
+});
+
+// El espacio interior es contenido del usuario y no se toca: solo se recortan los extremos.
+test('PRO-02: solo se recortan los extremos, el espacio interior se conserva', async () => {
+  montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+
+  await servicio.decidirOferta(1, 'rechazar', '  Faltan  dos  cosas  ', null, COORDINADOR_ID);
+
+  assert.equal(ofertaEnBd().motivo_rechazo, 'Faltan  dos  cosas');
+});
+
+// Lo que quedaba vacío tras recortar sigue rechazándose, con el mismo mensaje y el mismo 400.
+const SOLO_ESPACIOS = ['', '   ', '\t', '\n', '  \t \n  '];
+
+test('PRO-02: Programa SISS solo con espacios sigue dando 400 y no aprueba', async () => {
+  for (const valor of SOLO_ESPACIOS) {
+    montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 5 })] });
+    await assert.rejects(
+      servicio.decidirOferta(1, 'aprobar', null, { programaSISS: valor, actividadSISS: 'Actividad Y' }, COORDINADOR_ID),
+      (err) => err.status === 400 && /Programa SISS/.test(err.message),
+      JSON.stringify(valor),
+    );
+    assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  }
+});
+
+test('PRO-02: Actividad SISS solo con espacios sigue dando 400 y no aprueba', async () => {
+  for (const valor of SOLO_ESPACIOS) {
+    montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 5 })] });
+    await assert.rejects(
+      servicio.decidirOferta(1, 'aprobar', null, { programaSISS: 'Programa X', actividadSISS: valor }, COORDINADOR_ID),
+      (err) => err.status === 400 && /Actividad SISS/.test(err.message),
+      JSON.stringify(valor),
+    );
+    assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  }
+});
+
+test('PRO-02: motivo de rechazo solo con espacios sigue dando 400 y no rechaza', async () => {
+  for (const valor of SOLO_ESPACIOS) {
+    montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+    await assert.rejects(
+      servicio.decidirOferta(1, 'rechazar', valor, null, COORDINADOR_ID),
+      (err) => err.status === 400 && /motivo del rechazo/.test(err.message),
+      JSON.stringify(valor),
+    );
+    assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  }
+});
+
+// El motivo sigue SIN máximo funcional: esta corrección no introduce ningún tope.
+test('PRO-02: el motivo recortado sigue sin tope de longitud', async () => {
+  montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+
+  await servicio.decidirOferta(1, 'rechazar', `   ${'x'.repeat(20000)}   `, null, COORDINADOR_ID);
+
+  assert.equal(ofertaEnBd().motivo_rechazo.length, 20000, 'se recortan los extremos, no el contenido');
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// La capacidad del profesor se revalida BAJO el lock (individual y proyecto)
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Dos reglas distintas e independientes, que estas pruebas no mezclan:
+//   · GENERAL (ambos tipos):   ocupados < cupos_totales
+//   · ADICIONAL (solo proyecto): cupos_ofertados <= cupos_totales
+//
+// El fail-fast de antes de la transacción se conserva, pero puede quedar obsoleto: el único flujo
+// que sube los ocupados es la aceptación de un alumno (CU-GR-02), que serializa sobre la misma fila
+// de `profesor`. Por eso el conteo se repite bajo el FOR UPDATE.
+
+test('PRO-02: individual con el profesor LLENO no se aprueba — 409 y sigue pendiente_revision', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaIndividual()],
+    ocupados: ocupantes(1, 3),
+  });
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409 && /capacidad máxima/.test(err.message),
+  );
+
+  assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  assert.equal(ofertaEnBd().cupos_disponibles, 1, 'no se toca el lugar de la individual');
+});
+
+test('PRO-02: individual con ocupados > cupos_totales da el 409 de inconsistencia', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaIndividual()],
+    ocupados: ocupantes(1, 4),
+  });
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409 && /inconsistencia/.test(err.message),
+  );
+
+  assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+});
+
+test('PRO-02: la individual también bloquea la fila del profesor ANTES de cualquier escritura', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaIndividual()],
+    ocupados: ocupantes(1, 1),
+  });
+
+  await servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID);
+
+  assert.equal(bd.locks.length, 1, 'el FOR UPDATE no es exclusivo de las ofertas de proyecto');
+  assert.equal(bd.locks[0].profesorId, 1);
+  assert.equal(bd.locks[0].escriturasPrevias, 0, 'el lock precede a toda escritura');
+});
+
+// ── La ventana que esta corrección cierra ───────────────────────────────────
+// `antesDelLock` simula que un alumno es aceptado (CU-GR-02) justo entre el fail-fast y el lock:
+// el profesor pasa de 2/3 a 3/3. Sin la revalidación bajo el lock, ambas aprobaban con un 200.
+
+test('PRO-02: individual — el profesor se llena DENTRO de la ventana → 409, no se aprueba', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaIndividual()],
+    ocupados: ocupantes(1, 2),
+  });
+  bd.antesDelLock = () => { bd.ocupantes.push(...ocupantes(1, 1)); };
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409 && /capacidad máxima/.test(err.message),
+  );
+
+  assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  assert.equal(bd.locks.length, 1, 'el fail-fast pasó: la carrera la caza la revalidación bajo lock');
+});
+
+test('PRO-02: proyecto — el profesor se llena DENTRO de la ventana → 409, no se aprueba', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaProyecto({ cuposOfertados: 3 })],
+    ocupados: ocupantes(1, 2),
+  });
+  bd.antesDelLock = () => { bd.ocupantes.push(...ocupantes(1, 1)); };
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409 && /capacidad máxima/.test(err.message),
+  );
+
+  assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  // Lo caza la regla GENERAL, no la de proyecto: aquí cupos_ofertados (3) <= cupos_totales (3) SÍ se
+  // cumple, así que la regla adicional no tenía nada que objetar. Son dos límites independientes.
+  assert.ok(ofertaEnBd().cupos_ofertados <= 3, 'la regla de proyecto se cumplía');
+  assert.equal(bd.locks.length, 1, 'el fail-fast pasó: la carrera la caza la revalidación bajo lock');
+});
+
+// El fail-fast sigue existiendo: con el profesor lleno de entrada, ni se abre la transacción.
+test('PRO-02: el fail-fast previo se conserva — profesor lleno de entrada no llega al lock', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaProyecto({ cuposOfertados: 3 })],
+    ocupados: ocupantes(1, 3),
+  });
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409 && /capacidad máxima/.test(err.message),
+  );
+
+  assert.deepEqual(bd.locks, [], 'no se abrió transacción ni se tomó el FOR UPDATE');
+  assert.deepEqual(bd.escrituras, []);
+});
+
+// ── Con capacidad disponible, nada cambia ──────────────────────────────────
+
+test('PRO-02: con capacidad libre, la individual se aprueba con normalidad', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 3 })],
+    ofertas: [ofertaIndividual()],
+    ocupados: ocupantes(1, 2),
+  });
+
+  const resultado = await servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID);
+
+  assert.equal(resultado.estado_oferta, 'aprobada');
+  assert.equal(ofertaEnBd().cupos_ofertados, null);
+  assert.equal(ofertaEnBd().cupos_disponibles, 1);
+});
+
+// Las dos reglas son independientes: con 2 ocupados de 5 y 5 ofertados, ambas se cumplen por
+// separado. Si estuvieran combinadas (2 + 5 > 5) esto fallaría.
+test('PRO-02: con capacidad libre, el proyecto se aprueba si cumple su propia regla de cupos_ofertados', async () => {
+  montar({
+    profesores: [profesor({ cuposTotales: 5 })],
+    ofertas: [ofertaProyecto({ cuposOfertados: 5 })],
+    ocupados: ocupantes(1, 2),
+  });
+
+  const resultado = await servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID);
+
+  assert.equal(resultado.estado_oferta, 'aprobada', 'ocupados(2)<totales(5) Y ofertados(5)<=totales(5)');
+  assert.equal(ofertaEnBd().cupos_ofertados, 5, 'el tope de la oferta no se recorta');
+});

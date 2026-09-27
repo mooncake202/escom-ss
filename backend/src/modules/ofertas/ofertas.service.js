@@ -189,13 +189,22 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
   if (decision === 'aprobar') {
     const { programaSISS, actividadSISS } = datosAprobacion || {};
 
-    if (!programaSISS || !programaSISS.trim()) {
+    // Se valida y se persiste el MISMO valor recortado, igual que en CU-PRO-01: antes se validaba
+    // con trim() pero se guardaba la cadena cruda, así que un valor con espacios alrededor quedaba
+    // en BD con ellos. `textoObligatorioRecortado` cubre además el caso no-cadena, que antes
+    // reventaba en `.trim()` y salía como 500.
+    const programaLimpio = textoObligatorioRecortado(programaSISS);
+    const actividadLimpia = textoObligatorioRecortado(actividadSISS);
+
+    if (!programaLimpio) {
       throw Object.assign(new Error('Debes seleccionar el Programa SISS antes de aprobar.'), { status: 400 });
     }
-    if (!actividadSISS || !actividadSISS.trim()) {
+    if (!actividadLimpia) {
       throw Object.assign(new Error('Debes seleccionar la Actividad SISS antes de aprobar.'), { status: 400 });
     }
 
+    // Fail-fast: con el profesor ya lleno no vale la pena abrir una transacción ni tomar el lock.
+    // No sustituye a la revalidación de abajo — la de aquí puede quedar obsoleta en microsegundos.
     await validarCapacidadParaTramitarOferta(oferta.profesor_id);
 
     // El tope de la oferta se fijó al crearla o reenviarla contra la capacidad de ESE momento, pero
@@ -208,7 +217,32 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
       // modo que ninguna aprobación de característica pueda colarse entre leer y comparar.
       const profesorBloqueado = await bloquearProfesor(oferta.profesor_id, tx);
 
-      // Solo proyecto: una oferta individual tiene cupos_ofertados NULL y 1 lugar fijo, nunca puede
+      // REGLA GENERAL (individual Y proyecto): el profesor debe conservar capacidad. Se recalcula
+      // AQUÍ, bajo el lock, y no solo en el fail-fast de arriba: el único flujo que sube los
+      // ocupados es la aceptación de un alumno (CU-GR-02), que serializa sobre esta misma fila de
+      // `profesor`. Mientras el lock esté tomado, ese conteo no puede crecer, así que el valor es
+      // firme hasta el commit. Sin esto, un alumno aceptado entre el fail-fast y la escritura dejaba
+      // aprobar una oferta de un profesor ya lleno.
+      //
+      // Es una regla DISTINTA e INDEPENDIENTE de la de proyecto que viene después: esta compara
+      // ocupados contra cupos_totales; la otra compara cupos_ofertados contra cupos_totales. No se
+      // suman ni se combinan — son dos límites separados por diseño.
+      const ocupados = await contarCuposOcupados(oferta.profesor_id, tx);
+
+      if (ocupados > profesorBloqueado.cupos_totales) {
+        throw Object.assign(
+          new Error('La capacidad actual del profesor presenta una inconsistencia.'),
+          { status: 409 }
+        );
+      }
+      if (ocupados === profesorBloqueado.cupos_totales) {
+        throw Object.assign(
+          new Error('El profesor ha alcanzado su capacidad máxima de alumnos.'),
+          { status: 409 }
+        );
+      }
+
+      // REGLA ADICIONAL, solo proyecto: una oferta individual tiene cupos_ofertados NULL y 1 lugar fijo, nunca puede
       // exceder la capacidad por su propio tamaño. Se exige entero para que un NULL/undefined no
       // entre a la comparación.
       if (oferta.tipo_oferta === 'proyecto' && Number.isInteger(oferta.cupos_ofertados)) {
@@ -234,8 +268,8 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
         data: {
           estado_oferta: 'aprobada',
           motivo_rechazo: null,
-          programa_SISS: programaSISS,
-          nombre_SISS: actividadSISS,
+          programa_SISS: programaLimpio,
+          nombre_SISS: actividadLimpia,
           coordinador_id: coordinadorId,
         },
       });
@@ -259,7 +293,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
       await crearNotificacion({
         usuarioId: oferta.profesor.usuario_id,
         tipo: 'success',
-        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue aprobada. Programa SISS: "${programaSISS}" · Actividad SISS: "${actividadSISS}" (validados por coordinación).`,
+        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue aprobada. Programa SISS: "${programaLimpio}" · Actividad SISS: "${actividadLimpia}" (validados por coordinación).`,
         rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
       });
     } catch (err) {
@@ -279,13 +313,16 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
   }
 
   if (decision === 'rechazar') {
-    if (!motivoRechazo || motivoRechazo.trim() === '') {
+    // Mismo criterio que en la rama de aprobación: se persiste el valor recortado que se validó.
+    const motivoLimpio = textoObligatorioRecortado(motivoRechazo);
+
+    if (!motivoLimpio) {
       throw Object.assign(new Error('Debes capturar el motivo del rechazo.'), { status: 400 });
     }
 
     const { count } = await prisma.oferta_servicio.updateMany({
       where: { id: ofertaId, estado_oferta: 'pendiente_revision' },
-      data: { estado_oferta: 'rechazada', motivo_rechazo: motivoRechazo, coordinador_id: coordinadorId },
+      data: { estado_oferta: 'rechazada', motivo_rechazo: motivoLimpio, coordinador_id: coordinadorId },
     });
 
     if (count === 0) {
@@ -304,7 +341,7 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
       await crearNotificacion({
         usuarioId: oferta.profesor.usuario_id,
         tipo: 'urgente',
-        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue rechazada. Motivo: ${motivoRechazo}`,
+        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue rechazada. Motivo: ${motivoLimpio}`,
         rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
       });
     } catch (err) {
