@@ -252,12 +252,19 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
 
     await invalidarCacheOfertas();
 
-    await crearNotificacion({
-      usuarioId: oferta.profesor.usuario_id,
-      tipo: 'success',
-      mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue aprobada. Programa SISS: "${programaSISS}" · Actividad SISS: "${actividadSISS}" (validados por coordinación).`,
-      rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
-    });
+    // Fail-open, igual que el socket de abajo y que el resto de los avisos del proyecto (REP,
+    // Bajas, Características): la decisión ya está confirmada en BD, así que un fallo al notificar
+    // se registra pero NUNCA la invalida ni la hace parecer fallida con un 500.
+    try {
+      await crearNotificacion({
+        usuarioId: oferta.profesor.usuario_id,
+        tipo: 'success',
+        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue aprobada. Programa SISS: "${programaSISS}" · Actividad SISS: "${actividadSISS}" (validados por coordinación).`,
+        rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
+      });
+    } catch (err) {
+      console.error('Error al crear la notificación de oferta aprobada:', err.message);
+    }
 
     try {
       emitirAUsuario(oferta.profesor.usuario_id, 'oferta:decidida', {
@@ -292,12 +299,17 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
 
     await invalidarCacheOfertas();
 
-    await crearNotificacion({
-      usuarioId: oferta.profesor.usuario_id,
-      tipo: 'urgente',
-      mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue rechazada. Motivo: ${motivoRechazo}`,
-      rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
-    });
+    // Fail-open, igual que en la rama de aprobación: el rechazo ya está confirmado en BD.
+    try {
+      await crearNotificacion({
+        usuarioId: oferta.profesor.usuario_id,
+        tipo: 'urgente',
+        mensaje: `Tu oferta "${oferta.nombre_proyecto}" fue rechazada. Motivo: ${motivoRechazo}`,
+        rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
+      });
+    } catch (err) {
+      console.error('Error al crear la notificación de oferta rechazada:', err.message);
+    }
 
     try {
       emitirAUsuario(oferta.profesor.usuario_id, 'oferta:decidida', {

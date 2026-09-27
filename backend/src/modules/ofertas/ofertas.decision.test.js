@@ -39,7 +39,17 @@ const fingir = (ruta, exports) => {
 };
 
 fingir(rutaRedis, { del: async () => {} });
-fingir(rutaNotificaciones, { crearNotificacion: async (n) => { notificaciones.push(n); } });
+
+// Gancho para simular que la notificación persistente falla DESPUÉS de que la decisión ya se
+// confirmó: se asigna desde el test y se limpia en `montar`. Mismo recurso que `bd.antesDelLock`
+// del fake de prisma.
+let fallaNotificacion = null;
+fingir(rutaNotificaciones, {
+  crearNotificacion: async (n) => {
+    if (fallaNotificacion) throw fallaNotificacion;
+    notificaciones.push(n);
+  },
+});
 fingir(rutaSocket, {
   emitirAUsuario: (usuarioId, evento, datos) => { emitidos.push({ usuarioId, evento, datos }); },
   emitirATodosLosCoordinadores: () => {},
@@ -60,6 +70,7 @@ function montar({ profesores = [profesor()], ofertas = [], ocupados = [] } = {})
   prismaActual = creada.prisma;
   notificaciones.length = 0;
   emitidos.length = 0;
+  fallaNotificacion = null;
   return bd;
 }
 
@@ -225,4 +236,96 @@ test('PRO-02: profesor con la capacidad llena sigue siendo rechazado por la vali
   assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
   // Falla antes de la transacción: no llega a tomar el lock.
   assert.deepEqual(bd.locks, []);
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// La notificación es un efecto secundario FAIL-OPEN
+// ════════════════════════════════════════════════════════════════════════════
+//
+// La decisión se confirma dentro de la transacción; la notificación persistente y el socket vienen
+// después. Si la notificación falla, la decisión YA está escrita: no puede revertirse ni reportarse
+// como fallida. Mismo criterio que REP (`avisarUsuario`), ADM/Bajas (`avisarAlAlumno`) y
+// ADM/Características (`avisarAlProfesor`).
+
+test('PRO-02: aprobar con notificación exitosa → se aprueba, se notifica y se emite', async () => {
+  montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 5 })] });
+
+  const resultado = await servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID);
+
+  assert.equal(resultado.estado_oferta, 'aprobada');
+  assert.equal(notificaciones.length, 1);
+  assert.equal(notificaciones[0].usuarioId, 10);
+  assert.equal(notificaciones[0].tipo, 'success');
+  assert.equal(emitidos.length, 1);
+  assert.deepEqual(emitidos[0].datos, { ofertaId: 1, resultado: 'aprobada' });
+});
+
+test('PRO-02: aprobar con la notificación caída → la aprobación SIGUE siendo exitosa', async () => {
+  montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 5 })] });
+  fallaNotificacion = new Error('la tabla notificacion no responde');
+
+  const resultado = await servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID);
+
+  // No lanza: antes de la corrección, esta llamada rechazaba y el coordinador veía un 500.
+  assert.equal(resultado.estado_oferta, 'aprobada');
+  assert.deepEqual(notificaciones, [], 'la notificación no se persistió');
+
+  // La decisión ya confirmada NO se revierte ni cambia.
+  assert.equal(ofertaEnBd().estado_oferta, 'aprobada');
+  assert.equal(ofertaEnBd().programa_SISS, DATOS_APROBACION.programaSISS);
+  assert.equal(ofertaEnBd().nombre_SISS, DATOS_APROBACION.actividadSISS);
+  assert.equal(ofertaEnBd().coordinador_id, COORDINADOR_ID);
+  assert.equal(ofertaEnBd().motivo_rechazo, null);
+
+  // El resto de los efectos secundarios continúa: el socket sí se emite.
+  assert.equal(emitidos.length, 1);
+  assert.deepEqual(emitidos[0].datos, { ofertaId: 1, resultado: 'aprobada' });
+});
+
+test('PRO-02: rechazar con notificación exitosa → se rechaza, se notifica y se emite', async () => {
+  montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+
+  const resultado = await servicio.decidirOferta(1, 'rechazar', 'Faltan actividades concretas.', null, COORDINADOR_ID);
+
+  assert.equal(resultado.estado_oferta, 'rechazada');
+  assert.equal(notificaciones.length, 1);
+  assert.equal(notificaciones[0].tipo, 'urgente');
+  assert.match(notificaciones[0].mensaje, /fue rechazada/);
+  assert.equal(emitidos.length, 1);
+  assert.deepEqual(emitidos[0].datos, { ofertaId: 1, resultado: 'rechazada' });
+});
+
+test('PRO-02: rechazar con la notificación caída → el rechazo SIGUE siendo exitoso', async () => {
+  montar({ ofertas: [ofertaProyecto({ cuposOfertados: 3 })] });
+  fallaNotificacion = new Error('la tabla notificacion no responde');
+
+  const resultado = await servicio.decidirOferta(1, 'rechazar', 'Faltan actividades concretas.', null, COORDINADOR_ID);
+
+  assert.equal(resultado.estado_oferta, 'rechazada');
+  assert.deepEqual(notificaciones, []);
+
+  // La decisión ya confirmada NO se revierte ni cambia.
+  assert.equal(ofertaEnBd().estado_oferta, 'rechazada');
+  assert.equal(ofertaEnBd().motivo_rechazo, 'Faltan actividades concretas.');
+  assert.equal(ofertaEnBd().coordinador_id, COORDINADOR_ID);
+
+  assert.equal(emitidos.length, 1);
+  assert.deepEqual(emitidos[0].datos, { ofertaId: 1, resultado: 'rechazada' });
+});
+
+// El fail-open es POSTERIOR a las validaciones: lo que debe fallar antes de escribir sigue
+// fallando, y en ese caso no se notifica nada porque no hubo decisión.
+test('PRO-02: una notificación caída no convierte en éxito una decisión que debe fallar', async () => {
+  montar({ profesores: [profesor({ cuposTotales: 5 })], ofertas: [ofertaProyecto({ cuposOfertados: 8 })] });
+  fallaNotificacion = new Error('la tabla notificacion no responde');
+
+  await assert.rejects(
+    servicio.decidirOferta(1, 'aprobar', null, DATOS_APROBACION, COORDINADOR_ID),
+    (err) => err.status === 409,
+    'la guarda de capacidad sigue rechazando',
+  );
+
+  assert.equal(ofertaEnBd().estado_oferta, 'pendiente_revision');
+  assert.deepEqual(notificaciones, []);
+  assert.deepEqual(emitidos, [], 'sin decisión no hay aviso');
 });
