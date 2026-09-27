@@ -86,6 +86,15 @@ async function listarPerfilesDisponibles() {
 
 // CU-PRO-01: Solicitar registro
 
+// Texto obligatorio recortado: devuelve el valor sin espacios sobrantes, o null si no es una
+// cadena con contenido. Evita que una llamada directa a la API guarde "   " como nombre: el
+// frontend ya recorta, pero el backend no puede confiar en eso.
+function textoObligatorioRecortado(valor) {
+  if (typeof valor !== 'string') return null;
+  const limpio = valor.trim();
+  return limpio === '' ? null : limpio;
+}
+
 async function calcularCuposDisponibles(profesorId) {
   const profesor = await prisma.profesor.findUnique({
     where: { id: profesorId },
@@ -479,7 +488,10 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
 
   const { nombre_proyecto, descripcion_actividades, tipo_oferta, cupos_ofertados, carreras } = datos;
 
-  if (!nombre_proyecto || !descripcion_actividades || !tipo_oferta) {
+  const nombreLimpio = textoObligatorioRecortado(nombre_proyecto);
+  const descripcionLimpia = textoObligatorioRecortado(descripcion_actividades);
+
+  if (!nombreLimpio || !descripcionLimpia || !tipo_oferta) {
     throw Object.assign(new Error('Faltan campos obligatorios.'), { status: 400 });
   }
   if (!['individual', 'proyecto'].includes(tipo_oferta)) {
@@ -502,8 +514,8 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
   await validarCapacidadParaTramitarOferta(profesorId, true);
 
   let dataActualizada = {
-    nombre_proyecto,
-    descripcion_actividades,
+    nombre_proyecto: nombreLimpio,
+    descripcion_actividades: descripcionLimpia,
     tipo_oferta,
     estado_oferta: 'pendiente_revision',
     motivo_rechazo: null,
@@ -709,6 +721,7 @@ async function revisarConclusionAutomatica() {
 }
 
 module.exports = {
+  textoObligatorioRecortado,
   listarOfertasDisponibles,
   listarPerfilesDisponibles,
   calcularCuposDisponibles,

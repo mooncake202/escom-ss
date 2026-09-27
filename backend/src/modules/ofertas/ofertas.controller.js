@@ -1,5 +1,5 @@
 const ofertasService = require('./ofertas.service');
-const { emitirATodosLosCoordinadores } = ofertasService;
+const { emitirATodosLosCoordinadores, textoObligatorioRecortado } = ofertasService;
 const prisma = require('../../lib/prisma');
 
 async function getOfertas(req, res) {
@@ -50,7 +50,10 @@ async function solicitarRegistroOferta(req, res) {
       });
     }
 
-    if (!nombre_proyecto || !descripcion_actividades || !tipo_oferta) {
+    const nombreLimpio = textoObligatorioRecortado(nombre_proyecto);
+    const descripcionLimpia = textoObligatorioRecortado(descripcion_actividades);
+
+    if (!nombreLimpio || !descripcionLimpia || !tipo_oferta) {
       return res.status(400).json({ message: 'Faltan campos obligatorios.' });
     }
 
@@ -63,8 +66,8 @@ async function solicitarRegistroOferta(req, res) {
     }
 
     let dataOferta = {
-      nombre_proyecto,
-      descripcion_actividades,
+      nombre_proyecto: nombreLimpio,
+      descripcion_actividades: descripcionLimpia,
       tipo_oferta,
       estado_oferta: 'pendiente_revision',
       fecha_registro: new Date(),
