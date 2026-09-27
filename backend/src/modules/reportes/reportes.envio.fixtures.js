@@ -23,7 +23,7 @@ function crearBdEnvio(opciones = {}) {
   const {
     usuarioId = 7,
     rubrica = null,
-    carrera = 'IIA',
+    carrera = 'IA',
     correoPersonal = 'ana.garcia@example.com',
     programa = 'Programa SISS de prueba',
     fechaFin = '2026-05-14', // fin del periodo oficial (null = sin fecha de término)

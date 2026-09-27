@@ -6,6 +6,7 @@ import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/servi
 import { useHistorialOfertas } from "./hooks/useHistorialOfertas";
 import { EstatusBadge } from "./components/EstatusBadge";
 import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
+import { etiquetaPresentacion } from "@/features/gestion-ofertas/utils/carreraPresentacion";
 import { OfertaCard } from "./components/OfertaCard";
 import { FormCorreccion } from "./components/FormCorreccion";
 import { CerrarOfertaPanel } from "../CU-PRO-04-gestionar-estado-oferta/components/CerrarOfertaPanel";
@@ -271,7 +272,7 @@ export default function HistorialOfertas() {
                             <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                               {seleccionada.carreras.map(c => (
                                 <span key={c} style={{ fontSize: 13, color: C.textMuted }}>
-                                  {{ ISC: "ISC — Ingeniería en Sistemas Computacionales", LCD: "LCD — Licenciatura en Ciencia de Datos", IIA: "IIA — Ingeniería en Inteligencia Artificial" }[c] || c}
+                                  {etiquetaPresentacion(c)}
                                 </span>
                               ))}
                             </div>

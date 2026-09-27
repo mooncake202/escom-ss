@@ -4,7 +4,7 @@ import { useTheme, GRADIENTS, RADIUS, SHADOWS } from "@/themes/colors";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { useCartaCompromisoFirmada, MAX_MB } from "./hooks/useCartaCompromisoFirmada";
 import { formatFechaHora, formatFechaLarga } from "./hooks/cartaCompromisoData";
-import { codigoCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
+import { siglaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 // CU-ADM-14 — Coordinación registra la carta compromiso firmada que el alumno entregó
 // presencialmente durante el Registro. Datos reales; el diseño es el original.
@@ -90,7 +90,7 @@ function AlumnoItem({ alumno, activo, onClick, C }) {
           {alumno.nombreCompleto}
         </p>
         <p style={{ margin: 0, fontSize: 11, color: C.textDisabled }}>
-          {alumno.boleta} · {codigoCarrera(alumno.carrera)}
+          {alumno.boleta} · {siglaCarrera(alumno.carrera)}
         </p>
       </div>
 
@@ -159,7 +159,7 @@ function PanelDetalle({ alumno, hook, C }) {
           <div style={{ flex: 1, minWidth: 0 }}>
             <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.textPrimary }}>{alumno.nombreCompleto}</h2>
             <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textDisabled }}>
-              {alumno.boleta} · {codigoCarrera(alumno.carrera)}
+              {alumno.boleta} · {siglaCarrera(alumno.carrera)}
             </p>
           </div>
           <EstadoBadge enviada={alumno.carta.enviada} />

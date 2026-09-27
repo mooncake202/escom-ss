@@ -11,7 +11,7 @@ function crearBdReporte(opciones = {}) {
   const {
     usuarioId = 7,
     rubrica = null,
-    carrera = 'IIA',
+    carrera = 'IA',
     correoPersonal = 'ana.garcia@example.com',
     programa = 'Programa SISS de prueba',
     profesorUsuario = { nombre: 'LUIS', apellidos: 'TORRES VEGA' },

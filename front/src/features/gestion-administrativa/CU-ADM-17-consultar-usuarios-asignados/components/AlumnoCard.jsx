@@ -1,6 +1,6 @@
 import { RADIUS } from "@/themes/colors";
 import { formatearAvance } from "./formato";
-import { codigoCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
+import { siglaCarrera } from "@/features/gestion-administrativa/utils/carreraLabel";
 
 export function AlumnoCard({ alumno, onSeleccionar, C }) {
   return (
@@ -43,7 +43,7 @@ export function AlumnoCard({ alumno, onSeleccionar, C }) {
             fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: RADIUS.full,
             background: C.bgInput, border: `1px solid ${C.borderDefault}`, color: C.textMuted,
           }}>
-            {codigoCarrera(alumno.carrera)}
+            {siglaCarrera(alumno.carrera)}
           </span>
           {/* Avance académico, NO horas de servicio social. */}
           <span style={{

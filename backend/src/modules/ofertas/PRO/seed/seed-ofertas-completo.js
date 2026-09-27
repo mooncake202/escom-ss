@@ -23,7 +23,9 @@ const PASSWORD_PLANO = '12345678';
 // Capacidad base de todo profesor; su total es CUPOS_BASE + incremento de su característica vigente.
 const CUPOS_BASE = 3;
 
-const CARRERAS = ['ISC', 'LCD', 'IIA'];
+// Códigos LÓGICOS del catálogo. El de Inteligencia Artificial es IA: `IIA` es solo la sigla con
+// la que el frontend la muestra, nunca un valor persistido.
+const CARRERAS = ['ISC', 'LCD', 'IA'];
 
 // El catálogo de características NO se define aquí: su única fuente de verdad es
 // backend/src/lib/seedCaracteristicas.js. Este seed solo lee las que necesita.

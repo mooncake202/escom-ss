@@ -97,19 +97,26 @@ const TIPOS_EVENTO_NO_LABORABLE = Object.freeze([TIPO_EVENTO_INHABIL, TIPO_EVENT
 // México es UTC-6 todo el año (sin horario de verano desde 2022).
 const DESFASE_MEXICO_HORAS = 6;
 
-// Nombre institucional por código de carrera (alumno.carrera).
+// Nombre institucional por código de carrera (alumno.carrera). Las claves son los códigos LÓGICOS:
+// los que viven en `carrera.nombre` y en `alumno.carrera`. El de Inteligencia Artificial es IA.
+//
+// `IIA` NO es un código lógico: es la sigla con la que esa carrera se le MUESTRA al usuario, y vive
+// en el frontend. Aquí solo se devuelve el nombre institucional largo, que es el que imprime el PDF.
 const CARRERAS_NOMBRE_INSTITUCIONAL = Object.freeze({
   ISC: 'Ingeniería en Sistemas Computacionales',
   LCD: 'Licenciatura en Ciencia de Datos',
-  IIA: 'Ingeniería en Inteligencia Artificial',
+  IA: 'Ingeniería en Inteligencia Artificial',
 });
 
-// Códigos que el registro de esta rama aún guarda con otro nombre. El correcto es IIA (ya corregido en otra rama);
-// se retira el alias cuando el catálogo deje de emitirlo.
-const CARRERAS_ALIAS_LEGADO = Object.freeze({ IA: 'IIA' });
+// Entrada LEGADO tolerada: bases que todavía guardan `IIA` como valor persistido. No es una carrera
+// distinta — resuelve al mismo nombre institucional que IA. Se retira cuando ninguna base lo emita.
+const CARRERAS_ALIAS_LEGADO = Object.freeze({ IIA: 'IA' });
 
 function nombreInstitucionalCarrera(codigo) {
-  return CARRERAS_NOMBRE_INSTITUCIONAL[CARRERAS_ALIAS_LEGADO[codigo] ?? codigo] ?? null;
+  // `hasOwn` y no `??`: con acceso directo, un código como '__proto__' devolvería un miembro
+  // heredado de Object.prototype en vez de undefined.
+  const logico = Object.hasOwn(CARRERAS_ALIAS_LEGADO, codigo) ? CARRERAS_ALIAS_LEGADO[codigo] : codigo;
+  return Object.hasOwn(CARRERAS_NOMBRE_INSTITUCIONAL, logico) ? CARRERAS_NOMBRE_INSTITUCIONAL[logico] : null;
 }
 
 // Horas contabilizables (aprobada + rechazada; ver ESTADOS_BITACORA_QUE_CUENTAN) desde las que se habilita el

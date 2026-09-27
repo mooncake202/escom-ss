@@ -6,6 +6,7 @@ import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/servi
 import { useOfertas } from "./hooks/useOfertas";
 import { EstatusBadge } from "./components/EstatusBadge";
 import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
+import { siglaPresentacion } from "@/features/gestion-ofertas/utils/carreraPresentacion";
 import { Section } from "./components/Section";
 import { OfertaCard } from "./components/OfertaCard";
 import { DecisionPanel } from "../CU-PRO-02-revisar-solicitud-oferta/components/DecisionPanel";
@@ -246,7 +247,7 @@ export default function ConsultarOfertas() {
                               padding: "4px 12px", borderRadius: RADIUS.full, fontSize: 12, fontWeight: 700,
                               background: "rgba(99,102,241,0.1)", color: "#818cf8",
                               border: "1px solid rgba(99,102,241,0.2)",
-                            }}>{c}</span>
+                            }}>{siglaPresentacion(c)}</span>
                           ))}
                         </div>
                       </Section>

@@ -1,19 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTheme, RADIUS } from "@/themes/colors";
 import { apiFetch } from "@/services/apiClient";
+import { etiquetaPresentacion } from "@/features/gestion-ofertas/utils/carreraPresentacion";
 
-// SOLO presentación. Qué carreras existen lo decide el backend (GET /ofertas/perfiles, que lee la
-// tabla `carrera`); este mapa jamás añade ni quita opciones. La columna es VARCHAR(3), así que el
-// nombre largo no existe en BD y vive aquí. Un código que no esté en el mapa se muestra tal cual:
-// se prefiere una etiqueta pobre a ocultarle una opción al profesor.
-const NOMBRE_LARGO = Object.freeze({
-  ISC: "Ingeniería en Sistemas Computacionales",
-  LCD: "Licenciatura en Ciencia de Datos",
-  IIA: "Ingeniería en Inteligencia Artificial",
-});
-
-// El código corto se conserva dentro de la etiqueta: es el valor que se envía al backend.
-const etiquetaDe = (codigo) => (NOMBRE_LARGO[codigo] ? `${codigo} — ${NOMBRE_LARGO[codigo]}` : codigo);
+// Qué carreras existen lo decide el backend (GET /ofertas/perfiles, que lee la tabla `carrera`).
+// Lo que se MUESTRA pasa por etiquetaPresentacion; lo que se ENVÍA es el `nombre` literal del
+// catálogo, sin tocar — por eso onToggle recibe `nombre` y no la etiqueta.
 
 export function CarreraSelector({ value = [], onToggle, error }) {
   const { C } = useTheme();
@@ -60,7 +52,7 @@ export function CarreraSelector({ value = [], onToggle, error }) {
                 type="checkbox" checked={checked} onChange={() => onToggle(nombre)}
                 style={{ accentColor: C.accent, width: 15, height: 15, cursor: "pointer" }}
               />
-              <span style={{ fontSize: 13, color: checked ? C.textPrimary : C.textMuted }}>{etiquetaDe(nombre)}</span>
+              <span style={{ fontSize: 13, color: checked ? C.textPrimary : C.textMuted }}>{etiquetaPresentacion(nombre)}</span>
             </label>
           );
         })}

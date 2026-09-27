@@ -52,7 +52,7 @@ function montar() {
     alumnos: [
       { boleta: '2022630001', usuario_id: 100, carrera: 'ISC', celular: '5500000001', correo_personal: 'ana@gmail.com', creditos: decimal('85.00'), semestre: 8 },
       { boleta: '2022630002', usuario_id: 101, carrera: 'LCD', celular: '5500000002', correo_personal: null, creditos: decimal('80.00'), semestre: 6 },
-      { boleta: '2022630003', usuario_id: 102, carrera: 'IIA', celular: '5500000003', correo_personal: 'carla@gmail.com', creditos: decimal('100.00'), semestre: 9 },
+      { boleta: '2022630003', usuario_id: 102, carrera: 'IA', celular: '5500000003', correo_personal: 'carla@gmail.com', creditos: decimal('100.00'), semestre: 9 },
       { boleta: '2022630004', usuario_id: 103, carrera: 'ISC', celular: '5500000004', correo_personal: null, creditos: decimal('60.00'), semestre: 5 },
     ],
     solicitudes: [

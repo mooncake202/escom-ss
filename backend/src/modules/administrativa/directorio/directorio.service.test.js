@@ -50,7 +50,7 @@ function montar() {
     alumnos: [
       { boleta: '2022630001', usuario_id: U_ANA, carrera: 'ISC', celular: '5500000001', correo_personal: 'ana@gmail.com' },
       { boleta: '2022630002', usuario_id: U_BETO, carrera: 'LCD', celular: '5500000002', correo_personal: 'beto@gmail.com' },
-      { boleta: '2022630003', usuario_id: U_CARLA, carrera: 'IIA', celular: '5500000003', correo_personal: null },
+      { boleta: '2022630003', usuario_id: U_CARLA, carrera: 'IA', celular: '5500000003', correo_personal: null },
       { boleta: '2022630004', usuario_id: U_SOLO, carrera: 'ISC', celular: '5500000004', correo_personal: 'solo@gmail.com' },
       { boleta: '2022630005', usuario_id: U_SIN_ASIGNAR, carrera: 'ISC', celular: '5500000005', correo_personal: null },
     ],

@@ -274,7 +274,7 @@ test('dias_laborados = aprobadas + rechazadas (Bloque 1) y horas = suma de horas
   assert.deepEqual(r.diagnostico.bitacorasNoResueltas, [{ id: 6, estado: 'pendiente_revision', fecha: '2025-10-23' }]);
 });
 
-test('carreraNombre sale del catálogo de Reportes; IA (legado) se resuelve como IIA; el resto desconocido es null', async () => {
+test('carreraNombre sale del catálogo de Reportes; IIA (legado) se resuelve como IA; el resto desconocido es null', async () => {
   const esperados = {
     LCD: 'Licenciatura en Ciencia de Datos',
     IIA: 'Ingeniería en Inteligencia Artificial',

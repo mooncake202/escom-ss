@@ -17,11 +17,12 @@ const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
 // global. La prueba de consistencia afirma que ambos coinciden.
 const ESTADOS_LSS_LIBERAN_CUPO = ['solicitud_constancia_termino', 'constancia_disponible'];
 
-// Catálogo real de la tabla `carrera` en esta rama: la sigla de Inteligencia Artificial es IIA.
+// Catálogo de la tabla `carrera` con los códigos LÓGICOS. `crearBd` acepta otro catálogo por el
+// parámetro `carreras`, que es lo que permite probar el mismo flujo con una base en 'IIA'.
 const CATALOGO_CARRERAS = Object.freeze([
   { id: 1, nombre: 'ISC' },
   { id: 2, nombre: 'LCD' },
-  { id: 3, nombre: 'IIA' },
+  { id: 3, nombre: 'IA' },
 ]);
 
 const clonar = (x) => (x === null || x === undefined ? x : JSON.parse(JSON.stringify(x)));

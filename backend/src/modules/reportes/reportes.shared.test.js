@@ -19,16 +19,18 @@ const {
   TIPOS_NOTIFICACION,
 } = require('./reportes.shared');
 
-test('catálogo de carreras: nombre institucional de ISC, LCD e IIA', () => {
+test('catálogo de carreras: nombre institucional de ISC, LCD e IA (códigos lógicos)', () => {
   assert.equal(nombreInstitucionalCarrera('ISC'), 'Ingeniería en Sistemas Computacionales');
   assert.equal(nombreInstitucionalCarrera('LCD'), 'Licenciatura en Ciencia de Datos');
-  assert.equal(nombreInstitucionalCarrera('IIA'), 'Ingeniería en Inteligencia Artificial');
+  assert.equal(nombreInstitucionalCarrera('IA'), 'Ingeniería en Inteligencia Artificial');
 });
 
-test('catálogo de carreras: IA es un alias legado de IIA (el código correcto), no una carrera distinta', () => {
-  assert.equal(nombreInstitucionalCarrera('IA'), 'Ingeniería en Inteligencia Artificial');
-  assert.equal(nombreInstitucionalCarrera('IA'), nombreInstitucionalCarrera('IIA'));
-  assert.deepEqual({ ...CARRERAS_ALIAS_LEGADO }, { IA: 'IIA' });
+// IA es el código LÓGICO; IIA es una entrada legado de bases que aún la persisten así (y, en el
+// frontend, la sigla de presentación). Ambas son la misma carrera.
+test('catálogo de carreras: IIA es una entrada legado de IA (el código lógico), no una carrera distinta', () => {
+  assert.equal(nombreInstitucionalCarrera('IIA'), 'Ingeniería en Inteligencia Artificial');
+  assert.equal(nombreInstitucionalCarrera('IIA'), nombreInstitucionalCarrera('IA'));
+  assert.deepEqual({ ...CARRERAS_ALIAS_LEGADO }, { IIA: 'IA' });
   assert.ok(Object.isFrozen(CARRERAS_ALIAS_LEGADO));
 });
 
@@ -39,7 +41,7 @@ test('catálogo de carreras: código desconocido o vacío devuelve null (no se i
 });
 
 test('catálogo de carreras: cubre exactamente los códigos de la tabla carrera y es inmutable', () => {
-  assert.deepEqual(Object.keys(CARRERAS_NOMBRE_INSTITUCIONAL).sort(), ['IIA', 'ISC', 'LCD']);
+  assert.deepEqual(Object.keys(CARRERAS_NOMBRE_INSTITUCIONAL).sort(), ['IA', 'ISC', 'LCD']);
   assert.ok(Object.isFrozen(CARRERAS_NOMBRE_INSTITUCIONAL));
 });
 

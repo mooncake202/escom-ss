@@ -43,7 +43,7 @@ function reporteMensual({
   revisiones,
   documentoFecha = null,
   alumnoUsuarioId = 200 + id,
-  carrera = 'IIA',
+  carrera = 'IA',
   profesorUsuarioId = 300 + profesorId,
   profesorNombre = 'LUIS',
   profesorApellidos = 'TORRES VEGA',
@@ -98,7 +98,7 @@ const ESCRITURAS = new Set([
  * omisión coinciden con los de reporteMensual (mismo periodo oficial y mismo profesor).
  */
 function alumnoGrafo({
-  usuarioId = 201, boleta = '2022630001', nombre = 'ANA', apellidos = 'GARCIA LOPEZ', carrera = 'IIA',
+  usuarioId = 201, boleta = '2022630001', nombre = 'ANA', apellidos = 'GARCIA LOPEZ', carrera = 'IA',
   correoPersonal = 'ana.garcia@example.com', celular = '5512345678', creditos = '85.50', semestre = 8,
   programa = 'Programa SISS de prueba', solicitudId = 1001, fechaInicio = '2026-07-16', fechaFin = '2027-02-17',
   profesorUsuarioId = 301, profesorNombre = 'LUIS', profesorApellidos = 'TORRES VEGA', sinOferta = false, sinPeriodo = false,

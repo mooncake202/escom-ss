@@ -1,7 +1,6 @@
 const ofertasService = require('./ofertas.service');
 const { emitirATodosLosCoordinadores } = ofertasService;
 const prisma = require('../../lib/prisma');
-const { normalizarNombreCarrera } = require('./ofertas.carreras');
 
 async function getOfertas(req, res) {
   try {
@@ -93,9 +92,12 @@ async function solicitarRegistroOferta(req, res) {
       dataOferta.cupos_disponibles = cupos;
     }
 
-    const carrerasNormalizadas = carreras.map(normalizarNombreCarrera);
+    // Se busca el valor LITERAL que mandó el cliente: el selector obtiene las opciones de
+    // GET /ofertas/perfiles, que son las filas reales de `carrera`. Traducirlo aquí solo podría
+    // alejarlo de lo que la tabla contiene. La sigla de presentación (IIA) vive en el frontend y
+    // nunca viaja en el payload.
     const carrerasEncontradas = await prisma.carrera.findMany({
-      where: { nombre: { in: carrerasNormalizadas } },
+      where: { nombre: { in: carreras } },
     });
 
     if (carrerasEncontradas.length !== carreras.length) {
