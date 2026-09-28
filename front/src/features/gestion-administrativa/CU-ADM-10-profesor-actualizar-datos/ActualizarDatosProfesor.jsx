@@ -98,7 +98,7 @@ export default function ActualizarDatosProfesor() {
             name="telefono_personal"
             value={form.telefono_personal}
             onChange={handleChange}
-            placeholder="Ej. 55 1234 5678"
+            placeholder="Ej. 5512345678"
             error={errores.telefono_personal}
             C={C}
           />

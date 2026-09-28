@@ -144,6 +144,27 @@ test('ADM-10: teléfono obligatorio y de exactamente 10 dígitos', async () => {
   }
 });
 
+test('ADM-10: un teléfono que no es texto (número) da 400 de formato, no 500', async () => {
+  for (const telefono of [5512345678, true, { n: '5512345678' }, ['5512345678']]) {
+    montar();
+    await assert.rejects(
+      servicio.actualizarPerfilProfesor(U_PROFESOR, { telefono_personal: telefono, horario_atencion: 'x' }),
+      (err) => err.status === 400 && err.message === 'El teléfono personal debe tener exactamente 10 dígitos numéricos.',
+      `debería rechazar ${JSON.stringify(telefono)}`,
+    );
+    assert.deepEqual(escriturasA('profesor'), [], 'no escribe nada si falla la validación');
+    assert.equal(profesorEnBd().telefono_personal, '5511112222');
+  }
+});
+
+test('ADM-10: el teléfono se recorta antes de validar y se guarda sin espacios', async () => {
+  const perfil = await servicio.actualizarPerfilProfesor(U_PROFESOR, { telefono_personal: ' 5512345678 ', horario_atencion: 'x' });
+
+  assert.equal(profesorEnBd().telefono_personal, '5512345678');
+  assert.equal(escriturasA('profesor')[0].data.telefono_personal, '5512345678');
+  assert.equal(perfil.editables.telefonoPersonal, '5512345678');
+});
+
 test('ADM-10: horario obligatorio y con tope de 100 caracteres', async () => {
   for (const horario of ['', '   ', undefined]) {
     montar();

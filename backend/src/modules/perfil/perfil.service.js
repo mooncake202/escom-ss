@@ -72,8 +72,16 @@ async function obtenerPerfilProfesor(usuarioId) {
  * Ambos campos son obligatorios; el teléfono debe tener exactamente 10 dígitos (validarTelefono).
  */
 async function actualizarPerfilProfesor(usuarioId, datos) {
-  const { telefono_personal, horario_atencion } = datos;
+  const { horario_atencion } = datos;
 
+  // validarTelefono también lo usan GR y usuarios, así que el tipo se revisa aquí: un número
+  // (5512345678 sin comillas) pasaba la expresión regular y Prisma lo rechazaba con un 500.
+  // Mismo texto que el error de formato de validarTelefono.
+  if (datos.telefono_personal != null && typeof datos.telefono_personal !== 'string') {
+    throw crearError('El teléfono personal debe tener exactamente 10 dígitos numéricos.');
+  }
+  // Se recorta igual que en el front antes de validar y guardar.
+  const telefono_personal = limpiar(datos.telefono_personal);
   validarTelefono(telefono_personal, { requerido: true });
 
   const horario = limpiar(horario_atencion);

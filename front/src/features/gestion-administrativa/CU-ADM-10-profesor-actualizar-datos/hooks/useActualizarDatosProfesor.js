@@ -23,7 +23,7 @@ function validar(form) {
   if (!form.telefono_personal.trim()) {
     e.telefono_personal = "El teléfono personal es obligatorio.";
   } else if (!TELEFONO_RE.test(form.telefono_personal.trim())) {
-    e.telefono_personal = "El teléfono debe tener exactamente 10 dígitos numéricos.";
+    e.telefono_personal = "El teléfono personal debe tener exactamente 10 dígitos numéricos.";
   }
   return e;
 }
