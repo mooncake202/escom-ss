@@ -38,6 +38,30 @@ export function useAnunciosRecientes() {
   return { anuncios, cargando };
 }
 
+// Aviso de anuncios nuevos para el bloque de alertas de ARRIBA del dashboard. Función PURA: entra
+// la lista que devuelve este hook y sale lo que el slot calculado necesita.
+//
+// Es un aviso CALCULADO, no persistido: se deriva del `visto` que ya trae cada anuncio, así que
+// desaparece solo en cuanto el alumno abre el anuncio (ADM-02 lo marca visto al expandirlo) y en la
+// siguiente carga del dashboard el `visto` llega en true. No hay estado propio que mantener ni nada
+// que descartar a mano.
+//
+// El mensaje del caso plural NO lleva número a propósito: este hook solo pide los MAX_RECIENTES más
+// recientes, así que un conteo aquí sería "N de los 3 más recientes" y mentiría si hubiera más.
+export function avisoAnunciosNuevos(anuncios) {
+  const sinVer = Array.isArray(anuncios) ? anuncios.filter((a) => a && !a.visto) : [];
+
+  if (sinVer.length === 0) return { mostrar: false, mensaje: null, ruta: null };
+
+  // Con uno solo se puede ir directo a ese anuncio; ADM-02 valida el id contra los realmente
+  // visibles antes de abrirlo, así que un id que no le corresponda se ignora en silencio.
+  if (sinVer.length === 1) {
+    return { mostrar: true, mensaje: "Tienes un anuncio nuevo", ruta: `/alumno/anuncios?anuncio=${sinVer[0].id}` };
+  }
+
+  return { mostrar: true, mensaje: "Tienes anuncios nuevos", ruta: "/alumno/anuncios" };
+}
+
 // "Hace 2 horas" / "Ayer" / fecha corta. Solo presentación del resumen.
 export function tiempoRelativo(iso) {
   const f = new Date(iso);

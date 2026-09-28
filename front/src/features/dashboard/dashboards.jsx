@@ -9,7 +9,7 @@ import {
   marcarNotificacionLeida,
 } from "@/services/notificacionesService";
 import { useSocket, useSocketReconectado } from "@/context/SocketContext";
-import { useAnunciosRecientes, tiempoRelativo } from "@/features/gestion-administrativa/CU-ADM-02-anuncios/hooks/useAnunciosRecientes";
+import { useAnunciosRecientes, tiempoRelativo, avisoAnunciosNuevos } from "@/features/gestion-administrativa/CU-ADM-02-anuncios/hooks/useAnunciosRecientes";
 import { ESTADO_LSS_A_RUTA, RUTA_LSS_FALLBACK, RUTA_LSS_SIN_PROCESO } from "@/features/liberacion-ss/utils/estadoRutasLSS";
 
 // Parte 3 (sockets) — qué eventos le importan a cada rol en ESTE dashboard,
@@ -413,6 +413,11 @@ function BloqueAlertasGenerales({ notificaciones, onLeer, navigate, C, slotsCalc
 const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacion, navigate }) => {
   // CU-ADM-02 (resumen): los 3 anuncios más recientes visibles para este alumno.
   const { anuncios: anunciosRecientes, cargando: cargandoAnuncios } = useAnunciosRecientes();
+
+  // Aviso de ARRIBA, calculado del mismo `visto` que ya usa la insignia "Nuevo" del bloque de abajo:
+  // un solo origen de verdad, así que nunca pueden contradecirse. Si la carga falla, el hook deja la
+  // lista vacía y el aviso no se muestra.
+  const avisoAnuncios = avisoAnunciosNuevos(anunciosRecientes);
   const stats = [
     { icon: "clock",    label: "Horas acumuladas",    value: resumen.horasNetas ?? 0,             ...T.blue  },
     { icon: "document", label: "Reportes aprobados",  value: resumen.reportesAprobados ?? 0,     ...T.teal  },
@@ -450,6 +455,14 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
             mensaje: "Tu carta de término está lista para recoger.",
             ruta: "/alumno/seguimiento-carta-termino",
             tipo: "urgente",
+          },
+          // CU-ADM-02: anuncios sin ver, del profesor o de Coordinación. Va al final de los slots
+          // porque es informativo, no una acción pendiente del servicio.
+          {
+            mostrar: avisoAnuncios.mostrar,
+            mensaje: avisoAnuncios.mensaje,
+            ruta: avisoAnuncios.ruta,
+            tipo: "info",
           },
         ]}
         rutasPromovidas={[
