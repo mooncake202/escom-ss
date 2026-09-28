@@ -190,7 +190,7 @@ export function useRevisarSolicitudes() {
     setErrores({});
     try {
       const resultado = await rechazarSolicitudCaracteristica(seleccionada.id, comentario.trim());
-      mostrarToast(`Solicitud rechazada. ${seleccionada.profesor.nombre} fue notificado.`, "danger");
+      mostrarToast("Solicitud rechazada.", "danger");
       moverAResueltas(resultado);
     } catch (err) {
       if (err.code === "SOLICITUD_YA_RESUELTA") {

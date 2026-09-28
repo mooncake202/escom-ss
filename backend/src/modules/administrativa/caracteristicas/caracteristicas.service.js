@@ -374,6 +374,18 @@ async function aprobarSolicitud({ solicitudId, comentario }) {
       );
     }
 
+    // El rechazo no toma el lock del profesor, así que pudo confirmarse después de la relectura de
+    // arriba. La escritura exige 'pendiente' y va ANTES de tocar al profesor: si otro coordinador ya
+    // la resolvió, no se sobrescribe su decisión ni cambia la capacidad.
+    const aplicada = await tx.solicitud_caracteristica.updateMany({
+      where: { id: solicitudId, estado: ESTADO_PENDIENTE },
+      data: { estado: ESTADO_APROBADA, fecha_respuesta: new Date(), comentario: comentarioLimpio },
+    });
+    if (aplicada.count === 0) {
+      const actual = await tx.solicitud_caracteristica.findUnique({ where: { id: solicitudId } });
+      throw crearError(`Esta solicitud ya fue ${actual.estado}.`, 409, 'SOLICITUD_YA_RESUELTA');
+    }
+
     // Solo capacidad GLOBAL del profesor. Nada de ofertas, solicitudes de asignación ni alumnos.
     await tx.profesor.update({
       where: { id: solicitudPrevia.profesor_id },
@@ -383,9 +395,8 @@ async function aprobarSolicitud({ solicitudId, comentario }) {
       },
     });
 
-    const actualizada = await tx.solicitud_caracteristica.update({
+    const actualizada = await tx.solicitud_caracteristica.findUnique({
       where: { id: solicitudId },
-      data: { estado: ESTADO_APROBADA, fecha_respuesta: new Date(), comentario: comentarioLimpio },
       include: { caracteristica: true },
     });
 

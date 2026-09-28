@@ -390,7 +390,7 @@ test('ADM-16: ninguna decisión toca ofertas ni alumnos', async () => {
   assert.deepEqual(escriturasA('oferta_servicio'), []);
   assert.equal(JSON.stringify(bd.ocupantes), ocupantesAntes);
   // Solo se escribieron: profesor (1 update) y solicitudes.
-  assert.deepEqual([...new Set(bd.escrituras.map((e) => e.modelo))], ['profesor', 'solicitud_caracteristica']);
+  assert.deepEqual([...new Set(bd.escrituras.map((e) => e.modelo))].sort(), ['profesor', 'solicitud_caracteristica']);
 });
 
 test('ADM-16: la aprobación bloquea la fila del profesor ANTES de cualquier escritura', async () => {
@@ -401,6 +401,78 @@ test('ADM-16: la aprobación bloquea la fila del profesor ANTES de cualquier esc
   assert.equal(bd.locks.length, 1, 'debe tomarse exactamente un SELECT ... FOR UPDATE');
   assert.equal(bd.locks[0].profesorId, 1);
   assert.equal(bd.locks[0].escriturasPrevias, 0, 'el lock debe ser la primera sentencia de la transacción');
+});
+
+// Carrera aprobar/rechazar: el rechazo no toma el lock del profesor, así que puede confirmarse
+// entre la relectura bajo lock de la aprobación y su escritura. Se fuerza ese intercalado
+// deteniendo la aprobación justo después de releer la solicitud dentro de la transacción.
+function pausarAprobacionTrasRelectura() {
+  let soltar;
+  let avisarPausa;
+  const compuerta = new Promise((ok) => { soltar = ok; });
+  const enPausa = new Promise((ok) => { avisarPausa = ok; });
+  const base = prismaActual;
+  prismaActual = new Proxy(base, {
+    get: (destino, propiedad) => (propiedad === '$transaction'
+      ? async (cb) => cb(new Proxy(destino, {
+          get: (d, p) => (p === 'solicitud_caracteristica'
+            ? {
+                ...d.solicitud_caracteristica,
+                findUnique: async (args) => {
+                  const fila = await d.solicitud_caracteristica.findUnique(args);
+                  avisarPausa();
+                  await compuerta;
+                  return fila;
+                },
+              }
+            : d[p]),
+        }))
+      : destino[propiedad]),
+  });
+  return { enPausa, soltar };
+}
+
+test('ADM-16: un rechazo aplicado antes que la aprobación gana; la aprobación da 409 y no toca al profesor', async () => {
+  montar({
+    profesores: [profesor({ caracteristicaId: INVESTIGADOR, cuposTotales: 4 })],
+    solicitudes: [solicitud({ id: 1, caracteristicaId: JEFE })],
+  });
+  const { enPausa, soltar } = pausarAprobacionTrasRelectura();
+
+  const aprobacion = servicio.aprobarSolicitud({ solicitudId: 1 });
+  await enPausa;
+  const rechazo = await servicio.rechazarSolicitud({ solicitudId: 1, comentario: 'No procede.' });
+  soltar();
+
+  assert.equal(rechazo.estado, 'rechazada');
+  await assert.rejects(aprobacion, (err) => err.status === 409 && err.code === 'SOLICITUD_YA_RESUELTA'
+    && err.message === 'Esta solicitud ya fue rechazada.');
+  assert.equal(bd.solicitudes[0].estado, 'rechazada');
+  assert.equal(bd.solicitudes[0].comentario, 'No procede.');
+  assert.equal(profesorEnBd().caracteristica_id, INVESTIGADOR);
+  assert.equal(profesorEnBd().cupos_totales, 4);
+  assert.deepEqual(escriturasA('profesor'), []);
+  const avisos = bd.notificaciones.filter((n) => n.usuario_id === USUARIO_PROFESOR);
+  assert.deepEqual(avisos.map((n) => n.tipo), ['urgente'], 'un solo aviso: el del rechazo');
+});
+
+test('ADM-16: una aprobación aplicada antes que el rechazo gana; el rechazo da 409 y no avisa', async () => {
+  montar({
+    profesores: [profesor({ caracteristicaId: INVESTIGADOR, cuposTotales: 4 })],
+    solicitudes: [solicitud({ id: 1, caracteristicaId: JEFE })],
+  });
+
+  await servicio.aprobarSolicitud({ solicitudId: 1 });
+  await assert.rejects(
+    servicio.rechazarSolicitud({ solicitudId: 1, comentario: 'Tarde.' }),
+    (err) => err.status === 409 && err.code === 'SOLICITUD_YA_RESUELTA' && err.message === 'Esta solicitud ya fue aprobada.',
+  );
+
+  assert.equal(bd.solicitudes[0].estado, 'aprobada');
+  assert.equal(bd.solicitudes[0].comentario, null);
+  assert.equal(profesorEnBd().cupos_totales, 6);
+  const avisos = bd.notificaciones.filter((n) => n.usuario_id === USUARIO_PROFESOR);
+  assert.deepEqual(avisos.map((n) => n.tipo), ['success'], 'un solo aviso: el de la aprobación');
 });
 
 test('ADM-16: crear la solicitud también se serializa con el lock del profesor', async () => {
