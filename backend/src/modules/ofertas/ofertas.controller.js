@@ -1,5 +1,5 @@
 const ofertasService = require('./ofertas.service');
-const { emitirATodosLosCoordinadores, textoObligatorioRecortado, TIPOS_OFERTA, MENSAJE_TIPO_OFERTA_INVALIDO } = ofertasService;
+const { emitirATodosLosCoordinadores, textoObligatorioRecortado, enteroEstricto, TIPOS_OFERTA, MENSAJE_TIPO_OFERTA_INVALIDO } = ofertasService;
 const prisma = require('../../lib/prisma');
 
 async function getOfertas(req, res) {
@@ -77,9 +77,9 @@ async function solicitarRegistroOferta(req, res) {
       dataOferta.cupos_ofertados = null;
       dataOferta.cupos_disponibles = 1;
     } else {
-      const cupos = parseInt(cupos_ofertados, 10);
+      const cupos = enteroEstricto(cupos_ofertados);
 
-      if (!Number.isInteger(cupos) || cupos < 2) {
+      if (cupos === null || cupos < 2) {
         return res.status(400).json({
           message: 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.',
         });
@@ -210,7 +210,13 @@ async function postReenviarOferta(req, res) {
     if (!profesor) {
       return res.status(404).json({ message: 'Perfil de profesor no encontrado.' });
     }
+    // Misma guarda que en /cerrar: un `id` no numérico es una petición mal formada, no una oferta
+    // ausente, y devolver 404 afirmaba algo falso.
     const ofertaId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(ofertaId)) {
+      return res.status(400).json({ message: 'El identificador de la oferta no es válido.' });
+    }
+
     const actualizada = await ofertasService.reenviarOferta(ofertaId, profesor.id, req.body);
     return res.status(200).json({ message: 'Oferta reenviada exitosamente.', oferta: actualizada });
   } catch (err) {
@@ -227,7 +233,13 @@ async function postCerrarOferta(req, res) {
     if (!profesor) {
       return res.status(404).json({ message: 'Perfil de profesor no encontrado.' });
     }
+    // Un `id` no numérico daba NaN, el findUnique no encontraba nada y salía un 404 que afirmaba
+    // algo falso ("Oferta no encontrada."). Es una petición mal formada, no una oferta ausente.
     const ofertaId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(ofertaId)) {
+      return res.status(400).json({ message: 'El identificador de la oferta no es válido.' });
+    }
+
     const actualizada = await ofertasService.cerrarOfertaManual(ofertaId, profesor.id);
     return res.status(200).json({ message: 'Oferta cerrada exitosamente.', oferta: actualizada });
   } catch (err) {

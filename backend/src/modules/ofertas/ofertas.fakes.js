@@ -27,7 +27,7 @@ const CATALOGO_CARRERAS = Object.freeze([
 
 const clonar = (x) => (x === null || x === undefined ? x : JSON.parse(JSON.stringify(x)));
 
-function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CATALOGO_CARRERAS } = {}) {
+function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CATALOGO_CARRERAS, coordinadores = [] } = {}) {
   const bd = {
     profesores: profesores.map((p) => ({ ...p })),
     ofertas: ofertas.map((o) => ({ ...o })),
@@ -45,6 +45,16 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CAT
     // de leer cupos_totales. Permite probar que la guarda compara contra el valor leído bajo el lock
     // y no contra una lectura anterior. Se asigna sobre `bd` desde el test.
     antesDelLock: null,
+    // Gancho equivalente para los CAS que NO toman lock (reenvío, cierre manual): se dispara DENTRO
+    // del updateMany, antes de aplicar el `where`, para simular que otro actor movió el estado entre
+    // la validación y la escritura.
+    antesDeEscribir: null,
+    // Carreras asociadas a cada oferta, por id: { [ofertaId]: ['ISC', ...] }. Las puebla el propio
+    // fake al aplicar un `create` anidado, para poder afirmar el REEMPLAZO del perfil.
+    deseos: {},
+    // Quiénes reciben los avisos por socket. Vacío por omisión: así las pruebas que no miran las
+    // emisiones se comportan igual que antes.
+    coordinadores: coordinadores.map((c) => ({ ...c })),
   };
 
   const profesorDe = (id) => bd.profesores.find((p) => p.id === id) ?? null;
@@ -98,11 +108,20 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CAT
       },
       update: async ({ where, data }) => {
         const o = bd.ofertas.find((x) => x.id === where.id);
-        Object.assign(o, data);
+        // Prisma no guarda las relaciones anidadas como columnas de la fila: se separan para que la
+        // fila del fake conserve solo escalares y `deseos` refleje el perfil resultante.
+        const { deseo_de_carrera, ...escalares } = data;
+        Object.assign(o, escalares);
+        if (deseo_de_carrera?.create) {
+          bd.deseos[where.id] = deseo_de_carrera.create
+            .map((d) => bd.carreras.find((c) => c.id === d.carrera.connect.id)?.nombre)
+            .filter(Boolean);
+        }
         bd.escrituras.push({ modelo: 'oferta_servicio', operacion: 'update', where, data });
         return clonar(o);
       },
       updateMany: async ({ where, data }) => {
+        if (bd.antesDeEscribir) bd.antesDeEscribir();
         const afectadas = bd.ofertas.filter((o) => (
           o.id === where.id
           && (where.estado_oferta === undefined || o.estado_oferta === where.estado_oferta)
@@ -133,8 +152,9 @@ function crearBd({ profesores = [], ofertas = [], ocupantes = [], carreras = CAT
         return { count: 0 };
       },
     },
-    // Solo para que la emisión por socket (fail-open) no tenga que tocar la BD real.
-    coordinador: { findMany: async () => [] },
+    // Para la emisión por socket (fail-open). Vacío por omisión; el test que mira las emisiones
+    // pasa `coordinadores` a crearBd.
+    coordinador: { findMany: async () => clonar(bd.coordinadores) },
   };
 
   const prisma = new Proxy({}, {

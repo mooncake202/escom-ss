@@ -224,3 +224,44 @@ test('reenviar: la oferta individual pasa por la misma validación', async () =>
   );
   assert.equal(bd.ofertas[0].estado_oferta, 'rechazada');
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// Cupos enteros al CREAR (CU-PRO-01)
+//
+// `parseInt` truncaba en silencio: 2.9 se guardaba como 2 y "3abc" como 3, los dos por encima del
+// mínimo, así que la validación de rango los dejaba pasar. Mismo cambio que en el reenvío.
+// ════════════════════════════════════════════════════════════════════════════
+
+test('crear: un cupos_ofertados no entero → 400 y NO se crea nada', async () => {
+  for (const valor of [2.9, '2.9', '3abc', '4.0001', '3,5', '1e3']) {
+    montar();
+
+    const res = await crear({ cupos_ofertados: valor });
+
+    assert.equal(res.statusCode, 400, JSON.stringify(valor));
+    assert.equal(res.body.message, 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.');
+    assert.equal(bd.ofertas.length, 0, JSON.stringify(valor));
+  }
+});
+
+test('crear: un cupos_ofertados entero sigue aceptándose, como número y como cadena', async () => {
+  for (const valor of [3, '3']) {
+    montar();
+
+    const res = await crear({ cupos_ofertados: valor });
+
+    assert.equal(res.statusCode, 201, JSON.stringify(valor));
+    assert.equal(bd.ofertas[0].cupos_ofertados, 3);
+    assert.equal(bd.ofertas[0].cupos_disponibles, 3);
+  }
+});
+
+test('crear: los mensajes de rango y de tope no cambiaron', async () => {
+  montar({ cuposTotales: 3 });
+  const bajo = await crear({ cupos_ofertados: 1 });
+  assert.equal(bajo.body.message, 'Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.');
+
+  montar({ cuposTotales: 3 });
+  const alto = await crear({ cupos_ofertados: 9 });
+  assert.equal(alto.body.message, 'La oferta no puede tener más de 3 cupos.');
+});

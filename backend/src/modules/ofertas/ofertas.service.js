@@ -26,6 +26,15 @@ const MENSAJE_TIPO_OFERTA_INVALIDO = "tipo_oferta debe ser 'individual' o 'proye
 // porque esta búsqueda corre en el backend y los dos árboles no comparten paquete.
 const sinAcentos = (texto) => String(texto).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
+// Entero estricto para `cupos_ofertados`. `parseInt` NO sirve aquí: trunca en silencio, así que 2.9
+// pasaba como 2 y "3abc" como 3. Devuelve null para todo lo que no sea un entero exacto; quien llama
+// decide el mensaje, para conservar los textos de rango que ya existen en el registro y el reenvío.
+const enteroEstricto = (valor) => {
+  if (typeof valor === 'number') return Number.isInteger(valor) ? valor : null;
+  if (typeof valor === 'string' && /^\s*-?\d+\s*$/.test(valor)) return Number(valor);
+  return null;
+};
+
 /**
  * RF-GR-06: solo ofertas activas y con cupos disponibles al momento de la consulta.
  */
@@ -627,9 +636,9 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
   if (tipo_oferta === 'individual') {
     dataActualizada.cupos_disponibles = 1;
   } else {
-    const cupos = parseInt(cupos_ofertados, 10);
+    const cupos = enteroEstricto(cupos_ofertados);
 
-    if (!Number.isInteger(cupos) || cupos < 2) {
+    if (cupos === null || cupos < 2) {
       throw Object.assign(
         new Error('Para modalidad proyecto, cupos_ofertados debe ser un entero mayor o igual a 2.'),
         { status: 400 }
@@ -655,16 +664,36 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
   }
 
   const actualizada = await prisma.$transaction(async (tx) => {
+    // Condicionado a que la oferta SIGA 'rechazada' en el instante de escribir — mismo patrón CAS
+    // que el cierre manual y la decisión. Antes la escritura era por id a secas, así que si un
+    // coordinador la aprobaba entre la validación de arriba y este punto, el reenvío pisaba ese
+    // 'aprobada' con 'pendiente_revision' y además borraba su coordinador_id. Va PRIMERO dentro de
+    // la transacción: si pierde la carrera, las carreras no se tocan y el socket no se emite.
+    const { count } = await tx.oferta_servicio.updateMany({
+      where: { id: ofertaId, estado_oferta: 'rechazada' },
+      data: dataActualizada,
+    });
+
+    if (count === 0) {
+      throw Object.assign(
+        new Error('El estado de esta oferta cambió mientras la consultabas. Vuelve a cargar tus ofertas.'),
+        { status: 409 }
+      );
+    }
+
     await tx.deseo_de_carrera.deleteMany({ where: { oferta_id: ofertaId } });
-    return tx.oferta_servicio.update({
+    await tx.oferta_servicio.update({
       where: { id: ofertaId },
       data: {
-        ...dataActualizada,
         deseo_de_carrera: {
           create: carrerasEncontradas.map((c) => ({ carrera: { connect: { id: c.id } } })),
         },
       },
     });
+
+    // Se relee sin relaciones para devolver la misma forma de fila que antes, igual que tras el CAS
+    // del cierre manual y el de la decisión.
+    return tx.oferta_servicio.findUnique({ where: { id: ofertaId } });
   });
 
   // Igual que en el registro (CU-PRO-01): hecho calculado, se avisa a los 4 coordinadores por
@@ -675,6 +704,8 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
 
 // CU-PRO-04: Gestionar estado de oferta (cierre MANUAL, profesor)
 
+// Referencia de los estados explícitos de rechazo de una solicitud. NO se usa para decidir si una
+// solicitud ocupa cupo ni si hay un alumno activo: ese criterio es ESTADOS_QUE_OCUPAN_CUPO_PROFESOR.
 const ESTADOS_RECHAZO_SOLICITUD = [
   'rechazada_definitivamente',
   'rechazada_por_cupos',
@@ -703,11 +734,18 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
     );
   }
 
-  // Solicitudes o alumnos que todavía mantienen viva la oferta: no cuentan las
-  // rechazadas ni los alumnos que ya concluyeron su servicio (ver ESTADOS_LSS_LIBERAN_CUPO).
+  // Alumnos que todavía mantienen viva la oferta. El criterio es el MISMO que usan el conteo de
+  // cupos (`WHERE_SOLICITUD_OCUPA_CUPO` en lib/cupos.js), la conclusión automática de aquí abajo y
+  // el `alumnosActivos` que recibe el frontend: una lista BLANCA de estados que ocupan lugar, más la
+  // exclusión de quien ya concluyó su servicio (ver ESTADOS_LSS_LIBERAN_CUPO).
+  //
+  // Antes era una lista negra de los tres estados de rechazo, y por eso contaba como "alumno activo"
+  // a cualquier solicitud que no fuera ni rechazo ni ocupante — `modificar_reenviar`, por ejemplo,
+  // que existe en datos reales. El profesor veía el botón de cerrar (el frontend sí usa la lista
+  // blanca) y el backend le respondía 400.
   const procesosActivos = oferta.solicitud_registro.filter(
     (s) =>
-      !ESTADOS_RECHAZO_SOLICITUD.includes(s.estado_solicitud) &&
+      ESTADOS_QUE_OCUPAN_CUPO_PROFESOR.includes(s.estado_solicitud) &&
       !ESTADOS_LSS_LIBERAN_CUPO.includes(s.liberacion_proceso?.estado)
   ).length;
 
@@ -729,12 +767,33 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
     );
   }
 
-  const actualizada = await prisma.oferta_servicio.update({
-    where: { id: ofertaId },
+  // Condicionado a que la oferta SIGA 'aprobada' en el instante de escribir — mismo patrón CAS que
+  // decidirOferta y que la conclusión automática. Entre el findUnique de arriba y esta escritura el
+  // cron puede haberla concluido; sin esta guarda, un `update` por id pisaba ese 'concluida' con
+  // 'cerrada'. La única transición que puede aplicar es 'aprobada' → 'cerrada'.
+  const { count } = await prisma.oferta_servicio.updateMany({
+    where: { id: ofertaId, estado_oferta: 'aprobada' },
     data: { estado_oferta: 'cerrada' },
   });
 
+  if (count === 0) {
+    throw Object.assign(
+      new Error('El estado de esta oferta cambió mientras la consultabas. Vuelve a cargar tus ofertas.'),
+      { status: 409 }
+    );
+  }
+
+  // Se relee sin `include` para devolver exactamente la misma forma de fila que antes devolvía
+  // `update` (igual que decidirOferta tras su CAS): el `include` de arriba no debe salir al HTTP.
+  const actualizada = await prisma.oferta_servicio.findUnique({ where: { id: ofertaId } });
+
   await invalidarCacheOfertas();
+
+  // Avisa a Coordinación para que su consulta (CU-PRO-03) se refresque sola, con el mismo evento y
+  // el mismo helper que ya usan el registro, el reenvío y la decisión. Sin `excluirCoordinadorId`:
+  // quien cierra es el profesor, así que no hay coordinador al que ahorrarle la recarga.
+  // Fail-open por el helper, que no propaga: el cierre ya está confirmado en BD.
+  await emitirATodosLosCoordinadores('oferta:actualizada', { ofertaId });
 
   return actualizada;
 }
@@ -798,12 +857,20 @@ async function revisarConclusionAutomatica() {
 
       await invalidarCacheOfertas();
 
-      await crearNotificacion({
-        usuarioId: oferta.profesor.usuario_id,
-        tipo: 'success',
-        mensaje: `Tu oferta "${oferta.nombre_proyecto}" ha concluido: todos los alumnos terminaron su servicio social.`,
-        rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
-      });
+      // Fail-open, igual que en decidirOferta y que el resto de los avisos del proyecto: la
+      // conclusión ya está persistida por el CAS de arriba. Sin este try/catch, un fallo al
+      // notificar salía de la función y abortaba el recorrido, dejando SIN revisar todas las
+      // ofertas restantes de la pasada.
+      try {
+        await crearNotificacion({
+          usuarioId: oferta.profesor.usuario_id,
+          tipo: 'success',
+          mensaje: `Tu oferta "${oferta.nombre_proyecto}" ha concluido: todos los alumnos terminaron su servicio social.`,
+          rutaRelacionada: `/profesor/proyectos?destacar=${oferta.id}`,
+        });
+      } catch (err) {
+        console.error('Error al notificar la conclusión de la oferta:', err.message);
+      }
 
       try {
         emitirAUsuario(oferta.profesor.usuario_id, 'oferta:concluida', { ofertaId: oferta.id });
@@ -822,6 +889,7 @@ module.exports = {
   TIPOS_OFERTA,
   MENSAJE_TIPO_OFERTA_INVALIDO,
   textoObligatorioRecortado,
+  enteroEstricto,
   listarOfertasDisponibles,
   listarPerfilesDisponibles,
   calcularCuposDisponibles,

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { apiFetch } from "@/services/apiClient";
+import { validarEdicion } from "../historialOfertas.js";
 
 export function useHistorialOfertas() {
   const [proyectos, setProyectos]           = useState([]);
@@ -74,6 +75,7 @@ export function useHistorialOfertas() {
   }
 
   function toggleCarreraEdicion(key) {
+    if (erroresEdicion.carreras) setErroresEdicion(prev => ({ ...prev, carreras: null }));
     setFormEdicion(prev => ({
       ...prev,
       carreras: prev.carreras.includes(key)
@@ -82,20 +84,9 @@ export function useHistorialOfertas() {
     }));
   }
 
-  function validarEdicion(esIndividual) {
-    const e = {};
-    if (!formEdicion.nombre?.trim())       e.nombre       = "El nombre es obligatorio.";
-    if (!formEdicion.descripcion?.trim()) e.descripcion = "La descripción es obligatoria.";
-    if (!esIndividual) {
-      const n = parseInt(formEdicion.cupos);
-      if (!formEdicion.cupos || isNaN(n) || n < 2) e.cupos = "Para modalidad proyecto, el mínimo es de 2 cupos.";
-    }
-    return e;
-  }
-
 async function submitEdicion(p) {
   const esIndividual = p.tipo === "individual";
-  const e = validarEdicion(esIndividual);
+  const e = validarEdicion(formEdicion, esIndividual);
   if (Object.keys(e).length > 0) { setErroresEdicion(e); return; }
 
   try {

@@ -4,6 +4,7 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 import { useHistorialOfertas } from "./hooks/useHistorialOfertas";
+import { debeMostrarSinOfertas } from "./historialOfertas.js";
 import { EstatusBadge } from "./components/EstatusBadge";
 import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 import { etiquetaPresentacion } from "@/features/gestion-ofertas/utils/carreraPresentacion";
@@ -155,7 +156,7 @@ export default function HistorialOfertas() {
 
               {/* Lista */}
               <div style={{ flexShrink: 0, width: panelAbierto ? 420 : "100%", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-                {proyectos.length === 0 && (
+                {debeMostrarSinOfertas(proyectos.length, errorCarga) && (
                   <div style={{ textAlign: "center", padding: "3rem", color: C.textMuted, fontSize: 14 }}>
                     No tienes ofertas registradas aún.
                   </div>
