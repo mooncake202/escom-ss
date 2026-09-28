@@ -118,9 +118,48 @@ async function solicitarCambioDesdeSesion(usuarioId) {
   return solicitarRestablecimiento(usuario.correo_institucional);
 }
 
+/**
+ * RN-CRED-01, patrón B: cambio de contraseña desde sesión activa, sin
+ * correo ni token — el JWT ya es la prueba de identidad. Reutiliza tal
+ * cual la validación de RN-CRED-04 (validarContrasena) y RN-CRED-05 (no
+ * igual a la anterior) ya construidas arriba para el flujo de token; no
+ * aplica RN-CRED-03 (nada que invalidar, no hay token_contrasena de por
+ * medio en este patrón).
+ */
+async function cambiarContrasenaConActual(usuarioId, contrasenaActual, contrasenaNueva) {
+  const usuario = await prisma.usuario.findUnique({ where: { id: usuarioId } });
+  if (!usuario) {
+    const error = new Error('Usuario no encontrado.');
+    error.status = 404;
+    throw error;
+  }
+
+  const actualValida = await bcrypt.compare(contrasenaActual || '', usuario.contrasena);
+  if (!actualValida) {
+    const error = new Error('La contraseña actual no es correcta.');
+    error.status = 401;
+    throw error;
+  }
+
+  // Mismo orden que restablecerContrasena: primero requisitos de seguridad
+  // (RN-CRED-04), luego que no sea igual a la anterior (RN-CRED-05).
+  validarContrasena(contrasenaNueva);
+
+  const esIgualAnterior = await bcrypt.compare(contrasenaNueva, usuario.contrasena);
+  if (esIgualAnterior) {
+    const error = new Error('La nueva contraseña no puede ser igual a la anterior.');
+    error.status = 400;
+    throw error;
+  }
+
+  const hash = await bcrypt.hash(contrasenaNueva, 10);
+  await prisma.usuario.update({ where: { id: usuario.id }, data: { contrasena: hash } });
+}
+
 module.exports = {
   solicitarRestablecimiento,
   restablecerContrasena,
   solicitarCambioDesdeSesion,
   validarTokenVigente,
+  cambiarContrasenaConActual,
 };

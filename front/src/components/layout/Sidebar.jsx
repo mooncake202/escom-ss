@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme, GRADIENTS, BRAND } from "@/themes/colors";
 import { apiFetch } from "@/services/apiClient";
 import { useSocket } from "@/context/SocketContext";
+import { ModalCambiarContrasena } from "@/features/login/CU-CRED-02-cambiar-contraseña/ModalCambiarContrasena";
 
 // ── Iconos SVG inline ────────────────────────────────────────
 const Icon = ({ d, size = 18 }) => (
@@ -26,6 +27,7 @@ const ICONS = {
   baja:         "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z M15 3v4a1 1 0 001 1h4",
   userMinus:    "M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6h12a6 6 0 00-6-6z M22 11h-6",
   logout:       "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
+  lock:         "M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4",
   oferta:       "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
   alumnos:      "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
 };
@@ -91,6 +93,7 @@ const NAV_ITEMS = {
 export function Sidebar({ rol = "profesor" }) {
   const { C } = useTheme();
   const [expanded, setExpanded] = useState(() => localStorage.getItem("sidebarExpandido") === "true");
+  const [mostrarCambiarContrasena, setMostrarCambiarContrasena] = useState(false);
   const navigate  = useNavigate();
   const location  = useLocation();
   const { desconectar } = useSocket();
@@ -187,6 +190,37 @@ export function Sidebar({ rol = "profesor" }) {
           );
         })}
       </nav>
+
+      {/* Cambiar contraseña — RN-CRED-01, patrón B (sesión activa, sin correo/token).
+          Mismo componente compartido por los 3 roles, así que un solo botón aquí
+          cubre alumno/profesor/coordinador sin duplicar nada. */}
+      <div style={{ padding: "8px 6px 0", flexShrink: 0 }}>
+        <button
+          onClick={() => setMostrarCambiarContrasena(true)}
+          title={!expanded ? "Cambiar contraseña" : undefined}
+          style={{
+            width: "100%", height: 40,
+            display: "flex", alignItems: "center",
+            gap: 10, padding: expanded ? "0 10px" : "0",
+            justifyContent: expanded ? "flex-start" : "center",
+            borderRadius: 8, border: "none", cursor: "pointer",
+            background: "transparent", color: C.textMuted,
+            fontFamily: "inherit", fontSize: 13, fontWeight: 400,
+            transition: "background 0.15s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = C.navItemHover}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+        >
+          <span style={{ flexShrink: 0, display: "flex" }}>
+            <Icon d={ICONS.lock} size={17} />
+          </span>
+          {expanded && <span>Cambiar contraseña</span>}
+        </button>
+      </div>
+
+      {mostrarCambiarContrasena && (
+        <ModalCambiarContrasena onCerrar={() => setMostrarCambiarContrasena(false)} />
+      )}
 
       {/* Logout */}
       <div style={{ padding: "8px 6px", borderTop: `1px solid ${C.navBorder}`, flexShrink: 0 }}>

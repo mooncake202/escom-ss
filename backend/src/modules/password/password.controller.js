@@ -64,4 +64,24 @@ async function getValidarToken(req, res) {
   }
 }
 
-module.exports = { postForgotPassword, postResetPassword, postChangePasswordSesion, getValidarToken };
+async function putCambiarContrasena(req, res) {
+  try {
+    const usuarioId = req.usuario.sub;
+    const { contrasenaActual, contrasenaNueva } = req.body;
+    await passwordService.cambiarContrasenaConActual(usuarioId, contrasenaActual, contrasenaNueva);
+    return res.status(200).json({ message: 'Tu contraseña fue actualizada correctamente.' });
+  } catch (err) {
+    const status = err.status || 500;
+    const message = status === 500 ? 'Ocurrió un error. Intenta de nuevo más tarde.' : err.message;
+    if (status === 500) console.error('Error en cambiar-contrasena:', err);
+    return res.status(status).json({ message });
+  }
+}
+
+module.exports = {
+  postForgotPassword,
+  postResetPassword,
+  postChangePasswordSesion,
+  getValidarToken,
+  putCambiarContrasena,
+};
