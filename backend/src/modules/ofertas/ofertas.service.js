@@ -14,6 +14,18 @@ const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
 const CACHE_KEY_OFERTAS = 'cache:ofertas';
 const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
 
+// Valores del enum `TipoOfertaServicio`. Se exporta para que el registro (CU-PRO-01), el reenvío
+// (CU-PRO-05) y la consulta (CU-PRO-03) validen contra la MISMA lista en vez de repetir el literal.
+// La consulta lo necesita porque el valor va al `where` de un campo enum: sin validar, Prisma lanza
+// un error de validación que el controller traduce a 500 en vez de 400.
+const TIPOS_OFERTA = Object.freeze(['individual', 'proyecto']);
+const MENSAJE_TIPO_OFERTA_INVALIDO = "tipo_oferta debe ser 'individual' o 'proyecto'.";
+
+// Normalización para buscar sin distinguir mayúsculas ni acentos. Mismo comportamiento que
+// `sinAcentos` de front/.../CU-REP-05-revisar-reportes-profesor/revisionReportes.js; se duplica
+// porque esta búsqueda corre en el backend y los dos árboles no comparten paquete.
+const sinAcentos = (texto) => String(texto).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
 /**
  * RF-GR-06: solo ofertas activas y con cupos disponibles al momento de la consulta.
  */
@@ -156,10 +168,16 @@ const { emitirAUsuario } = require('../../sockets/socket.server');
 // lss-alumno.service.js: cualquier coordinador puede revisar/decidir cualquier oferta (no hay
 // reparto real entre ellos), así que se emite individualmente a cada coordinador existente en vez
 // de a uno solo. Fail-open, nunca tumba la operación de negocio.
-async function emitirATodosLosCoordinadores(evento, datos) {
+async function emitirATodosLosCoordinadores(evento, datos, { excluirCoordinadorId } = {}) {
   try {
-    const coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+    const coordinadores = await prisma.coordinador.findMany({ select: { id: true, usuario_id: true } });
     for (const c of coordinadores) {
+      // `excluirCoordinadorId` evita avisar a quien acaba de provocar el cambio: su pantalla ya se
+      // recarga sola, así que el evento solo le costaría una petición repetida. Se filtra en el
+      // servidor y no en el cliente porque la sesión del frontend guarda `usuario.id`, no
+      // `coordinador.id`, y no podría compararlos. Sin el parámetro, el comportamiento es el de
+      // siempre: se avisa a todos (registro y reenvío lo usan así).
+      if (excluirCoordinadorId !== undefined && c.id === excluirCoordinadorId) continue;
       try {
         emitirAUsuario(c.usuario_id, evento, datos);
       } catch (err) {
@@ -309,6 +327,15 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
       console.error('Error al emitir oferta:decidida:', err.message);
     }
 
+    // Los DEMÁS coordinadores comparten esta bandeja, así que su pantalla de consulta debe
+    // enterarse de la decisión. Mismo evento que ya emiten el registro y el reenvío. Se excluye a
+    // quien decidió: su pantalla ya recarga sola. `emitirATodosLosCoordinadores` es fail-open por
+    // dentro, igual que el socket de arriba: nunca invalida una decisión ya confirmada.
+    await emitirATodosLosCoordinadores('oferta:actualizada', {
+      ofertaId: oferta.id,
+      decididaPor: coordinadorId,
+    }, { excluirCoordinadorId: coordinadorId });
+
     return actualizada;
   }
 
@@ -356,6 +383,15 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion,
     } catch (err) {
       console.error('Error al emitir oferta:decidida:', err.message);
     }
+
+    // Los DEMÁS coordinadores comparten esta bandeja, así que su pantalla de consulta debe
+    // enterarse de la decisión. Mismo evento que ya emiten el registro y el reenvío. Se excluye a
+    // quien decidió: su pantalla ya recarga sola. `emitirATodosLosCoordinadores` es fail-open por
+    // dentro, igual que el socket de arriba: nunca invalida una decisión ya confirmada.
+    await emitirATodosLosCoordinadores('oferta:actualizada', {
+      ofertaId: oferta.id,
+      decididaPor: coordinadorId,
+    }, { excluirCoordinadorId: coordinadorId });
 
     return actualizada;
   }
@@ -466,6 +502,13 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     throw Object.assign(new Error("vista debe ser 'pendientes' o 'historial'."), { status: 400 });
   }
 
+  // Sin esta guarda, un `tipo` fuera del enum llega al `where` y Prisma lanza un error de
+  // validación sin `status`, que el controller convierte en 500. El filtro es opcional: solo se
+  // valida cuando viene.
+  if (tipoOferta && !TIPOS_OFERTA.includes(tipoOferta)) {
+    throw Object.assign(new Error(MENSAJE_TIPO_OFERTA_INVALIDO), { status: 400 });
+  }
+
   const where = {
     estado_oferta: estadoWhere,
     ...(tipoOferta && { tipo_oferta: tipoOferta }),
@@ -485,16 +528,22 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
   // exactamente la misma regla de coincidencia. El volumen de esta tabla es bajo (pantalla interna
   // de coordinación, no una búsqueda pública), así que traer las filas ya filtradas por
   // estado/tipo y filtrar aquí no representa un problema de escala.
-  const ofertas = busqueda
+  // El término se recorta ANTES de comparar, y el recorte decide si hay búsqueda: un texto que
+  // queda vacío tras recortarlo (solo espacios) se comporta como "sin búsqueda", no como "0
+  // resultados". El espacio INTERIOR se conserva, así que "Prueba de" sigue encontrando "Prueba de
+  // integración". `busqueda` viene del query string y puede no ser cadena; `sinAcentos` ya hace
+  // String(), así que un valor no textual sigue sin provocar 500: simplemente no coincide con nada.
+  const termino = sinAcentos(busqueda ?? '').trim();
+
+  const ofertas = termino
     ? ofertasEncontradas.filter((o) => {
-        const termino = busqueda.toLowerCase();
         const nombre = o.profesor.usuario.nombre;
         const apellidos = o.profesor.usuario.apellidos;
         return (
-          o.nombre_proyecto.toLowerCase().includes(termino) ||
-          nombre.toLowerCase().includes(termino) ||
-          apellidos.toLowerCase().includes(termino) ||
-          `${nombre} ${apellidos}`.toLowerCase().includes(termino)
+          sinAcentos(o.nombre_proyecto).includes(termino) ||
+          sinAcentos(nombre).includes(termino) ||
+          sinAcentos(apellidos).includes(termino) ||
+          sinAcentos(`${nombre} ${apellidos}`).includes(termino)
         );
       })
     : ofertasEncontradas;
@@ -543,8 +592,8 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
   if (!nombreLimpio || !descripcionLimpia || !tipo_oferta) {
     throw Object.assign(new Error('Faltan campos obligatorios.'), { status: 400 });
   }
-  if (!['individual', 'proyecto'].includes(tipo_oferta)) {
-    throw Object.assign(new Error("tipo_oferta debe ser 'individual' o 'proyecto'."), { status: 400 });
+  if (!TIPOS_OFERTA.includes(tipo_oferta)) {
+    throw Object.assign(new Error(MENSAJE_TIPO_OFERTA_INVALIDO), { status: 400 });
   }
   if (!Array.isArray(carreras) || carreras.length === 0) {
     throw Object.assign(new Error('Debe seleccionar al menos un perfil de carrera.'), { status: 400 });
@@ -770,6 +819,8 @@ async function revisarConclusionAutomatica() {
 }
 
 module.exports = {
+  TIPOS_OFERTA,
+  MENSAJE_TIPO_OFERTA_INVALIDO,
   textoObligatorioRecortado,
   listarOfertasDisponibles,
   listarPerfilesDisponibles,

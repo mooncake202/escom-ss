@@ -16,7 +16,7 @@ export default function ConsultarOfertas() {
   const { C } = useTheme();
   const { usuario } = useSesion();
   const {
-    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadosIds,
+    proyectos, lista, cargando, errorCarga, vista, busqueda, hayFiltros, filtroModalidad, seleccionado, toast, destacadosIds,
     seleccionar, cambiarVista, setBusqueda, setFiltroModalidad, aprobar, rechazar,
   } = useOfertas();
 
@@ -36,7 +36,6 @@ export default function ConsultarOfertas() {
       .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de ofertas:", err));
   }, []);
 
-  const hayFiltros = busqueda || filtroModalidad !== "todos";
 
   const inputStyle = {
     padding: "8px 13px", background: C.bgInput,
@@ -187,7 +186,7 @@ export default function ConsultarOfertas() {
                         )}
                         {seleccionado.fechaRegistro && (
                           <p style={{ margin: "2px 0 0", fontSize: 12, color: C.textDisabled }}>
-                            Registrada: {formatearFechaUTC(seleccionado.fechaRegistro, { day: "2-digit", month: "short", year: "numeric" })}
+                            Registrada el {formatearFechaUTC(seleccionado.fechaRegistro, { day: "2-digit", month: "2-digit", year: "numeric" })}
                           </p>
                         )}
                       </div>

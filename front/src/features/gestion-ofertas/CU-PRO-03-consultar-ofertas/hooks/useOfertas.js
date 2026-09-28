@@ -1,29 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/services/apiClient";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
+import { adaptarOferta, resolverSeleccion, terminoBuscado, hayFiltrosActivos } from "../consultaOfertas.js";
 
-function adaptarOferta(o) {
-  return {
-    id: o.id,
-    nombre: o.titulo,
-    tituloSISS: o.nombreSISS,
-    programaSISS: o.programaSISS,
-    profesor: o.profesor,
-    modalidad: o.modalidad,
-    estado: o.estado === "pendiente_revision" ? "pendiente"
-          : o.estado === "aprobada" ? "aprobado"
-          : o.estado === "rechazada" ? "rechazado"
-          : o.estado,
-    descripcion: o.descripcion,
-    actividades: o.actividades ? [o.actividades] : [],
-    cuposRegistrados: o.cuposRegistrados,
-    cuposDisponibles: o.cuposDisponibles,
-    cuposOcupadosProfesor: o.cuposOcupadosProfesor,
-    cuposTotalesProfesor: o.cuposTotalesProfesor,
-    perfilDeseado: o.perfilCarrera,
-    motivoRechazo: o.motivoRechazo,
-  };
-}
 
 export function useOfertas() {
   const [proyectos, setProyectos]                 = useState([]);
@@ -36,6 +16,8 @@ export function useOfertas() {
   const [seleccionado, setSeleccionado]           = useState(null);
   const [toast, setToast]                         = useState(null);
 
+  const { socket } = useSocket();
+
   const [searchParams] = useSearchParams();
   const [destacadosIds, setDestacadosIds] = useState(new Set());
 
@@ -45,29 +27,61 @@ export function useOfertas() {
   }, [searchParams]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setBusquedaDebounced(busqueda), 400);
+    // El recorte vive en `terminoBuscado`: de ahí salen tanto el término que se envía como el que
+    // decide si hay filtros activos, así que un texto de solo espacios equivale a no buscar en los
+    // dos sitios.
+    const timer = setTimeout(() => setBusquedaDebounced(terminoBuscado(busqueda)), 400);
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  const cargar = useCallback(() => {
+  // `silencioso`: recarga sin tocar `cargando`, para que un refresco por socket no haga
+  // desaparecer la lista ya pintada. Mismo criterio que el dashboard, que tampoco toca `cargando`
+  // al refrescar por evento.
+  const cargar = useCallback(({ silencioso = false } = {}) => {
     const params = new URLSearchParams();
     if (busquedaDebounced) params.set("busqueda", busquedaDebounced);
     if (filtroModalidad !== "todos") params.set("tipo", filtroModalidad);
 
-    setCargando(true);
-    Promise.all([
+    if (!silencioso) setCargando(true);
+    return Promise.all([
       apiFetch(`/ofertas/consultar?vista=pendientes&${params.toString()}`),
       apiFetch(`/ofertas/consultar?vista=historial&${params.toString()}`),
     ])
       .then(([pendientes, historial]) => {
-        setProyectos([...pendientes, ...historial].map(adaptarOferta));
+        const lista = [...pendientes, ...historial].map(adaptarOferta);
+        setProyectos(lista);
+        // El detalle abierto apunta a un objeto de la lista ANTERIOR. Se re-resuelve por id contra
+        // la nueva: si sigue ahí, se reemplaza por la versión fresca; si desapareció (otro
+        // coordinador la decidió y cambió de categoría, o dejó de entrar en la consulta), se cierra
+        // para no mostrar datos que ya no existen.
+        setSeleccionado((previo) => resolverSeleccion(lista, previo));
         setErrorCarga(null);
       })
       .catch((err) => setErrorCarga(err.message || "No se pudieron cargar las ofertas."))
-      .finally(() => setCargando(false));
+      .finally(() => { if (!silencioso) setCargando(false); });
   }, [busquedaDebounced, filtroModalidad]);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  // Tiempo real: el backend emite `oferta:actualizada` a los coordinadores cuando un profesor
+  // registra o reenvía una oferta, y cuando OTRO coordinador la decide (a quien decide ya se le
+  // excluye en el servidor, así que aquí no hace falta filtrar). La recarga es silenciosa y
+  // conserva búsqueda, modalidad y pestaña: `cargar` lleva los filtros vigentes en su closure y
+  // `vista` no es parámetro suyo.
+  //
+  // `cargar` va en las dependencias a propósito: su identidad cambia con los filtros, y el handler
+  // debe capturar los vigentes. El cleanup desregistra la MISMA referencia antes de volver a
+  // registrar, así que no se acumulan listeners.
+  useEffect(() => {
+    if (!socket) return;
+
+    const refrescarSilencioso = () => cargar({ silencioso: true });
+    socket.on("oferta:actualizada", refrescarSilencioso);
+    return () => socket.off("oferta:actualizada", refrescarSilencioso);
+  }, [socket, cargar]);
+
+  // Cierra el hueco de eventos perdidos durante una desconexión real.
+  useSocketReconectado(() => cargar({ silencioso: true }));
 
   const lista = proyectos.filter(p =>
     vista === "solicitudes" ? p.estado === "pendiente" : p.estado !== "pendiente"
@@ -134,8 +148,12 @@ export function useOfertas() {
     }
   }
 
+  // Se deriva del término ya RECORTADO, no del texto crudo del input: así "   " no cuenta como
+  // filtro activo ni dispara el mensaje de "no se encontraron ofertas".
+  const hayFiltros = hayFiltrosActivos(busquedaDebounced, filtroModalidad);
+
   return {
-    proyectos, lista, cargando, errorCarga, vista, busqueda, filtroModalidad, seleccionado, toast, destacadosIds,
+    proyectos, lista, cargando, errorCarga, vista, busqueda, hayFiltros, filtroModalidad, seleccionado, toast, destacadosIds,
     seleccionar, cambiarVista, setBusqueda, setFiltroModalidad, aprobar, rechazar,
   };
 }

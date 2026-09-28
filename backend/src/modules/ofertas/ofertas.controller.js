@@ -1,5 +1,5 @@
 const ofertasService = require('./ofertas.service');
-const { emitirATodosLosCoordinadores, textoObligatorioRecortado } = ofertasService;
+const { emitirATodosLosCoordinadores, textoObligatorioRecortado, TIPOS_OFERTA, MENSAJE_TIPO_OFERTA_INVALIDO } = ofertasService;
 const prisma = require('../../lib/prisma');
 
 async function getOfertas(req, res) {
@@ -57,8 +57,8 @@ async function solicitarRegistroOferta(req, res) {
       return res.status(400).json({ message: 'Faltan campos obligatorios.' });
     }
 
-    if (!['individual', 'proyecto'].includes(tipo_oferta)) {
-      return res.status(400).json({ message: "tipo_oferta debe ser 'individual' o 'proyecto'." });
+    if (!TIPOS_OFERTA.includes(tipo_oferta)) {
+      return res.status(400).json({ message: MENSAJE_TIPO_OFERTA_INVALIDO });
     }
 
     if (!Array.isArray(carreras) || carreras.length === 0) {
