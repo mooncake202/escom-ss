@@ -29,7 +29,7 @@ const ETAPAS = {
   },
   aprobada: {
     titulo: "Baja aprobada",
-    detalle: "El servicio social del alumno quedó cancelado y su lugar en la oferta fue liberado.",
+    detalle: "El servicio social del alumno quedó cancelado y se liberó un cupo del profesor.",
     color: "success",
   },
   rechazada: {

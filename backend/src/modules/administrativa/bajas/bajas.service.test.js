@@ -1549,6 +1549,29 @@ test('notificaciones: al aprobar, el profesor recibe SU ruta y Coordinación la 
     assert.equal(bd.notificaciones.find((n) => n.usuario_id === coord).ruta_relacionada,
       '/coordinacion/gestionar-bajas');
   }
+
+  // Texto: se libera el cupo del PROFESOR; el lugar en la oferta no se afirma.
+  for (const usuarioId of [U_PROFESOR, U_COORD_1, U_COORD_2]) {
+    assert.equal(bd.notificaciones.find((n) => n.usuario_id === usuarioId).mensaje, 'La baja de Ana Torres Vega (2022630001) fue aprobada. Su servicio social actual quedó cancelado y se liberó un cupo del profesor.');
+  }
+});
+
+test('notificaciones: con la oferta cerrada, el aviso habla del cupo del profesor y no del lugar en la oferta', async () => {
+  montar({
+    ofertas: [oferta({ estado: 'cerrada' })],
+    bajas: [bajaEnRevision({ solicitanteId: U_PROFESOR })],
+    documentos: [documento({ id: 1 })],
+  });
+
+  const r = await servicio.aprobarSolicitud({ solicitudId: 1, coordinadorUsuarioId: U_COORD_1 });
+
+  assert.equal(r.cupoLiberado, false, 'la oferta cerrada no recibe su lugar de vuelta');
+  assert.equal(ofertaEnBd().cupos_disponibles, 1, 'cupos_disponibles sin cambio');
+  for (const usuarioId of [U_PROFESOR, U_COORD_1, U_COORD_2]) {
+    const { mensaje } = bd.notificaciones.find((n) => n.usuario_id === usuarioId);
+    assert.equal(mensaje, 'La baja de Ana Torres Vega (2022630001) fue aprobada. Su servicio social actual quedó cancelado y se liberó un cupo del profesor.');
+    assert.doesNotMatch(mensaje, /lugar en la oferta/);
+  }
 });
 
 // ── Autorización ──

@@ -1067,8 +1067,10 @@ async function avisarAlSolicitante(solicitud, { tipo, mensaje, ruta }) {
  * No se toca JWT, Redis ni el middleware: solo se reutiliza el socket que este módulo ya usaba.
  */
 async function avisarResolucionAprobada(cap) {
+  // Lo que se libera SIEMPRE es un cupo del profesor (el alumno deja de estar asignado). El lugar en
+  // la oferta solo vuelve si la oferta sigue aprobada, así que el aviso no lo afirma.
   const mensaje = `La baja de ${cap.nombre} (${cap.boleta}) fue aprobada. Su servicio social actual `
-    + 'quedó cancelado y su lugar en la oferta fue liberado.';
+    + 'quedó cancelado y se liberó un cupo del profesor.';
 
   const destinatarios = new Set();
   if (cap.profesorUsuarioId) destinatarios.add(cap.profesorUsuarioId);
