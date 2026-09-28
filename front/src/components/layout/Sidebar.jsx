@@ -32,13 +32,19 @@ const ICONS = {
   alumnos:      "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z",
 };
 
+// "Recursos" (consulta de solo lectura, RecursosConsulta.jsx) se quitó del
+// sidebar de Alumno/Profesor por auditoría contra la tabla de referencia de
+// roles: "Gestionar recursos del servicio social" es exclusivo de
+// Coordinador ahí. La ruta /alumno/recursos y /profesor/recursos siguen
+// existiendo y protegidas por rol tanto en frontend (RutaProtegida) como en
+// backend (requireRole en recursos.routes.js) — solo se ocultó del menú,
+// no se tocó nada más (investigado, confirmado sin tocar código de rutas).
 const NAV_ITEMS_ALUMNO = [
   { key: "dashboard",   label: "Inicio",        path: "/dashboard",                     icon: "dashboard" },
   { key: "actividades", label: "Actividades",   path: "/alumno/actividades",            icon: "actividades" },
   { key: "reportes",    label: "Reportes",      path: "/alumno/reportes",               icon: "reportes" },
   { key: "calendario",  label: "Calendario",    path: "/alumno/calendario",             icon: "calendario" },
   { key: "anuncios",    label: "Anuncios",      path: "/alumno/anuncios",               icon: "anuncios" },
-  { key: "recursos",    label: "Recursos",      path: "/alumno/recursos",               icon: "recursos" },
   // Una sola entrada para toda la asignación del alumno: dentro se navega por pestañas entre su
   // profesor responsable y su equipo. Antes eran dos entradas y una de ellas aparecía y desaparecía
   // según la pantalla, lo que hacía saltar el menú.
@@ -48,18 +54,20 @@ const NAV_ITEMS_ALUMNO = [
   { key: "datos",       label: "Mis datos",     path: "/alumno/datos",                  icon: "config" },
 ];
 
+// "Recursos" y "Contacto inst." quitados del sidebar de Profesor (misma
+// auditoría que Alumno arriba — ambos son exclusivos de Coordinador en la
+// tabla de referencia). "Calendario" se movió a la posición 4, igual que
+// en Coordinación y Alumno (antes estaba en la posición 7).
 const NAV_ITEMS_PROFESOR = [
   { key: "dashboard",     label: "Inicio",             path: "/dashboard",                       icon: "dashboard" },
   { key: "solicitudes",   label: "Solicitudes",        path: "/profesor/solicitudes",            icon: "solicitudes" },
   { key: "actividades",   label: "Actividades",        path: "/profesor/actividades",            icon: "actividades" },
+  { key: "calendario",    label: "Calendario",         path: "/profesor/calendario",             icon: "calendario" },
   { key: "mis-alumnos",   label: "Mis alumnos",        path: "/profesor/mis-alumnos",            icon: "alumnos" },
   { key: "ofertas",       label: "Mis ofertas",        path: "/profesor/proyectos",              icon: "oferta" },
   { key: "reportes",      label: "Reportes",           path: "/profesor/reportes",               icon: "reportes" },
-  { key: "calendario",    label: "Calendario",         path: "/profesor/calendario",             icon: "calendario" },
   { key: "modificacion",  label: "Solicitar cambios",  path: "/profesor/solicitar-modificacion", icon: "solicitudes" },
   { key: "anuncios",      label: "Anuncios",           path: "/profesor/anuncios",               icon: "anuncios" },
-  { key: "recursos",      label: "Recursos",           path: "/profesor/recursos",               icon: "recursos" },
-  { key: "institucion",   label: "Contacto inst.",     path: "/profesor/contacto-institucional", icon: "institucion" },
   { key: "baja",          label: "Baja alumno",        path: "/profesor/solicitar-baja-alumno",  icon: "userMinus" },
   { key: "datos",         label: "Mis datos",          path: "/profesor/datos-personales",       icon: "config" },
 ];

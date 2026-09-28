@@ -227,14 +227,16 @@ function App() {
         <Route path="/coordinacion/admin/recursos" element={
           <RutaProtegida roles={COORDINADOR}><GestionarRecursos /></RutaProtegida>
         } />
-        {/* ADM-05: consulta en solo lectura. El alumno ASIGNADO y el profesor comparten la MISMA
-            pantalla; solo cambia el rol que se le pasa al layout. `alumno_sin_asignar` no entra:
-            los recursos son del servicio en curso, no del trámite de registro. */}
+        {/* ADM-05: acceso de alumno/profesor a la consulta de recursos retirado por decisión
+            explícita (backend ya exige `coordinador` en GET /recursos). Las rutas se dejan
+            declaradas — no borradas — apuntando a RutaProtegida con roles={COORDINADOR} para que
+            cualquier alumno/profesor que navegue directo por URL reciba el mismo rechazo/redirect
+            que ya usa el resto del proyecto para restricciones por rol, en vez de un 404 genérico. */}
         <Route path="/alumno/recursos" element={
-          <RutaProtegida roles={ALUMNO_ASIGNADO}><RecursosConsulta rol="alumno_asignado" /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><RecursosConsulta rol="alumno_asignado" /></RutaProtegida>
         } />
         <Route path="/profesor/recursos" element={
-          <RutaProtegida roles={PROFESOR}><RecursosConsulta rol="profesor" /></RutaProtegida>
+          <RutaProtegida roles={COORDINADOR}><RecursosConsulta rol="profesor" /></RutaProtegida>
         } />
         <Route path="/coordinacion/admin/anuncios" element={
           <RutaProtegida roles={COORDINADOR}><PublicarAnuncios rol="coordinacion" /></RutaProtegida>

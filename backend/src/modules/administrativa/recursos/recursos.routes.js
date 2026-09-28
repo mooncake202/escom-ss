@@ -6,12 +6,9 @@ const router = express.Router();
 
 // Montado bajo '/recursos' en server.js.
 
-// Lectura: alumno asignado, profesor y coordinación. La lista es la misma para los tres — no hay
-// nada que filtrar por rol, así que `listar()` ni siquiera recibe el usuario.
-//
-// `alumno_sin_asignar` queda FUERA por decisión de alcance: los recursos son del servicio en curso,
-// no del trámite de registro.
-router.get('/', requireAuth, requireRole('alumno_asignado', 'profesor', 'coordinador'), getRecursos);
+// Lectura: SOLO coordinación. El acceso de alumno/profesor a la consulta de recursos fue retirado
+// por decisión explícita (ya no forma parte de la tabla de referencia de acciones por rol).
+router.get('/', requireAuth, requireRole('coordinador'), getRecursos);
 
 // Escritura: SOLO coordinación. La protección del frontend no basta; el rol se exige aquí.
 router.post('/', requireAuth, requireRole('coordinador'), postRecurso);

@@ -512,6 +512,7 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
 
         {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.purple} C={C}>
+          <ActionItem icon="calendar" {...T.blue}    label="Consultar calendario escolar" desc="Periodos, días inhábiles, vacaciones" onClick={() => navigate("/alumno/calendario")} C={C} />
           <ActionItem icon="bell"   {...T.warning} label="Anuncios del sistema"        desc="Anuncios nuevos"          onClick={() => navigate("/alumno/anuncios")} C={C} />
           <ActionItem icon="user"   {...T.purple}  label="Mi asignación"               desc="Tu profesor responsable y tu equipo" onClick={() => navigate("/alumno/mi-asignacion")} C={C} />
           <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales" desc="Teléfono, correo personal" onClick={() => navigate("/alumno/datos")} C={C} />
@@ -786,6 +787,7 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
 
         {/* CU-ADM */}
         <Section title="Administrativa" icon="cog" {...T.slate} C={C}>
+          <ActionItem icon="calendar" {...T.blue}  label="Consultar calendario escolar"   desc="Periodos, días inhábiles, vacaciones" onClick={() => navigate("/profesor/calendario")} C={C} />
           <ActionItem icon="pencil" {...T.blue}    label="Actualizar datos personales"    desc="Teléfono, cubículo, departamento" onClick={() => navigate("/profesor/datos-personales")} C={C} />
           <ActionItem icon="bell"   {...T.warning} label="Publicar anuncio a mis alumnos" desc="Visible para todos tus alumnos asignados" onClick={() => navigate("/profesor/anuncios")} C={C} />
           <ActionItem icon="logout" {...T.danger}  label="Solicitar baja de alumno"       desc="Requiere justificación documentada" onClick={() => navigate("/profesor/solicitar-baja-alumno")} C={C} />
