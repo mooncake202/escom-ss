@@ -336,6 +336,127 @@ test('crear Periodo: semestre "02" → s02', async () => {
   assert.equal(prisma.estado.periodos[0].semestre, 's02');
 });
 
+// ── Dos Periodos no pueden INICIAR el mismo día ──
+//
+// A diferencia del Vacacional, aquí el TRASLAPE sí está permitido: dos ciclos consecutivos pueden
+// solaparse por los extremos. Lo único que se rechaza es que dos periodos arranquen la misma fecha.
+// La guarda no necesita `idExcluido` porque un Periodo es inmutable: solo se alcanza desde el alta.
+
+// Periodo existente: inicia el 16/10/2026 y termina el 17/05/2027 (el mismo rango que periodoNuevo).
+const conPeriodoExistente = (inicio = '2026-10-16', fin = '2027-05-17') => crearPrismaFalso({
+  eventos: [evento(1, 'Periodo', inicio, { fecha_fin: utc(fin), nombre: 'Existente' })],
+  periodos: [{ id: 1, evento_calendario_id: 1, anio: '2027', semestre: 's01', fecha_max_expediente: utc('2026-09-25') }],
+});
+
+test('crear Periodo: otro con la MISMA fecha de inicio → 409 PERIODO_DUPLICADO sin escribir ni tocar Redis', async () => {
+  const prisma = conPeriodoExistente();
+  const redis = crearRedisFalso();
+
+  await assert.rejects(
+    crear(periodoNuevo(), prisma, redis),
+    (err) => {
+      assert.equal(err.status, 409);
+      assert.equal(err.code, CODIGOS_ERROR.PERIODO_DUPLICADO);
+      assert.equal(err.message, 'Ya existe un periodo de prestación que inicia en esa fecha.');
+      return true;
+    },
+  );
+
+  // Ni evento ni periodo_registro a medias: la guarda corre DENTRO de la transacción, antes de crear.
+  assert.equal(prisma.estado.eventos.length, 1, 'no se creó el evento');
+  assert.equal(prisma.estado.periodos.length, 1, 'no se creó el periodo_registro');
+  assert.equal(prisma.estado.escrituras, 0, 'ninguna escritura');
+  assert.deepEqual(redis.llamadas, [], 'Redis solo se toca tras el commit');
+});
+
+test('crear Periodo: el mismo inicio se rechaza aunque cambie todo lo demás', async () => {
+  for (const [caso, extra] of Object.entries({
+    'otro fin': { fechaFin: '2027-06-14' },
+    'otro nombre': { nombre: 'Otro periodo' },
+    'otra fecha máxima': { fechaMaxExpediente: '2026-09-21' },
+    'todo lo anterior a la vez': { fechaFin: '2027-06-14', nombre: 'Otro', fechaMaxExpediente: '2026-09-21' },
+  })) {
+    const prisma = conPeriodoExistente();
+    await rechazaCon(crear(periodoNuevo(extra), prisma, crearRedisFalso()), 409, CODIGOS_ERROR.PERIODO_DUPLICADO);
+    assert.equal(prisma.estado.eventos.length, 1, caso);
+  }
+});
+
+// El caso del requisito: traslape permitido, arranque distinto.
+test('crear Periodo: con fecha de inicio DISTINTA se crea aunque los rangos se traslapen', async () => {
+  const prisma = conPeriodoExistente('2026-10-01', '2027-05-03');
+  const redis = crearRedisFalso();
+
+  const { evento: creado } = await crear(
+    periodoNuevo({ fechaInicio: '2026-10-15', fechaFin: '2027-05-17' }),
+    prisma, redis,
+  );
+
+  assert.equal(prisma.estado.eventos.length, 2, 'los dos periodos coexisten');
+  assert.equal(prisma.estado.periodos.length, 2, 'cada uno con su periodo_registro');
+  assert.equal(creado.fechaInicio, '2026-10-15');
+  assert.ok(redis.llamadas.length > 0, 'sí se registra la modificación tras el commit');
+});
+
+test('crear Periodo: todas las formas de traslape con inicio distinto se permiten', async () => {
+  // Todos los INICIOS caen en el ciclo 2027/01 (agosto 2026 – enero 2027) y son días hábiles
+  // posteriores a hoy; los FINES pueden quedar fuera del ciclo, que es lo que el código permite.
+  const casos = {
+    'empieza después y termina después': ['2026-10-15', '2027-05-17', '2026-09-25'],
+    'empieza antes y termina dentro': ['2026-09-23', '2027-01-15', '2026-09-21'],
+    'contenido por completo': ['2026-10-19', '2027-04-30', '2026-09-25'],
+    'contiene al existente': ['2026-09-23', '2027-06-14', '2026-09-21'],
+  };
+  for (const [caso, [fechaInicio, fechaFin, fechaMaxExpediente]] of Object.entries(casos)) {
+    const prisma = conPeriodoExistente('2026-10-01', '2027-05-03');
+    await crear(periodoNuevo({ fechaInicio, fechaFin, fechaMaxExpediente }), prisma, crearRedisFalso());
+    assert.equal(prisma.estado.eventos.length, 2, caso);
+  }
+
+  // Y el borde: empezar justo el día en que TERMINA el existente tampoco es duplicado.
+  const prismaBorde = conPeriodoExistente('2026-10-01', '2026-11-02');
+  await crear(periodoNuevo({ fechaInicio: '2026-11-02', fechaFin: '2027-05-17', fechaMaxExpediente: '2026-09-25' }), prismaBorde, crearRedisFalso());
+  assert.equal(prismaBorde.estado.eventos.length, 2, 'empieza el día del fin del existente');
+});
+
+// La regla es SOLO entre Periodos: no se inventa un cruce entre tipos distintos.
+test('crear Periodo: compartir la fecha de inicio con un Vacacional o un Inhabil NO es duplicado', async () => {
+  for (const [caso, existente] of Object.entries({
+    Vacacional: evento(1, 'Vacacional', '2026-10-16', { fecha_fin: utc('2026-10-23') }),
+    Inhabil: evento(1, 'Inhabil', '2026-10-16', { hora: horaUtc('10:00') }),
+  })) {
+    const prisma = crearPrismaFalso({ eventos: [existente] });
+    await crear(periodoNuevo(), prisma, crearRedisFalso());
+    assert.equal(prisma.estado.eventos.length, 2, caso);
+    assert.equal(prisma.estado.periodos.length, 1, caso);
+  }
+});
+
+// Y a la inversa: la regla nueva no debe estorbar a los otros dos tipos de alta.
+test('la regla nueva no afecta al alta de Inhabil ni de Vacacional en la fecha de un Periodo', async () => {
+  const prismaInhabil = conPeriodoExistente('2026-09-22');
+  await crear(inhabilNuevo(), prismaInhabil, crearRedisFalso());
+  assert.equal(prismaInhabil.estado.eventos.length, 2, 'el Inhabil se crea');
+
+  const prismaVacacional = conPeriodoExistente('2026-10-05');
+  await crear(vacacionalNuevo(), prismaVacacional, crearRedisFalso());
+  assert.equal(prismaVacacional.estado.eventos.length, 2, 'el Vacacional se crea');
+});
+
+// Los Periodos son inmutables, así que la guarda no tiene camino desde la edición.
+test('un Periodo sigue siendo inmutable: la guarda nueva solo se alcanza desde el alta', async () => {
+  const prisma = conPeriodoExistente();
+  await rechazaCon(
+    service.actualizarInhabil({ id: 1, entrada: periodoNuevo() }, deps(prisma, crearRedisFalso())),
+    409, CODIGOS_ERROR.EVENTO_INMUTABLE,
+  );
+  await rechazaCon(
+    service.eliminarInhabil({ id: 1 }, deps(prisma, crearRedisFalso())),
+    409, CODIGOS_ERROR.EVENTO_INMUTABLE,
+  );
+  assert.equal(prisma.estado.escrituras, 0);
+});
+
 test('crear Periodo: inicio o fin en sábado/domingo → 400 VALIDACION por campo, sin escribir en BD ni Redis', async () => {
   const casos = [
     [{ fechaInicio: '2026-10-17' }, ['fechaInicio']],                          // sábado

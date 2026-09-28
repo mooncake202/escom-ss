@@ -30,6 +30,7 @@ const TIPOS_VISIBLES_POR_ROL = Object.freeze({
 const MENSAJES = Object.freeze({
   [CODIGOS_ERROR.INHABIL_DUPLICADO]: 'Ya existe un día inhábil en esa fecha.',
   [CODIGOS_ERROR.VACACIONAL_CRUZADO]: 'Ya existe un periodo vacacional que se cruza con las fechas seleccionadas.',
+  [CODIGOS_ERROR.PERIODO_DUPLICADO]: 'Ya existe un periodo de prestación que inicia en esa fecha.',
   [CODIGOS_ERROR.EVENTO_INMUTABLE]: 'Los periodos y periodos vacacionales publicados no pueden editarse ni eliminarse.',
   [CODIGOS_ERROR.EVENTO_YA_EN_VIGOR]: 'Este día inhábil ya entró en vigor y no puede modificarse ni eliminarse.',
   [CODIGO_NO_ENCONTRADO]: 'Evento no encontrado.',
@@ -202,6 +203,20 @@ async function asegurarSinVacacionalCruzado(tx, fechaInicioISO, fechaFinISO) {
   if (existente) throw errorDeCodigo(CODIGOS_ERROR.VACACIONAL_CRUZADO, 409);
 }
 
+// Dos Periodos no pueden INICIAR el mismo día. A diferencia del Vacacional, aquí el traslape SÍ se
+// permite: dos ciclos consecutivos pueden solaparse por los extremos. Solo se compara fecha_inicio.
+// Misma ventana de concurrencia que las otras dos guardas: no hay UNIQUE ni bloqueo en BD.
+//
+// No hace falta un `idExcluido`: un Periodo es inmutable (evaluarModificabilidad lo rechaza con
+// EVENTO_INMUTABLE), así que esta guarda solo se alcanza desde el alta y nunca compara contra sí mismo.
+async function asegurarSinPeriodoEnFecha(tx, fechaISO) {
+  const existente = await tx.evento_calendario.findFirst({
+    where: { tipo: TIPOS_EVENTO.PERIODO, fecha_inicio: fechaADate(fechaISO) },
+    select: { id: true },
+  });
+  if (existente) throw errorDeCodigo(CODIGOS_ERROR.PERIODO_DUPLICADO, 409);
+}
+
 function exigirModificable(fila, ahora) {
   const modificabilidad = evaluarModificabilidad(
     {
@@ -237,6 +252,7 @@ async function crearEvento({ usuarioId, entrada }, deps = {}) {
   const fila = await prisma.$transaction(async (tx) => {
     if (datos.tipo === TIPOS_EVENTO.INHABIL) await asegurarSinInhabilEnFecha(tx, datos.fechaInicio, null);
     if (datos.tipo === TIPOS_EVENTO.VACACIONAL) await asegurarSinVacacionalCruzado(tx, datos.fechaInicio, datos.fechaFin);
+    if (datos.tipo === TIPOS_EVENTO.PERIODO) await asegurarSinPeriodoEnFecha(tx, datos.fechaInicio);
 
     const evento = await tx.evento_calendario.create({
       data: {

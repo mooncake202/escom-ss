@@ -24,6 +24,10 @@ const CODIGOS_ERROR = Object.freeze({
   INHABIL_DUPLICADO: 'INHABIL_DUPLICADO',
   // Dos Vacacionales no pueden compartir ningún día.
   VACACIONAL_CRUZADO: 'VACACIONAL_CRUZADO',
+  // Dos Periodos no pueden INICIAR el mismo día. Que se traslapen sí está permitido: dos ciclos
+  // consecutivos pueden solaparse por los extremos; lo que no puede haber son dos arranques el
+  // mismo día, porque la fecha de inicio es la que identifica el arranque del periodo.
+  PERIODO_DUPLICADO: 'PERIODO_DUPLICADO',
 });
 
 // La API usa "01"/"02"; Prisma usa s01/s02.
