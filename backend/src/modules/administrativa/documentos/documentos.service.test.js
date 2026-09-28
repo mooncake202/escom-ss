@@ -109,6 +109,8 @@ function montar() {
     evaluacionesDesempeno: [],
     secuencia: 100,
     fallarEscritura: false,
+    candados: new Map(),
+    intentosDeBloqueo: [],
   };
 
   const usuarioDe = (id) => bd.usuarios.find((u) => u.id === id) ?? null;
@@ -219,9 +221,32 @@ function montar() {
         return f;
       },
     },
+    // Cada transacción recibe su propio `tx`. Su `$queryRaw` emula SELECT ... FOR UPDATE: retiene el
+    // candado de esa boleta hasta que la transacción termina, y cualquier otra que lo pida espera.
     $transaction: async (fn) => {
       if (bd.fallarEscritura) throw new Error('fallo simulado de base de datos');
-      return fn(prismaActual);
+      const tomados = [];
+      const tx = {
+        ...prismaActual,
+        $queryRaw: async (_textos, boleta) => {
+          bd.intentosDeBloqueo.push(boleta);
+          while (bd.candados.has(boleta)) await bd.candados.get(boleta).liberado;
+          let liberar;
+          const liberado = new Promise((ok) => { liberar = ok; });
+          bd.candados.set(boleta, { liberado, liberar });
+          tomados.push(boleta);
+          return [{ boleta }];
+        },
+      };
+      try {
+        return await fn(tx);
+      } finally {
+        for (const boleta of tomados) {
+          const candado = bd.candados.get(boleta);
+          bd.candados.delete(boleta);
+          candado.liberar();
+        }
+      }
     },
   };
   return bd;
@@ -893,6 +918,53 @@ test('ADM-14: al fallar una sustitución, el archivo ANTERIOR se conserva', asyn
 
   assert.equal(fs.existsSync(path.join(BASE, rutaVieja)), true, 'la carta previa sigue disponible');
   assert.deepEqual(descifrarBuffer(fs.readFileSync(path.join(BASE, rutaVieja))), PDF);
+});
+
+test('ADM-14: dos envíos cruzados para el mismo alumno dejan UNA sola carta y UN solo archivo', async () => {
+  const carpeta = path.join(BASE, B_ANA, carta.SUBCARPETA);
+  fs.rmSync(carpeta, { recursive: true, force: true });
+
+  // Intercalado: el primer envío se detiene justo después de leer "¿ya hay carta?" y solo sigue
+  // cuando el segundo ya intentó avanzar (pidió el candado o, sin candado, leyó también). Sin el
+  // bloqueo, ambos leen "sin carta" y dan de alta dos filas.
+  const base = prismaActual.documento;
+  let soltarPrimero;
+  const segundoEnCamino = new Promise((ok) => { soltarPrimero = ok; });
+  let lecturas = 0;
+  prismaActual.documento = {
+    ...base,
+    findFirst: async (args) => {
+      lecturas += 1;
+      const fila = await base.findFirst(args);
+      if (lecturas === 1) await segundoEnCamino;
+      else soltarPrimero();
+      return fila;
+    },
+  };
+  const intentosAntes = bd.intentosDeBloqueo.length;
+  const vigilarSegundo = setInterval(() => {
+    if (bd.intentosDeBloqueo.length - intentosAntes >= 2) soltarPrimero();
+  }, 1);
+
+  let resultados;
+  try {
+    resultados = await Promise.all([
+      carta.registrarCarta({ usuarioId: U_COORD, boleta: B_ANA, archivoPdf: { buffer: Buffer.from('%PDF primero') } }),
+      carta.registrarCarta({ usuarioId: U_COORD, boleta: B_ANA, archivoPdf: { buffer: Buffer.from('%PDF segundo') } }),
+    ]);
+  } finally {
+    clearInterval(vigilarSegundo);
+  }
+
+  const cartas = bd.documentos.filter((d) => d.alumno_id === B_ANA && d.tipo_documento === 'carta_compromiso_firmada');
+  assert.equal(cartas.length, 1, 'una sola fila de carta para el alumno');
+  assert.deepEqual(resultados.map((r) => r.sustituida), [false, true], 'el segundo envío es una sustitución');
+  assert.equal(resultados[0].documentoId, resultados[1].documentoId);
+
+  const archivos = fs.readdirSync(carpeta);
+  assert.equal(archivos.length, 1, 'un solo archivo final: el anterior se borró');
+  assert.equal(path.join(B_ANA, carta.SUBCARPETA, archivos[0]), cartas[0].ruta_archivo);
+  assert.deepEqual(descifrarBuffer(fs.readFileSync(path.join(carpeta, archivos[0]))), Buffer.from('%PDF segundo'));
 });
 
 // ════════════════════════════════════════════════════════════════════════════

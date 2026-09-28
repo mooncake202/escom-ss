@@ -141,6 +141,12 @@ async function registrarCarta({ usuarioId, boleta, archivoPdf }) {
 
   try {
     documento = await prisma.$transaction(async (tx) => {
+      // Serializa los envíos del MISMO alumno: sin esto, dos envíos cruzados leían "sin carta" y
+      // creaban dos filas. Va ANTES de leer la carta existente (mismo criterio que bloquearProfesor
+      // en lib/cupos.js): el segundo espera aquí y, al continuar, ve la carta del primero y la
+      // sustituye en vez de dar otra alta. Alumnos distintos no se bloquean entre sí.
+      await tx.$queryRaw`SELECT boleta FROM alumno WHERE boleta = ${boletaLimpia} FOR UPDATE`;
+
       const existente = await tx.documento.findFirst({
         where: { alumno_id: boletaLimpia, tipo_documento: TIPO_CARTA_FIRMADA },
       });
