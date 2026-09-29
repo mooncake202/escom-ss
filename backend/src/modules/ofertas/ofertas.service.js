@@ -64,6 +64,17 @@ async function listarOfertasDisponibles() {
   return resultado;
 }
 
+// Invalida el caché de 30s de listarOfertasDisponibles cuando una oferta cambia de estado
+// (CU-PRO-02 aprobar/rechazar) — sin esto, RN-PRO-12/RF-PRO-14 ("de inmediato") dependían de
+// esperar el TTL. No crítico: si Redis falla, el próximo listado igual expira solo en 30s.
+async function invalidarCacheOfertas() {
+  try {
+    await redis.del(CACHE_KEY_OFERTAS);
+  } catch (err) {
+    console.error('Error al invalidar caché de ofertas (no crítico):', err.message);
+  }
+}
+
 /**
  * Catálogo de "perfiles" (carrera deseada) para el filtro de StepSeleccionOferta.
  */
@@ -168,6 +179,8 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
       },
     });
 
+    await invalidarCacheOfertas();
+
     await crearNotificacion({
       usuarioId: oferta.profesor.usuario_id,
       tipo: 'success',
@@ -196,6 +209,8 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
       where: { id: ofertaId },
       data: { estado_oferta: 'rechazada', motivo_rechazo: motivoRechazo },
     });
+
+    await invalidarCacheOfertas();
 
     await crearNotificacion({
       usuarioId: oferta.profesor.usuario_id,
