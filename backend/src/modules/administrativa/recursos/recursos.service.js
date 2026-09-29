@@ -9,13 +9,23 @@
 // El catálogo es INSTITUCIONAL, no de quien lo capturó: cualquier coordinador puede editar o
 // eliminar cualquier recurso. `coordinador_id` queda como autoría de la última escritura.
 //
-// El modelo no tiene categoría y la interfaz tampoco la usa: no se inventa ninguna.
+// `tipo` (enum, nullable, @unique en schema.prisma): la mayoría de los recursos son genéricos y no
+// llevan tipo. Solo los que el sistema necesita ubicar por código (no por el nombre libre que
+// cualquier coordinador puede cambiar) llevan uno — hoy solo `link_constancia_creditos`
+// (CU-GR-01). El `@unique` en BD garantiza que nunca pueda haber 2 recursos con el mismo tipo a la
+// vez, sin depender de un chequeo de aplicación.
 
 const prisma = require('../../../lib/prisma');
 const { crearError } = require('../directorio/directorio.shared');
 
 const MAX_NOMBRE = 150; // recurso.nombre  VarChar(150)
 const MAX_URL = 500;    // recurso.url     VarChar(500)
+
+// Catálogo de tipos válidos — mismo valor que el enum TipoRecurso de schema.prisma. Mantenerlos
+// sincronizados a mano: Prisma no expone el enum como array en runtime.
+const TIPOS_RECURSO = Object.freeze({
+  link_constancia_creditos: 'Link de constancia de créditos (CU-GR-01)',
+});
 
 const limpiar = (valor) => (typeof valor === 'string' ? valor.trim() : '');
 
@@ -36,10 +46,11 @@ function validarUrl(url) {
   return url;
 }
 
-/** Valida nombre y URL. Los límites se miden DESPUÉS del trim. */
-function validarDatos({ nombre, url }) {
+/** Valida nombre, URL y tipo (opcional). Los límites se miden DESPUÉS del trim. */
+function validarDatos({ nombre, url, tipo }) {
   const nombreLimpio = limpiar(nombre);
   const urlLimpia = limpiar(url);
+  const tipoLimpio = tipo ? limpiar(tipo) : null;
 
   if (nombreLimpio === '') throw crearError('El título del recurso es obligatorio.', 400, 'NOMBRE_VACIO');
   if (nombreLimpio.length > MAX_NOMBRE) {
@@ -51,7 +62,11 @@ function validarDatos({ nombre, url }) {
   }
   validarUrl(urlLimpia);
 
-  return { nombre: nombreLimpio, url: urlLimpia };
+  if (tipoLimpio && !(tipoLimpio in TIPOS_RECURSO)) {
+    throw crearError('El tipo de recurso seleccionado no es válido.', 400, 'TIPO_INVALIDO');
+  }
+
+  return { nombre: nombreLimpio, url: urlLimpia, tipo: tipoLimpio };
 }
 
 // `ultimaActualizacion` es lo que muestra la interfaz: la fecha de edición si existe y, si no, la
@@ -60,6 +75,7 @@ const vistaRecurso = (r) => ({
   id: r.id,
   nombre: r.nombre,
   url: r.url,
+  tipo: r.tipo,
   fechaRegistro: r.fecha_registro.toISOString(),
   fechaActualizacion: r.fecha_actualizacion ? r.fecha_actualizacion.toISOString() : null,
   ultimaActualizacion: (r.fecha_actualizacion ?? r.fecha_registro).toISOString(),
@@ -80,50 +96,85 @@ async function perfilCoordinador(usuarioId) {
   return coordinador;
 }
 
+/**
+ * Traduce el choque de la constraint única de `tipo` a un mensaje claro, en vez del genérico 500.
+ *
+ * Con el driver-adapter de Prisma 7, un P2002 de MySQL NO trae `meta.target` (eso es Postgres/
+ * SQLite) — el nombre real del índice vive en `meta.driverAdapterError.cause.constraint.index`
+ * (confirmado disparando el choque real: `{"index":"recurso_tipo_key"}`).
+ */
+function relanzarSiTipoDuplicado(err, tipo) {
+  const indice = err.meta?.driverAdapterError?.cause?.constraint?.index;
+  if (err.code === 'P2002' && indice === 'recurso_tipo_key') {
+    throw crearError(
+      `Ya existe otro recurso con el tipo "${TIPOS_RECURSO[tipo] || tipo}". Edita ese recurso en vez de crear uno nuevo, o quítale el tipo primero.`,
+      409,
+      'TIPO_YA_EXISTE',
+    );
+  }
+  throw err;
+}
+
 /** Misma lista para todos los que pueden leer: alumnos (ambos estados) y coordinación. */
 async function listar() {
   const recursos = await prisma.recurso.findMany({ orderBy: [{ nombre: 'asc' }] });
-  return { recursos: recursos.map(vistaRecurso) };
+  return { recursos: recursos.map(vistaRecurso), tiposDisponibles: TIPOS_RECURSO };
 }
 
-async function crear({ usuarioId, nombre, url }) {
-  const datos = validarDatos({ nombre, url });
+// CU-GR-01: el alumno_sin_asignar todavía no tiene cuenta, así que esto tiene que ser público. Se
+// busca por `tipo` (columna con @unique real en BD), no por `nombre` — un coordinador puede
+// renombrar el recurso libremente sin romper esta integración.
+async function obtenerUrlConstanciaCreditos() {
+  const recurso = await prisma.recurso.findUnique({ where: { tipo: 'link_constancia_creditos' } });
+  return { url: recurso?.url ?? null };
+}
+
+async function crear({ usuarioId, nombre, url, tipo }) {
+  const datos = validarDatos({ nombre, url, tipo });
   const coordinador = await perfilCoordinador(usuarioId);
 
-  const recurso = await prisma.recurso.create({
-    data: {
-      coordinador_id: coordinador.id,
-      nombre: datos.nombre,
-      url: datos.url,
-      fecha_registro: new Date(),
-      // Se deja en null a propósito: todavía no ha sido editado.
-      fecha_actualizacion: null,
-    },
-  });
-
-  return { recurso: vistaRecurso(recurso) };
+  try {
+    const recurso = await prisma.recurso.create({
+      data: {
+        coordinador_id: coordinador.id,
+        nombre: datos.nombre,
+        url: datos.url,
+        tipo: datos.tipo,
+        fecha_registro: new Date(),
+        // Se deja en null a propósito: todavía no ha sido editado.
+        fecha_actualizacion: null,
+      },
+    });
+    return { recurso: vistaRecurso(recurso) };
+  } catch (err) {
+    relanzarSiTipoDuplicado(err, datos.tipo);
+  }
 }
 
-async function actualizar({ usuarioId, id, nombre, url }) {
+async function actualizar({ usuarioId, id, nombre, url, tipo }) {
   const recursoId = resolverId(id);
-  const datos = validarDatos({ nombre, url });
+  const datos = validarDatos({ nombre, url, tipo });
   const coordinador = await perfilCoordinador(usuarioId);
 
   const existente = await prisma.recurso.findUnique({ where: { id: recursoId } });
   if (!existente) throw crearError('No se encontró ese recurso.', 404, 'RECURSO_NO_ENCONTRADO');
 
-  const recurso = await prisma.recurso.update({
-    where: { id: recursoId },
-    data: {
-      nombre: datos.nombre,
-      url: datos.url,
-      fecha_actualizacion: new Date(),
-      // Queda como autor de la última edición; fecha_registro nunca se toca.
-      coordinador_id: coordinador.id,
-    },
-  });
-
-  return { recurso: vistaRecurso(recurso) };
+  try {
+    const recurso = await prisma.recurso.update({
+      where: { id: recursoId },
+      data: {
+        nombre: datos.nombre,
+        url: datos.url,
+        tipo: datos.tipo,
+        fecha_actualizacion: new Date(),
+        // Queda como autor de la última edición; fecha_registro nunca se toca.
+        coordinador_id: coordinador.id,
+      },
+    });
+    return { recurso: vistaRecurso(recurso) };
+  } catch (err) {
+    relanzarSiTipoDuplicado(err, datos.tipo);
+  }
 }
 
 async function eliminar({ usuarioId, id }) {
@@ -137,4 +188,7 @@ async function eliminar({ usuarioId, id }) {
   return { id: recursoId };
 }
 
-module.exports = { listar, crear, actualizar, eliminar, MAX_NOMBRE, MAX_URL };
+module.exports = {
+  listar, crear, actualizar, eliminar, MAX_NOMBRE, MAX_URL, TIPOS_RECURSO,
+  obtenerUrlConstanciaCreditos,
+};

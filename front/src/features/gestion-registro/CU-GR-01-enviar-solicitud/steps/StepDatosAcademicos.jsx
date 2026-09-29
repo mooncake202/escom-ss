@@ -1,11 +1,34 @@
+import { useState, useEffect } from "react";
 import { Field, InputField, SelectField, ErrorMsg } from "../../../../components/ui/FormFields";
 import { RADIUS } from "../../../../themes/colors";
 import { CARRERAS } from "../utils/constants";
 import { formatearFechaUTC } from "@/utils/fechas";
+import { obtenerUrlConstanciaCreditos } from "@/services/recursosService";
 
 
 export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) {
   const periodoSeleccionado = periodos?.find(p => String(p.id) === String(form.periodo));
+
+  // El link ya no vive hardcodeado aquí: coordinación lo administra en "Gestionar Recursos"
+  // (mismo recurso, identificado por tipo='link_constancia_creditos', no por nombre). Si todavía
+  // no lo ha dado de alta, el bloque simplemente no se muestra — nunca cae de vuelta a una URL fija
+  // en el código.
+  //
+  // Poll cada 25s mientras el alumno esté en este paso: es el único punto del sistema donde el
+  // usuario no tiene cuenta todavía, así que no hay sesión ni socket con el que avisarle en vivo si
+  // coordinación cambia el link mientras llena el formulario.
+  const [urlConstancia, setUrlConstancia] = useState(null);
+  useEffect(() => {
+    let vigente = true;
+    const consultar = () => {
+      obtenerUrlConstanciaCreditos()
+        .then(({ url }) => { if (vigente) setUrlConstancia(url); })
+        .catch(() => { if (vigente) setUrlConstancia(null); });
+    };
+    consultar();
+    const intervalo = setInterval(consultar, 25000);
+    return () => { vigente = false; clearInterval(intervalo); };
+  }, []);
 
   // Rango del input de créditos según el dictamen activo.
   // ⚠️ Asumo que "min 96.01" (redondeado a 97) es del dictamen POR ELECTIVA
@@ -59,14 +82,19 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
         />
         <ErrorMsg field="creditos" errors={errors} C={C} />
 
-        <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
-          <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-            🔗{" "}
-            <a href="https://www.youtube.com/watch?v=U5akJxmjZ-s" target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
-              Solicita tu constancia de créditos aquí GUARDA ESTE DOCUMENTO
-            </a>
-          </p>
-        </div>
+        {urlConstancia && (
+          <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
+            <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
+              🔗{" "}
+              <a href={urlConstancia} target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
+                Solicita tu constancia de créditos aquí GUARDA ESTE DOCUMENTO
+              </a>
+            </p>
+            <p style={{ margin: "6px 0 0", fontSize: 11, color: C.textDisabled }}>
+              Si este enlace no funciona, repórtalo a coordinación.
+            </p>
+          </div>
+        )}
 
       </Field>
 

@@ -11,7 +11,7 @@ import {
 export const MAX_NOMBRE = 150; // recurso.nombre VarChar(150); el backend lo revalida
 export const MAX_URL = 500;    // recurso.url    VarChar(500)
 
-const FORM_VACIO = { nombre: "", url: "" };
+const FORM_VACIO = { nombre: "", url: "", tipo: "" };
 
 /** "15 de enero de 2026" — la fecha llega en ISO desde el backend. */
 export function formatFecha(iso) {
@@ -24,6 +24,7 @@ export function formatFecha(iso) {
 export function useGestionarRecursos() {
   const [carga, setCarga] = useState({ estado: "cargando", error: null });
   const [recursos, setRecursos] = useState([]);
+  const [tiposDisponibles, setTiposDisponibles] = useState({});
   const [intento, setIntento] = useState(0);
 
   const [modo, setModo] = useState(null); // "agregar" | "editar" | "eliminar" | null
@@ -36,7 +37,7 @@ export function useGestionarRecursos() {
   useEffect(() => {
     let vigente = true;
     obtenerRecursos().then(
-      (r) => { if (vigente) { setRecursos(r.recursos); setCarga({ estado: "listo", error: null }); } },
+      (r) => { if (vigente) { setRecursos(r.recursos); setTiposDisponibles(r.tiposDisponibles || {}); setCarga({ estado: "listo", error: null }); } },
       (err) => { if (vigente) setCarga({ estado: "error", error: err.message }); },
     );
     return () => { vigente = false; };
@@ -82,7 +83,7 @@ export function useGestionarRecursos() {
   }
 
   function abrirEditar(recurso) {
-    setForm({ nombre: recurso.nombre, url: recurso.url });
+    setForm({ nombre: recurso.nombre, url: recurso.url, tipo: recurso.tipo || "" });
     setErrores({});
     setRecursoActivo(recurso);
     setModo("editar");
@@ -107,7 +108,7 @@ export function useGestionarRecursos() {
     const e = validar();
     if (Object.keys(e).length > 0) { setErrores(e); return; }
 
-    const datos = { nombre: form.nombre.trim(), url: form.url.trim() };
+    const datos = { nombre: form.nombre.trim(), url: form.url.trim(), tipo: form.tipo || null };
     setEnviando(true);
     try {
       if (modo === "agregar") {
@@ -144,7 +145,7 @@ export function useGestionarRecursos() {
 
   return {
     carga, recargar,
-    recursos, modo, recursoActivo, form, errores, enviando, toast,
+    recursos, tiposDisponibles, modo, recursoActivo, form, errores, enviando, toast,
     abrirAgregar, abrirEditar, abrirEliminar,
     cancelar, handleChange, handleGuardar, handleEliminar,
   };

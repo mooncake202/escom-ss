@@ -1,6 +1,6 @@
 import { RADIUS } from "@/themes/colors";
 
-export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancelar, enviando, C }) {
+export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancelar, enviando, tiposDisponibles = {}, C }) {
   const inputStyle = (hasError) => ({
     width: "100%", padding: "10px 14px", boxSizing: "border-box",
     background: C.bgInput,
@@ -46,6 +46,22 @@ export function RecursoForm({ modo, form, errores, onChange, onGuardar, onCancel
             style={inputStyle(!!errores.url)}
           />
           {errores.url && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.url}</p>}
+        </div>
+
+        <div style={{ flex: "1 1 220px" }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>
+            Tipo especial
+          </label>
+          <select name="tipo" value={form.tipo || ""} onChange={onChange} style={inputStyle(!!errores.tipo)}>
+            <option value="">Ninguno (recurso genérico)</option>
+            {Object.entries(tiposDisponibles).map(([valor, etiqueta]) => (
+              <option key={valor} value={valor}>{etiqueta}</option>
+            ))}
+          </select>
+          {errores.tipo && <p style={{ margin: "4px 0 0", fontSize: 12, color: C.danger }}>{errores.tipo}</p>}
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: C.textDisabled }}>
+            Solo puede existir un recurso de cada tipo especial a la vez.
+          </p>
         </div>
       </div>
 

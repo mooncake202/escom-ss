@@ -81,11 +81,17 @@ function validarContrasena(contrasena) {
 // usan @alumno.ipn.mx, no @ipn.mx (ese dominio es exclusivo de profesor y
 // coordinador en CU-CRED-03). No se toca la función existente para no
 // arriesgar ese flujo ya probado.
-const CORREO_ALUMNO_IPN_REGEX = /^[^\s@]+@alumno\.ipn\.mx$/i;
+//
+// Antes solo exigía el dominio (cualquier parte local). Corregido: el correo
+// institucional real de un alumno del IPN es LETRAS seguidas de EXACTAMENTE
+// 4 DÍGITOS — mismo patrón ya exigido en el login/recuperación de contraseña
+// (LoginPage.jsx/RecuperarContrasena.jsx) y en el formulario de registro
+// (CU-GR-01, validations.js). Backend y frontend deben exigir lo mismo.
+const CORREO_ALUMNO_IPN_REGEX = /^[a-zA-Z]+[0-9]{4}@alumno\.ipn\.mx$/i;
 
 function validarCorreoInstitucionalAlumno(correo) {
   if (!correo || !CORREO_ALUMNO_IPN_REGEX.test(correo.trim())) {
-    const error = new Error('El correo institucional debe ser válido y terminar en @alumno.ipn.mx.');
+    const error = new Error('El correo institucional debe tener el formato de alumno del IPN: letras seguidas de 4 dígitos y @alumno.ipn.mx (ej. juapere1234@alumno.ipn.mx).');
     error.status = 400;
     throw error;
   }

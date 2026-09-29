@@ -12,7 +12,7 @@ export default function GestionarRecursos() {
   const { usuario } = useSesion();
   const {
     carga, recargar,
-    recursos, modo, recursoActivo, form, errores, enviando, toast,
+    recursos, tiposDisponibles, modo, recursoActivo, form, errores, enviando, toast,
     abrirAgregar, abrirEditar, abrirEliminar,
     cancelar, handleChange, handleGuardar, handleEliminar,
   } = useGestionarRecursos();
@@ -96,6 +96,7 @@ export default function GestionarRecursos() {
             onGuardar={handleGuardar}
             onCancelar={cancelar}
             enviando={enviando}
+            tiposDisponibles={tiposDisponibles}
             C={C}
           />
         )}

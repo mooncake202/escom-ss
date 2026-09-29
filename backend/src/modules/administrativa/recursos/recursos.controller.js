@@ -19,10 +19,20 @@ async function getRecursos(_req, res) {
   }
 }
 
+// CU-GR-01: público a propósito — el alumno_sin_asignar todavía no tiene cuenta cuando llena este
+// formulario. Expone SOLO la URL de este recurso puntual, nunca el catálogo completo.
+async function getRecursoConstanciaCreditos(_req, res) {
+  try {
+    return res.status(200).json(await servicio.obtenerUrlConstanciaCreditos());
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener el recurso de constancia de créditos:');
+  }
+}
+
 async function postRecurso(req, res) {
   try {
-    const { nombre, url } = req.body ?? {};
-    return res.status(201).json(await servicio.crear({ usuarioId: req.usuario.sub, nombre, url }));
+    const { nombre, url, tipo } = req.body ?? {};
+    return res.status(201).json(await servicio.crear({ usuarioId: req.usuario.sub, nombre, url, tipo }));
   } catch (err) {
     return manejarError(err, res, 'Error al crear un recurso:');
   }
@@ -30,9 +40,9 @@ async function postRecurso(req, res) {
 
 async function putRecurso(req, res) {
   try {
-    const { nombre, url } = req.body ?? {};
+    const { nombre, url, tipo } = req.body ?? {};
     return res.status(200).json(await servicio.actualizar({
-      usuarioId: req.usuario.sub, id: req.params.id, nombre, url,
+      usuarioId: req.usuario.sub, id: req.params.id, nombre, url, tipo,
     }));
   } catch (err) {
     return manejarError(err, res, 'Error al actualizar un recurso:');
@@ -47,4 +57,4 @@ async function deleteRecurso(req, res) {
   }
 }
 
-module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso };
+module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos };

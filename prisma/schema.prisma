@@ -65,6 +65,13 @@ enum EstadoRevision {
   rechazado
 }
 
+// Recursos con un propósito especial que el sistema consulta por código, no por nombre libre
+// (ej. el link de constancia de créditos que CU-GR-01 muestra públicamente). NULL = recurso
+// genérico sin propósito especial. Deja espacio para agregar más valores después.
+enum TipoRecurso {
+  link_constancia_creditos
+}
+
 
 // ─────────────────────────────────────────
 // 1. Tablas independientes / base
@@ -270,12 +277,16 @@ model periodo_registro {
 }
 
 model recurso {
-  id                  Int       @id @default(autoincrement())
+  id                  Int          @id @default(autoincrement())
   coordinador_id      Int
-  nombre              String    @db.VarChar(150)
-  url                 String    @db.VarChar(500)
-  fecha_registro      DateTime  @db.DateTime(0)
-  fecha_actualizacion DateTime? @db.DateTime(0)
+  nombre              String       @db.VarChar(150)
+  url                 String       @db.VarChar(500)
+  // NULL = recurso genérico (la mayoría). Con @unique, MySQL permite múltiples NULL pero nunca deja
+  // 2 filas con el mismo valor no-nulo — así "a lo más 1 recurso con este tipo" queda garantizado a
+  // nivel de BD, no solo por un chequeo de aplicación.
+  tipo                TipoRecurso? @unique
+  fecha_registro      DateTime     @db.DateTime(0)
+  fecha_actualizacion DateTime?    @db.DateTime(0)
 
   coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
 }
