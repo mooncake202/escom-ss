@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   LIMITE_FIRMA_BYTES, agruparDiasPorMes, nombreMes, etiquetaEstadoReporte, validarArchivoFirma, describirError, formatearFechaHoraMexico,
+  contarPendientesDeRevision, textoAvisoPendientes,
 } from "./reportesGeneracion.js";
 
 const dia = (fecha, extra = {}) => ({ fecha, tipo: "laborable_sin_bitacora", ...extra });
@@ -97,4 +98,30 @@ test("formatearFechaHoraMexico: sin horario de verano en México (mismo -6 en ve
   assert.equal(formatearFechaHoraMexico("2026-07-15T18:00:00.000Z").hora, "12:00");
   assert.equal(formatearFechaHoraMexico("2026-01-15T18:00:00.000Z").hora, "12:00");
   for (const invalido of [null, undefined, "", "no es fecha"]) assert.equal(formatearFechaHoraMexico(invalido), null);
+});
+
+test("contarPendientesDeRevision: cuenta solo pendiente_revision de diagnostico.bitacorasNoResueltas", () => {
+  const diagnostico = {
+    bitacorasNoResueltas: [
+      { id: 38, estado: "pendiente_revision", fecha: "2026-09-08" },
+      { id: 39, estado: "pendiente_revision", fecha: "2026-09-09" },
+      { id: 40, estado: "pendiente_datos", fecha: "2026-09-10" },
+      { id: 41, estado: "en_curso", fecha: "2026-09-11" },
+    ],
+  };
+  assert.equal(contarPendientesDeRevision(diagnostico), 2);
+});
+
+test("contarPendientesDeRevision: sin diagnóstico o sin pendientes da 0 (no se muestra aviso)", () => {
+  assert.equal(contarPendientesDeRevision(undefined), 0);
+  assert.equal(contarPendientesDeRevision({}), 0);
+  assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [] }), 0);
+  assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [{ id: 1, estado: "pendiente_datos" }] }), 0);
+});
+
+test("textoAvisoPendientes: texto exacto con N", () => {
+  assert.equal(
+    textoAvisoPendientes(1),
+    "Tienes 1 bitácora(s) pendiente(s) de revisión en este periodo. Avísale a tu profesor para que las revise antes de generar tu reporte; las que sigan pendientes no se contabilizarán.",
+  );
 });

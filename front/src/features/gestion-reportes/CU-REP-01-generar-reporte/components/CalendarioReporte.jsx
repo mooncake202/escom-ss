@@ -19,7 +19,7 @@ export function CalendarioReporte({ anio, mes, dias, C }) {
 
   function describir(dia) {
     if (!dia) return "Fuera del periodo del reporte";
-    if (dia.tipo === "laborado") return `Bitácora aprobada (${dia.horas} h)`;
+    if (dia.tipo === "laborado") return `Bitácora válida (${dia.horas} h)`;
     if (dia.tipo === "vacacional" || dia.tipo === "inhabil") return dia.evento?.nombre ?? (dia.tipo === "vacacional" ? "Día vacacional" : "Día inhábil");
     if (dia.tipo === "fin_de_semana") return "Fin de semana";
     return "Sin bitácora aprobada";
@@ -85,7 +85,7 @@ export function CalendarioReporte({ anio, mes, dias, C }) {
       {/* Leyenda */}
       <div style={{ display: "flex", gap: "1rem", marginTop: "0.75rem", flexWrap: "wrap" }}>
         {[
-          { color: C.accent,      border: "none",                         label: "Bitácora aprobada" },
+          { color: C.accent,      border: "none",                         label: "Bitácora válida"   },
           { color: "transparent", border: `1px solid ${C.borderDefault}`, label: "Sin bitácora"      },
           { tachado: true,                                                 label: "Inhábil"           },
         ].map(item => (

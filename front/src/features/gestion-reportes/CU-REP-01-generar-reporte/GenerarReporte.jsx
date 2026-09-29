@@ -6,7 +6,7 @@ import { CalendarioReporte }                    from "./components/CalendarioRep
 import { AvanceActividades }                    from "./components/AvanceActividades";
 import { FirmaCanvas }                          from "../compartido/FirmaCanvas";
 import { useGenerarReporte }                    from "./hooks/useGenerarReporte";
-import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico } from "./reportesGeneracion";
+import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico, textoAvisoPendientes } from "./reportesGeneracion";
 
 // Fuera del componente para que React no lo remonte (y el textarea pierda el foco) en cada render.
 function Layout({ usuario, ancho = 580, children }) {
@@ -207,6 +207,18 @@ export default function GenerarReporte() {
             </div>
           )}
 
+          {/* Aviso de bitácoras en revisión del periodo: mismo estilo de advertencia, NO bloquea */}
+          {g.pendientesDeRevision > 0 && (
+            <div style={{
+              margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
+              background: C.warningSoft, border: `1px solid ${C.warning}`,
+            }}>
+              <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+                {textoAvisoPendientes(g.pendientesDeRevision)}
+              </p>
+            </div>
+          )}
+
           {mesData && (
             <>
               {/* Selector de mes (cuando el periodo abarca dos meses) */}
@@ -232,7 +244,7 @@ export default function GenerarReporte() {
               )}
 
               <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.accentText, lineHeight: 1.6 }}>
-                Los días y horas son de tus bitácoras aprobadas.
+                Los días y horas son de tus bitácoras válidas.
               </p>
 
               <div style={{

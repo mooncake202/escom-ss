@@ -47,6 +47,16 @@ const ETIQUETAS_ESTADO = {
 
 export const etiquetaEstadoReporte = (estado) => ETIQUETAS_ESTADO[estado] ?? estado;
 
+/**
+ * Bitácoras del periodo que siguen en revisión del profesor. El backend ya las limita al periodo del reporte
+ * (diagnostico.bitacorasNoResueltas); esa lista trae además en_curso y pendiente_datos, que no son "de revisión".
+ */
+export const contarPendientesDeRevision = (diagnostico) => (diagnostico?.bitacorasNoResueltas ?? [])
+  .filter((b) => b.estado === "pendiente_revision").length;
+
+export const textoAvisoPendientes = (n) => `Tienes ${n} bitácora(s) pendiente(s) de revisión en este periodo. `
+  + "Avísale a tu profesor para que las revise antes de generar tu reporte; las que sigan pendientes no se contabilizarán.";
+
 /** Validación previa de la firma (el servidor valida de verdad: estructura, dimensiones y tamaño). */
 export function validarArchivoFirma(archivo) {
   if (!archivo) return "La firma es obligatoria.";

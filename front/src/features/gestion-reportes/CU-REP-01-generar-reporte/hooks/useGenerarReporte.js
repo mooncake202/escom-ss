@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   obtenerSiguienteReporte, subirRubrica, obtenerVistaPrevia, enviarReporteMensual,
 } from "@/services/reportesService";
-import { agruparDiasPorMes, validarArchivoFirma, describirError } from "../reportesGeneracion";
+import { agruparDiasPorMes, validarArchivoFirma, describirError, contarPendientesDeRevision } from "../reportesGeneracion";
 
 // Toda la información sale de GET /reportes/mensual/siguiente; aquí no se calculan periodos ni horas.
 export function useGenerarReporte() {
@@ -204,6 +204,8 @@ export function useGenerarReporte() {
     resumen: datos?.resumen ?? { diasLaborados: 0, horas: 0, bitacorasAprobadas: 0 },
     puedeGenerar: datos?.puedeGenerar === true,
     motivosBloqueo: datos?.motivosBloqueo ?? [],
+    // Solo informativo: no bloquea Continuar ni la generación.
+    pendientesDeRevision: contarPendientesDeRevision(datos?.diagnostico),
     meses, mesActivo, setMesActivo, avances,
     pasoActual, numeroPaso: Math.min(indice, pasos.length - 1) + 1, totalPasos: pasos.length,
     actividades, handleActividadesChange, errores,
