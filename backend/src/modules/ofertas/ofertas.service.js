@@ -316,7 +316,7 @@ async function listarMisOfertas(profesorId) {
       cuposDisponibles: o.cupos_disponibles,
       alumnosActivos: alumnosVinculados.length,
       alumnos: alumnosVinculados,
-      estatus: ESTATUS_POR_ESTADO[o.estado_oferta] ?? o.estado_oferta,
+      estatus: ESTATUS_POR_ESTADO[o.estado_oferta.toLowerCase()] ?? 'desconocido',
       carreras: o.deseo_de_carrera.map((d) => d.carrera.nombre),
       motivoRechazo: o.motivo_rechazo,
       fechaRegistro: o.fecha_registro.toISOString().slice(0, 10),

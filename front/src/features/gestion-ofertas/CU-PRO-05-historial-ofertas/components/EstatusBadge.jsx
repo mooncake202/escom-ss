@@ -8,8 +8,9 @@ export function EstatusBadge({ estatus }) {
     concluido:   { bg: C.accentSoft,   color: C.accentText, label: "Concluido"   },
     cerrado:     { bg: C.bgInput,      color: C.textMuted,  label: "Cerrado"     },
     rechazada:   { bg: C.dangerSoft,   color: C.danger,     label: "Rechazada"   },
+    desconocido: { bg: C.bgInput,      color: C.textDisabled, label: "Estado desconocido" },
   };
-  const s = map[estatus] || map.cerrado;
+  const s = map[estatus] || map.desconocido;
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 5,
