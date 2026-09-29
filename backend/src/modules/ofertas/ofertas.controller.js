@@ -2,6 +2,7 @@ const ofertasService = require('./ofertas.service');
 const prisma = require('../../lib/prisma');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+const { normalizarNombreCarrera } = require('./ofertas.carreras');
 
 async function getOfertas(req, res) {
   try {
@@ -93,8 +94,9 @@ async function solicitarRegistroOferta(req, res) {
       dataOferta.cupos_disponibles = cupos;
     }
 
+    const carrerasNormalizadas = carreras.map(normalizarNombreCarrera);
     const carrerasEncontradas = await prisma.carrera.findMany({
-      where: { nombre: { in: carreras } },
+      where: { nombre: { in: carrerasNormalizadas } },
     });
 
     if (carrerasEncontradas.length !== carreras.length) {

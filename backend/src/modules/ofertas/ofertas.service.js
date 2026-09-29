@@ -8,6 +8,7 @@ const {
   obtenerSolicitudesOcupandoOfertas,
 } = require('../../lib/cupos');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
+const { normalizarNombreCarrera } = require('./ofertas.carreras');
 
 const CACHE_KEY_OFERTAS = 'cache:ofertas';
 const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
@@ -438,7 +439,8 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     dataActualizada.cupos_disponibles = cupos;
   }
 
-  const carrerasEncontradas = await prisma.carrera.findMany({ where: { nombre: { in: carreras } } });
+  const carrerasNormalizadas = carreras.map(normalizarNombreCarrera);
+  const carrerasEncontradas = await prisma.carrera.findMany({ where: { nombre: { in: carrerasNormalizadas } } });
   if (carrerasEncontradas.length !== carreras.length) {
     throw Object.assign(new Error('Una o más carreras seleccionadas no son válidas.'), { status: 400 });
   }
