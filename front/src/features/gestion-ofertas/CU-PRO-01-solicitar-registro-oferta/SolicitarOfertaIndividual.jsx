@@ -27,7 +27,7 @@ export default function SolicitarOfertaIndividual() {
 
   if (enviado) {
     return (
-      <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
+      <DashboardLayout titulo="Solicitar oferta individual"  rol="profesor" usuario={nombreCompletoSesion(usuario)}>
         <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <ConfirmacionEnvio tipo="individual" onVolver={() => navigate("/profesor/proyectos")} />
         </div>
@@ -36,7 +36,7 @@ export default function SolicitarOfertaIndividual() {
   }
 
   return (
-    <DashboardLayout titulo="Solicitar oferta individual" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
+    <DashboardLayout titulo="Solicitar oferta individual"  rol="profesor" usuario={nombreCompletoSesion(usuario)}>
       <div style={{ maxWidth: 680, margin: "0 auto", width: "100%" }}>
 
         <button onClick={() => navigate("/profesor/proyectos")} style={{

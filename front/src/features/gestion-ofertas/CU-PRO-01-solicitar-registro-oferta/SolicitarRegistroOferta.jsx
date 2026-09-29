@@ -23,7 +23,7 @@ export default function SolicitarRegistroOferta() {
 
   if (enviado) {
     return (
-      <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
+      <DashboardLayout titulo="Registrar proyecto"  rol="profesor" usuario={nombreCompletoSesion(usuario)}>
         <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
           <ConfirmacionEnvio tipo="proyecto" onVolver={() => navigate("/profesor/proyectos")} />
         </div>
@@ -32,7 +32,7 @@ export default function SolicitarRegistroOferta() {
   }
 
   return (
-    <DashboardLayout titulo="Registrar proyecto" subtitulo="CU-PRO-01 · Profesor" rol="profesor" usuario={nombreCompletoSesion(usuario)}>
+    <DashboardLayout titulo="Registrar proyecto"  rol="profesor" usuario={nombreCompletoSesion(usuario)}>
       <div style={{ maxWidth: 640, margin: "0 auto", width: "100%" }}>
 
         <button onClick={() => navigate("/profesor/proyectos")} style={{

@@ -968,7 +968,7 @@ export default function RegistroProfesores() {
   return (
     <DashboardLayout
       titulo="Gestión de Usuarios"
-      subtitulo="CU-CRED-03 · FINALIZADO"
+      
       rol={sesion?.rol || "coordinador"}
       usuario={nombreCompletoSesion(sesion)}
     >

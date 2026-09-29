@@ -82,7 +82,7 @@ export default function HistorialOfertas() {
   return (
     <DashboardLayout
       titulo="Mis ofertas"
-      subtitulo="CU-PRO-05 · Profesor"
+      
       rol="profesor"
       usuario={nombreCompletoSesion(usuario)}
     >

@@ -46,7 +46,7 @@ export default function ConsultarOfertas() {
   return (
     <DashboardLayout
       titulo="Consultar ofertas"
-      subtitulo="CU-PRO-02 / CU-PRO-03 · Coordinación"
+      
       rol="coordinacion"
       usuario={nombreCompletoSesion(usuario)}
     >

@@ -340,18 +340,9 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
   const where = {
     estado_oferta: estadoWhere,
     ...(tipoOferta && { tipo_oferta: tipoOferta }),
-    ...(busqueda && {
-      OR: [
-        { nombre_proyecto: { contains: busqueda } },
-        { profesor: { usuario: { OR: [
-          { nombre: { contains: busqueda } },
-          { apellidos: { contains: busqueda } },
-        ] } } },
-      ],
-    }),
   };
 
-  const ofertas = await prisma.oferta_servicio.findMany({
+  const ofertasEncontradas = await prisma.oferta_servicio.findMany({
     where,
     include: {
       profesor: { include: { usuario: true } },
@@ -360,8 +351,26 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     orderBy: { fecha_registro: 'desc' },
   });
 
-  const { cuposOcupadosPorProfesor } = await construirContextoCupos(ofertas);
+  // La búsqueda se filtra en memoria (no en el WHERE de Prisma) para que las 4 comparaciones
+  // — nombre de la oferta, nombre del profesor, apellidos, y nombre completo concatenado — usen
+  // exactamente la misma regla de coincidencia. El volumen de esta tabla es bajo (pantalla interna
+  // de coordinación, no una búsqueda pública), así que traer las filas ya filtradas por
+  // estado/tipo y filtrar aquí no representa un problema de escala.
+  const ofertas = busqueda
+    ? ofertasEncontradas.filter((o) => {
+        const termino = busqueda.toLowerCase();
+        const nombre = o.profesor.usuario.nombre;
+        const apellidos = o.profesor.usuario.apellidos;
+        return (
+          o.nombre_proyecto.toLowerCase().includes(termino) ||
+          nombre.toLowerCase().includes(termino) ||
+          apellidos.toLowerCase().includes(termino) ||
+          `${nombre} ${apellidos}`.toLowerCase().includes(termino)
+        );
+      })
+    : ofertasEncontradas;
 
+  const { cuposOcupadosPorProfesor } = await construirContextoCupos(ofertas);
 
   return ofertas.map((o) => ({
     id: o.id,
