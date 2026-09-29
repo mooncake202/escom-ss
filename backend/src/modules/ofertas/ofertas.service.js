@@ -676,4 +676,5 @@ module.exports = {
   cerrarOfertaManual,
   revisarConclusionAutomatica,
   emitirATodosLosCoordinadores,
+  invalidarCacheOfertas,
 };

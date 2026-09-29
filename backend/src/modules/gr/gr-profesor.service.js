@@ -2,6 +2,7 @@ const prisma = require('../../lib/prisma');
 const { dictamenLabel } = require('./gr.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { asegurarCapacidadProfesor, bloquearProfesor } = require('../../lib/cupos');
+const { invalidarCacheOfertas } = require('../ofertas/ofertas.service');
 
 const MOTIVO_RECHAZO_PROFESOR = 'Rechazado por profesor';
 const MOTIVO_RECHAZO_CUPOS = 'Cupos de la oferta cubiertos';
@@ -186,6 +187,11 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
     }
     return { estado_solicitud: 'rechazada_por_cupos' };
   }
+
+  // La aceptación decrementó cupos_disponibles de la oferta (RN-GR-08) — mismo patrón
+  // de invalidación ya usado en decidirOferta/cerrarOfertaManual/revisarConclusionAutomatica,
+  // para que el listado público de GR-01 no quede hasta 30s desactualizado.
+  await invalidarCacheOfertas();
 
   try {
     emitirAUsuario(solicitud.alumno.usuario_id, 'solicitud:aceptada', {
