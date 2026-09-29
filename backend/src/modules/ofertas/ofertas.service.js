@@ -142,8 +142,27 @@ async function validarCapacidadParaTramitarOferta(profesorId, esAccionDelProfeso
 
 const { emitirAUsuario } = require('../../sockets/socket.server');
 
+// Socket — mismo patrón exacto que emitirATodosLosCoordinadores en gr.service.js y
+// lss-alumno.service.js: cualquier coordinador puede revisar/decidir cualquier oferta (no hay
+// reparto real entre ellos), así que se emite individualmente a cada coordinador existente en vez
+// de a uno solo. Fail-open, nunca tumba la operación de negocio.
+async function emitirATodosLosCoordinadores(evento, datos) {
+  try {
+    const coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+    for (const c of coordinadores) {
+      try {
+        emitirAUsuario(c.usuario_id, evento, datos);
+      } catch (err) {
+        console.error(`Error al emitir ${evento} a coordinador ${c.usuario_id}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error(`Error al listar coordinadores para emitir ${evento}:`, err.message);
+  }
+}
+
 // CU-PRO-02: Revisar solicitud de oferta
-async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion) {
+async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion, coordinadorId) {
   const oferta = await prisma.oferta_servicio.findUnique({
     where: { id: ofertaId },
     include: { profesor: { include: { usuario: true } } },
@@ -169,15 +188,28 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
 
     await validarCapacidadParaTramitarOferta(oferta.profesor_id);
 
-    const actualizada = await prisma.oferta_servicio.update({
-      where: { id: ofertaId },
+    // Condicionado a que SIGA pendiente_revision en el instante de escribir — cierra la ventana
+    // de carrera entre el chequeo de arriba y este update: si otro coordinador ya decidió sobre
+    // esta misma oferta mientras se validaba, count=0 y no se aplica ningún cambio.
+    const { count } = await prisma.oferta_servicio.updateMany({
+      where: { id: ofertaId, estado_oferta: 'pendiente_revision' },
       data: {
         estado_oferta: 'aprobada',
         motivo_rechazo: null,
         programa_SISS: programaSISS,
         nombre_SISS: actividadSISS,
+        coordinador_id: coordinadorId,
       },
     });
+
+    if (count === 0) {
+      throw Object.assign(
+        new Error('Esta oferta ya fue revisada por otro coordinador mientras la consultabas.'),
+        { status: 409 }
+      );
+    }
+
+    const actualizada = await prisma.oferta_servicio.findUnique({ where: { id: ofertaId } });
 
     await invalidarCacheOfertas();
 
@@ -205,10 +237,19 @@ async function decidirOferta(ofertaId, decision, motivoRechazo, datosAprobacion)
       throw Object.assign(new Error('Debes capturar el motivo del rechazo.'), { status: 400 });
     }
 
-    const actualizada = await prisma.oferta_servicio.update({
-      where: { id: ofertaId },
-      data: { estado_oferta: 'rechazada', motivo_rechazo: motivoRechazo },
+    const { count } = await prisma.oferta_servicio.updateMany({
+      where: { id: ofertaId, estado_oferta: 'pendiente_revision' },
+      data: { estado_oferta: 'rechazada', motivo_rechazo: motivoRechazo, coordinador_id: coordinadorId },
     });
+
+    if (count === 0) {
+      throw Object.assign(
+        new Error('Esta oferta ya fue revisada por otro coordinador mientras la consultabas.'),
+        { status: 409 }
+      );
+    }
+
+    const actualizada = await prisma.oferta_servicio.findUnique({ where: { id: ofertaId } });
 
     await invalidarCacheOfertas();
 
@@ -437,6 +478,10 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     estado_oferta: 'pendiente_revision',
     motivo_rechazo: null,
     cupos_ofertados: null,
+    // Vuelve a NULL: el coordinador que la rechazó ya no es "quien decide" sobre esta versión
+    // reenviada — nadie ha decidido todavía, la próxima decisión (de cualquier coordinador) es
+    // la que debe quedar registrada aquí.
+    coordinador_id: null,
   };
 
   if (tipo_oferta === 'individual') {
@@ -482,21 +527,9 @@ async function reenviarOferta(ofertaId, profesorId, datos) {
     });
   });
 
-  const coordinador = await prisma.coordinador.findFirst();
-  if (coordinador) {
-    await crearNotificacion({
-      usuarioId: coordinador.usuario_id,
-      tipo: 'info',
-      mensaje: `Oferta reenviada tras corrección: "${actualizada.nombre_proyecto}".`,
-      rutaRelacionada: `/coordinacion/ofertas?destacar=${actualizada.id}`,
-    });
-
-    try {
-      emitirAUsuario(coordinador.usuario_id, 'oferta:reenviada', { ofertaId: actualizada.id });
-    } catch (err) {
-      console.error('Error al emitir oferta:reenviada:', err.message);
-    }
-  }
+  // Igual que en el registro (CU-PRO-01): hecho calculado, se avisa a los 4 coordinadores por
+  // socket, sin persistir fila en `notificacion`.
+  emitirATodosLosCoordinadores('oferta:actualizada', { ofertaId: actualizada.id });
   return actualizada;
 }
 
@@ -642,4 +675,5 @@ module.exports = {
   reenviarOferta,
   cerrarOfertaManual,
   revisarConclusionAutomatica,
+  emitirATodosLosCoordinadores,
 };

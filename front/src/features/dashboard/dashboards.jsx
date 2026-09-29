@@ -43,8 +43,7 @@ const EVENTOS_POR_ROL = {
     "documentacion:decidida",
     "expediente:pendiente_revision",
     "expediente:decidido",
-    "oferta:nueva",
-    "oferta:reenviada",
+    "oferta:actualizada",
     "reporte:nuevo",
     "resumen:actualizado",
     "documentacion:pendiente", "documentacion:decidida",
@@ -924,7 +923,16 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         {/* CU-PRO */}
         <Section title="Gestión de Ofertas" icon="star" {...T.warning} C={C} badge={resumen.ofertasPorValidar}>
           <ActionItem icon="check"  {...T.warning} label="Solicitudes de ofertas e historial"        desc="Solicitudes de profesores" onClick={() => navigate("/coordinacion/ofertas")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/ofertas" mensajeContador={(n) => `Tienes ${n} ofertas actualizadas.`} notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* Calculada (cualquier coordinador ve/decide todas las ofertas, no hay reparto entre
+              ellos) — igual que el patrón de GR y LSS-04, ya no depende de una fila en
+              `notificacion` por evento de "oferta nueva"/"oferta reenviada". */}
+          <SlotNotificacionCalculada
+            mostrar={(resumen.ofertasPorValidar ?? 0) > 0}
+            mensaje={`Tienes ${resumen.ofertasPorValidar} oferta${resumen.ofertasPorValidar === 1 ? "" : "s"} pendiente${resumen.ofertasPorValidar === 1 ? "" : "s"} de revisión.`}
+            ruta="/coordinacion/ofertas"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="cog"    {...T.purple}  label="Modificar características de profesor" desc="Solicitudes pendientes" onClick={() => navigate("/coordinacion/solicitudes-caracteristicas")} C={C} />
           <SlotNotificacion ruta="/coordinacion/solicitudes-caracteristicas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           

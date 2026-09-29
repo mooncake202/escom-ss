@@ -321,7 +321,9 @@ async function resumenCoordinacion() {
     expedientesPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'expediente_pendiente_revision' } }),
     reportesPorRevisar: 0,
     reportesAprobadosMes: 0,
-    ofertasPorValidar: 0,
+    // CU-PRO-02/03: cualquier coordinador puede revisar cualquier oferta pendiente (no hay reparto
+    // entre ellos) — conteo en vivo, no dependía de nada hasta ahora (quedó en 0 sin conectar).
+    ofertasPorValidar: await prisma.oferta_servicio.count({ where: { estado_oferta: 'pendiente_revision' } }),
     // CU-ADM-12: mismo criterio de "activa" que la bandeja de bajas, resuelto por ese módulo.
     bajas,
   };

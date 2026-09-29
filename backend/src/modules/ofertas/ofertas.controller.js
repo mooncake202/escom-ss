@@ -1,7 +1,6 @@
 const ofertasService = require('./ofertas.service');
+const { emitirATodosLosCoordinadores } = ofertasService;
 const prisma = require('../../lib/prisma');
-const { crearNotificacion } = require('../notificaciones/notificaciones.service');
-const { emitirAUsuario } = require('../../sockets/socket.server');
 const { normalizarNombreCarrera } = require('./ofertas.carreras');
 
 async function getOfertas(req, res) {
@@ -103,34 +102,22 @@ async function solicitarRegistroOferta(req, res) {
       return res.status(400).json({ message: 'Una o más carreras seleccionadas no son válidas.' });
     }
 
-    const coordinador = await prisma.coordinador.findFirst();
-    if (!coordinador) {
-      return res.status(500).json({ message: 'No hay coordinador registrado en el sistema.' });
-    }
-
     const nuevaOferta = await prisma.oferta_servicio.create({
       data: {
         ...dataOferta,
         profesor: { connect: { id: profesor_id } },
-        coordinador: { connect: { id: coordinador.id } },
+        // coordinador_id queda NULL a propósito: nadie ha decidido todavía. decidirOferta lo
+        // asigna con el id de quien realmente apruebe/rechace.
         deseo_de_carrera: {
           create: carrerasEncontradas.map((c) => ({ carrera: { connect: { id: c.id } } })),
         },
       },
     });
 
-    await crearNotificacion({
-      usuarioId: coordinador.usuario_id,
-      tipo: 'info',
-      mensaje: `Nueva solicitud de oferta: "${nuevaOferta.nombre_proyecto}" (${profesor.usuario.nombre} ${profesor.usuario.apellidos}).`,
-      rutaRelacionada: `/coordinacion/ofertas?destacar=${nuevaOferta.id}`,
-    });
-
-    try {
-      emitirAUsuario(coordinador.usuario_id, 'oferta:nueva', { ofertaId: nuevaOferta.id });
-    } catch (err) {
-      console.error('Error al emitir oferta:nueva:', err.message);
-    }
+    // Cualquier coordinador puede revisar cualquier oferta (no hay reparto real entre ellos), así
+    // que esto es un hecho CALCULADO ("hay ofertas pendientes de revisión"), no una notificación
+    // persistida por evento — se avisa por socket a los 4 para que refresquen su conteo en vivo.
+    emitirATodosLosCoordinadores('oferta:actualizada', { ofertaId: nuevaOferta.id });
 
     return res.status(201).json({
       message: 'Oferta registrada exitosamente. Queda sujeta a revisión de coordinador.',
@@ -148,7 +135,13 @@ async function postDecidirOferta(req, res) {
   try {
     const { decision, motivoRechazo, programaSISS, actividadSISS } = req.body;
     const ofertaId = parseInt(req.params.id, 10);
-    const resultado = await ofertasService.decidirOferta(ofertaId, decision, motivoRechazo, { programaSISS, actividadSISS });
+
+    const coordinadorQueDecide = await prisma.coordinador.findUnique({ where: { usuario_id: req.usuario.sub } });
+    if (!coordinadorQueDecide) {
+      return res.status(404).json({ message: 'No se encontró tu perfil de coordinador.' });
+    }
+
+    const resultado = await ofertasService.decidirOferta(ofertaId, decision, motivoRechazo, { programaSISS, actividadSISS }, coordinadorQueDecide.id);
     return res.status(200).json({ message: 'Decisión registrada correctamente.', oferta: resultado });
   } catch (err) {
     const status = err.status || 500;

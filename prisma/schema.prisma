@@ -336,7 +336,10 @@ model cumulo_horas_y_faltas {
 model oferta_servicio {
   id                      Int                @id @default(autoincrement())
   profesor_id             Int
-  coordinador_id          Int
+  // NULL mientras la oferta está pendiente_revision — cualquier coordinador puede decidir sobre
+  // cualquier oferta (no hay reparto real entre ellos), así que este campo ya no se asigna al
+  // crear la oferta: decidirOferta lo escribe con el id de quien realmente aprobó/rechazó.
+  coordinador_id          Int?
   nombre_SISS             String?            @db.VarChar(100)
   programa_SISS           String?            @db.VarChar(150)
   nombre_proyecto         String             @db.VarChar(150)
@@ -348,8 +351,8 @@ model oferta_servicio {
   fecha_registro          DateTime           @db.DateTime(0)
   motivo_rechazo          String?            @db.Text
 
-  profesor    profesor    @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
-  coordinador coordinador @relation(fields: [coordinador_id], references: [id], onDelete: Cascade)
+  profesor    profesor     @relation(fields: [profesor_id], references: [id], onDelete: Cascade)
+  coordinador coordinador? @relation(fields: [coordinador_id], references: [id], onDelete: SetNull)
 
   deseo_de_carrera   deseo_de_carrera[]
   solicitud_registro solicitud_registro[]

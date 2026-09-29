@@ -83,7 +83,7 @@ async function resolverAlumnoDeProfesor(profesorUsuarioId, alumnoBoleta) {
     include: {
       alumno: { include: { usuario: true } },
       carrera: true,
-      oferta: { include: { coordinador: { include: { usuario: true } } } },
+      oferta: true,
       periodo_registro: { include: { evento_calendario: true } },
       liberacion_proceso: { include: { evaluacion_desempeno: { include: { revision_desempeno: true } } } },
     },
@@ -318,12 +318,20 @@ async function notificarAlumno(alumnoUsuarioId, mensaje) {
 /**
  * Paso 13: Tipo A calculada (sin fila en `notificacion`) — el dashboard de
  * coordinación recalcula su conteo de "pendiente_dictamen" en cada consulta
- * (ver dashboard.service.js), así que aquí solo hace falta avisar en vivo
- * al coordinador dueño de la oferta de este alumno.
+ * (ver dashboard.service.js), así que aquí solo hace falta avisar en vivo.
+ * Cualquier coordinador puede dictaminar cualquier evaluación (no hay reparto
+ * real entre ellos, `oferta.coordinador` es solo quien la aprobó/rechazó en
+ * CU-PRO-02) — se avisa a TODOS, no solo al de esa oferta en particular.
  */
-function avisarCoordinacion(solicitud) {
-  const coordinadorUsuarioId = solicitud.oferta?.coordinador?.usuario_id;
-  if (coordinadorUsuarioId) emitirResumenActualizado(coordinadorUsuarioId);
+async function avisarCoordinacion() {
+  try {
+    const coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+    for (const c of coordinadores) {
+      emitirResumenActualizado(c.usuario_id);
+    }
+  } catch (err) {
+    console.error('Error al listar coordinadores para avisar (lss, profesor):', err.message);
+  }
 }
 
 /**
