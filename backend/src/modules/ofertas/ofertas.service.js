@@ -556,10 +556,14 @@ async function cerrarOfertaManual(ofertaId, profesorId) {
     );
   }
 
-  return prisma.oferta_servicio.update({
+  const actualizada = await prisma.oferta_servicio.update({
     where: { id: ofertaId },
     data: { estado_oferta: 'cerrada' },
   });
+
+  await invalidarCacheOfertas();
+
+  return actualizada;
 }
 
 // CU-PRO-04: Concluir ofertas automáticamente (RN-PRO-18/19/20)
@@ -603,6 +607,8 @@ async function revisarConclusionAutomatica() {
         where: { id: oferta.id },
         data: { estado_oferta: 'concluida' },
       });
+
+      await invalidarCacheOfertas();
 
       await crearNotificacion({
         usuarioId: oferta.profesor.usuario_id,
