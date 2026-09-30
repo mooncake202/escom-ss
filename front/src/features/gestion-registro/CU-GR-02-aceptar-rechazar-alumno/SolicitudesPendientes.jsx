@@ -10,6 +10,7 @@ export default function SolicitudesPendientes() {
   const {
     pendientes, cargandoLista, seleccionada, loading, resultado,
     verDetalle, cerrarDetalle, decidir,
+    alertasCupos, descartarAlerta,
   } = useSolicitudesPendientes();
   const [busqueda, setBusqueda] = useState("");
 
@@ -27,6 +28,31 @@ export default function SolicitudesPendientes() {
       rol="profesor"
       usuario={nombreProfesor}
     >
+
+      {/* Excepción E3: el backend no pudo rechazar automáticamente al resto de
+          solicitantes de una oferta que se quedó sin cupos (ni siquiera tras
+          reintentar) — se avisa aquí, no en la respuesta de aceptar, porque
+          para cuando se persiste esta notificación esa respuesta ya se envió. */}
+      {alertasCupos.map((a) => (
+        <div key={a.id} style={{
+          marginBottom: "1.25rem", padding: "12px 16px",
+          borderRadius: RADIUS.md,
+          background: C.dangerSoft,
+          border: `1px solid ${C.danger}`,
+          color: C.danger,
+          fontSize: 13, fontWeight: 500,
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: "1rem",
+        }}>
+          <span>🚨 {a.mensaje}</span>
+          <button
+            onClick={() => descartarAlerta(a.id)}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: C.danger, fontSize: 16, padding: 0, lineHeight: 1, flexShrink: 0,
+            }}
+          >✕</button>
+        </div>
+      ))}
 
       {/* Toast de resultado — 3 estados reales posibles desde el backend:
           aceptada_por_profesor, rechazada_por_profesor, rechazada_por_cupos

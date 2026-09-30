@@ -3,6 +3,7 @@ const { dictamenLabel } = require('./gr.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { asegurarCapacidadProfesor, bloquearProfesor } = require('../../lib/cupos');
 const { invalidarCacheOfertas } = require('../ofertas/ofertas.service');
+const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
 const MOTIVO_RECHAZO_PROFESOR = 'Rechazado por profesor';
 const MOTIVO_RECHAZO_CUPOS = 'Cupos de la oferta cubiertos';
@@ -53,6 +54,51 @@ async function listarSolicitudesPendientes(profesorUsuarioId) {
     tituloOferta: s.oferta?.nombre_proyecto ?? null,
     motivacion: s.motivacion_oferta,
   }));
+}
+
+/**
+ * RN-GR-11 — si la oferta se quedó sin cupos, rechaza automáticamente el resto
+ * de solicitudes todavía pendientes de esa misma oferta y notifica a cada
+ * alumno afectado. Extraída para poder reintentarse tal cual una segunda vez
+ * (Excepción E3) — es idempotente a propósito: el `updateMany` solo toca
+ * filas que SIGAN en 'espera_respuesta_de_profesor', así que si un intento
+ * anterior ya rechazó algunas antes de fallar a medias, el reintento no las
+ * vuelve a tocar ni las re-notifica.
+ */
+async function rechazarPendientesPorCuposLlenos(ofertaId) {
+  const ofertaActualizada = await prisma.oferta_servicio.findUnique({ where: { id: ofertaId } });
+
+  if (ofertaActualizada.cupos_disponibles !== 0) return;
+
+  // Socket (Parte 2): un updateMany por sí solo pierde de vista A QUIÉN
+  // afectó — se resuelve la lista de alumnos afectados ANTES del
+  // updateMany, con el mismo `where`, para poder emitirles después.
+  const solicitudesAfectadas = await prisma.solicitud_registro.findMany({
+    where: { oferta_id: ofertaId, estado_solicitud: 'espera_respuesta_de_profesor' },
+    select: { id: true, alumno: { select: { usuario_id: true } } },
+  });
+
+  await prisma.solicitud_registro.updateMany({
+    where: { oferta_id: ofertaId, estado_solicitud: 'espera_respuesta_de_profesor' },
+    data: {
+      estado_solicitud: 'rechazada_por_cupos',
+      estado_anterior: 'espera_respuesta_de_profesor',
+      tipo_rechazo: 'corregible',
+      motivo_rechazo: MOTIVO_RECHAZO_CUPOS,
+    },
+  });
+
+  for (const s of solicitudesAfectadas) {
+    try {
+      emitirAUsuario(s.alumno.usuario_id, 'solicitud:rechazada_por_cupos', {
+        solicitudId: s.id,
+        estado_solicitud: 'rechazada_por_cupos',
+        motivo: MOTIVO_RECHAZO_CUPOS,
+      });
+    } catch (err) {
+      console.error('Error al emitir solicitud:rechazada_por_cupos:', err.message);
+    }
+  }
 }
 
 /**
@@ -205,44 +251,30 @@ async function decidirSolicitud(solicitudId, decision, profesorUsuarioId) {
   // RN-GR-11 / Excepción E3: el rechazo automático de las demás solicitudes
   // va FUERA de la transacción de aceptación, a propósito — si esto falla,
   // la aceptación YA quedó guardada y no debe revertirse (así lo pide E3:
-  // "mantiene la aceptación ya procesada... genera una alerta interna").
+  // "mantiene la aceptación ya procesada"). Un reintento inmediato, sin
+  // delay, cubre fallas transitorias; si el reintento también falla, se
+  // persiste una notificación urgente al profesor en vez de solo loguear —
+  // es la única vía de aviso (E3 no agrega nada a la respuesta síncrona de
+  // aceptar, que ya se envió).
   try {
-    const ofertaActualizada = await prisma.oferta_servicio.findUnique({ where: { id: solicitud.oferta_id } });
-
-    if (ofertaActualizada.cupos_disponibles === 0) {
-      // Socket (Parte 2): un updateMany por sí solo pierde de vista A QUIÉN
-      // afectó — se resuelve la lista de alumnos afectados ANTES del
-      // updateMany, con el mismo `where`, para poder emitirles después.
-      const solicitudesAfectadas = await prisma.solicitud_registro.findMany({
-        where: { oferta_id: solicitud.oferta_id, estado_solicitud: 'espera_respuesta_de_profesor' },
-        select: { id: true, alumno: { select: { usuario_id: true } } },
-      });
-
-      await prisma.solicitud_registro.updateMany({
-        where: { oferta_id: solicitud.oferta_id, estado_solicitud: 'espera_respuesta_de_profesor' },
-        data: {
-          estado_solicitud: 'rechazada_por_cupos',
-          estado_anterior: 'espera_respuesta_de_profesor',
-          tipo_rechazo: 'corregible',
-          motivo_rechazo: MOTIVO_RECHAZO_CUPOS,
-        },
-      });
-
-      for (const s of solicitudesAfectadas) {
-        try {
-          emitirAUsuario(s.alumno.usuario_id, 'solicitud:rechazada_por_cupos', {
-            solicitudId: s.id,
-            estado_solicitud: 'rechazada_por_cupos',
-            motivo: MOTIVO_RECHAZO_CUPOS,
-          });
-        } catch (err) {
-          console.error('Error al emitir solicitud:rechazada_por_cupos:', err.message);
-        }
+    await rechazarPendientesPorCuposLlenos(solicitud.oferta_id);
+  } catch (primerError) {
+    console.error('[E3] Primer intento de rechazo automático por cupos falló, reintentando:', primerError);
+    try {
+      await rechazarPendientesPorCuposLlenos(solicitud.oferta_id);
+    } catch (segundoError) {
+      console.error('🚨 ALERTA (E3): falló el rechazo automático por cupos cubiertos tras reintentar. Requiere revisión manual. Oferta id:', solicitud.oferta_id, segundoError);
+      try {
+        await crearNotificacion({
+          usuarioId: profesorUsuarioId,
+          tipo: 'urgente',
+          mensaje: `No se pudo rechazar automáticamente al resto de solicitantes de "${solicitud.oferta.nombre_proyecto}" por cupos cubiertos. Debes rechazarlos manualmente.`,
+          rutaRelacionada: '/profesor/solicitudes',
+        });
+      } catch (errNotificacion) {
+        console.error('🚨 ALERTA (E3): además falló al persistir la notificación de aviso al profesor:', errNotificacion);
       }
     }
-  } catch (err) {
-    // Excepción E3: alerta interna para revisión manual.
-    console.error('🚨 ALERTA (E3): falló el rechazo automático por cupos cubiertos. Requiere revisión manual. Oferta id:', solicitud.oferta_id, err);
   }
 
   return { estado_solicitud: 'aceptada_por_profesor' };
