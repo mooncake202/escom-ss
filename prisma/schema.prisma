@@ -70,6 +70,7 @@ enum EstadoRevision {
 // genérico sin propósito especial. Deja espacio para agregar más valores después.
 enum TipoRecurso {
   link_constancia_creditos
+  link_siss
 }
 
 

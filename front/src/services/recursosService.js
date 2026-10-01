@@ -13,6 +13,12 @@ export function obtenerUrlConstanciaCreditos() {
   return apiFetch("/recursos/publico/constancia-creditos");
 }
 
+// CU-GR-04: a diferencia de constancia de créditos, aquí el alumno ya tiene sesión — el endpoint
+// exige sesión autenticada (ver recursos.routes.js), pero apiFetch ya manda el token siempre.
+export function obtenerUrlSiss() {
+  return apiFetch("/recursos/publico/siss");
+}
+
 export function crearRecurso({ nombre, url, tipo }) {
   return apiFetch("/recursos", { method: "POST", body: JSON.stringify({ nombre, url, tipo: tipo || null }) });
 }

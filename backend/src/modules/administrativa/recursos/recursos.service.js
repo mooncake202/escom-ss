@@ -25,6 +25,7 @@ const MAX_URL = 500;    // recurso.url     VarChar(500)
 // sincronizados a mano: Prisma no expone el enum como array en runtime.
 const TIPOS_RECURSO = Object.freeze({
   link_constancia_creditos: 'Link de constancia de créditos (CU-GR-01)',
+  link_siss: 'Link de la plataforma SISS (CU-GR-04)',
 });
 
 const limpiar = (valor) => (typeof valor === 'string' ? valor.trim() : '');
@@ -129,6 +130,14 @@ async function obtenerUrlConstanciaCreditos() {
   return { url: recurso?.url ?? null };
 }
 
+// CU-GR-04: a diferencia de constancia de créditos, aquí el alumno ya tiene sesión (alumno_sin_asignar
+// autenticado) — el endpoint que consume esto exige requireAuth, no es público. Mismo patrón de
+// búsqueda por `tipo`, mismo fallback a `url: null` si no está configurado.
+async function obtenerUrlSiss() {
+  const recurso = await prisma.recurso.findUnique({ where: { tipo: 'link_siss' } });
+  return { url: recurso?.url ?? null };
+}
+
 async function crear({ usuarioId, nombre, url, tipo }) {
   const datos = validarDatos({ nombre, url, tipo });
   const coordinador = await perfilCoordinador(usuarioId);
@@ -190,5 +199,5 @@ async function eliminar({ usuarioId, id }) {
 
 module.exports = {
   listar, crear, actualizar, eliminar, MAX_NOMBRE, MAX_URL, TIPOS_RECURSO,
-  obtenerUrlConstanciaCreditos,
+  obtenerUrlConstanciaCreditos, obtenerUrlSiss,
 };

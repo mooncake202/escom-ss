@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAuth, requireRole } = require('../../../middleware/auth.middleware');
-const { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos } = require('./recursos.controller');
+const { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos, getRecursoSiss } = require('./recursos.controller');
 
 const router = express.Router();
 
@@ -10,6 +10,11 @@ const router = express.Router();
 // cuenta. Expone solo la URL de un recurso puntual, no el catálogo (eso sigue exclusivo de
 // coordinación más abajo).
 router.get('/publico/constancia-creditos', getRecursoConstanciaCreditos);
+
+// CU-GR-04: aquí el alumno YA tiene sesión (alumno_sin_asignar autenticado) — a diferencia de la
+// ruta de arriba, esta sí exige requireAuth, sin restricción de rol adicional (cualquier sesión
+// autenticada basta).
+router.get('/publico/siss', requireAuth, getRecursoSiss);
 
 // Lectura del catálogo completo: SOLO coordinación. El acceso de alumno/profesor a la consulta de
 // recursos fue retirado por decisión explícita (ya no forma parte de la tabla de referencia de

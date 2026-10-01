@@ -29,6 +29,16 @@ async function getRecursoConstanciaCreditos(_req, res) {
   }
 }
 
+// CU-GR-04: a diferencia de constancia de créditos, aquí el alumno ya tiene sesión — esta ruta
+// exige requireAuth (ver recursos.routes.js). Expone SOLO la URL de este recurso puntual.
+async function getRecursoSiss(req, res) {
+  try {
+    return res.status(200).json(await servicio.obtenerUrlSiss());
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener el recurso de la plataforma SISS:');
+  }
+}
+
 async function postRecurso(req, res) {
   try {
     const { nombre, url, tipo } = req.body ?? {};
@@ -57,4 +67,4 @@ async function deleteRecurso(req, res) {
   }
 }
 
-module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos };
+module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos, getRecursoSiss };
