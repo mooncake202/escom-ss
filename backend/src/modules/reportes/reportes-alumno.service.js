@@ -28,6 +28,7 @@ const {
   MOTIVOS_BLOQUEO,
   MENSAJES_BLOQUEO,
   CARGO_PROFESOR_BASE,
+  FILAS_CONTROL_ASISTENCIA,
   nombreInstitucionalCarrera,
   nombreCompleto,
   aNumero,
@@ -294,6 +295,10 @@ function evaluarBloqueos({
 
   if (!periodoGenerable) agregar(MOTIVOS_BLOQUEO.PERIODO_NO_CERRADO);
   else if (diasLaborados === 0) agregar(MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS);
+  // Más jornadas que renglones en el Control de Asistencia: dato inconsistente. Se informa como bloqueo, con su
+  // mensaje, en vez de dejar que filasDeAsistencia lance y tumbe la pantalla. Ese límite se queda intacto como
+  // última defensa de la generación del PDF. Las tres ramas son excluyentes: 0, más de 24, o un conteo válido.
+  else if (diasLaborados > FILAS_CONTROL_ASISTENCIA) agregar(MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO);
 
   // Para Reporte N > 1 basta con que exista el Reporte N-1 (cualquiera sea su estado): como `numero` siempre se
   // asigna como max(num_reporte existentes) + 1, esa existencia ya está garantizada por construcción — no hace
@@ -630,12 +635,17 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
     resumen: { diasLaborados, horas, bitacorasQueCuentan: bitacoras.length },
     // Página 2 del PDF. El total del mes es el cálculo vigente: en la primera generación es exactamente el valor que
     // después se persiste como horas_reportadas. Si el reporte YA existe, manda su snapshot.
-    asistencia: construirAsistencia({
-      bitacoras,
-      totalDelMes: reporteExistenteFila?.horas_reportadas ?? horas,
-      horasPrevias: sumarHorasReportadasPrevias(reportes, numero),
-      responsable: profesor ? { nombre: profesor.nombreCompleto, cargo: profesor.cargo } : null,
-    }),
+    // Con más jornadas que renglones el bloque no se puede armar (filasDeAsistencia lanzaría): se devuelve vacío,
+    // mismo criterio que la rama sin periodo de más arriba. El PDF no se genera en ese estado, así que el bloque
+    // vacío nunca llega a imprimirse.
+    asistencia: construirAsistencia(
+      diasLaborados > FILAS_CONTROL_ASISTENCIA ? {} : {
+        bitacoras,
+        totalDelMes: reporteExistenteFila?.horas_reportadas ?? horas,
+        horasPrevias: sumarHorasReportadasPrevias(reportes, numero),
+        responsable: profesor ? { nombre: profesor.nombreCompleto, cargo: profesor.cargo } : null,
+      },
+    ),
     bitacoras,
     calendario: { dias: calendario.dias, eventos: calendario.eventos },
     actividades: calcularAvanceActividades({ actividades, registros, inicio: periodo.inicio, fin: periodo.fin }),

@@ -10,7 +10,7 @@ const {
   evaluarBloqueosDeDatos,
   plazoEnvioReporteMensualVencido,
 } = require('./reportes-alumno.service');
-const { MOTIVOS_BLOQUEO, ESTADOS_REPORTE } = require('./reportes.shared');
+const { MOTIVOS_BLOQUEO, MENSAJES_BLOQUEO, FILAS_CONTROL_ASISTENCIA, ESTADOS_REPORTE } = require('./reportes.shared');
 const plazoDeAviso = (r) => r.diagnostico.plazoEnvio;
 const limiteDe = (r) => r.diagnostico.limiteServicio;
 
@@ -551,6 +551,72 @@ test('periodo cerrado sin ninguna bitácora aprobada: SIN_BITACORAS_APROBADAS', 
   const r = await prepararReporteMensual(1, { prisma, ahora: ahoraMx('2025-11-20') });
   assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]);
   assert.deepEqual(r.resumen, { diasLaborados: 0, horas: 0, bitacorasQueCuentan: 0 });
+});
+
+// ── Más jornadas que renglones del Control de Asistencia ────────────────────────────────────────────────────
+//
+// Dato inconsistente (solo con datos corruptos o de prueba): el formato oficial tiene 24 renglones y no crece.
+// Antes esto hacía que filasDeAsistencia lanzara DENTRO de la preparación y la pantalla no cargaba, sin ningún
+// mensaje. Ahora se informa como un motivo de bloqueo más, como los otros.
+
+/** `n` bitácoras contabilizables con fechas distintas dentro del periodo 1 (16-oct → 14-nov del escenario). */
+const bitacorasEnElPeriodo = (n) => Array.from({ length: n }, (_, i) => {
+  const dia = 16 + i; // 16-oct en adelante; el periodo 1 abarca hasta mediados de noviembre
+  const fecha = dia <= 31 ? `2025-10-${dia}` : `2025-11-${String(dia - 31).padStart(2, '0')}`;
+  return bit(i + 1, fecha, 4);
+});
+
+test('más jornadas que renglones del formato: bloquea con mensaje en vez de lanzar', async () => {
+  const { prisma } = crearEscenario({ bitacoras: bitacorasEnElPeriodo(25) });
+
+  // Lo esencial: NO lanza. Antes de este cambio, aquí explotaba con ASISTENCIA_EXCEDE_FILAS.
+  const r = await prepararReporteMensual(1, { prisma, ahora: ahoraMx('2025-11-20') });
+
+  assert.equal(r.puedeGenerar, false);
+  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO]);
+  // El mensaje es el del catálogo, igual que los otros motivos, y nombra el límite real del formato.
+  const motivo = r.motivosBloqueo[0];
+  assert.equal(motivo.mensaje, MENSAJES_BLOQUEO[MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO]);
+  assert.match(motivo.mensaje, new RegExp(`${FILAS_CONTROL_ASISTENCIA}`));
+  // El resumen sigue informando lo que de verdad hay, sin recortar.
+  assert.equal(r.resumen.diasLaborados, 25);
+});
+
+test('exactamente 24 jornadas SÍ se puede generar: el límite es inclusivo', async () => {
+  const { prisma } = crearEscenario({ bitacoras: bitacorasEnElPeriodo(FILAS_CONTROL_ASISTENCIA) });
+
+  const r = await prepararReporteMensual(1, { prisma, ahora: ahoraMx('2025-11-20') });
+
+  assert.deepEqual(codigos(r), []);
+  assert.equal(r.puedeGenerar, true);
+  assert.equal(r.resumen.diasLaborados, FILAS_CONTROL_ASISTENCIA);
+  // Con 24 la hoja de asistencia sí se arma completa, sin filas libres.
+  assert.equal(r.asistencia.filas.filter((f) => f.conRegistro).length, FILAS_CONTROL_ASISTENCIA);
+});
+
+test('el motivo NO aparece con cero bitácoras: manda SIN_BITACORAS_APROBADAS (son excluyentes)', async () => {
+  const { prisma } = crearEscenario({ bitacoras: [] });
+
+  const r = await prepararReporteMensual(1, { prisma, ahora: ahoraMx('2025-11-20') });
+
+  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]);
+  assert.equal(codigos(r).includes(MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO), false);
+});
+
+test('con el periodo bloqueado por exceso, la hoja de asistencia viaja vacía y la preparación responde normal', async () => {
+  const { prisma } = crearEscenario({ bitacoras: bitacorasEnElPeriodo(25) });
+
+  const r = await prepararReporteMensual(1, { prisma, ahora: ahoraMx('2025-11-20') });
+
+  // Las 24 filas existen (el formato las conserva) pero ninguna lleva registro, y los totales van vacíos.
+  assert.equal(r.asistencia.filas.length, FILAS_CONTROL_ASISTENCIA);
+  assert.equal(r.asistencia.filas.some((f) => f.conRegistro), false);
+  assert.equal(r.asistencia.totalMes, '');
+  assert.equal(r.asistencia.totalAcumulado, '');
+  // Y el resto de la pantalla sigue armado: calendario, actividades y diagnóstico.
+  assert.ok(r.reporte.periodo, 'el periodo se sigue calculando');
+  assert.ok(Array.isArray(r.calendario.dias));
+  assert.ok(Array.isArray(r.actividades));
 });
 
 // ── fecha_fin es administrativa: no limita la secuencia mensual ─────────────────────────────────────────────

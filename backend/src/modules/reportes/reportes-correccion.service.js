@@ -24,6 +24,7 @@ const {
   ESTADO_REVISION_FIRMADA,
   MOTIVOS_BLOQUEO,
   MENSAJES_BLOQUEO,
+  FILAS_CONTROL_ASISTENCIA,
 } = require('./reportes.shared');
 const { construirAsistencia } = require('./reportes.asistencia');
 const { construirDatosPdf, generarPdfReporteMensual } = require('./reportes.pdf');
@@ -94,14 +95,26 @@ function construirResultado({ alumno, solicitud }, cfg, fila, { bitacoras = [], 
   const impresion = datosDeImpresion(alumno, solicitud);
   const { periodo } = cfg.periodo(solicitud, fila);
 
-  const codigos = [...(periodo ? [] : [MOTIVOS_BLOQUEO.SIN_PERIODO_OFICIAL]), ...impresion.motivosDatos];
+  // Más jornadas que renglones del Control de Asistencia: dato inconsistente. Se informa como motivo de bloqueo, con
+  // su mensaje, en vez de dejar que construirAsistencia lance un 422 sin explicación en la vista previa y el reenvío.
+  // No hace falta comprobar el tipo: datosDeAsistencia ya devuelve una lista vacía para el global, así que este
+  // conteo solo puede exceder en un reporte mensual. El límite de filasDeAsistencia queda intacto.
+  const excedeAsistencia = bitacoras.length > FILAS_CONTROL_ASISTENCIA;
+
+  const codigos = [
+    ...(periodo ? [] : [MOTIVOS_BLOQUEO.SIN_PERIODO_OFICIAL]),
+    ...(excedeAsistencia ? [MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO] : []),
+    ...impresion.motivosDatos,
+  ];
   const motivosBloqueo = codigos.map((codigo) => ({ codigo, mensaje: MENSAJES_BLOQUEO[codigo] }));
   return {
     alumno: impresion.alumno,
     profesor: impresion.profesor,
     servicio: { programa: impresion.programa },
     reporte: { tipo: cfg.tipo, numero: cfg.numero(fila), periodo },
-    asistencia: construirAsistencia({
+    // Con el bloqueo activo el bloque no se puede armar (filasDeAsistencia lanzaría): se devuelve vacío, mismo
+    // criterio que REP-01. El PDF no se genera en ese estado, así que ese bloque vacío nunca llega a imprimirse.
+    asistencia: construirAsistencia(excedeAsistencia ? {} : {
       bitacoras,
       totalDelMes: cfg.snapshot(fila).horasReportadas ?? null,
       horasPrevias,

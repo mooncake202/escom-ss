@@ -119,6 +119,22 @@ const revisionesDe = (reporte) => reporte.revision_reporte_mensual;
 const sinCambios = (e, antes, mensaje = 'no cambia nada') => assert.deepEqual(e.estadoActual(), antes, mensaje);
 const es404 = (err) => err.status === 404 && err.message === 'Reporte no encontrado.';
 
+// `n` bitácoras contabilizables dentro del periodo del reporte que se corrige (el 2: 17-ago → 15-sep de 2026).
+const bitacorasDelPeriodo = (n) => Array.from({ length: n }, (_, i) => {
+  const dia = 17 + i; // 17-ago en adelante; el periodo llega hasta el 15 de septiembre
+  const fecha = dia <= 31 ? `2026-08-${dia}` : `2026-09-${String(dia - 31).padStart(2, '0')}`;
+  return {
+    id: i + 1,
+    solicitud_registro_id: 1001,
+    estado: 'aprobada',
+    fecha_registro: new Date(`${fecha}T00:00:00.000Z`),
+    fecha_revision: new Date(`${fecha}T16:00:00.000Z`),
+    horas_contabilizadas: 4,
+    hora_inicio: new Date(`${fecha}T14:00:00.000Z`),
+    hora_fin: new Date(`${fecha}T18:00:00.000Z`),
+  };
+});
+
 // ══ Reenvío ═══════════════════════════════════════════════════
 
 test('reenviar: pasa a pendiente_revision_profesor con las actividades nuevas y el snapshot INTACTO (número, días, horas)', async (t) => {
@@ -309,6 +325,55 @@ test('si faltan datos para imprimir (correo personal, profesor, programa) → 40
   const sinPeriodo = await escenario(t, { alumno: { sinPeriodo: true } });
   await assert.rejects(sinPeriodo.reenviar(), (err) => err.code === CODIGOS_ERROR.REPORTE_NO_GENERABLE && err.motivosBloqueo.some((m) => m.codigo === 'SIN_PERIODO_OFICIAL'));
   for (const e of [sinCorreo, sinProfesor, sinPeriodo]) assert.deepEqual([e.sellosDeTiempo, e.generados, e.reporte.estado_reporte], [[], [], ESTADOS_REPORTE.RECHAZADO_PROFESOR]);
+});
+
+// ── Más jornadas que renglones del Control de Asistencia ───────────────────────────────────────────────────
+//
+// Mismo tratamiento que ya recibe en CU-REP-01: motivo de bloqueo con mensaje, no una excepción
+// ASISTENCIA_EXCEDE_FILAS (422) sin explicación. El límite de filasDeAsistencia se queda intacto.
+
+test('más de 24 bitácoras en el periodo: la vista previa da 409 con el motivo, no un 422 sin mensaje', async (t) => {
+  const e = await escenario(t, { bd: { bitacoras: bitacorasDelPeriodo(25) } });
+
+  await assert.rejects(
+    e.vistaPrevia(),
+    (err) => err.status === 409
+      && err.code === CODIGOS_ERROR.REPORTE_NO_GENERABLE
+      && err.motivosBloqueo.some((m) => m.codigo === 'DEMASIADAS_BITACORAS_EN_EL_PERIODO' && typeof m.mensaje === 'string' && m.mensaje.includes('24')),
+  );
+  // Y no es el error viejo: nada de ASISTENCIA_EXCEDE_FILAS.
+  await assert.rejects(e.vistaPrevia(), (err) => err.code !== 'ASISTENCIA_EXCEDE_FILAS');
+  assert.deepEqual(e.generados, [], 'no se genera ningún PDF');
+});
+
+test('más de 24 bitácoras: el reenvío se bloquea igual y NO avanza el estado ni escribe nada', async (t) => {
+  const e = await escenario(t, { bd: { bitacoras: bitacorasDelPeriodo(25) } });
+  const antes = e.estadoActual();
+
+  await assert.rejects(
+    e.reenviar(),
+    (err) => err.status === 409
+      && err.code === CODIGOS_ERROR.REPORTE_NO_GENERABLE
+      && err.motivosBloqueo.some((m) => m.codigo === 'DEMASIADAS_BITACORAS_EN_EL_PERIODO'),
+  );
+
+  sinCambios(e, antes);
+  assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.RECHAZADO_PROFESOR, 'sigue rechazado');
+  assert.deepEqual([e.sellosDeTiempo, e.generados, e.notificaciones], [[], [], []], 'ni sello, ni PDF, ni aviso');
+  assert.deepEqual(archivos(e.rutaBaseDocumentos), ['2022630001/anterior.pdf'], 'no queda ningún archivo nuevo');
+});
+
+test('exactamente 24 bitácoras: la corrección funciona con normalidad (el límite es inclusivo)', async (t) => {
+  const e = await escenario(t, { bd: { bitacoras: bitacorasDelPeriodo(24) } });
+
+  const r = await e.reenviar();
+
+  assert.equal(r.reporte.estadoReporte, ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR);
+  assert.equal(e.reporte.actividades_mes, ACTIVIDADES_NUEVAS);
+  // La página 2 se arma con los 24 registros y el total del mes sigue siendo el snapshot, no un recálculo.
+  const { asistencia } = e.generados[0].datos;
+  assert.equal(asistencia.filas.filter((f) => f.conRegistro).length, 24);
+  assert.equal(asistencia.totalMes, '13', 'el snapshot de horas_reportadas, intacto');
 });
 
 test('sin rúbrica registrada → 409 RUBRICA_NO_REGISTRADA (no se pide una nueva aquí) y no se genera ni sella nada', async (t) => {
