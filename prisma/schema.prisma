@@ -71,6 +71,7 @@ enum EstadoRevision {
 enum TipoRecurso {
   link_constancia_creditos
   link_siss
+  link_seguro_social
 }
 
 

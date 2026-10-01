@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLayout }            from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
@@ -6,6 +6,7 @@ import { DocumentoUploader }        from "./components/DocumentoUploader";
 import { useAdjuntarDocumentacion } from "./hooks/useAdjuntarDocumentacion";
 import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoSolicitud";
 import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
+import { obtenerUrlSeguroSocial } from "@/services/recursosService";
 
 // Cuánto tiempo se ve el mensaje de confirmación (RF-GR-58) antes de
 // redirigir automáticamente (RF-GR-60).
@@ -17,6 +18,23 @@ export default function AdjuntarDocumentacion() {
   const { docs, errores, loading, errorEnvio, todosObligatorios, agregarDoc, quitarDoc, enviar } = useAdjuntarDocumentacion();
   const { estado, cargando, error } = useEstadoSolicitud();
   const [mostrarConfirmacion, setMostrarConfirmacion] = useState(false);
+  const [urlSeguroSocial, setUrlSeguroSocial] = useState(null);
+
+  // Link editable por coordinación (recurso tipo link_seguro_social), mismo patrón de polling de
+  // 25s que ya usan GR-01 y GR-04 — a diferencia de ambos, aquí si no está configurado se avisa con
+  // una leyenda en vez de ocultar el bloque en silencio: el alumno necesita saber que ese atajo no
+  // está disponible, no solo dejar de verlo.
+  useEffect(() => {
+    let vigente = true;
+    const consultar = () => {
+      obtenerUrlSeguroSocial()
+        .then(({ url }) => { if (vigente) setUrlSeguroSocial(url); })
+        .catch(() => { if (vigente) setUrlSeguroSocial(null); });
+    };
+    consultar();
+    const intervalo = setInterval(consultar, 25000);
+    return () => { vigente = false; clearInterval(intervalo); };
+  }, []);
 
   const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
   const nombre = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "";
@@ -117,12 +135,18 @@ export default function AdjuntarDocumentacion() {
           />
 
           <div style={{ padding: "12px 14px", background: C.bgInput, borderRadius: RADIUS.md, border: `1px solid ${C.borderSubtle}`, marginTop: "0.5rem" }}>
-            <p style={{ margin: 0, fontSize: 13, color: C.textMuted, textAlign: "center" }}>
-              🔗{" "}
-              <a href="https://serviciosdigitales.imss.gob.mx/gestionAsegurados-web-externo/vigencia" target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
-                Solicita tu constancia de seguro social aquí
-              </a>
-            </p>
+            {urlSeguroSocial ? (
+              <p style={{ margin: 0, fontSize: 13, color: C.textMuted, textAlign: "center" }}>
+                🔗{" "}
+                <a href={urlSeguroSocial} target="_blank" rel="noopener noreferrer" style={{ color: C.accentText, fontWeight: 600 }}>
+                  Solicita tu constancia de seguro social aquí
+                </a>
+              </p>
+            ) : (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, textAlign: "center" }}>
+                Este enlace no está disponible por el momento. Repórtalo a coordinación.
+              </p>
+            )}
           </div>
         </div>
 

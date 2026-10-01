@@ -26,6 +26,7 @@ const MAX_URL = 500;    // recurso.url     VarChar(500)
 const TIPOS_RECURSO = Object.freeze({
   link_constancia_creditos: 'Link de constancia de créditos (CU-GR-01)',
   link_siss: 'Link de la plataforma SISS (CU-GR-04)',
+  link_seguro_social: 'Link de constancia de seguro social IMSS (CU-GR-05)',
 });
 
 const limpiar = (valor) => (typeof valor === 'string' ? valor.trim() : '');
@@ -138,6 +139,13 @@ async function obtenerUrlSiss() {
   return { url: recurso?.url ?? null };
 }
 
+// CU-GR-05: mismo patrón que link_siss — el alumno ya tiene sesión en este punto del flujo, así
+// que esta ruta también exige requireAuth.
+async function obtenerUrlSeguroSocial() {
+  const recurso = await prisma.recurso.findUnique({ where: { tipo: 'link_seguro_social' } });
+  return { url: recurso?.url ?? null };
+}
+
 async function crear({ usuarioId, nombre, url, tipo }) {
   const datos = validarDatos({ nombre, url, tipo });
   const coordinador = await perfilCoordinador(usuarioId);
@@ -199,5 +207,5 @@ async function eliminar({ usuarioId, id }) {
 
 module.exports = {
   listar, crear, actualizar, eliminar, MAX_NOMBRE, MAX_URL, TIPOS_RECURSO,
-  obtenerUrlConstanciaCreditos, obtenerUrlSiss,
+  obtenerUrlConstanciaCreditos, obtenerUrlSiss, obtenerUrlSeguroSocial,
 };

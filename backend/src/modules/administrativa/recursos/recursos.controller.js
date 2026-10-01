@@ -39,6 +39,15 @@ async function getRecursoSiss(req, res) {
   }
 }
 
+// CU-GR-05: mismo patrón que SISS — el alumno ya tiene sesión en este punto del flujo.
+async function getRecursoSeguroSocial(req, res) {
+  try {
+    return res.status(200).json(await servicio.obtenerUrlSeguroSocial());
+  } catch (err) {
+    return manejarError(err, res, 'Error al obtener el recurso de constancia de seguro social:');
+  }
+}
+
 async function postRecurso(req, res) {
   try {
     const { nombre, url, tipo } = req.body ?? {};
@@ -67,4 +76,4 @@ async function deleteRecurso(req, res) {
   }
 }
 
-module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos, getRecursoSiss };
+module.exports = { getRecursos, postRecurso, putRecurso, deleteRecurso, getRecursoConstanciaCreditos, getRecursoSiss, getRecursoSeguroSocial };
