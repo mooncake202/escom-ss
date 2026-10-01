@@ -12,6 +12,7 @@ const { generarToken } = require('../../lib/jwt');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { ofertaPuedeRecibirAlumno } = require('../../lib/cupos');
 const { ESTADOS_CON_CUPO_CONSUMIDO } = require('./gr.shared');
+const { invalidarCacheOfertas } = require('../ofertas/ofertas.service');
 
 const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 
@@ -398,6 +399,13 @@ async function ejecutarBorradoParcial(solicitud, motivo) {
 
     return tx.solicitud_registro.findUnique({ where: { id: solicitud.id } });
   });
+
+  // liberarLugarOferta (si corrió) cambió cupos_disponibles de la oferta — mismo
+  // patrón de invalidación ya usado al aceptar y al rechazar definitivamente desde
+  // GR-07, para que el listado público de GR-01 no quede hasta 30s desactualizado.
+  if (solicitudActualizada !== null && cupoConsumido && solicitud.oferta_id) {
+    await invalidarCacheOfertas();
+  }
 
   if (solicitudActualizada === null) {
     // No fue esta ejecución: sin archivos que borrar, sin socket, sin cupo.

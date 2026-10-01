@@ -5,6 +5,7 @@ const { descifrarBuffer } = require('../../lib/fileEncryption');
 const { dictamenLabel, RUTA_BASE_DOCUMENTOS, liberarLugarOferta } = require('./gr.service');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 const { emitirAUsuario } = require('../../sockets/socket.server');
+const { invalidarCacheOfertas } = require('../ofertas/ofertas.service');
 
 function crearError(mensaje, status = 400, code) {
   const err = new Error(mensaje);
@@ -183,6 +184,13 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
       await liberarLugarOferta(tx, solicitud.oferta_id);
     }
   });
+  // liberarLugarOferta cambió cupos_disponibles de la oferta — mismo patrón de
+  // invalidación ya usado al aceptar (gr-profesor.service.js), para que el
+  // listado público de GR-01 no quede hasta 30s desactualizado mostrando esa
+  // oferta sin cupo cuando en realidad ya se liberó.
+  if (solicitud.oferta_id) {
+    await invalidarCacheOfertas();
+  }
   // La transacción ya eliminó las filas en BD; ahora sí se borran los
   // archivos físicos que quedaron huérfanos.
   borrarArchivosFisicos(documentos);
