@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLayout } from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
 import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoSolicitud";
 import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
 import { confirmarCartaCompromiso } from "@/services/estadoSolicitudService";
-
-const URL_SISS = "https://serviciosocial.ipn.mx/";
+import { obtenerUrlSiss } from "@/services/recursosService";
 
 function actualizarUsuarioLocal(cambios) {
   const actual = JSON.parse(localStorage.getItem("usuario") || "null");
@@ -22,9 +21,26 @@ export default function CartaCompromiso() {
   const [accedioSISS, setAccedioSISS] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [errorAccion, setErrorAccion] = useState("");
+  const [urlSiss, setUrlSiss] = useState(null);
 
   const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
   const nombre = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "";
+
+  // RN-GR-44/RF-GR-76: link editable por coordinación (recurso tipo link_siss), mismo patrón de
+  // polling de 25s que ya usa CU-GR-03 (registro SISS) — el alumno puede quedarse en esta pantalla
+  // un buen rato antes de confirmar, así que si coordinación lo actualiza mientras tanto, se
+  // refleja sin que el alumno tenga que recargar.
+  useEffect(() => {
+    let vigente = true;
+    const consultar = () => {
+      obtenerUrlSiss()
+        .then(({ url }) => { if (vigente) setUrlSiss(url); })
+        .catch(() => { if (vigente) setUrlSiss(null); });
+    };
+    consultar();
+    const intervalo = setInterval(consultar, 25000);
+    return () => { vigente = false; clearInterval(intervalo); };
+  }, []);
 
   if (cargando) return null;
 
@@ -138,24 +154,42 @@ export default function CartaCompromiso() {
             </ul>
           </div>
 
-          {/* Botón SISS — RN-GR-44 / RF-GR-76 */}
-          <a
-            href={URL_SISS}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              marginTop: "0.5rem", padding: "10px 20px",
-              borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
-              background: GRADIENTS.primary, color: "#fff",
-              textDecoration: "none", boxShadow: SHADOWS.accent,
-            }}
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-            </svg>
-            Ir a la plataforma SISS
-          </a>
+          {/* Botón SISS — RN-GR-44 / RF-GR-76. Link editable por coordinación (recurso tipo
+              link_siss, el mismo que usa CU-GR-03); deshabilitado si todavía no está configurado,
+              en vez de ocultarlo — a diferencia del link opcional de CU-GR-05 (constancia de
+              créditos), este paso sí es obligatorio para continuar el proceso. */}
+          {urlSiss ? (
+            <a
+              href={urlSiss}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                marginTop: "0.5rem", padding: "10px 20px",
+                borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+                background: GRADIENTS.primary, color: "#fff",
+                textDecoration: "none", boxShadow: SHADOWS.accent,
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+              Ir a la plataforma SISS
+            </a>
+          ) : (
+            <button
+              disabled
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                marginTop: "0.5rem", padding: "10px 20px",
+                borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+                background: C.borderDefault, color: C.textDisabled,
+                border: "none", cursor: "not-allowed", fontFamily: "inherit",
+              }}
+            >
+              Enlace no configurado
+            </button>
+          )}
         </div>
 
         {/* Checkbox confirmación — RN-GR-45, texto exacto de la ficha */}

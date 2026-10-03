@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 import { ProcesoLayout } from "@/features/gestion-registro/CU-GR-03-registro-siss/components/ProcesoLayout";
 import { useEstadoSolicitud } from "@/features/gestion-registro/hooks/useEstadoSolicitud";
 import { SolicitudRechazadaDefinitivamente } from "@/features/gestion-registro/components/SolicitudRechazadaDefinitivamente";
 import { continuarAExpediente } from "@/services/estadoSolicitudService";
-
-const URL_SISS = "https://serviciosocial.ipn.mx/";
+import { obtenerUrlSiss } from "@/services/recursosService";
 
 function actualizarUsuarioLocal(cambios) {
   const actual = JSON.parse(localStorage.getItem("usuario") || "null");
@@ -21,10 +20,25 @@ export default function EsperaEntregaCartaCompromiso() {
 
   const [enviando, setEnviando] = useState(false);
   const [errorAccion, setErrorAccion] = useState("");
+  const [urlSiss, setUrlSiss] = useState(null);
 
   const usuarioLS = JSON.parse(localStorage.getItem("usuario") || "null");
   const nombre = usuarioLS ? `${usuarioLS.nombre} ${usuarioLS.apellidos}` : "";
   const estadoSolicitud = estado?.estado_solicitud;
+
+  // RF-GR-77: el alumno puede consultar de nuevo el enlace mientras espera. Mismo recurso
+  // (link_siss) y mismo patrón de polling que CU-GR-03 y la pantalla de CartaCompromiso.jsx.
+  useEffect(() => {
+    let vigente = true;
+    const consultar = () => {
+      obtenerUrlSiss()
+        .then(({ url }) => { if (vigente) setUrlSiss(url); })
+        .catch(() => { if (vigente) setUrlSiss(null); });
+    };
+    consultar();
+    const intervalo = setInterval(consultar, 25000);
+    return () => { vigente = false; clearInterval(intervalo); };
+  }, []);
 
   if (cargando) return null;
 
@@ -217,23 +231,38 @@ export default function EsperaEntregaCartaCompromiso() {
             </ul>
           </div>
 
-          <a
-            href={URL_SISS}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-flex", alignItems: "center", gap: 8,
-              marginTop: "0.5rem", padding: "10px 20px",
-              borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
-              background: GRADIENTS.primary, color: "#fff",
-              textDecoration: "none", boxShadow: SHADOWS.accent,
-            }}
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
-            </svg>
-            Ir a la plataforma SISS
-          </a>
+          {urlSiss ? (
+            <a
+              href={urlSiss}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                marginTop: "0.5rem", padding: "10px 20px",
+                borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+                background: GRADIENTS.primary, color: "#fff",
+                textDecoration: "none", boxShadow: SHADOWS.accent,
+              }}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3" />
+              </svg>
+              Ir a la plataforma SISS
+            </a>
+          ) : (
+            <button
+              disabled
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                marginTop: "0.5rem", padding: "10px 20px",
+                borderRadius: RADIUS.md, fontSize: 13, fontWeight: 600,
+                background: C.borderDefault, color: C.textDisabled,
+                border: "none", cursor: "not-allowed", fontFamily: "inherit",
+              }}
+            >
+              Enlace no configurado
+            </button>
+          )}
         </div>
 
       </div>
