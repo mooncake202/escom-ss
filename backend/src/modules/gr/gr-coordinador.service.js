@@ -229,7 +229,7 @@ async function descargarDocumento(documentoId, usuarioSolicitante) {
     throw crearError('El archivo ya no está disponible.', 404);
   }
 
-  return descifrarBuffer(bufferCifrado);
+  return { buffer: descifrarBuffer(bufferCifrado), nombreExpediente: documento.nombre_expediente };
 }
 
 

@@ -27,8 +27,11 @@ async function postDecidirDocumentacion(req, res) {
 
 async function getDescargarDocumento(req, res) {
   try {
-    const buffer = await grCoordinadorService.descargarDocumento(req.params.id, req.usuario);
+    const { buffer, nombreExpediente } = await grCoordinadorService.descargarDocumento(req.params.id, req.usuario);
     res.setHeader('Content-Type', 'application/pdf');
+    if (nombreExpediente) {
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreExpediente}"`);
+    }
     return res.status(200).send(buffer);
   } catch (err) {
     const status = err.status || 500;

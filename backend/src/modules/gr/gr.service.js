@@ -695,20 +695,29 @@ async function adjuntarDocumentacionInicial(usuarioId, { cartaCreditos, seguroSo
     await prisma.$transaction(async (tx) => {
       // Reutiliza la fila si ya existe (ej. Coordinador pidió corrección);
       // solo crea una nueva si es la primera vez que este alumno sube este tipo.
+      // Mismo patrón BOLETA_TIPO-DE-DOCUMENTO (mayúsculas) ya usado en LSS para
+      // evaluacion_desempeno/expediente_lss — sin esto, la descarga se queda sin
+      // Content-Disposition (mismo bug ya encontrado y corregido allá).
+      const NOMBRE_DOCUMENTO = {
+        carta_creditos: 'CARTA_CREDITOS',
+        constancia_seguro_social: 'CONSTANCIA_SEGURO_SOCIAL',
+      };
+
       for (const [tipoDocumento, rutaNueva] of [
         ['carta_creditos', rutaRelativaCarta],
         ['constancia_seguro_social', rutaRelativaSeguro],
       ]) {
+        const nombreDocumento = `${alumno.boleta}_${NOMBRE_DOCUMENTO[tipoDocumento]}.pdf`;
         const existente = await tx.documento.findFirst({ where: { alumno_id: alumno.boleta, tipo_documento: tipoDocumento } });
         if (existente) {
           rutasViejasABorrar.push(existente.ruta_archivo);
           await tx.documento.update({
             where: { id: existente.id },
-            data: { ruta_archivo: rutaNueva, estado_documento: 'en_revision', creador_id: usuarioId, fecha_creacion: ahora, aprobado_por_id: null },
+            data: { ruta_archivo: rutaNueva, nombre_expediente: nombreDocumento, estado_documento: 'en_revision', creador_id: usuarioId, fecha_creacion: ahora, aprobado_por_id: null },
           });
         } else {
           await tx.documento.create({
-            data: { alumno_id: alumno.boleta, creador_id: usuarioId, tipo_documento: tipoDocumento, fecha_creacion: ahora, estado_documento: 'en_revision', ruta_archivo: rutaNueva },
+            data: { alumno_id: alumno.boleta, creador_id: usuarioId, tipo_documento: tipoDocumento, fecha_creacion: ahora, estado_documento: 'en_revision', ruta_archivo: rutaNueva, nombre_expediente: nombreDocumento },
           });
         }
       }
