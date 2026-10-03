@@ -1,4 +1,5 @@
 import { apiFetch, API_URL } from "./apiClient";
+import { nombreDesdeContentDisposition } from "./descargaUtils";
 
 export async function getSolicitudesDocumentacion() {
   return apiFetch("/coordinador/documentacion");
@@ -12,9 +13,12 @@ export async function decidirDocumentacion(id, decision, motivoRechazo) {
 }
 
 /**
- * Descarga un documento (PDF ya descifrado por el backend) y lo abre en una
- * pestaña nueva. No reutiliza apiFetch porque la respuesta es binaria, no
- * JSON — pero sí manda el mismo header de autenticación.
+ * Descarga un documento (PDF ya descifrado por el backend) mediante un
+ * <a download> disparado por código — mismo patrón que descargarEvaluacion
+ * (lssAlumnoService.js). No usa window.open(blobUrl): una URL blob: no lleva
+ * el header Content-Disposition, así que el nombre real (documento.nombre_
+ * expediente) se perdía al guardar — bug real ya corregido aquí. Tampoco
+ * usa apiFetch porque la respuesta es binaria, no JSON.
  */
 export async function verDocumentoPDF(documentoId) {
   const token = localStorage.getItem("token");
@@ -34,6 +38,11 @@ export async function verDocumentoPDF(documentoId) {
 
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = nombreDesdeContentDisposition(res.headers.get("Content-Disposition")) || "documento.pdf";
+  document.body.appendChild(enlace);
+  enlace.click();
+  document.body.removeChild(enlace);
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
