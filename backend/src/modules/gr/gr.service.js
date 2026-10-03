@@ -1229,7 +1229,12 @@ async function corregirExpediente(usuarioId) {
     include: { solicitud_registro: true },
   });
   if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
-  if (alumno.solicitud_registro.estado_solicitud !== 'expediente_con_correcciones') {
+
+  // RF-GR-106: revisa el plazo real (Reloj 2 en este estado) antes de dejar avanzar — mismo hueco
+  // ya corregido en obtenerInfoExpediente/subirExpediente (GR-10): sin esto, un alumno con la
+  // pantalla abierta desde antes del vencimiento podía corregir y reenviar después de vencido.
+  const solicitud = await verificarYAplicarVencimiento(alumno.solicitud_registro.id);
+  if (solicitud.estado_solicitud !== 'expediente_con_correcciones') {
     throw crearError('Tu solicitud no está en el paso correcto para esto.', 409);
   }
 
