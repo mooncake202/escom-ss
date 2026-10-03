@@ -1065,7 +1065,9 @@ async function obtenerInfoExpediente(usuarioId) {
   });
   if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
 
-  const solicitud = alumno.solicitud_registro;
+  // RF-GR-90: revisa el plazo real (no confía en que el polling de useEstadoSolicitud ya lo haya
+  // hecho) — reutiliza la misma verificación que ya usan login y el cron, sin reescribir la regla.
+  const solicitud = await verificarYAplicarVencimiento(alumno.solicitud_registro.id);
   if (solicitud.estado_solicitud !== 'adjuntar_expediente') {
     throw crearError('Tu solicitud no está en el paso de subir expediente.', 409);
   }
@@ -1096,7 +1098,10 @@ async function subirExpediente(usuarioId, archivos) {
   });
   if (!alumno || !alumno.solicitud_registro) throw crearError('No se encontró tu solicitud de registro.', 404);
 
-  const solicitud = alumno.solicitud_registro;
+  // RF-GR-90: vuelve a revisar el plazo justo antes de procesar el envío — un alumno pudo tener
+  // esta pantalla abierta desde antes del corte, sin que ningún poll/login/cron haya corrido
+  // mientras tanto. Mismo mecanismo que obtenerInfoExpediente, nada nuevo que mantener.
+  const solicitud = await verificarYAplicarVencimiento(alumno.solicitud_registro.id);
   if (solicitud.estado_solicitud !== 'adjuntar_expediente') {
     throw crearError('Tu solicitud no está en el paso de subir expediente.', 409);
   }
