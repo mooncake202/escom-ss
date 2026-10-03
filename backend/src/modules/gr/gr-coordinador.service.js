@@ -114,25 +114,30 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
 
   if (decision === 'aceptar') {
     // No borra ningún archivo — no aplica el reordenamiento aquí.
-    await prisma.$transaction([
-      prisma.solicitud_registro.update({
-        where: { id: solicitud.id },
+    await prisma.$transaction(async (tx) => {
+      // Condicionado a que SIGA pendiente en el instante de escribir — mismo patrón que
+      // rechazar_definitivo, para cerrar la ventana de carrera entre el chequeo de arriba y
+      // este update (dos coordinadores decidiendo sobre la misma solicitud a la vez).
+      const { count } = await tx.solicitud_registro.updateMany({
+        where: { id: solicitud.id, estado_solicitud: 'SISS_y_documentacion_pendiente' },
         data: { estado_solicitud: 'SISS_docs_aprobados', estado_anterior: 'SISS_y_documentacion_pendiente', registro_siss: true, docs_iniciales: true, tipo_rechazo: null, motivo_rechazo: null },
-      }),
-      prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } }),
-    ]);
+      });
+      if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+      await tx.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } });
+    });
     emitirDecision('aprobado');
     return { estado_solicitud: 'SISS_docs_aprobados' };
   }
 
   if (decision === 'corregir_siss') {
-    await prisma.$transaction([
-      prisma.solicitud_registro.update({
-        where: { id: solicitud.id },
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.solicitud_registro.updateMany({
+        where: { id: solicitud.id, estado_solicitud: 'SISS_y_documentacion_pendiente' },
         data: { estado_solicitud: 'corregir_SISS', estado_anterior: 'SISS_y_documentacion_pendiente', registro_siss: false, docs_iniciales: false, motivo_rechazo: motivoRechazo },
-      }),
-      prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'con_correcciones' } }),
-    ]);
+      });
+      if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+      await tx.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'con_correcciones' } });
+    });
     // Solo hasta aquí, con la BD ya confirmada, se tocan los archivos físicos.
     borrarArchivosFisicos(documentos);
     emitirDecision('corregir_siss');
@@ -140,13 +145,14 @@ async function decidirDocumentacion(solicitudId, decision, motivoRechazo, coordi
   }
 
   if (decision === 'corregir_documentos') {
-    await prisma.$transaction([
-      prisma.solicitud_registro.update({
-        where: { id: solicitud.id },
+    await prisma.$transaction(async (tx) => {
+      const { count } = await tx.solicitud_registro.updateMany({
+        where: { id: solicitud.id, estado_solicitud: 'SISS_y_documentacion_pendiente' },
         data: { estado_solicitud: 'corregir_docsini', estado_anterior: 'SISS_y_documentacion_pendiente', docs_iniciales: false, motivo_rechazo: motivoRechazo },
-      }),
-      prisma.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'con_correcciones' } }),
-    ]);
+      });
+      if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+      await tx.documento.updateMany({ where: { id: { in: idsDocumentos } }, data: { estado_documento: 'con_correcciones' } });
+    });
     borrarArchivosFisicos(documentos);
     emitirDecision('corregir_documentos');
     return { estado_solicitud: 'corregir_docsini' };
@@ -272,8 +278,11 @@ async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
     throw crearError('Esta solicitud ya fue procesada.', 409);
   }
 
-  await prisma.solicitud_registro.update({
-    where: { id: solicitud.id },
+  // Condicionado a que SIGA en espera en el instante de escribir — cierra la ventana de carrera
+  // entre el chequeo de arriba y este update (dos coordinadores registrando la misma recepción
+  // casi al mismo tiempo), mismo patrón que decidirOferta y decidirDocumentacion.
+  const { count } = await prisma.solicitud_registro.updateMany({
+    where: { id: solicitud.id, estado_solicitud: 'espera_confirmacion_carta_compromiso' },
     data: {
       estado_solicitud: 'carta_compromiso_confirmada',
       estado_anterior: 'espera_confirmacion_carta_compromiso',
@@ -281,6 +290,7 @@ async function registrarRecepcionCarta(solicitudId, coordinadorUsuarioId) {
       fecha_carta_compromiso: new Date(),
     },
   });
+  if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
 
   try {
     emitirAUsuario(solicitud.alumno.usuario_id, 'carta:recibida', {
@@ -364,20 +374,23 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
   });
 
   if (decision === 'aprobar') {
-    await prisma.$transaction([
+    await prisma.$transaction(async (tx) => {
       // RN-GR-73: la transición completa a Alumno Asignado (estado_solicitud
       // + rol) ocurre aquí mismo, atómicamente, en el momento en que
       // Coordinación aprueba — ya no depende de que el alumno confirme el
       // modal de bienvenida (que ahora es puramente informativo).
-      prisma.solicitud_registro.update({
-        where: { id: solicitud.id },
+      // Condicionado a que SIGA pendiente de revisión — cierra la ventana de carrera entre el
+      // chequeo de arriba y este update, mismo patrón que decidirOferta/decidirDocumentacion.
+      const { count } = await tx.solicitud_registro.updateMany({
+        where: { id: solicitud.id, estado_solicitud: 'expediente_pendiente_revision' },
         data: { estado_solicitud: 'alumno_asignado', estado_anterior: 'expediente_pendiente_revision', tipo_rechazo: null, motivo_rechazo: null },
-      }),
-      prisma.usuario.update({ where: { id: solicitud.alumno.usuario_id }, data: { rol: 'alumno_asignado' } }),
-      ...(documentoExpediente
-        ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } })]
-        : []),
-    ]);
+      });
+      if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+      await tx.usuario.update({ where: { id: solicitud.alumno.usuario_id }, data: { rol: 'alumno_asignado' } });
+      if (documentoExpediente) {
+        await tx.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'aprobado', aprobado_por_id: coordinador.id } });
+      }
+    });
 
     await crearNotificacion({
       usuarioId: solicitud.alumno.usuario_id,
@@ -410,15 +423,16 @@ async function decidirExpediente(solicitudId, decision, motivoRechazo, coordinad
   }
 
   // rechazar — RN-GR-71, mismo patrón de reutilizar fila que en GR-11.
-  await prisma.$transaction([
-    prisma.solicitud_registro.update({
-      where: { id: solicitud.id },
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.solicitud_registro.updateMany({
+      where: { id: solicitud.id, estado_solicitud: 'expediente_pendiente_revision' },
       data: { estado_solicitud: 'expediente_con_correcciones', estado_anterior: 'expediente_pendiente_revision', motivo_rechazo: motivoRechazo, tipo_rechazo: 'corregible' },
-    }),
-    ...(documentoExpediente
-      ? [prisma.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'con_correcciones' } })]
-      : []),
-  ]);
+    });
+    if (count === 0) throw crearError('Esta solicitud ya fue procesada.', 409);
+    if (documentoExpediente) {
+      await tx.documento.update({ where: { id: documentoExpediente.id }, data: { estado_documento: 'con_correcciones' } });
+    }
+  });
 
   try {
     emitirAUsuario(solicitud.alumno.usuario_id, 'expediente:decidido', {
