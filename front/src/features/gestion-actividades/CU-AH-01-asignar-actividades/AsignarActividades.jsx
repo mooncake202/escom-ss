@@ -6,6 +6,7 @@ import { useAsignarActividades } from "./hooks/useAsignarActividades";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { SelectField } from "@/components/ui/FormFields";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 const TITULO_MODO = {
   crear: "Nueva actividad",
@@ -20,6 +21,11 @@ export default function AsignarActividades() {
   const { usuario: sesion } = useSesion();
   const [filtroProyecto, setFiltroProyecto] = useState("todas");
   const [filtroCarrera, setFiltroCarrera] = useState([]);
+  // ?alerta=caducar|sin_actividades — viene de las notificaciones calculadas
+  // del dashboard de profesor; solo resalta en la lista, nunca auto-abre a
+  // nadie (puede haber varios alumnos que cumplan la misma condición).
+  const [searchParams] = useSearchParams();
+  const alertaTipo = searchParams.get("alerta");
   const [acordeonVencidasAbierto, setAcordeonVencidasAbierto] = useState(false);
   const [acordeonCompletadasAbierto, setAcordeonCompletadasAbierto] = useState(false);
   const {
@@ -132,6 +138,11 @@ export default function AsignarActividades() {
                 <AlumnoCard
                   key={a.solicitudId} alumno={a} C={C}
                   seleccionado={alumnoSeleccionado?.solicitudId === a.solicitudId}
+                  resaltado={
+                    alertaTipo === "caducar" ? !!a.alertaCaducar
+                    : alertaTipo === "sin_actividades" ? !!a.alertaSinActividades
+                    : false
+                  }
                   onSeleccionar={seleccionarAlumno}
                 />
               ))}

@@ -1,6 +1,6 @@
 const prisma = require('../../lib/prisma');
 const { ESTADOS_REPORTE } = require('../reportes/reportes.shared');
-const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado } = require('../ah/ah.shared');
+const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado, evaluarAlertasActividad } = require('../ah/ah.shared');
 const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN, ESTADO_CARTA_LISTA_PARA_RECOGER } = require('../lss/lss.shared');
 const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
 const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
@@ -32,7 +32,7 @@ async function calcularAlertasActividadesProfesor(profesorId) {
     where: { estado_solicitud: 'alumno_asignado', oferta: { profesor_id: profesorId } },
     select: {
       periodo_registro: { select: { evento_calendario: { select: { fecha_inicio: true } } } },
-      actividad: { where: { estado: { in: ESTADOS_ACTIVOS } }, select: { fecha_limite: true } },
+      actividad: { where: { estado: { in: ESTADOS_ACTIVOS } }, select: { estado: true, fecha_limite: true } },
     },
   });
 
@@ -41,20 +41,9 @@ async function calcularAlertasActividadesProfesor(profesorId) {
   let alumnoSinActividades = false;
 
   for (const s of solicitudes) {
-    if (s.actividad.length === 0) {
-      const fechaInicio = s.periodo_registro?.evento_calendario?.fecha_inicio;
-      if (fechaInicio) {
-        const diasHastaInicio = Math.round((new Date(fechaInicio) - hoy) / 86400000);
-        if (diasHastaInicio <= 1) alumnoSinActividades = true;
-      }
-      continue;
-    }
-    const maxFechaLimite = s.actividad.reduce(
-      (max, a) => (a.fecha_limite > max ? a.fecha_limite : max),
-      s.actividad[0].fecha_limite,
-    );
-    const diasHastaLimite = Math.round((new Date(maxFechaLimite) - hoy) / 86400000);
-    if (diasHastaLimite < 2) actividadesProximasACaducar = true;
+    const { proximaACaducar, sinActividades } = evaluarAlertasActividad(s, hoy);
+    if (proximaACaducar) actividadesProximasACaducar = true;
+    if (sinActividades) alumnoSinActividades = true;
   }
 
   return { actividadesProximasACaducar, alumnoSinActividades };

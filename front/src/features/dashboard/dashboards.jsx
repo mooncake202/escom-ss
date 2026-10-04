@@ -711,13 +711,13 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
           {
             mostrar: !!resumen.actividadesProximasACaducar,
             mensaje: "Actividades de alumnos próximas a caducar. Asígnales más.",
-            ruta: "/profesor/actividades",
+            ruta: "/profesor/actividades?alerta=caducar",
             tipo: "urgente",
           },
           {
             mostrar: !!resumen.alumnoSinActividades,
             mensaje: "Un alumno no tiene actividades. Asígnales más.",
-            ruta: "/profesor/actividades",
+            ruta: "/profesor/actividades?alerta=sin_actividades",
             tipo: "warning",
           },
           {

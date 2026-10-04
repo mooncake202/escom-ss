@@ -10,7 +10,7 @@ const {
   validarActividadNoCompletada,
   validarMotivoRechazo,
 } = require('./validators');
-const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas, limiteHorasAlcanzado } = require('./ah.shared');
+const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas, limiteHorasAlcanzado, calcularDiaMexicoUTC, evaluarAlertasActividad } = require('./ah.shared');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
 
@@ -133,16 +133,26 @@ async function listarAlumnosDeProfesor(profesorUsuarioId) {
   const todasLasActividades = solicitudes.flatMap((s) => s.actividad);
   const conteos = await contarAvancesPorActividad(todasLasActividades.map((a) => a.id));
 
-  return solicitudes.map((s) => ({
-    solicitudId: s.id,
-    nombre: `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`,
-    boleta: s.alumno.boleta,
-    carrera: s.alumno.carrera,
-    correoInst: s.alumno.usuario.correo_institucional,
-    proyecto: s.oferta?.nombre_proyecto ?? null,
-    periodoInicio: s.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
-    actividades: s.actividad.map((a) => mapearActividad(a, (conteos.get(a.id) ?? 0) > 0)),
-  }));
+  // Mismo cálculo que alimenta las 2 notificaciones del dashboard — aquí se
+  // expone por alumno (no agregado) para que la pantalla pueda resaltar en
+  // la lista a quien disparó la notificación en la que el profesor dio clic.
+  const hoy = calcularDiaMexicoUTC();
+
+  return solicitudes.map((s) => {
+    const { proximaACaducar, sinActividades } = evaluarAlertasActividad(s, hoy);
+    return {
+      solicitudId: s.id,
+      nombre: `${s.alumno.usuario.nombre} ${s.alumno.usuario.apellidos}`,
+      boleta: s.alumno.boleta,
+      carrera: s.alumno.carrera,
+      correoInst: s.alumno.usuario.correo_institucional,
+      proyecto: s.oferta?.nombre_proyecto ?? null,
+      periodoInicio: s.periodo_registro?.evento_calendario?.fecha_inicio ?? null,
+      actividades: s.actividad.map((a) => mapearActividad(a, (conteos.get(a.id) ?? 0) > 0)),
+      alertaCaducar: proximaACaducar,
+      alertaSinActividades: sinActividades,
+    };
+  });
 }
 
 async function resolverSolicitudDeProfesor(profesorUsuarioId, solicitudId) {

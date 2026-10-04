@@ -151,6 +151,38 @@ async function obtenerOCrearCumulo(alumnoBoleta, tx = prisma) {
   });
 }
 
+// Mismos 2 estados que cuentan como "activa" para las alertas calculadas del
+// profesor — una actividad vencida o completada ya no necesita que se le
+// "asigne más".
+const ESTADOS_ACTIVOS_ALERTA = ['sin_comenzar', 'en_progreso'];
+
+/**
+ * Única fuente de verdad para las 2 alertas calculadas del profesor
+ * (actividades por caducar / alumno sin actividades) — la usan tanto el
+ * resumen agregado del dashboard (dashboard.service.js, boolean por
+ * profesor) como el listado de AH-01 (ah-profesor.service.js, por alumno,
+ * para resaltar en la lista a quien disparó cada alerta). `solicitud` debe
+ * traer `actividad` (todas, sin filtrar por estado) y
+ * `periodo_registro.evento_calendario.fecha_inicio`.
+ */
+function evaluarAlertasActividad(solicitud, hoy) {
+  const activas = solicitud.actividad.filter((a) => ESTADOS_ACTIVOS_ALERTA.includes(a.estado));
+
+  if (activas.length === 0) {
+    const fechaInicio = solicitud.periodo_registro?.evento_calendario?.fecha_inicio;
+    if (!fechaInicio) return { proximaACaducar: false, sinActividades: false };
+    const diasHastaInicio = Math.round((new Date(fechaInicio) - hoy) / 86400000);
+    return { proximaACaducar: false, sinActividades: diasHastaInicio <= 1 };
+  }
+
+  const maxFechaLimite = activas.reduce(
+    (max, a) => (a.fecha_limite > max ? a.fecha_limite : max),
+    activas[0].fecha_limite,
+  );
+  const diasHastaLimite = Math.round((new Date(maxFechaLimite) - hoy) / 86400000);
+  return { proximaACaducar: diasHastaLimite < 2, sinActividades: false };
+}
+
 module.exports = {
   tieneActividadesPendientes,
   ESTADOS_COMPLETADA,
@@ -168,4 +200,5 @@ module.exports = {
   calcularHorasNetas,
   limiteHorasAlcanzado,
   obtenerOCrearCumulo,
+  evaluarAlertasActividad,
 };

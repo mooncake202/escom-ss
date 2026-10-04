@@ -6,7 +6,7 @@ const CARRERA_LABEL = {
   LCD: "Lic. Ciencia de Datos",
 };
 
-export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
+export function AlumnoCard({ alumno, seleccionado, resaltado, onSeleccionar, C }) {
   // "Activas" = solo lo que aún requiere acción del alumno. Vencida y
   // completadas quedan fuera de este contador y no se muestran aquí.
   const activas = alumno.actividades.filter(a => a.estado === "sin_comenzar" || a.estado === "en_progreso").length;
@@ -17,7 +17,10 @@ export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
       style={{
         padding: "1rem 1.25rem", borderRadius: RADIUS.lg, cursor: "pointer",
         background: seleccionado ? C.navItemActive : C.bgCard,
-        border: `1px solid ${seleccionado ? C.accent : C.borderDefault}`,
+        border: `1px solid ${seleccionado ? C.accent : resaltado ? "#F59E0B" : C.borderDefault}`,
+        // Resaltado: viene de una notificación del dashboard (ver AsignarActividades.jsx,
+        // ?alerta=caducar|sin_actividades) — nunca auto-selecciona, solo señala en la lista.
+        boxShadow: resaltado && !seleccionado ? "0 0 0 1px #F59E0B" : "none",
         transition: "all 0.15s",
       }}
     >
@@ -28,7 +31,10 @@ export function AlumnoCard({ alumno, seleccionado, onSeleccionar, C }) {
             {alumno.nombre.split(" ").slice(0, 2).map(w => w[0]).join("")}
           </div>
           <div style={{ minWidth: 0 }}>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{alumno.nombre}</p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: C.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "flex", alignItems: "center", gap: 5 }}>
+              {alumno.nombre}
+              {resaltado && <span title="Relacionado con una notificación pendiente" style={{ fontSize: 11, lineHeight: 1 }}>⚠️</span>}
+            </p>
             <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>{CARRERA_LABEL[alumno.carrera]} · {alumno.boleta}
             <br />
             <span style={{ fontSize: 10, color: C.textDisabled }}>
