@@ -14,6 +14,9 @@ const {
 const { HORAS_POR_JORNADA, LIMITE_HORAS_SERVICIO, calcularHorasNetas, limiteHorasAlcanzado, calcularDiaMexicoUTC, evaluarAlertasActividad } = require('./ah.shared');
 const { emitirAUsuario } = require('../../sockets/socket.server');
 const { crearNotificacion } = require('../notificaciones/notificaciones.service');
+// Reportes: mismo patrón de import cruzado que ya usa ah-alumno.service.js
+// (plazoEnvioReporteMensualVencido) — no se toca nada de reportes.periodos.js.
+const { CONFIG_PERIODOS, determinarEsquema, normalizarFechaISO } = require('../reportes/reportes.periodos');
 
 /**
  * Genérico (fail-open): avisa al PROPIO profesor que ejecutó la mutación
@@ -576,7 +579,13 @@ async function resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId
   const bitacora = await prisma.bitacora.findUnique({
     where: { id: Number(bitacoraId) },
     include: {
-      solicitud_registro: { include: { oferta: true, alumno: { include: { usuario: true } } } },
+      solicitud_registro: {
+        include: {
+          oferta: true,
+          alumno: { include: { usuario: true } },
+          periodo_registro: { include: { evento_calendario: true } },
+        },
+      },
     },
   });
 
@@ -590,24 +599,114 @@ async function resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId
   return { profesor, bitacora };
 }
 
+// 'YYYY-MM-DD' del día `dia` del mes `mes` (0-indexado) de `anio` — mismo truco de
+// desborde de Date.UTC que usa reportes.periodos.js (día 0 = último día del mes
+// anterior), redefinido aquí porque reportes.periodos.js no lo exporta.
+function diaDelMesISO(anio, mes, dia) {
+  return new Date(Date.UTC(anio, mes, dia)).toISOString().slice(0, 10);
+}
+
+/**
+ * Igual que numeroPeriodoDeFecha de Reportes, pero con los extremos de cada
+ * periodo SIN recortar a lunes-viernes — cubre el mes/quincena completo,
+ * fines de semana incluidos, así que nunca devuelve null por caer en el
+ * hueco que sí existe en el calendario oficial de Reportes (ver
+ * reportes.periodos.js). Deliberadamente NO se toca reportes.periodos.js:
+ * esta es una vista "natural" aparte, solo para que AH sepa a qué reporte
+ * pertenece una bitácora, sin importar si cayó en fin de semana.
+ */
+function numeroPeriodoReporteNaturalDeFecha({ fechaInicio, fecha, maximo = 60 }) {
+  const inicioServicio = normalizarFechaISO(fechaInicio);
+  const objetivo = normalizarFechaISO(fecha);
+  const esquema = determinarEsquema(inicioServicio);
+  const [anioI, mesI] = inicioServicio.split('-').map(Number);
+  const mes0 = mesI - 1;
+
+  for (let numero = 1; numero <= maximo; numero++) {
+    let inicio;
+    let fin;
+    if (esquema === 'mes_calendario') {
+      inicio = numero === 1 ? inicioServicio : diaDelMesISO(anioI, mes0 + numero - 1, 1);
+      fin = diaDelMesISO(anioI, mes0 + numero, 0);
+    } else {
+      inicio = numero === 1
+        ? inicioServicio
+        : diaDelMesISO(anioI, mes0 + numero - 1, CONFIG_PERIODOS.diaCorteMediados + 1);
+      fin = diaDelMesISO(anioI, mes0 + numero, CONFIG_PERIODOS.diaCorteMediados);
+    }
+    if (objetivo < inicio) return null;
+    if (objetivo <= fin) return numero;
+  }
+  return null;
+}
+
+// Estados de bitácora que cuentan como "sin dictaminar todavía" — mismo
+// criterio que ESTADOS_BITACORA_NO_RESUELTOS de Reportes, redefinido aquí
+// porque esa constante no está exportada desde reportes.shared para AH.
+const ESTADOS_BITACORA_SIN_DICTAMINAR = ['en_curso', 'pendiente_datos', 'pendiente_revision'];
+
 /**
  * RN-AH-26 corregida: al aprobar una bitácora rechazada desde el
  * historial, horas_acumuladas NO cambia (ya se sumó en confirmarBitacora y
  * nunca se restó ahí al rechazar) — solo se DECREMENTA horas_rechazadas
  * por lo que esa jornada había sumado ahí. motivo_rechazo se limpia.
  *
- * Caso borde confirmado con el usuario: si las horas NETAS del alumno YA
- * estaban en >=480 ANTES de este cambio, no se bloquea (no es un 409) —
- * se regresa un aviso informativo (`requiereConfirmacion: true`) y el
- * profesor puede forzar la confirmación pasando `confirmarSobrepasoHoras`.
+ * Dos bloqueos adicionales confirmados con el usuario, en este orden:
+ *
+ * 1) Si el reporte mensual del periodo al que pertenece esta bitácora ya
+ *    fue enviado (existe la fila reporte_mensual), no se permite reaprobar:
+ *    cambiaría las horas netas del alumno por detrás de un reporte que ya
+ *    se mandó con un snapshot fijo — bloqueo duro, sin opción de forzar.
+ *    El periodo se determina con numeroPeriodoReporteNaturalDeFecha (mes/
+ *    quincena completos, sin el recorte a L-V de Reportes) para que ningún
+ *    día quede sin periodo. Si no se puede determinar (alumno sin
+ *    fecha_inicio, etc.) no bloquea por este motivo — mismo criterio
+ *    fail-open que plazoEnvioReporteMensualVencido.
+ *
+ * 2) Si el alumno ya alcanzó sus 480 horas NETAS y ya no le queda ninguna
+ *    otra bitácora sin dictaminar (todas aprobada/rechazada), tampoco se
+ *    permite — ya no hay nada más que avanzar, así que no tiene sentido
+ *    seguir pidiendo confirmación: bloqueo duro. Si todavía le queda algo
+ *    sin dictaminar, se mantiene el aviso de confirmación de siempre
+ *    (`requiereConfirmacion: true`, el profesor puede forzarlo).
  */
 async function aprobarBitacoraRechazadaDesdeHistorial(profesorUsuarioId, bitacoraId, confirmarSobrepasoHoras = false) {
   const { profesor, bitacora } = await resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId);
 
   const alumnoBoleta = bitacora.solicitud_registro.alumno_id;
+  const fechaInicio = bitacora.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+
+  if (fechaInicio) {
+    const numeroPeriodo = numeroPeriodoReporteNaturalDeFecha({
+      fechaInicio: normalizarFechaISO(fechaInicio),
+      fecha: bitacora.fecha_registro,
+    });
+    if (numeroPeriodo !== null) {
+      const reporteDelPeriodo = await prisma.reporte_mensual.findFirst({
+        where: { solicitud_registro_id: bitacora.solicitud_registro_id, num_reporte: numeroPeriodo },
+        select: { id: true },
+      });
+      if (reporteDelPeriodo) {
+        throw crearError(
+          'No puedes aprobar esta bitácora: el alumno ya envió el reporte mensual del periodo al que pertenece.',
+          409,
+        );
+      }
+    }
+  }
+
   const cumuloAntes = await prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumnoBoleta } });
 
   if (limiteHorasAlcanzado(cumuloAntes) && !confirmarSobrepasoHoras) {
+    const quedanSinDictaminar = await prisma.bitacora.count({
+      where: {
+        solicitud_registro_id: bitacora.solicitud_registro_id,
+        estado: { in: ESTADOS_BITACORA_SIN_DICTAMINAR },
+      },
+    });
+    if (quedanSinDictaminar === 0) {
+      throw crearError('El alumno ya alcanzó sus 480 horas y todas las bitácoras están dictaminadas.', 409);
+    }
     return {
       requiereConfirmacion: true,
       mensaje: 'Este alumno ya había completado sus 480 horas de servicio antes de esta aprobación. ¿Deseas continuar de todos modos?',
