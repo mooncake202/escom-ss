@@ -2,9 +2,16 @@ import { useState } from "react";
 import { GRADIENTS, SHADOWS, RADIUS } from "@/themes/colors";
 
 const SEGUNDOS_MINIMOS_JORNADA = 3600;
+// Punto 3 (ajuste pedido): si al alumno le faltan 25 min o menos para
+// completar la SIGUIENTE hora que se contabilizaría (horas_contabilizadas
+// se calcula con Math.floor en el backend), avisarle antes de finalizar —
+// mismo objetivo que el aviso de mínimo: que no pierda minutos por no
+// saber que está a punto de redondear hacia abajo.
+const SEGUNDOS_AVISO_REDONDEO = 25 * 60;
 
 export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onFinalizar, onDescartar, C }) {
   const [mostrarConfirmMinimo, setMostrarConfirmMinimo] = useState(false);
+  const [mostrarAvisoRedondeo, setMostrarAvisoRedondeo] = useState(false);
   const radio   = 54;
   const circunf = 2 * Math.PI * radio;
   const offset  = circunf * (1 - porcentaje / 100);
@@ -19,6 +26,17 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
   const rm = Math.floor((restante % 3600) / 60);
 
   const color = porcentaje >= 90 ? "#EF4444" : porcentaje >= 70 ? "#F59E0B" : "#2E86DE";
+
+  // Horas completas que el backend contabilizaría SI finalizara justo ahora
+  // (mismo cálculo que finalizarJornada: Math.floor, topado en el límite).
+  const horasSiFinalizaAhora = Math.min(Math.floor(segundos / 3600), limiteSeg / 3600);
+  const segundosEnHoraActual = segundos % 3600;
+  const faltanParaProximaHora = segundosEnHoraActual === 0 ? 0 : 3600 - segundosEnHoraActual;
+  const cercaDeRedondear = segundos >= SEGUNDOS_MINIMOS_JORNADA
+    && segundos < limiteSeg
+    && faltanParaProximaHora > 0
+    && faltanParaProximaHora <= SEGUNDOS_AVISO_REDONDEO;
+  const minutosFaltantes = Math.ceil(faltanParaProximaHora / 60);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1.5rem", padding: "2rem 0" }}>
@@ -71,6 +89,8 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
         onClick={() => {
           if (segundos < SEGUNDOS_MINIMOS_JORNADA) {
             setMostrarConfirmMinimo(true);
+          } else if (cercaDeRedondear) {
+            setMostrarAvisoRedondeo(true);
           } else {
             onFinalizar();
           }
@@ -131,6 +151,54 @@ export function JornadaTimer({ segundos, limiteSeg, limiteHoras, porcentaje, onF
                 }}
               >
                 Descartar jornada
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Aviso de redondeo: faltan ≤25 min para la siguiente hora completa
+          (finalizarJornada contabiliza con Math.floor) — mismo lenguaje
+          visual que el modal de mínimo, sin opción de descartar (ya se
+          cumplió la hora mínima, aquí la decisión es solo esperar o no). */}
+      {mostrarAvisoRedondeo && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+          zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            maxWidth: 440, width: "90%", background: C.bgCard, borderRadius: RADIUS.lg,
+            boxShadow: SHADOWS.xl, padding: "2rem", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 40, marginBottom: "1rem" }}>⏳</div>
+            <h2 style={{ margin: "0 0 0.75rem", fontSize: 18, fontWeight: 700, color: C.textPrimary }}>
+              Estás a punto de redondear hacia abajo
+            </h2>
+            <p style={{ margin: "0 0 1.5rem", fontSize: 14, color: C.textSecondary, lineHeight: 1.6 }}>
+              Llevas <strong>{tiempo}</strong>. Si finalizas ahora se contabilizarán <strong>{horasSiFinalizaAhora} hora{horasSiFinalizaAhora !== 1 ? "s" : ""}</strong> — te faltan <strong>{minutosFaltantes} min</strong> para que se cuente la siguiente hora completa.
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem" }}>
+              <button
+                onClick={() => setMostrarAvisoRedondeo(false)}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: RADIUS.md,
+                  fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  background: GRADIENTS.primary, border: "none",
+                  color: "#fff", fontFamily: "inherit", boxShadow: SHADOWS.accent,
+                }}
+              >
+                Seguir trabajando
+              </button>
+              <button
+                onClick={() => { setMostrarAvisoRedondeo(false); onFinalizar(); }}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: RADIUS.md,
+                  fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  background: "transparent", border: `2px solid ${C.danger}`,
+                  color: C.danger, fontFamily: "inherit",
+                }}
+              >
+                Finalizar de todas formas
               </button>
             </div>
           </div>

@@ -147,6 +147,7 @@ async function cerrarJornadasAbandonadas() {
     select: {
       id: true,
       hora_inicio: true,
+      hora_fin: true,
       solicitud_registro: { select: { alumno: { select: { usuario_id: true } } } },
     },
   });
@@ -154,14 +155,25 @@ async function cerrarJornadasAbandonadas() {
   let cerradas = 0;
   for (const b of candidatas) {
     try {
-      await prisma.bitacora.update({
-        where: { id: b.id },
-        data: {
-          estado: 'pendiente_datos',
-          hora_fin: new Date(b.hora_inicio.getTime() + HORAS_POR_JORNADA * 3600 * 1000),
-          horas_contabilizadas: HORAS_POR_JORNADA,
-        },
-      });
+      // Dos casos distintos bajo el mismo "abandonada" (en_curso, hora_inicio
+      // ya pasó el límite de la jornada):
+      // - Nunca llamó a finalizarJornada (hora_fin sigue null): sí fue un
+      //   abandono real, se fuerzan los valores fijos de la jornada completa.
+      // - Sí finalizó (hora_fin/horas_contabilizadas ya los puso el propio
+      //   alumno, con sus horas reales) pero nunca llegó a confirmar el
+      //   formulario: NO se tocan esos campos — solo se pasa a
+      //   pendiente_datos para que, sin importar qué día vuelva a entrar,
+      //   el sistema la encuentre y lo mande directo a completarla. Pisar
+      //   aquí sus horas reales con el fijo de 4 sería borrar un dato que
+      //   el alumno ya había registrado correctamente.
+      const datosCierre = b.hora_fin
+        ? { estado: 'pendiente_datos' }
+        : {
+            estado: 'pendiente_datos',
+            hora_fin: new Date(b.hora_inicio.getTime() + HORAS_POR_JORNADA * 3600 * 1000),
+            horas_contabilizadas: HORAS_POR_JORNADA,
+          };
+      await prisma.bitacora.update({ where: { id: b.id }, data: datosCierre });
       cerradas++;
 
       const usuarioAlumno = b.solicitud_registro?.alumno?.usuario_id;

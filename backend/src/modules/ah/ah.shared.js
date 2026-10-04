@@ -71,6 +71,66 @@ async function esDiaLaborable(diaUTC) {
   return conteo === 0;
 }
 
+function segundosDelDiaMexico(ahora) {
+  const partes = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Mexico_City',
+    hourCycle: 'h23',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(ahora);
+  const numero = (tipo) => Number(partes.find((p) => p.type === tipo).value);
+  return numero('hour') * 3600 + numero('minute') * 60 + numero('second');
+}
+
+// evento_calendario.hora se guarda como Date epoch 1970-01-01T HH:mm:00.000Z
+// (ver calendario.service.js: horaADate/dateAHora) — se lee en UTC a propósito,
+// la hora en sí ya está en hora de México, solo se usa Date como contenedor.
+function segundosDeHoraEvento(horaDate) {
+  return horaDate.getUTCHours() * 3600 + horaDate.getUTCMinutes() * 60;
+}
+
+/**
+ * Variante de esDiaLaborable sensible a la HORA exacta — solo para el único
+ * punto donde importa: decidir EN ESTE INSTANTE si el alumno puede iniciar
+ * una jornada nueva. Un Inhabil declarado "a partir de cierta hora"
+ * (evento_calendario.hora no nulo) solo bloquea desde esa hora en adelante;
+ * antes de esa hora, el día sigue siendo laborable para INICIAR.
+ *
+ * Deliberadamente NO se usa en ningún otro lado (ni en validarAlMenosUnDia-
+ * HabilEnRango/AH-01, ni en contabilizarFaltasDiarias, ni en
+ * contarDiasHabilesTranscurridos): esos siguen tratando cualquier Inhabil
+ * —parcial o completo— como el día completo no laborable, sin cambios.
+ *
+ * Tampoco se llama desde finalizarJornada/cancelarJornada/confirmarBitacora:
+ * una jornada que ya está en_curso nunca se re-valida contra esto, así que
+ * nunca se interrumpe a medio camino sin importar qué declare Coordinación
+ * después de que el alumno ya inició.
+ */
+async function puedeIniciarJornadaAhora(ahora = new Date()) {
+  const hoy = calcularDiaMexicoUTC(ahora);
+  const dow = hoy.getUTCDay();
+  if (dow === 0 || dow === 6) return false;
+
+  const eventos = await prisma.evento_calendario.findMany({
+    where: {
+      tipo: { in: TIPOS_EVENTO_NO_LABORABLE },
+      fecha_inicio: { lte: hoy },
+      OR: [
+        { fecha_fin: { gte: hoy } },
+        { AND: [{ fecha_fin: null }, { fecha_inicio: hoy }] },
+      ],
+    },
+    select: { hora: true },
+  });
+
+  if (eventos.length === 0) return true;
+  // Si algún evento del día es de día completo (hora null), bloquea sin importar la hora actual.
+  if (eventos.some((e) => e.hora === null)) return false;
+
+  // Todos los eventos del día son parciales: bloquea solo a partir de la hora declarada más temprana.
+  const segundosCorteMasTemprano = Math.min(...eventos.map((e) => segundosDeHoraEvento(e.hora)));
+  return segundosDelDiaMexico(ahora) < segundosCorteMasTemprano;
+}
+
 async function obtenerBitacoraDelDia(solicitudRegistroId, diaUTC) {
   return prisma.bitacora.findFirst({
     where: { solicitud_registro_id: Number(solicitudRegistroId), fecha_registro: diaUTC },
@@ -193,6 +253,7 @@ module.exports = {
   calcularDiaMexicoUTC,
   restarDias,
   esDiaLaborable,
+  puedeIniciarJornadaAhora,
   obtenerBitacoraDelDia,
   faltaBitacoraHoy,
   tieneJornadaPendienteDatos,

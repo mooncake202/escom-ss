@@ -7,7 +7,7 @@ const {
   LIMITE_HORAS_SERVICIO,
   SEGUNDOS_MINIMOS_JORNADA,
   calcularDiaMexicoUTC,
-  esDiaLaborable,
+  puedeIniciarJornadaAhora,
   obtenerBitacoraDelDia,
   obtenerOCrearCumulo,
   calcularHorasNetas,
@@ -150,7 +150,7 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
   const hoy = calcularDiaMexicoUTC();
 
   const [esLaborable, pendiente, bitacoraHoy, actividades, cumulo, reporteMensualVencido] = await Promise.all([
-    esDiaLaborable(hoy),
+    puedeIniciarJornadaAhora(),
     prisma.bitacora.findFirst({
       where: { solicitud_registro_id: solicitud.id, estado: 'pendiente_datos' },
       orderBy: { fecha_registro: 'asc' },
@@ -213,7 +213,7 @@ async function iniciarJornada(alumnoUsuarioId) {
   const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
   const hoy = calcularDiaMexicoUTC();
 
-  if (!(await esDiaLaborable(hoy))) {
+  if (!(await puedeIniciarJornadaAhora())) {
     throw crearError('Hoy no es un día laborable; no puedes registrar jornada.');
   }
 
