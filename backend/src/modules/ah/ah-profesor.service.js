@@ -194,6 +194,13 @@ async function obtenerDetalleAlumno(profesorUsuarioId, solicitudId) {
 async function crearActividad(profesorUsuarioId, solicitudId, datos) {
   const { solicitud } = await resolverSolicitudDeProfesor(profesorUsuarioId, solicitudId);
 
+  // Precondición de la ficha ("alumno con rol Alumno Asignado"): resolverSolicitudDeProfesor
+  // solo confirma que la oferta es del profesor, no que el alumno siga alumno_asignado
+  // (ej. todavía en trámite, o ya dado de baja) — se exige aparte aquí.
+  if (solicitud.estado_solicitud !== 'alumno_asignado') {
+    throw crearError('Este alumno no está asignado actualmente; no puedes asignarle actividades.', 409);
+  }
+
   validarCamposActividad(datos);
   const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
