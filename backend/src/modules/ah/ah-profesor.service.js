@@ -4,6 +4,7 @@ const {
   validarCamposActividad,
   validarCamposEdicionActividad,
   validarAlMenosUnDiaHabilEnRango,
+  validarFechaLimiteEsDiaHabil,
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
@@ -216,6 +217,7 @@ async function crearActividad(profesorUsuarioId, solicitudId, datos) {
   validarFechaLimiteContraInicio(datos.fecha_limite, fechaInicioPeriodo);
   validarFechaLimiteNoPasada(datos.fecha_limite);
   await validarAlMenosUnDiaHabilEnRango(datos.fecha_limite);
+  await validarFechaLimiteEsDiaHabil(datos.fecha_limite);
 
   const actividad = await prisma.actividad.create({
     data: {
@@ -315,6 +317,7 @@ async function extenderFechaLimiteActividad(profesorUsuarioId, actividadId, nuev
   const fechaInicioPeriodo = actividad.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
   validarExtensionFecha(nuevaFechaLimite, actividad.fecha_limite, fechaInicioPeriodo);
   await validarAlMenosUnDiaHabilEnRango(nuevaFechaLimite);
+  await validarFechaLimiteEsDiaHabil(nuevaFechaLimite);
 
   const nuevoEstado = actividad.porcentaje_progreso > 0 ? 'en_progreso' : 'sin_comenzar';
 

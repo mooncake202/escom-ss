@@ -113,6 +113,24 @@ async function validarAlMenosUnDiaHabilEnRango(fechaLimite) {
 }
 
 /**
+ * BLOQUEO DURO adicional, independiente del anterior: el propio día de
+ * fecha_limite no puede caer en un día no laborable (fin de semana, o
+ * Inhabil/Vacacional — incluye un Inhabil declarado solo "a partir de
+ * cierta hora": esDiaLaborable no distingue parcial de completo, así que
+ * ese día cuenta como no laborable completo también aquí). Un vencimiento
+ * el mismo día en que nadie puede trabajar no tiene sentido, aunque el
+ * resto del rango sí tenga días hábiles (eso ya lo cubre
+ * validarAlMenosUnDiaHabilEnRango, con un propósito distinto). Aplica
+ * igual a crear y a extender fecha límite.
+ */
+async function validarFechaLimiteEsDiaHabil(fechaLimite) {
+  const limite = new Date(fechaLimite);
+  if (!(await esDiaLaborable(limite))) {
+    throw crearError('La fecha límite no puede caer en un día no laborable (fin de semana o día inhábil).');
+  }
+}
+
+/**
  * RN-AH: una actividad completada (a tiempo o tarde) es un registro
  * histórico cerrado — no se puede editar ni extender su fecha_limite.
  * `vencida` NO está en ESTADOS_COMPLETADA y sigue permitiendo ambas
@@ -189,6 +207,7 @@ module.exports = {
   validarCamposActividad,
   validarCamposEdicionActividad,
   validarAlMenosUnDiaHabilEnRango,
+  validarFechaLimiteEsDiaHabil,
   validarFechaLimiteContraInicio,
   validarFechaLimiteNoPasada,
   validarExtensionFecha,
