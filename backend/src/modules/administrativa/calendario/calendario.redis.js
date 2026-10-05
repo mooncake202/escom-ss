@@ -1,9 +1,9 @@
 // Redis del calendario: metadata informativa. Ninguna función lanza: si Redis falla o no responde,
 // la operación principal (BD) sigue y solo se registra el error.
 
+const { CACHE_KEY_PERIODOS: CLAVE_CACHE_PERIODOS } = require('../../periodos/periodos.service');
+
 const CLAVE_ULTIMA_MODIFICACION = 'calendario:ultima_modificacion';
-// Misma clave que modules/periodos/periodos.service.js (allá no se exporta).
-const CLAVE_CACHE_PERIODOS = 'cache:periodos';
 // Con lazyConnect, ioredis encola los comandos si Redis está caído: sin tope, la petición se colgaría.
 const TIMEOUT_REDIS_MS = 1500;
 

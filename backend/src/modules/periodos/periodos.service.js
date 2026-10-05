@@ -52,4 +52,4 @@ async function listarPeriodosVigentes() {
   return resultado;
 }
 
-module.exports = { listarPeriodosVigentes };
+module.exports = { listarPeriodosVigentes, CACHE_KEY_PERIODOS };
