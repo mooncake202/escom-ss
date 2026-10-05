@@ -261,18 +261,25 @@ function SlotNotificacion({ ruta, rutaVerTodas = ruta, mensajeContador, notifica
     ? mensajeContador(coincidencias.length)
     : `Tienes ${coincidencias.length} notificaciones sin leer.`;
 
-  // Cada notificación ya trae su propio id en `ruta_relacionada`
-  // (ej. "/profesor/proyectos?destacar=5") — se juntan todos para que la
-  // pantalla destino pueda resaltar TODAS las filas involucradas, no solo
-  // una. Si alguna coincidencia no trae `destacar` (no pasa en Ofertas,
-  // pero el slot es genérico), simplemente se omite de la lista.
-  const ids = coincidencias
-    .map((n) => {
-      const query = n.ruta_relacionada?.split("?")[1];
-      return query ? new URLSearchParams(query).get("destacar") : null;
-    })
-    .filter(Boolean);
-  const destino = ids.length > 0 ? `${rutaVerTodas}?destacar=${ids.join(",")}` : rutaVerTodas;
+  // Cada notificación ya trae su propio id en `ruta_relacionada`, pero no
+  // todos los módulos usan el mismo nombre de parámetro: Ofertas/Reportes/
+  // Bajas/Características usan "destacar", AH usa "actividad"/"bitacora"
+  // (dos tipos de fila distintos en la misma pantalla). Por eso se fusiona
+  // CUALQUIER parámetro presente, no solo "destacar" — así la pantalla
+  // destino recibe, agrupados por nombre, los ids de TODAS las coincidencias
+  // ("actividad=56,57&bitacora=50"), no solo los que usan la convención de
+  // Ofertas.
+  const porClave = new Map();
+  for (const n of coincidencias) {
+    const query = n.ruta_relacionada?.split("?")[1];
+    if (!query) continue;
+    for (const [clave, valor] of new URLSearchParams(query)) {
+      if (!porClave.has(clave)) porClave.set(clave, []);
+      if (!porClave.get(clave).includes(valor)) porClave.get(clave).push(valor);
+    }
+  }
+  const queryString = [...porClave.entries()].map(([clave, valores]) => `${clave}=${valores.join(",")}`).join("&");
+  const destino = queryString ? `${rutaVerTodas}?${queryString}` : rutaVerTodas;
 
   return (
     <AlertBanner tipo={coincidencias[0].tipo} C={C} onClick={() => navigate(destino)}>
