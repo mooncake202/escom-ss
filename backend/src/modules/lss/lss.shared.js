@@ -15,11 +15,10 @@ const ESTADO_EXPEDIENTE_EN_REVISION = 'expediente_en_revision';
 const ESTADO_TERMINAL = 'constancia_disponible'; // último estado del flujo LSS
 
 // Valor real de reporte_mensual.estado_reporte / reporte_global.estado_reporte
-// cuando Coordinación aprobó definitivamente (CU-REP-06). Confirmado contra
-// reportes.shared.js (rama feature/reportes, todavía no fusionada — por eso
-// se duplica aquí en vez de importarse). Al fusionar, reemplazar por un
-// import real de ESTADOS_REPORTE.APROBADO_COORDINADOR.
-const ESTADO_REPORTE_APROBADO_COORDINADOR = 'aprobado_coordinador';
+// cuando Coordinación aprobó definitivamente (CU-REP-06) — importado de
+// Reportes en vez de duplicado, para no desincronizarse si ese módulo
+// renombra el estado.
+const { ESTADO_REPORTE_APROBACION_FINAL: ESTADO_REPORTE_APROBADO_COORDINADOR } = require('../reportes/reportes.shared');
 
 // Catálogo de evaluacion_desempeno.estado (CU-LSS-02/03/04) — diseño nuevo,
 // sin precedente real todavía (LSS-03/04 no existen), definido aquí para

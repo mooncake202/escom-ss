@@ -30,7 +30,7 @@
 //   2. Crea (si no existe) 1 reporte_global con su documento y
 //      estado_reporte='aprobado_coordinador'.
 //   3. Si MARCAR_OFERTA_CONCLUIDA=true, actualiza
-//      oferta_servicio.estado_oferta = 'Concluida' para la oferta de esa
+//      oferta_servicio.estado_oferta = 'concluida' para la oferta de esa
 //      solicitud (solo aplica de verdad a ofertas tipo_oferta='individual'
 //      — RN-LSS-02).
 //
@@ -162,9 +162,9 @@ async function main() {
   if (MARCAR_OFERTA_CONCLUIDA) {
     await prisma.oferta_servicio.update({
       where: { id: solicitud.oferta.id },
-      data: { estado_oferta: 'Concluida' },
+      data: { estado_oferta: 'concluida' },
     });
-    console.log(`✅ oferta_servicio id=${solicitud.oferta.id} (tipo_oferta=${solicitud.oferta.tipo_oferta}) marcada como 'Concluida'.`);
+    console.log(`✅ oferta_servicio id=${solicitud.oferta.id} (tipo_oferta=${solicitud.oferta.tipo_oferta}) marcada como 'concluida'.`);
     if (solicitud.oferta.tipo_oferta !== 'individual') {
       console.log(`  (nota: RN-LSS-02 dice que este requisito NO aplica a tipo_oferta='proyecto' — se marcó igual porque lo pediste, pero no debería bloquear/afectar la validación.)`);
     }

@@ -152,7 +152,9 @@ async function calcularRequisitos(solicitud, alumnoBoleta) {
   const cumpleReportes = cumpleMensuales && globalAprobado;
 
   const aplicaOferta = solicitud.oferta?.tipo_oferta === 'individual';
-  const cumpleOferta = aplicaOferta ? solicitud.oferta.estado_oferta === 'Concluida' : true;
+  // Valor real de oferta_servicio.estado_oferta (ofertas.service.js) es 'concluida', minúscula —
+  // comparar contra 'Concluida' nunca hacía match y bloqueaba a TODO alumno de oferta individual.
+  const cumpleOferta = aplicaOferta ? solicitud.oferta.estado_oferta === 'concluida' : true;
 
   const cumpleTodos = cumpleHoras && cumpleReportes && cumpleOferta;
 
