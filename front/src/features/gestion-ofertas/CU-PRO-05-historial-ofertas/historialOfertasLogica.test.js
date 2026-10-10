@@ -10,7 +10,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validarEdicion, debeMostrarSinOfertas } from "./historialOfertas.js";
+import { validarEdicion, debeMostrarSinOfertas } from "./historialOfertasLogica.js";
 
 // Forma real de `formEdicion`, tal como la arma `iniciarEdicion` desde una oferta de /ofertas/mias.
 const form = (extra = {}) => ({

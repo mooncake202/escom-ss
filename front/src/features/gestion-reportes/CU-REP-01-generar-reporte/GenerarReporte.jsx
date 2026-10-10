@@ -6,7 +6,7 @@ import { CalendarioReporte }                    from "./components/CalendarioRep
 import { AvanceActividades }                    from "./components/AvanceActividades";
 import { FirmaCanvas }                          from "../compartido/FirmaCanvas";
 import { useGenerarReporte }                    from "./hooks/useGenerarReporte";
-import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico, textoAvisoPendientes } from "./reportesGeneracion";
+import { nombreMes, etiquetaEstadoReporte, formatearFechaHoraMexico, textoAvisoPendientes, textoAvisoBitacorasRechazadas } from "./reportesGeneracion";
 
 // Fuera del componente para que React no lo remonte (y el textarea pierda el foco) en cada render.
 function Layout({ usuario, ancho = 580, children }) {
@@ -207,7 +207,8 @@ export default function GenerarReporte() {
             </div>
           )}
 
-          {/* Aviso de bitácoras en revisión del periodo: mismo estilo de advertencia, NO bloquea */}
+          {/* Detalle del motivo BITACORAS_SIN_REVISAR: cuántas y a avisarle al profesor. Si puedeGenerar es
+              false por esto, el bloqueo en sí ya se muestra arriba — esto solo da el detalle. */}
           {g.pendientesDeRevision > 0 && (
             <div style={{
               margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
@@ -215,6 +216,19 @@ export default function GenerarReporte() {
             }}>
               <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
                 {textoAvisoPendientes(g.pendientesDeRevision)}
+              </p>
+            </div>
+          )}
+
+          {/* RN-REP: si puede generar y hay bitácoras rechazadas en el periodo, avisar que al continuar
+              esas bitácoras quedan fijas (candado de AH) — antes de que el alumno siga adelante. */}
+          {g.puedeGenerar && g.hayBitacorasRechazadas && (
+            <div style={{
+              margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
+              background: C.warningSoft, border: `1px solid ${C.warning}`,
+            }}>
+              <p style={{ margin: 0, fontSize: 12, color: C.textPrimary, lineHeight: 1.6 }}>
+                🔒 {textoAvisoBitacorasRechazadas}
               </p>
             </div>
           )}

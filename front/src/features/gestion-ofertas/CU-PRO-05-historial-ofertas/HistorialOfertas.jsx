@@ -4,7 +4,7 @@ import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 import { useHistorialOfertas } from "./hooks/useHistorialOfertas";
-import { debeMostrarSinOfertas } from "./historialOfertas.js";
+import { debeMostrarSinOfertas } from "./historialOfertasLogica.js";
 import { EstatusBadge } from "./components/EstatusBadge";
 import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
 import { etiquetaPresentacion } from "@/features/gestion-ofertas/utils/carreraPresentacion";

@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { apiFetch } from "@/services/apiClient";
-import { validarEdicion } from "../historialOfertas.js";
+import { validarEdicion } from "../historialOfertasLogica.js";
 
 export function useHistorialOfertas() {
   const [proyectos, setProyectos]           = useState([]);

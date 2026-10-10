@@ -469,7 +469,13 @@ function mapearActividadHistorial(a) {
   };
 }
 
-function mapearBitacoraHistorial(b) {
+// `numeroReporteQueLaBloquea` es null si esta bitácora todavía se puede modificar. Si no, trae el
+// número y el estado_reporte del reporte mensual que ya la tomó — útil para la etiqueta en pantalla
+// ("🔒 Ya usada en el reporte mensual No. X") sin que el frontend tenga que adivinar nada.
+function mapearBitacoraHistorial(b, mapaReportesPorPeriodo = null) {
+  const numeroPeriodo = mapaReportesPorPeriodo?.numeroPeriodo?.(b) ?? null;
+  const reporteQueLaBloquea = numeroPeriodo !== null ? mapaReportesPorPeriodo.reportesPorNumero.get(numeroPeriodo) ?? null : null;
+
   return {
     id: b.id,
     tipo: 'bitacora',
@@ -487,10 +493,12 @@ function mapearBitacoraHistorial(b) {
       descripcion: r.descripcion,
       evidencia: r.evidencia,
     })),
+    numeroReporteQueLaBloquea: reporteQueLaBloquea ? reporteQueLaBloquea.numero : null,
+    estadoDelReporteQueLaBloquea: reporteQueLaBloquea ? reporteQueLaBloquea.estado : null,
   };
 }
 
-async function armarHistorial(solicitudId, filtros = {}) {
+async function armarHistorial(solicitudId, filtros = {}, fechaInicioPeriodo = null) {
   const { tipo = 'todos', estado, fechaDesde, fechaHasta } = filtros;
 
   const rangoFecha = (campo) => {
@@ -527,9 +535,25 @@ async function armarHistorial(solicitudId, filtros = {}) {
         }),
   ]);
 
+  // Mapa número de periodo -> reporte, para resolver el candado de cada bitácora sin una consulta
+  // por fila. Mismo criterio que reporteQueBloqueaBitacora: existe la fila, sin importar su estado.
+  let mapaReportesPorPeriodo = null;
+  if (fechaInicioPeriodo) {
+    const reportes = await prisma.reporte_mensual.findMany({
+      where: { solicitud_registro_id: solicitudId },
+      select: { num_reporte: true, estado_reporte: true },
+    });
+    const reportesPorNumero = new Map(reportes.map((r) => [r.num_reporte, { numero: r.num_reporte, estado: r.estado_reporte }]));
+    const fechaInicioISO = normalizarFechaISO(fechaInicioPeriodo);
+    mapaReportesPorPeriodo = {
+      reportesPorNumero,
+      numeroPeriodo: (b) => numeroPeriodoReporteNaturalDeFecha({ fechaInicio: fechaInicioISO, fecha: b.fecha_registro }),
+    };
+  }
+
   const registros = [
     ...actividades.map(mapearActividadHistorial),
-    ...bitacoras.map(mapearBitacoraHistorial),
+    ...bitacoras.map((b) => mapearBitacoraHistorial(b, mapaReportesPorPeriodo)),
   ].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   return {
@@ -557,7 +581,8 @@ async function obtenerHistorialAlumnoDeProfesor(profesorUsuarioId, alumnoBoleta,
   });
   if (!solicitud) throw crearError('Alumno no encontrado.', 404);
 
-  const { registros, totales } = await armarHistorial(solicitud.id, filtros);
+  const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+  const { registros, totales } = await armarHistorial(solicitud.id, filtros, fechaInicioPeriodo);
 
   return {
     alumno: {
@@ -646,6 +671,32 @@ function numeroPeriodoReporteNaturalDeFecha({ fechaInicio, fecha, maximo = 60 })
 const ESTADOS_BITACORA_SIN_DICTAMINAR = ['en_curso', 'pendiente_datos', 'pendiente_revision'];
 
 /**
+ * Candado "bitácora ya tomada por un reporte": si el periodo al que pertenece `bitacora` (por su
+ * fecha_registro) ya tiene un reporte_mensual creado —sin importar su estado_reporte: pendiente,
+ * aprobado o rechazado, basta con que exista la fila—, esa bitácora queda de solo-consulta. Calculado
+ * al vuelo contra reporte_mensual (sin campo nuevo en bitacora): mismo criterio que ya usaba
+ * aprobarBitacoraRechazadaDesdeHistorial, ahora extraído para reutilizarse también en aprobarBitacora/
+ * rechazarBitacora y en el historial (etiqueta visible antes de intentar nada).
+ * Devuelve null si no bloquea, o { numeroPeriodo, reporteId, estadoReporte } si sí.
+ */
+async function reporteQueBloqueaBitacora(bitacora) {
+  const fechaInicio = bitacora.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+  if (!fechaInicio) return null;
+
+  const numeroPeriodo = numeroPeriodoReporteNaturalDeFecha({
+    fechaInicio: normalizarFechaISO(fechaInicio),
+    fecha: bitacora.fecha_registro,
+  });
+  if (numeroPeriodo === null) return null;
+
+  const reporte = await prisma.reporte_mensual.findFirst({
+    where: { solicitud_registro_id: bitacora.solicitud_registro_id, num_reporte: numeroPeriodo },
+    select: { id: true, estado_reporte: true },
+  });
+  return reporte ? { numeroPeriodo, reporteId: reporte.id, estadoReporte: reporte.estado_reporte } : null;
+}
+
+/**
  * RN-AH-26 corregida: al aprobar una bitácora rechazada desde el
  * historial, horas_acumuladas NO cambia (ya se sumó en confirmarBitacora y
  * nunca se restó ahí al rechazar) — solo se DECREMENTA horas_rechazadas
@@ -674,25 +725,12 @@ async function aprobarBitacoraRechazadaDesdeHistorial(profesorUsuarioId, bitacor
   const { profesor, bitacora } = await resolverBitacoraRechazadaDeProfesor(profesorUsuarioId, bitacoraId);
 
   const alumnoBoleta = bitacora.solicitud_registro.alumno_id;
-  const fechaInicio = bitacora.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
 
-  if (fechaInicio) {
-    const numeroPeriodo = numeroPeriodoReporteNaturalDeFecha({
-      fechaInicio: normalizarFechaISO(fechaInicio),
-      fecha: bitacora.fecha_registro,
-    });
-    if (numeroPeriodo !== null) {
-      const reporteDelPeriodo = await prisma.reporte_mensual.findFirst({
-        where: { solicitud_registro_id: bitacora.solicitud_registro_id, num_reporte: numeroPeriodo },
-        select: { id: true },
-      });
-      if (reporteDelPeriodo) {
-        throw crearError(
-          'No puedes aprobar esta bitácora: el alumno ya envió el reporte mensual del periodo al que pertenece.',
-          409,
-        );
-      }
-    }
+  if (await reporteQueBloqueaBitacora(bitacora)) {
+    throw crearError(
+      'No puedes aprobar esta bitácora: el alumno ya envió el reporte mensual del periodo al que pertenece.',
+      409,
+    );
   }
 
   const cumuloAntes = await prisma.cumulo_horas_y_faltas.findUnique({ where: { alumno_id: alumnoBoleta } });
@@ -834,6 +872,13 @@ async function resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId) {
 async function aprobarBitacora(profesorUsuarioId, bitacoraId, actividadAdicional = null) {
   const { profesor, bitacora } = await resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId);
 
+  // Defensa adicional: con BITACORAS_SIN_REVISAR (CU-REP-01) una bitácora pendiente_revision nunca
+  // debería tener ya un reporte para su periodo, pero se revalida aquí por si el reporte se creó antes
+  // de que esa regla existiera.
+  if (await reporteQueBloqueaBitacora(bitacora)) {
+    throw crearError('No puedes revisar esta bitácora: el alumno ya envió el reporte mensual del periodo al que pertenece.', 409);
+  }
+
   if (actividadAdicional) {
     validarCamposActividad(actividadAdicional);
     const fechaInicioPeriodo = bitacora.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
@@ -889,6 +934,10 @@ async function aprobarBitacora(profesorUsuarioId, bitacoraId, actividadAdicional
  */
 async function rechazarBitacora(profesorUsuarioId, bitacoraId, motivoRechazo) {
   const { profesor, bitacora } = await resolverBitacoraDeProfesor(profesorUsuarioId, bitacoraId);
+
+  if (await reporteQueBloqueaBitacora(bitacora)) {
+    throw crearError('No puedes revisar esta bitácora: el alumno ya envió el reporte mensual del periodo al que pertenece.', 409);
+  }
 
   validarMotivoRechazo(motivoRechazo);
 

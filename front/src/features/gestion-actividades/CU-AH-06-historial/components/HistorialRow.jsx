@@ -134,6 +134,16 @@ export function HistorialRow({ registro, expandido, onToggle, destacado, onAprob
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          {/* Candado: esta bitácora ya quedó tomada por un reporte mensual (RN-REP-01 BITACORAS_SIN_REVISAR +
+              candado de AH) — de solo consulta, no se puede aprobar ni rechazar de nuevo. */}
+          {esBitacora && registro.numeroReporteQueLaBloquea != null && (
+            <span
+              title={`Ya forma parte del reporte mensual No. ${registro.numeroReporteQueLaBloquea} — no se puede modificar.`}
+              style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: "rgba(154,154,154,0.15)", color: C.textDisabled, fontWeight: 600 }}
+            >
+              🔒 Reporte No. {registro.numeroReporteQueLaBloquea}
+            </span>
+          )}
           <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 20, background: estilo.bg, color: estilo.color, fontWeight: 600 }}>
             {label}
           </span>
@@ -218,7 +228,12 @@ export function HistorialRow({ registro, expandido, onToggle, destacado, onAprob
 
                     {/* Aprobar bitácora rechazada desde historial — solo si
                         el padre pasó onAprobar (solo vista profesor). */}
-                    {onAprobar && (
+                    {onAprobar && registro.numeroReporteQueLaBloquea != null && (
+                      <p style={{ margin: "10px 0 0", fontSize: 12, color: C.textDisabled, lineHeight: 1.5 }}>
+                        🔒 Ya no se puede aprobar: el alumno ya generó el reporte mensual No. {registro.numeroReporteQueLaBloquea} de este periodo.
+                      </p>
+                    )}
+                    {onAprobar && registro.numeroReporteQueLaBloquea == null && (
                       <>
                         {pidiendoConfirmacion && (
                           <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: RADIUS.md, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)" }}>

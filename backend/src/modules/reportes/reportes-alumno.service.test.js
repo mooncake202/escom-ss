@@ -191,7 +191,7 @@ test('puede generar: periodo cerrado, horas REALES (no días × 4) y datos de al
   assert.deepEqual(llamadas.actividad.where.fecha_asignacion, { lt: new Date('2025-11-15T06:00:00.000Z') });
 });
 
-test('periodo por fecha_registro (Bloque 1): la jornada cuenta según el día en que se trabajó, no según cuándo se revisó; aprobada y rechazada cuentan, pendiente_revision no bloquea pero se detecta', async () => {
+test('periodo por fecha_registro (Bloque 1): la jornada cuenta según el día en que se trabajó, no según cuándo se revisó; aprobada y rechazada cuentan, pendiente_revision bloquea (BITACORAS_SIN_REVISAR) y se detecta', async () => {
   const { prisma } = crearEscenario({
     bitacoras: [
       bit(1, '2025-10-16', 3, '2025-10-17T16:00:00.000Z'),                       // jornada Y revisión dentro del periodo: cuenta
@@ -207,11 +207,11 @@ test('periodo por fecha_registro (Bloque 1): la jornada cuenta según el día en
   assert.deepEqual(r.bitacoras.map((b) => b.id), [1, 3, 5], 'ordenadas por fecha_registro; la #2 (fuera del periodo) no aparece');
   assert.deepEqual(r.bitacoras.map((b) => b.estado), ['aprobada', 'aprobada', 'rechazada']);
   assert.deepEqual(r.diagnostico.bitacorasNoResueltas, [{ id: 4, estado: 'pendiente_revision', fecha: '2025-10-21' }]);
-  assert.equal(r.puedeGenerar, true, 'la pendiente de revisión no bloquea el reporte');
-  assert.deepEqual(codigos(r), []);
+  assert.equal(r.puedeGenerar, false, 'la pendiente de revisión ahora bloquea el reporte');
+  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.BITACORAS_SIN_REVISAR]);
 });
 
-test('bitácoras no resueltas (Bloque 1, ajuste final): en_curso y pendiente_datos también se detectan, en el mismo orden por fecha_registro, sin contar ni bloquear', async () => {
+test('bitácoras no resueltas (Bloque 1, ajuste final): en_curso y pendiente_datos también se detectan, en el mismo orden por fecha_registro; no cuentan para días/horas pero sí bloquean (BITACORAS_SIN_REVISAR)', async () => {
   const { prisma } = crearEscenario({
     bitacoras: [
       bit(1, '2025-10-16', 4),                                                 // aprobada: cuenta
@@ -229,8 +229,8 @@ test('bitácoras no resueltas (Bloque 1, ajuste final): en_curso y pendiente_dat
     { id: 3, estado: 'pendiente_datos', fecha: '2025-10-18' },
     { id: 4, estado: 'pendiente_revision', fecha: '2025-10-19' },
   ]);
-  assert.equal(r.puedeGenerar, true, 'ninguna de las tres bloquea el reporte');
-  assert.deepEqual(codigos(r), []);
+  assert.equal(r.puedeGenerar, false, 'cualquiera de las tres ya basta para bloquear');
+  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.BITACORAS_SIN_REVISAR]);
 });
 
 test('límites del periodo por fecha_registro: inclusivos; un día antes de inicio o después de fin no cuenta', async () => {
@@ -247,14 +247,14 @@ test('límites del periodo por fecha_registro: inclusivos; un día antes de inic
   assert.deepEqual(r.resumen, { diasLaborados: 2, horas: 5, bitacorasQueCuentan: 2 });
 });
 
-test('bitácoras pendientes de revisión sin ninguna aprobada/rechazada: sigue bloqueando SIN_BITACORAS_APROBADAS (las pendientes no bastan), pero se detectan', async () => {
+test('bitácoras pendientes de revisión sin ninguna aprobada/rechazada: bloquea por SIN_BITACORAS_APROBADAS y BITACORAS_SIN_REVISAR a la vez', async () => {
   const { prisma } = crearEscenario({
     bitacoras: [bit(1, '2025-10-16', 4, undefined, 'pendiente_revision')],
   });
   const r = await prepararReporteMensual(7, { prisma, ahora: ahoraMx('2025-11-25') });
   assert.deepEqual(r.resumen, { diasLaborados: 0, horas: 0, bitacorasQueCuentan: 0 });
   assert.deepEqual(r.diagnostico.bitacorasNoResueltas, [{ id: 1, estado: 'pendiente_revision', fecha: '2025-10-16' }]);
-  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]);
+  assert.deepEqual(codigos(r), [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS, MOTIVOS_BLOQUEO.BITACORAS_SIN_REVISAR]);
   assert.equal(r.puedeGenerar, false);
 });
 

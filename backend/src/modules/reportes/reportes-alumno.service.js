@@ -3,7 +3,8 @@
 // Una bitácora pertenece al periodo cuya fecha_registro (el día de la jornada, @db.Date) cae dentro de [inicio, fin] —
 // NUNCA por fecha_revision (nuevas reglas, Bloque 1). Cuentan las bitácoras 'aprobada' y 'rechazada' (el profesor ya
 // decidió esa jornada, aceptada o no); 'en_curso', 'pendiente_datos' y 'pendiente_revision' (sin decisión final) no
-// cuentan ni bloquean el reporte, solo se detectan para avisar al alumno (diagnostico.bitacorasNoResueltas).
+// cuentan para días/horas; si hay alguna, SÍ bloquean el reporte (BITACORAS_SIN_REVISAR) y además se listan en
+// diagnostico.bitacorasNoResueltas para que la pantalla pueda señalar cuáles son.
 // diasLaborados = cantidad de esas bitácoras del periodo; horas = SUM(horas_contabilizadas) tal como las guarda AH.
 // El reporte se puede generar desde el primer día hábil ADMINISTRATIVO posterior a fecha_fin del periodo (L-V, sin
 // evento Inhabil ni Vacacional; nuevas reglas, Bloque 2) — no basta con que el periodo ya haya terminado. Para el
@@ -271,6 +272,7 @@ function evaluarBloqueosDeDatos({ carreraNombre, correoPersonal, profesor, ofert
 // `motivosDatos` (evaluarBloqueosDeDatos) va al final y se informa aunque no haya periodo.
 function evaluarBloqueos({
   servicio, periodo, hoy, periodoGenerable, diasLaborados, reporteExistente, motivosDatos = [],
+  hayBitacorasSinResolver = false,
 }) {
   const motivos = [];
   const agregar = (codigo) => motivos.push({ codigo, mensaje: MENSAJES_BLOQUEO[codigo] });
@@ -299,6 +301,11 @@ function evaluarBloqueos({
   // mensaje, en vez de dejar que filasDeAsistencia lance y tumbe la pantalla. Ese límite se queda intacto como
   // última defensa de la generación del PDF. Las tres ramas son excluyentes: 0, más de 24, o un conteo válido.
   else if (diasLaborados > FILAS_CONTROL_ASISTENCIA) agregar(MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO);
+
+  // Independiente de lo anterior: basta con que UNA bitácora del periodo siga sin decisión final
+  // (en_curso, pendiente_datos o pendiente_revision) para bloquear — antes solo se exponía en
+  // diagnostico.bitacorasNoResueltas sin frenar nada.
+  if (periodoGenerable && hayBitacorasSinResolver) agregar(MOTIVOS_BLOQUEO.BITACORAS_SIN_REVISAR);
 
   // Para Reporte N > 1 basta con que exista el Reporte N-1 (cualquiera sea su estado): como `numero` siempre se
   // asigna como max(num_reporte existentes) + 1, esa existencia ya está garantizada por construcción — no hace
@@ -565,8 +572,8 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
   ]);
 
   // Cuentan para dias_laborados/horas_reportadas: aprobada + rechazada. Las tres sin decisión final (en_curso,
-  // pendiente_datos, pendiente_revision) se separan aparte: no cuentan ni bloquean el reporte (evaluarBloqueos nunca
-  // las recibe), solo se exponen en diagnostico para avisar.
+  // pendiente_datos, pendiente_revision) se separan aparte: no cuentan para días/horas, pero SÍ bloquean el
+  // reporte (evaluarBloqueos recibe hayBitacorasSinResolver) y se exponen en diagnostico para señalarlas.
   const bitacorasFilas = bitacorasDelPeriodo.filter((b) => ESTADOS_BITACORA_QUE_CUENTAN.includes(b.estado));
   const bitacorasNoResueltasFilas = bitacorasDelPeriodo.filter((b) => ESTADOS_BITACORA_NO_RESUELTOS.includes(b.estado));
 
@@ -613,6 +620,7 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
 
   const motivosBloqueo = evaluarBloqueos({
     servicio: base.servicio, periodo, hoy, periodoGenerable, diasLaborados, reporteExistente, motivosDatos,
+    hayBitacorasSinResolver: bitacorasNoResueltas.length > 0,
   });
 
   return {

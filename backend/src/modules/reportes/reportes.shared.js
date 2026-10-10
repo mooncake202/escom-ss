@@ -135,6 +135,9 @@ const MOTIVOS_BLOQUEO = Object.freeze({
   FECHA_FIN_NO_DISPONIBLE: 'FECHA_FIN_NO_DISPONIBLE',
   PERIODO_NO_CERRADO: 'PERIODO_NO_CERRADO',
   SIN_BITACORAS_APROBADAS: 'SIN_BITACORAS_APROBADAS',
+  // Hay al menos una bitácora del periodo todavía sin decisión final (en_curso, pendiente_datos o
+  // pendiente_revision) — antes solo se informaba en diagnostico.bitacorasNoResueltas, ahora bloquea.
+  BITACORAS_SIN_REVISAR: 'BITACORAS_SIN_REVISAR',
   // Más jornadas contabilizables en el periodo que renglones en el Control de Asistencia. Solo ocurre con datos
   // inconsistentes; se informa como bloqueo (con mensaje) para no dejar que la preparación lance y tumbe la pantalla.
   DEMASIADAS_BITACORAS_EN_EL_PERIODO: 'DEMASIADAS_BITACORAS_EN_EL_PERIODO',
@@ -163,6 +166,8 @@ const MENSAJES_BLOQUEO = Object.freeze({
     'El periodo de este reporte todavía no está disponible para generarse: debe pasar el primer día hábil administrativo posterior a su fecha de término.',
   [MOTIVOS_BLOQUEO.SIN_BITACORAS_APROBADAS]:
     'No hay bitácoras aprobadas en el periodo de este reporte.',
+  [MOTIVOS_BLOQUEO.BITACORAS_SIN_REVISAR]:
+    'Tienes bitácoras de este periodo sin revisar. Pídele a tu profesor que las revise (apruebe o rechace) antes de generar tu reporte.',
   [MOTIVOS_BLOQUEO.DEMASIADAS_BITACORAS_EN_EL_PERIODO]:
     `El periodo de este reporte tiene más de ${FILAS_CONTROL_ASISTENCIA} jornadas registradas y el formato oficial `
     + 'solo admite ese número. Solicita a coordinación que lo corrija.',
@@ -175,7 +180,7 @@ const MENSAJES_BLOQUEO = Object.freeze({
   [MOTIVOS_BLOQUEO.REPORTE_GLOBAL_YA_EXISTE]:
     'Ya existe un reporte global para tu servicio social.',
   [MOTIVOS_BLOQUEO.SIN_CORREO_PERSONAL]:
-    'Tu perfil no tiene correo personal registrado y el reporte lo requiere. Solicita a coordinación que lo corrija.',
+    'Tu perfil no tiene correo personal registrado y el reporte lo requiere. Actualízalo en "Actualizar datos personales".',
   [MOTIVOS_BLOQUEO.SIN_PROGRAMA_SISS]:
     'La oferta de tu servicio social no tiene un Programa SISS asignado. Solicita a coordinación que lo corrija.',
   [MOTIVOS_BLOQUEO.SIN_PROFESOR_RESPONSABLE]:

@@ -48,14 +48,20 @@ const ETIQUETAS_ESTADO = {
 export const etiquetaEstadoReporte = (estado) => ETIQUETAS_ESTADO[estado] ?? estado;
 
 /**
- * Bitácoras del periodo que siguen en revisión del profesor. El backend ya las limita al periodo del reporte
- * (diagnostico.bitacorasNoResueltas); esa lista trae además en_curso y pendiente_datos, que no son "de revisión".
+ * Bitácoras del periodo sin decisión final (en_curso, pendiente_datos o pendiente_revision). El backend ya las
+ * limita al periodo del reporte (diagnostico.bitacorasNoResueltas) y, desde BITACORAS_SIN_REVISAR, basta con que
+ * exista una para bloquear la generación — este conteo es solo para detallar el aviso, no decide el bloqueo.
  */
-export const contarPendientesDeRevision = (diagnostico) => (diagnostico?.bitacorasNoResueltas ?? [])
-  .filter((b) => b.estado === "pendiente_revision").length;
+export const contarPendientesDeRevision = (diagnostico) => (diagnostico?.bitacorasNoResueltas ?? []).length;
 
-export const textoAvisoPendientes = (n) => `Tienes ${n} bitácora(s) pendiente(s) de revisión en este periodo. `
-  + "Avísale a tu profesor para que las revise antes de generar tu reporte; las que sigan pendientes no se contabilizarán.";
+export const textoAvisoPendientes = (n) => `Tienes ${n} bitácora(s) de este periodo sin revisar. `
+  + "No podrás generar tu reporte hasta que tu profesor las revise (apruebe o rechace) — avísale para que lo haga.";
+
+/** Si el periodo del reporte tiene al menos una bitácora rechazada (RN-REP: candado de AH). */
+export const hayBitacorasRechazadas = (bitacoras = []) => bitacoras.some((b) => b.estado === "rechazada");
+
+export const textoAvisoBitacorasRechazadas = "Al continuar, las bitácoras rechazadas de este periodo quedarán "
+  + "fijas: ya no podrán modificarse. Si alguna no debió rechazarse, coméntalo con tu profesor antes de generar tu reporte.";
 
 /** Validación previa de la firma (el servidor valida de verdad: estructura, dimensiones y tamaño). */
 export function validarArchivoFirma(archivo) {
