@@ -59,6 +59,19 @@ export function filtrarPorAlumno(reportes, busqueda) {
   return reportes.filter((r) => sinAcentos(r.alumno.nombreCompleto).includes(buscado));
 }
 
+// "Procesados" trae todo lo que ya no espera al profesor: lo que ÉL rechazó (rechazado_profesor) y lo
+// que ÉL ya aprobó, sin importar qué haya pasado después con coordinación (pendiente_revision_coordinador,
+// rechazado_coordinador o aprobado_coordinador son las 3 formas de "yo ya lo aprobé").
+export const esRechazadoPorProfesor = (reporte) => reporte.estadoReporte === 'rechazado_profesor';
+
+/** Separa "procesados" en lo que el profesor rechazó vs lo que el profesor ya aprobó (venga de donde venga). */
+export function separarProcesados(procesados) {
+  const aprobados = [];
+  const rechazados = [];
+  for (const r of procesados) (esRechazadoPorProfesor(r) ? rechazados : aprobados).push(r);
+  return { aprobados, rechazados };
+}
+
 /** Agrupa por alumno (por boleta), conservando el orden de aparición. */
 export function agruparPorAlumno(reportes) {
   const grupos = new Map();

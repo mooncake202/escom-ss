@@ -6,7 +6,7 @@ import {
 } from "@/services/reportesService";
 import { validarArchivoFirma } from "../../CU-REP-01-generar-reporte/reportesGeneracion";
 import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
-import { claveReporte, filtrarPorAlumno, agruparPorAlumno, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../revisionReportes";
+import { claveReporte, filtrarPorAlumno, agruparPorAlumno, separarProcesados, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../revisionReportes";
 
 // ── Modos del panel ──────────────────────────────────────────
 export const MODO = {
@@ -83,9 +83,16 @@ export function useRevisarReportes() {
   const reporte = seleccionado === null ? null : todos.find((r) => claveReporte(r) === seleccionado) ?? null;
 
   const pendientes = filtrarPorAlumno(lista.pendientes, busqueda);
-  const procesados = filtrarPorAlumno(lista.procesados, busqueda);
+  const procesadosFiltrados = filtrarPorAlumno(lista.procesados, busqueda);
+  const { aprobados, rechazados } = separarProcesados(procesadosFiltrados);
   const pendientesAgrupados = agruparPorAlumno(pendientes);
-  const procesadosAgrupados = agruparPorAlumno(procesados);
+  const aprobadosAgrupados = agruparPorAlumno(aprobados);
+  const rechazadosAgrupados = agruparPorAlumno(rechazados);
+
+  // Categorías colapsables: Pendientes abierta por defecto, Aprobados/Rechazados colapsadas — así la
+  // lista no se vuelve eterna para un profesor con muchos alumnos e historial.
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState({ pendientes: true, aprobados: false, rechazados: false });
+  const toggleCategoria = (clave) => setCategoriasAbiertas((prev) => ({ ...prev, [clave]: !prev[clave] }));
 
   function limpiarFormularios() {
     setComentario("");
@@ -238,8 +245,9 @@ export function useRevisarReportes() {
   return {
     carga, recargar,
     tieneReportes: lista.pendientes.length + lista.procesados.length > 0,
-    pendientes, procesados, reporte, detalle, reintentarDetalle,
-    pendientesAgrupados, procesadosAgrupados, estaDestacado,
+    pendientes, aprobados, rechazados, reporte, detalle, reintentarDetalle,
+    pendientesAgrupados, aprobadosAgrupados, rechazadosAgrupados, estaDestacado,
+    categoriasAbiertas, toggleCategoria,
     busqueda, setBusqueda,
     seleccionado, seleccionar, cerrar,
     pdf, verPdf, cerrarPdf,

@@ -1,12 +1,11 @@
 import { useEffect }                                          from "react";
 import { useTheme, RADIUS }                                    from "@/themes/colors";
 import { DashboardLayout }                                       from "@/components/layout/DashboardLayout";
-import { ReporteCard }                                           from "./components/ReporteCard";
 import { ReporteDetalle }                                        from "./components/ReporteDetalle";
-import { claveReporte }                                          from "../CU-REP-05-revisar-reportes-profesor/revisionReportes";
+import { CategoriaReportes }                                      from "./components/CategoriaReportes";
 import {
   useValidarReportes,
-  FILTRO_ESTADO, CRITERIO,
+  CRITERIO,
 }                                                                from "./hooks/useValidarReportes";
 import { useSesion, nombreCompletoSesion }                       from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
@@ -17,11 +16,11 @@ export default function ValidarReportes() {
   const nombreCoordinacion = nombreCompletoSesion(usuario);
   const {
     carga, recargar,
-    tieneReportes, reportesFiltrados, reporte, detalle, reintentarDetalle, estaDestacado,
+    tieneReportes, pendientesFiltrados, aprobados, rechazados, reporte, detalle, reintentarDetalle, estaDestacado,
+    categoriasAbiertas, toggleCategoria,
     seleccionado, seleccionar, cerrar,
     pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
-    filtroEstado, setFiltroEstado,
     criterio, setCriterio,
     busqueda, setBusqueda,
     comentario, handleComentarioChange, errorComentario,
@@ -157,31 +156,6 @@ export default function ValidarReportes() {
           flexWrap: "wrap", alignItems: "center",
         }}>
 
-          {/* Filtro estado — toggle */}
-          <div style={{
-            display: "flex", borderRadius: RADIUS.md, overflow: "hidden",
-            border: `1px solid ${C.borderDefault}`,
-          }}>
-            {[
-              { key: FILTRO_ESTADO.PENDIENTES, label: "Pendientes" },
-              { key: FILTRO_ESTADO.PROCESADOS, label: "Procesados" },
-            ].map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => { setFiltroEstado(key); seleccionar(null); }}
-                style={{
-                  padding: "8px 16px", fontSize: 13, fontWeight: 600,
-                  cursor: "pointer", fontFamily: "inherit", border: "none",
-                  background: filtroEstado === key ? C.accent : "transparent",
-                  color: filtroEstado === key ? "#fff" : C.textMuted,
-                  transition: "background 0.15s",
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
           {/* Criterio de búsqueda */}
           <select
             value={criterio}
@@ -241,34 +215,28 @@ export default function ValidarReportes() {
 
         <div style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start" }}>
 
-          {/* ── Lista izquierda ── */}
-          <div style={{ flex: "0 0 310px", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-            <p style={{ margin: "0 0 0.625rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              {filtroEstado === FILTRO_ESTADO.PENDIENTES ? "Pendientes de validación" : "Procesados"} ({reportesFiltrados.length})
-            </p>
-
-            {reportesFiltrados.length === 0 ? (
-              <div style={{
-                padding: "1rem", borderRadius: RADIUS.lg,
-                background: C.bgCard, border: `1px solid ${C.borderDefault}`,
-                textAlign: "center",
-              }}>
-                <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
-                  {busqueda ? `Sin resultados para "${busqueda}".` : "Sin reportes en esta categoría."}
-                </p>
-              </div>
-            ) : (
-              reportesFiltrados.map(r => (
-                <ReporteCard
-                  key={claveReporte(r)}
-                  reporte={r}
-                  activo={seleccionado === claveReporte(r)}
-                  onSeleccionar={seleccionar}
-                  destacado={estaDestacado(r)}
-                  C={C}
-                />
-              ))
-            )}
+          {/* ── Lista izquierda: 3 categorías colapsables (Pendientes abierta, Aprobados/
+              Rechazados colapsadas) — la bandeja de coordinación ve TODO el sistema sin
+              reparto, así que sin esto se vuelve una lista eterna. ── */}
+          <div style={{ flex: "0 0 310px", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <CategoriaReportes
+              titulo="Pendientes de validación" reportes={pendientesFiltrados}
+              abierta={categoriasAbiertas.pendientes} onToggle={() => toggleCategoria("pendientes")}
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
+            <CategoriaReportes
+              titulo="Aprobados" reportes={aprobados}
+              abierta={categoriasAbiertas.aprobados} onToggle={() => toggleCategoria("aprobados")}
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
+            <CategoriaReportes
+              titulo="Rechazados" reportes={rechazados}
+              abierta={categoriasAbiertas.rechazados} onToggle={() => toggleCategoria("rechazados")}
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
           </div>
 
           {/* ── Placeholder derecho ── */}

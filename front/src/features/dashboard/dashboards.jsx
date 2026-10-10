@@ -754,7 +754,6 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "0.75rem", marginBottom: "1.5rem" }}>
         <StatCard icon="users"    label="Alumnos asignados"    value={resumen.alumnosAsignados ?? 0} sub={`de ${resumen.cuposTotales ?? 0} cupos`} {...T.teal} C={C} />
         <StatCard icon="folder"   label="Ofertas activas"      value={resumen.ofertasActivas ?? 0} {...T.blue} C={C} />
-        {/* Dan 0 hasta que existan CU-REP / CU-AH-04 con su convención de estado */}
         <StatCard icon="document" label="Reportes por revisar"  value={resumen.reportesPorRevisar ?? 0} {...T.danger} C={C} />
         <StatCard icon="inbox"    label="Revisar bitácoras"     value={resumen.bitacorasPorRevisar ?? 0} {...T.warning} C={C} />
       </div>
@@ -795,6 +794,14 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         <Section title="Reportes" icon="document" {...T.danger} C={C} badge={resumen.reportesPorRevisar}>
           <ActionItem icon="pencil" {...T.danger} label="Revisar y firmar reporte" desc="Reportes esperan tu revisión y firma" onClick={() => navigate("/profesor/reportes")} C={C} />
           <SlotNotificacion ruta="/profesor/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.reportesPorRevisar ?? 0) > 0}
+            mensaje={`${resumen.reportesPorRevisar} reporte(s) pendiente(s) de revisión`}
+            ruta="/profesor/reportes"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
         </Section>
 
         {/* CU-PRO */}
@@ -938,6 +945,14 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         <Section title="Reportes" icon="document" {...T.teal} C={C} badge={resumen.reportesPorRevisar}>
           <ActionItem icon="pencil"   {...T.danger} label="Dictaminar reportes e historial"   desc="Reportes esperan dictamen" onClick={() => navigate("/coordinacion/reportes")} C={C} />
           <SlotNotificacion ruta="/coordinacion/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          <SlotNotificacionCalculada
+            mostrar={(resumen.reportesPorRevisar ?? 0) > 0}
+            mensaje={`${resumen.reportesPorRevisar} reporte(s) pendiente(s) de dictamen`}
+            ruta="/coordinacion/reportes"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
         </Section>
 
         {/* CU-PRO */}

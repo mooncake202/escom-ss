@@ -6,7 +6,7 @@ import {
 } from "@/services/reportesService";
 import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
 import { claveReporte, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
-import { CRITERIO, filtrarReportes } from "../validacionReportes";
+import { CRITERIO, filtrarReportes, separarProcesados } from "../validacionReportes";
 
 export { CRITERIO };
 
@@ -15,12 +15,6 @@ export const MODO = {
   NORMAL:   "normal",
   APROBAR:  "aprobar",   // confirma la validación (el servidor agrega el sello del prototipo)
   RECHAZAR: "rechazar",  // pide el motivo
-};
-
-// ── Filtros de estado ────────────────────────────────────────
-export const FILTRO_ESTADO = {
-  PENDIENTES: "pendientes",
-  PROCESADOS: "procesados", // validados o rechazados por Coordinación
 };
 
 // Todo sale del backend: bandeja, detalle, PDF almacenado, rechazo y validación (que agrega el sello y aprueba).
@@ -34,9 +28,13 @@ export function useValidarReportes() {
   const { pdf, abrirPdf, cerrarPdf }    = usePdfAlmacenado();
 
   // ── Filtros ──────────────────────────────────────────────
-  const [filtroEstado, setFiltroEstado]   = useState(FILTRO_ESTADO.PENDIENTES);
   const [criterio, setCriterio]           = useState(CRITERIO.TODOS);
   const [busqueda, setBusqueda]           = useState("");
+
+  // Categorías colapsables: Pendientes abierta por defecto, Aprobados/Rechazados colapsadas — mismo
+  // patrón que CU-REP-05, para que la bandeja de coordinación (ve TODO, sin reparto) no se vuelva eterna.
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState({ pendientes: true, aprobados: false, rechazados: false });
+  const toggleCategoria = (clave) => setCategoriasAbiertas((prev) => ({ ...prev, [clave]: !prev[clave] }));
 
   // ── Rechazo ──────────────────────────────────────────────
   const [comentario, setComentario]           = useState("");
@@ -89,8 +87,8 @@ export function useValidarReportes() {
   const todos = [...lista.pendientes, ...lista.procesados];
   const reporte = seleccionado === null ? null : todos.find((r) => claveReporte(r) === seleccionado) ?? null;
 
-  const porEstado = filtroEstado === FILTRO_ESTADO.PENDIENTES ? lista.pendientes : lista.procesados;
-  const reportesFiltrados = filtrarReportes(porEstado, criterio, busqueda);
+  const pendientesFiltrados = filtrarReportes(lista.pendientes, criterio, busqueda);
+  const { aprobados, rechazados } = separarProcesados(filtrarReportes(lista.procesados, criterio, busqueda));
 
   function resetModo() {
     setModo(MODO.NORMAL);
@@ -192,11 +190,11 @@ export function useValidarReportes() {
   return {
     carga, recargar,
     tieneReportes: todos.length > 0,
-    reportesFiltrados, reporte, detalle, reintentarDetalle, estaDestacado,
+    pendientesFiltrados, aprobados, rechazados, reporte, detalle, reintentarDetalle, estaDestacado,
+    categoriasAbiertas, toggleCategoria,
     seleccionado, seleccionar, cerrar,
     pdf, verPdf, cerrarPdf,
     modo, irModo, resetModo,
-    filtroEstado, setFiltroEstado,
     criterio, setCriterio,
     busqueda, setBusqueda,
     comentario, handleComentarioChange, errorComentario,

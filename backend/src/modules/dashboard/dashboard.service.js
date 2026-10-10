@@ -193,6 +193,8 @@ async function resumenProfesor(usuarioId) {
     alertasActividades,
     bajas,
     bitacorasRevisionAtrasada,
+    reportesMensualesPorRevisar,
+    reportesGlobalesPorRevisar,
   ] = await Promise.all([
     // Antes contaba TODAS las solicitudes de sus ofertas (incluyendo las que
     // apenas se enviaron) — ahora solo cuenta las que de verdad llegaron al
@@ -233,6 +235,14 @@ async function resumenProfesor(usuarioId) {
     calcularAlertasActividadesProfesor(profesor.id),
     bajasService.resumenBajasDelProfesor({ usuarioId }),
     calcularBitacorasRevisionAtrasada(profesor.id),
+    // RF-REP: notificación calculada — mensuales y globales de sus alumnos en pendiente_revision_profesor,
+    // sumados en un solo número (mismo criterio que alumnosConFaltasCriticas: una sola notificación).
+    prisma.reporte_mensual.count({
+      where: { estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR, solicitud_registro: { oferta: { profesor_id: profesor.id } } },
+    }),
+    prisma.reporte_global.count({
+      where: { estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR, solicitud_registro: { oferta: { profesor_id: profesor.id } } },
+    }),
   ]);
 
   return {
@@ -245,8 +255,7 @@ async function resumenProfesor(usuarioId) {
     solicitudesPendientes,
     alumnosConFaltasCriticas,
     alumnosConEvaluacionSolicitada,
-    // TODO: requiere convención de estado de CU-REP — todavía no construido.
-    reportesPorRevisar: 0,
+    reportesPorRevisar: reportesMensualesPorRevisar + reportesGlobalesPorRevisar,
     bitacorasPorRevisar,
     departamento: profesor.departamento,
     cubiculo: profesor.cubiculo,
@@ -283,6 +292,8 @@ async function resumenCoordinacion() {
     alumnosEnProcesoLiberacion,
     periodoMasReciente,
     bajas,
+    reportesMensualesPorRevisar,
+    reportesGlobalesPorRevisar,
   ] = await Promise.all([
     prisma.solicitud_registro.count(),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
@@ -296,6 +307,10 @@ async function resumenCoordinacion() {
     prisma.liberacion_proceso.count({ where: { NOT: { estado: ESTADO_LSS_TERMINAL } } }),
     prisma.periodo_registro.findFirst({ orderBy: { id: 'desc' } }),
     bajasService.resumenBajasDeCoordinacion(),
+    // RF-REP: notificación calculada — mensuales y globales en pendiente_revision_coordinador, de
+    // CUALQUIER alumno (coordinación ve todo sin reparto, mismo criterio que ofertasPorValidar).
+    prisma.reporte_mensual.count({ where: { estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR } }),
+    prisma.reporte_global.count({ where: { estado_reporte: ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR } }),
   ]);
 
   return {
@@ -308,7 +323,7 @@ async function resumenCoordinacion() {
     periodoLabel: formatearPeriodo(periodoMasReciente),
     solicitudesRegistroPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'SISS_y_documentacion_pendiente' } }),
     expedientesPendientes: await prisma.solicitud_registro.count({ where: { estado_solicitud: 'expediente_pendiente_revision' } }),
-    reportesPorRevisar: 0,
+    reportesPorRevisar: reportesMensualesPorRevisar + reportesGlobalesPorRevisar,
     reportesAprobadosMes: 0,
     // CU-PRO-02/03: cualquier coordinador puede revisar cualquier oferta pendiente (no hay reparto
     // entre ellos) — conteo en vivo, no dependía de nada hasta ahora (quedó en 0 sin conectar).

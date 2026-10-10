@@ -1,9 +1,8 @@
 import { useEffect }                        from "react";
 import { useTheme, RADIUS }                from "@/themes/colors";
 import { DashboardLayout }                  from "@/components/layout/DashboardLayout";
-import { ReporteCard }                      from "./components/ReporteCard";
 import { ReporteDetalle }                   from "./components/ReporteDetalle";
-import { claveReporte }                     from "./revisionReportes";
+import { CategoriaReportes }                from "./components/CategoriaReportes";
 import { useRevisarReportes }            from "./hooks/useRevisarReportes";
 import { useSesion, nombreCompletoSesion }  from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
@@ -14,8 +13,9 @@ export default function RevisarReportes() {
   const nombreProfesor = nombreCompletoSesion(usuario);
   const {
     carga, recargar,
-    tieneReportes, pendientes, procesados, reporte, detalle, reintentarDetalle,
-    pendientesAgrupados, procesadosAgrupados, estaDestacado,
+    tieneReportes, pendientes, aprobados, rechazados, reporte, detalle, reintentarDetalle,
+    pendientesAgrupados, aprobadosAgrupados, rechazadosAgrupados, estaDestacado,
+    categoriasAbiertas, toggleCategoria,
     busqueda, setBusqueda,
     seleccionado, seleccionar, cerrar,
     pdf, verPdf, cerrarPdf,
@@ -193,72 +193,29 @@ export default function RevisarReportes() {
               )}
             </div>
 
-            {/* Pendientes */}
-            <div>
-              <p style={{ margin: "0 0 0.625rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Pendientes de revisión ({pendientes.length})
-              </p>
-              {pendientesAgrupados.length === 0 ? (
-                <div style={{
-                  padding: "1rem", borderRadius: RADIUS.lg,
-                  background: C.bgCard, border: `1px solid ${C.borderDefault}`,
-                  textAlign: "center",
-                }}>
-                  <p style={{ margin: 0, fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>
-                    {busqueda ? `Sin resultados para "${busqueda}".` : "Sin reportes pendientes."}
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  {pendientesAgrupados.map(grupo => (
-                    <div key={grupo.boleta}>
-                      {/* Nombre del alumno */}
-                      <p style={{ margin: "0 0 0.375rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                        {grupo.alumno}
-                      </p>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                        {grupo.reportes.map(r => (
-                          <ReporteCard
-                            key={claveReporte(r)} reporte={r}
-                            activo={seleccionado === claveReporte(r)}
-                            onSeleccionar={seleccionar}
-                            esPendiente destacado={estaDestacado(r)} C={C}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Procesados */}
-            {procesadosAgrupados.length > 0 && (
-              <div>
-                <p style={{ margin: "0 0 0.625rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                  Procesados ({procesados.length})
-                </p>
-                <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                  {procesadosAgrupados.map(grupo => (
-                    <div key={grupo.boleta}>
-                      <p style={{ margin: "0 0 0.375rem", fontSize: 11, fontWeight: 700, color: C.textDisabled, textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                        {grupo.alumno}
-                      </p>
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.375rem" }}>
-                        {grupo.reportes.map(r => (
-                          <ReporteCard
-                            key={claveReporte(r)} reporte={r}
-                            activo={seleccionado === claveReporte(r)}
-                            onSeleccionar={seleccionar}
-                            esPendiente={false} destacado={estaDestacado(r)} C={C}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* 3 categorías colapsables: Pendientes abierta por defecto, Aprobados/Rechazados
+                colapsadas — así no se vuelve una lista eterna con historial de muchos alumnos. */}
+            <CategoriaReportes
+              titulo="Pendientes de revisión" total={pendientes.length}
+              abierta={categoriasAbiertas.pendientes} onToggle={() => toggleCategoria("pendientes")}
+              agrupados={pendientesAgrupados} esPendiente
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
+            <CategoriaReportes
+              titulo="Aprobados" total={aprobados.length}
+              abierta={categoriasAbiertas.aprobados} onToggle={() => toggleCategoria("aprobados")}
+              agrupados={aprobadosAgrupados} esPendiente={false}
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
+            <CategoriaReportes
+              titulo="Rechazados" total={rechazados.length}
+              abierta={categoriasAbiertas.rechazados} onToggle={() => toggleCategoria("rechazados")}
+              agrupados={rechazadosAgrupados} esPendiente={false}
+              seleccionado={seleccionado} onSeleccionar={seleccionar} estaDestacado={estaDestacado}
+              busqueda={busqueda} C={C}
+            />
           </div>
 
           {/* ── Placeholder derecho ── */}

@@ -20,6 +20,18 @@ const textosDe = (r) => ({
   [CRITERIO.CARRERA]:  r.alumno.carrera ?? "",
 });
 
+// Coordinación solo ve 2 estados "procesados": lo que ella misma validó o rechazó (nunca llega a ver
+// rechazado_profesor, ese reporte ni siquiera sale de la bandeja del profesor).
+export const esRechazadoPorCoordinacion = (reporte) => reporte.estadoReporte === 'rechazado_coordinador';
+
+/** Separa "procesados" en lo que coordinación validó vs lo que rechazó. */
+export function separarProcesados(procesados) {
+  const aprobados = [];
+  const rechazados = [];
+  for (const r of procesados) (esRechazadoPorCoordinacion(r) ? rechazados : aprobados).push(r);
+  return { aprobados, rechazados };
+}
+
 /** Filtra por alumno, profesor o carrera (o los tres), sin distinguir mayúsculas ni acentos. Vacío devuelve todo. */
 export function filtrarReportes(reportes, criterio, busqueda) {
   const buscado = sinAcentos(busqueda.trim());
