@@ -200,7 +200,7 @@ test('200 pdf: application/pdf con los bytes exactos almacenados; nunca se regen
   assert.ok(e.operaciones.every((o) => /\.(findUnique|findFirst|findMany)$/.test(o)), 'solo lecturas');
 });
 
-test('200 aprobar: PDF final = PDF vigente + sello, con hash, IP y sello de tiempo; pasa a aprobado_coordinador y se avisa a alumno y profesor', async (t) => {
+test('200 aprobar: PDF final = PDF vigente + sello, con hash, IP y sello de tiempo; pasa a aprobado_coordinador y se avisa al alumno', async (t) => {
   const e = await levantar(t);
   const r = await e.pedir('/mensual/1/aprobar', { metodo: 'POST', cuerpo: { estado: 'aprobado', hash: 'x', sello: 'y', coordinador_id: 71 } });
 
@@ -219,7 +219,7 @@ test('200 aprobar: PDF final = PDF vigente + sello, con hash, IP y sello de tiem
   assert.notEqual(ruta, '1/vigente.pdf');
   assert.equal(Buffer.compare(descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, ruta))), final), 0);
   assert.equal(fs.existsSync(path.join(e.rutaBaseDocumentos, '1/vigente.pdf')), true, 'el PDF anterior se conserva');
-  assert.deepEqual(e.avisos.notificaciones.map((n) => n.rutaRelacionada), ['/alumno/reportes?destacar=1', '/profesor/reportes?destacar=1']);
+  assert.deepEqual(e.avisos.notificaciones.map((n) => n.rutaRelacionada), ['/alumno/reportes?destacar=1']);
 
   // Y ahora el PDF que se ve es el final.
   assert.equal(Buffer.compare((await e.pedirPdf('/mensual/1/pdf')).cuerpo, final), 0);
@@ -262,7 +262,7 @@ test('200 rechazar: cambia el estado, guarda el motivo y avisa; sin PDF, sello, 
   assert.deepEqual([ultima.tipo_revisor, ultima.estado, ultima.comentario, ultima.usuario_id, ultima.hash_documento, ultima.token_tsa, ultima.ip_firma], ['coordinador', 'rechazado', 'Falta el detalle.', 70, null, null, null]);
   assert.equal(e.reporte(1).documento.ruta_archivo, '1/vigente.pdf');
   assert.deepEqual(e.sellosDeTiempo, []);
-  assert.equal(e.avisos.notificaciones.length, 2);
+  assert.equal(e.avisos.notificaciones.length, 1);
 });
 
 test('rechazar: sin motivo → 400 con código; ya resuelto → 409 con el estado; nadie más cambia', async (t) => {

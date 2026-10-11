@@ -184,16 +184,14 @@ test('REP-04 global: el PDF usa el periodo completo, título global y la rúbric
   assert.equal(e.sellos.length, 0, 'la vista previa no sella');
 });
 
-test('REP-04 global tras rechazo de COORDINACIÓN: vuelve al profesor (nunca a coordinación) y avisa al profesor con la ruta del global', async (t) => {
+test('REP-04 global tras rechazo de COORDINACIÓN: vuelve al profesor (nunca a coordinación) sin avisar a nadie', async (t) => {
   const e = await escenarioCorreccion(t, {
     estado: ESTADOS_REPORTE.RECHAZADO_COORDINADOR,
     revisiones: [rev(1, 'alumno', 'aprobado', '2027-02-20T15:00:00.000Z'), rev(4, 'profesor', 'aprobado', '2027-02-24T15:00:00.000Z'), rev(5, 'coordinador', 'rechazado', '2027-02-26T15:00:00.000Z', { comentario: 'x' })],
   });
   await reenviarReporteCorregido(ALUMNO, 'global', 1, 'Resumen corregido.', e.deps);
   assert.equal(e.global.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR);
-  assert.deepEqual(e.notificaciones, [{
-    usuarioId: 301, tipo: 'warning', mensaje: 'ANA GARCIA LOPEZ corrigió y reenvió el Reporte Global para tu revisión.', rutaRelacionada: '/profesor/reportes?destacar=1&tipo=global',
-  }]);
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja del profesor es calculada');
 });
 
 test('REP-04: un global pendiente o aprobado no se corrige (409); el id de un global no habilita corregir el mensual del mismo id', async (t) => {
@@ -248,7 +246,7 @@ test('REP-05: el profesor ve el global en su lista y detalle (sin número ni sna
   await assert.rejects(detalleProfesor(PROFESOR, 'global', 2, { prisma: e.prisma }), (err) => err.status === 404);
 });
 
-test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno, mismo Buffer para hash/TSA/archivo/BD, y avisa a coordinación', async (t) => {
+test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno, mismo Buffer para hash/TSA/archivo/BD, sin avisar a nadie', async (t) => {
   const e = await escenarioProfesor(t);
   const antes = e.global.revision_reporte_global.map((r) => structuredClone(r));
   const mensualAntes = structuredClone(e.mensual);
@@ -264,7 +262,7 @@ test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno
   const nueva = e.global.revision_reporte_global.at(-1);
   assert.deepEqual([nueva.tipo_revisor, nueva.estado, nueva.hash_documento, nueva.token_tsa, nueva.usuario_id], ['profesor', 'aprobado', sha256(final), TOKEN, PROFESOR]);
   assert.deepEqual(e.mensual, mensualAntes, 'el mensual con el mismo id no se toca');
-  assert.deepEqual(e.notificaciones.map((n) => [n.usuarioId, n.mensaje, n.rutaRelacionada]), [70, 71].map((u) => [u, 'ANA GARCIA LOPEZ: el Reporte Global fue aprobado por su profesor y espera tu validación.', '/coordinacion/reportes?destacar=1&tipo=global']));
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja de Coordinación es calculada');
 });
 
 test('REP-05: si falla la TSA, un global no avanza; una aprobación repetida recibe 409 (CAS) y no queda nada duplicado', async (t) => {
@@ -359,7 +357,6 @@ test('REP-06: validar un global verifica el hash contra la aprobación del profe
   assert.deepEqual(e.mensual, mensualAntes);
   assert.deepEqual(e.notificaciones.map((n) => [n.usuarioId, n.mensaje, n.rutaRelacionada]), [
     [201, 'Coordinación validó tu Reporte Global.', '/alumno/reportes?destacar=1&tipo=global'],
-    [301, 'Coordinación validó el Reporte Global de ANA GARCIA LOPEZ.', '/profesor/reportes?destacar=1&tipo=global'],
   ]);
   assert.equal((await pdfCoordinacion(COORDINADOR, 'global', 1, { prisma: e.prisma, rutaBaseDocumentos: e.docs })).nombreArchivo, 'reporte-global-2022630001.pdf');
 });
@@ -381,7 +378,7 @@ test('REP-06: si el PDF del global no es el que aprobó el profesor → 500 y no
   assert.deepEqual(e.sellos, []);
   assert.equal(archivos(e.docs).length, 1, 'no se generó ningún archivo');
   assert.equal(e.mensual.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR, 'el mensual con el mismo id sigue igual');
-  assert.deepEqual(e.notificaciones.map((n) => n.usuarioId), [201, 301]);
+  assert.deepEqual(e.notificaciones.map((n) => n.usuarioId), [201]);
 });
 
 test('REP-06: un global ya validado o rechazado no se vuelve a resolver (409) y una validación simultánea solo avanza una vez', async (t) => {

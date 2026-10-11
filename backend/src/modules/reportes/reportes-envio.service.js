@@ -24,7 +24,6 @@ const { crearError, prepararReporteParaPdf, CODIGOS_ERROR: CODIGOS_PREPARACION }
 const { MENSUAL } = require('./reportes.tipos');
 const {
   RUTA_BASE_DOCUMENTOS,
-  TIPOS_NOTIFICACION,
   ESTADOS_REPORTE,
   TIPO_DOCUMENTO_REPORTE_MENSUAL,
   ESTADO_DOCUMENTO_VIGENTE,
@@ -180,11 +179,12 @@ async function registrarEnvio(tx, { usuarioId, solicitudId, numero, datos, activ
   return { reporteId: reporte.id, documentoId: documento.id };
 }
 
-// ── Aviso al profesor ────────────────────────────────────────
+// ── Aviso ────────────────────────────────────────────────────
 
 // Mismo patrón que Ofertas: crearNotificacion (persiste, con ruta destacando el registro) + emitirAUsuario (socket).
 // Fail-open: un fallo aquí (incluida la carga de esos módulos) se registra pero nunca invalida una operación ya confirmada.
-// Lo usan el envío del alumno y las revisiones del profesor (CU-REP-05).
+// La usan las revisiones del profesor y de Coordinación (CU-REP-05/06): el ENVÍO del alumno ya no avisa al profesor
+// de forma persistida (su bandeja usa una notificación calculada, igual que Coordinación — ver dashboards.jsx).
 async function avisarUsuario(usuarioId, { tipo, mensaje, rutaRelacionada, evento, datos }, deps = {}) {
   if (!usuarioId) return;
   try {
@@ -201,21 +201,41 @@ async function avisarUsuario(usuarioId, { tipo, mensaje, rutaRelacionada, evento
   }
 }
 
-const notificarEnvioAlProfesor = ({ cfg, profesorUsuarioId, alumnoNombre, numero, reporteId }, deps) => avisarUsuario(profesorUsuarioId, {
-  tipo: TIPOS_NOTIFICACION.PENDIENTE,
-  mensaje: `${alumnoNombre} envió el ${cfg.etiqueta({ num_reporte: numero })} para tu revisión.`,
-  rutaRelacionada: `/profesor/reportes?${cfg.consultaDestacar(reporteId)}`,
-  evento: 'reporte:nuevo',
-  datos: { reporteId },
-}, deps);
+// Solo socket, SIN notificación persistida: refresca en vivo una bandeja calculada (el badge del dashboard y,
+// dentro de la pantalla misma, su lista). La usan el envío y la corrección del alumno (avisan al profesor) y la
+// aprobación del profesor (avisa a Coordinación). Fail-open, igual que avisarUsuario.
+function emitirEnVivo(usuarioId, evento, datos, deps = {}) {
+  if (!usuarioId) return;
+  try {
+    const emitir = deps.emitirAUsuario ?? require('../../sockets/socket.server').emitirAUsuario;
+    emitir(usuarioId, evento, datos);
+  } catch (err) {
+    console.error(`[reportes] No se pudo emitir ${evento}:`, err.message);
+  }
+}
+
+// Mismo patrón que emitirATodosLosCoordinadores en ofertas.service.js: cualquier coordinador puede validar
+// cualquier reporte (no hay reparto entre ellos), así que se avisa a todos para refrescar su bandeja calculada.
+async function emitirATodosLosCoordinadores(evento, datos, deps = {}) {
+  const prisma = deps.prisma ?? require('../../lib/prisma');
+  let coordinadores;
+  try {
+    coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
+  } catch (err) {
+    console.error(`[reportes] No se pudo listar a los coordinadores para emitir ${evento}:`, err.message);
+    return;
+  }
+  for (const { usuario_id: coordinadorId } of coordinadores) emitirEnVivo(coordinadorId, evento, datos, deps);
+}
 
 // ── Envío ────────────────────────────────────────────────────
 
 /**
  * Orquesta el envío de un reporte (mensual o global): la cadena documental es la MISMA y solo cambian la preparación de datos
- * (`estrategia.preparar`) y el registro en la BD (`estrategia.registrar`).
- * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, generarPdf,
- * crearNotificacion, emitirAUsuario }.
+ * (`estrategia.preparar`) y el registro en la BD (`estrategia.registrar`). No avisa al profesor de forma persistida: su
+ * bandeja usa una notificación calculada (conteo en vivo de pendientes) — pero SÍ se le emite el evento de socket
+ * 'reporte:nuevo' para que esa bandeja (el badge del dashboard y la lista de la pantalla) se refresque sola.
+ * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, generarPdf, emitirAUsuario }.
  * Regresa { reporte: { id, numero, estadoReporte }, fechaEnvio }.
  */
 async function enviarReporte(usuarioId, actividades, deps, estrategia) {
@@ -262,13 +282,7 @@ async function enviarReporte(usuarioId, actividades, deps, estrategia) {
     throw err;
   }
 
-  await notificarEnvioAlProfesor({
-    cfg: estrategia.cfg,
-    profesorUsuarioId: resultado.profesor?.usuarioId,
-    alumnoNombre: datos.alumno.nombreCompleto,
-    numero: datos.numeroReporte,
-    reporteId: ids.reporteId,
-  }, deps);
+  emitirEnVivo(resultado.profesor?.usuarioId, 'reporte:nuevo', { reporteId: ids.reporteId }, deps);
 
   return {
     reporte: { id: ids.reporteId, numero: datos.numeroReporte, estadoReporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR },
@@ -285,6 +299,8 @@ module.exports = {
   RUTA_BASE_DOCUMENTOS, CODIGOS_ERROR, enviarReporteMensual,
   // Piezas de la cadena documental que reutiliza la aprobación del profesor.
   sha256, pedirSello, guardarPdfCifrado, descartarArchivo, avisarUsuario, OPCIONES_TRANSACCION,
+  // Refresco en vivo (solo socket, sin notificación persistida) de bandejas calculadas.
+  emitirEnVivo, emitirATodosLosCoordinadores,
   // La orquestación común del envío (mensual y global).
   enviarReporte,
 };

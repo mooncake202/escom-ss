@@ -17,7 +17,6 @@
 
 const {
   RUTA_BASE_DOCUMENTOS,
-  TIPOS_NOTIFICACION,
   ESTADOS_REPORTE,
   ESTADOS_REPORTE_RECHAZADOS,
   TIPO_REVISOR_ALUMNO,
@@ -37,7 +36,7 @@ const {
 } = require('./reportes-alumno.service');
 const { cambiarEstado } = require('./reportes-revision.service');
 const {
-  OPCIONES_TRANSACCION, sha256, pedirSello, guardarPdfCifrado, descartarArchivo, avisarUsuario,
+  OPCIONES_TRANSACCION, sha256, pedirSello, guardarPdfCifrado, descartarArchivo, emitirEnVivo,
 } = require('./reportes-envio.service');
 const { errorNoEncontrado, validarIdentificador } = require('./reportes-profesor.service');
 const { dePropiedadAlumno } = require('./reportes-seguimiento.service');
@@ -218,9 +217,10 @@ async function registrarReenvio(tx, { cfg, id, usuarioId, fila, rutaAnterior, ru
 }
 
 /**
- * Corrige y reenvía el reporte rechazado. `actividades` es el texto que el alumno vio en la vista previa.
- * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, generarPdf,
- * crearNotificacion, emitirAUsuario }.
+ * Corrige y reenvía el reporte rechazado. `actividades` es el texto que el alumno vio en la vista previa. No avisa al
+ * profesor de forma persistida (su bandeja usa una notificación calculada), pero SÍ le emite 'reporte:nuevo' por
+ * socket para que esa bandeja se refresque sola.
+ * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, generarPdf, emitirAUsuario }.
  * Regresa { reporte: { id, numero, estadoReporte }, fechaEnvio }.
  */
 async function reenviarReporteCorregido(usuarioId, tipoReporte, reporteId, actividades, deps = {}) {
@@ -255,14 +255,7 @@ async function reenviarReporteCorregido(usuarioId, tipoReporte, reporteId, activ
     throw err;
   }
 
-  // Aviso al profesor (fail-open): siempre vuelve a él, también si rechazó Coordinación.
-  await avisarUsuario(profesor?.usuarioId, {
-    tipo: TIPOS_NOTIFICACION.PENDIENTE,
-    mensaje: `${datos.alumno.nombreCompleto} corrigió y reenvió el ${cfg.etiqueta(fila)} para tu revisión.`,
-    rutaRelacionada: `/profesor/reportes?${cfg.consultaDestacar(id)}`,
-    evento: 'reporte:nuevo',
-    datos: { reporteId: id },
-  }, deps);
+  emitirEnVivo(profesor?.usuarioId, 'reporte:nuevo', { reporteId: id }, deps);
 
   return {
     reporte: { id, numero: datos.numeroReporte, estadoReporte: ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR },

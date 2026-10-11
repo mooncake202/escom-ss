@@ -292,33 +292,11 @@ test('aprobar: el PDF final conserva las dos hojas con la firma del alumno y UNA
   assert.equal(archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/')).length, 2);
 });
 
-test('aprobar: avisa a cada coordinador (notificación existente + evento reporte:nuevo) destacando el reporte', async (t) => {
+test('aprobar: no avisa (persistido) a nadie, pero sí emite "reporte:nuevo" a cada coordinador por socket para refrescar su bandeja calculada', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
-  assert.deepEqual(e.notificaciones.map((n) => n.usuarioId), COORDINADORES);
-  assert.deepEqual(e.notificaciones[0], {
-    usuarioId: 70,
-    tipo: 'warning',
-    mensaje: 'ANA GARCIA LOPEZ: el Reporte Mensual No. 2 fue aprobado por su profesor y espera tu validación.',
-    rutaRelacionada: '/coordinacion/reportes?destacar=1',
-  });
+  assert.deepEqual(e.notificaciones, []);
   assert.deepEqual(e.emisiones, COORDINADORES.map((usuarioId) => ({ usuarioId, evento: 'reporte:nuevo', datos: { reporteId: 1 } })));
-});
-
-test('aprobar: fail-open — si falla la notificación o el socket, la aprobación ya confirmada no se revierte', async (t) => {
-  t.mock.method(console, 'error', () => {});
-  const e = await escenario(t);
-  const r = await e.aprobar({
-    crearNotificacion: async () => { throw new Error('notificaciones caídas'); },
-    emitirAUsuario: () => { throw new Error('socket no inicializado'); },
-  });
-  assert.equal(r.reporte.estadoReporte, 'pendiente_revision_coordinador');
-  assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR);
-
-  const sinLista = await escenario(t, { bd: { coordinadores: [] } });
-  sinLista.prisma.coordinador.findMany = async () => { throw new Error('BD'); };
-  await sinLista.aprobar();
-  assert.equal(sinLista.reporte.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR);
 });
 
 test('aprobar: sin rúbrica registrada → 409 RUBRICA_NO_REGISTRADA; no se sella, no se escribe y no se cambia nada', async (t) => {
@@ -420,7 +398,7 @@ test('aprobar: dos aprobaciones simultáneas — solo una avanza; la otra recibe
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(resultados.find((r) => r.status === 'rejected').reason.code, CODIGOS_ERROR.REPORTE_NO_PENDIENTE);
   assert.equal(revisionesDe(e.reporte).length, antesRevisiones + 1, 'una sola revisión del profesor');
-  assert.equal(e.notificaciones.length, COORDINADORES.length, 'solo se avisó una vez');
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja de Coordinación es calculada');
   // Solo quedan el PDF del alumno y el final registrado: el del perdedor se borró.
   const propios = archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/'));
   assert.equal(propios.length, 2);

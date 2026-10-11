@@ -490,68 +490,18 @@ test('la solicitud ausente se informa como 404 sin efectos', async (t) => {
 
 // ── Aviso al profesor (mismo patrón que Ofertas: notificación persistida + evento por socket) ──
 
-test('al enviar, se notifica al profesor responsable con el alumno y el número de reporte, y se navega a /profesor/reportes?destacar=<id>', async (t) => {
+test('al enviar no se notifica (persistido) a nadie, pero sí se le emite "reporte:nuevo" al profesor por socket para refrescar su bandeja calculada', async (t) => {
   const e = await escenario(t);
   const { reporte } = await e.enviar();
-
-  assert.deepEqual(e.notificaciones, [{
-    usuarioId: PROFESOR_USUARIO_ID,
-    tipo: 'warning',
-    mensaje: 'ANA GARCIA LOPEZ envió el Reporte Mensual No. 1 para tu revisión.',
-    rutaRelacionada: `/profesor/reportes?destacar=${reporte.id}`,
-  }]);
+  assert.deepEqual(e.notificaciones, []);
   assert.deepEqual(e.emisiones, [{ usuarioId: PROFESOR_USUARIO_ID, evento: 'reporte:nuevo', datos: { reporteId: reporte.id } }]);
 });
 
-test('la notificación se envía después de confirmar el registro (con el reporte ya guardado) y una sola vez', async (t) => {
-  const e = await escenario(t);
-  let reportesAlNotificar = null;
-  await e.enviar(ACTIVIDADES_EJEMPLO, { crearNotificacion: async () => { reportesAlNotificar = e.db.reportes.length; } });
-  assert.equal(reportesAlNotificar, 1);
-  assert.equal(e.emisiones.length, 1);
-});
-
-test('fail-open: si falla crear la notificación, el envío sigue siendo válido y se emite igualmente el evento', async (t) => {
-  const registro = t.mock.method(console, 'error', () => {});
-  const e = await escenario(t);
-  const resultado = await e.enviar(ACTIVIDADES_EJEMPLO, { crearNotificacion: async () => { throw new Error('BD de notificaciones caída'); } });
-
-  assert.equal(resultado.reporte.numero, 1);
-  assert.equal(e.db.reportes.length, 1);
-  assert.equal(e.db.documentos.length, 1);
-  assert.equal(archivosEn(e.rutaBaseDocumentos).length, 1, 'el archivo se conserva');
-  assert.equal(e.emisiones.length, 1);
-  assert.match(String(registro.mock.calls[0].arguments[0]), /No se pudo crear la notificación/);
-});
-
-test('fail-open: si falla el socket (o no se pueden cargar los módulos de notificación), el envío sigue siendo válido', async (t) => {
-  t.mock.method(console, 'error', () => {});
-  const e = await escenario(t);
-  const resultado = await e.enviar(ACTIVIDADES_EJEMPLO, { emitirAUsuario: () => { throw new Error('socket no inicializado'); } });
-  assert.equal(resultado.reporte.numero, 1);
-  assert.equal(e.notificaciones.length, 1, 'la notificación persistida no se pierde');
-  assert.equal(e.db.revisiones.length, 1);
-});
-
-test('si el envío falla (TSA, registro o validación) NO se notifica al profesor', async (t) => {
-  t.mock.method(console, 'error', () => {});
-  const sinTsa = await escenario(t, {}, { tsa: async () => { throw new ErrorTsa('sin conexión', 'TSA_SIN_CONEXION'); } });
-  await assert.rejects(sinTsa.enviar(), (err) => err.status === 503);
-  assert.deepEqual([sinTsa.notificaciones, sinTsa.emisiones], [[], []]);
-
-  const sinRegistro = await escenario(t, { fallos: { 'reporte_mensual.create': new Error('falla') } });
-  await assert.rejects(sinRegistro.enviar(), /falla/);
-  assert.deepEqual([sinRegistro.notificaciones, sinRegistro.emisiones], [[], []]);
-
-  const bloqueado = await escenario(t, { bitacoras: [] });
-  await assert.rejects(bloqueado.enviar(), (err) => err.code === 'REPORTE_NO_GENERABLE');
-  assert.deepEqual([bloqueado.notificaciones, bloqueado.emisiones], [[], []]);
-});
-
-test('envíos simultáneos: solo el que crea el reporte notifica al profesor', async (t) => {
+test('envíos simultáneos: ninguno notifica (persistido); solo el que gana la carrera emite "reporte:nuevo"', async (t) => {
   const e = await escenario(t, {}, { tsa: async () => { await new Promise((r) => setTimeout(r, 15)); return { token: TOKEN, fecha: new Date() }; } });
   const resultados = await Promise.allSettled([e.enviar(), e.enviar(), e.enviar()]);
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
-  assert.equal(e.notificaciones.length, 1);
+  assert.deepEqual(e.notificaciones, []);
   assert.equal(e.emisiones.length, 1);
+  assert.equal(e.emisiones[0].evento, 'reporte:nuevo');
 });

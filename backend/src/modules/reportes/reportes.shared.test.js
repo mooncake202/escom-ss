@@ -169,7 +169,9 @@ test('todo aviso de Reportes (alumno, profesor, coordinación; mensual y global)
     const codigo = fs.readFileSync(path.join(__dirname, archivo), 'utf8').replace(/\/\/.*$/gm, '');
     assert.equal(/\btipo:\s*(exito\s*\?\s*)?'(info|warning|success|urgente)'/.test(codigo), false, `${archivo}: usa TIPOS_NOTIFICACION en vez de un tipo escrito a mano`);
   }
-  // Quien avisa lo hace con la constante (los cuatro servicios que crean avisos).
-  const avisan = ['reportes-envio.service.js', 'reportes-correccion.service.js', 'reportes-revision.service.js', 'reportes-validacion.service.js'];
+  // Quien avisa lo hace con la constante. El envío (reportes-envio.service.js) y la corrección
+  // (reportes-correccion.service.js) ya no avisan a nadie: la bandeja del profesor usa una notificación
+  // calculada, no un evento persistido — mismo criterio que Coordinación.
+  const avisan = ['reportes-revision.service.js', 'reportes-validacion.service.js'];
   for (const archivo of avisan) assert.match(fs.readFileSync(path.join(__dirname, archivo), 'utf8'), /TIPOS_NOTIFICACION\./, archivo);
 });

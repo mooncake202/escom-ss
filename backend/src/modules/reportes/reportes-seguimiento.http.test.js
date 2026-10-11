@@ -218,7 +218,7 @@ test('200 vista previa de la corrección: PDF en memoria (no-store) sin cambiar 
   assert.equal(igual.cuerpo.code, 'SIN_CAMBIOS_EN_ACTIVIDADES');
 });
 
-test('200 reenviar: vuelve al profesor con el snapshot intacto, hash/IP/sello en la revisión nueva y aviso al profesor', async (t) => {
+test('200 reenviar: vuelve al profesor con el snapshot intacto, hash/IP/sello en la revisión nueva, sin avisar a nadie', async (t) => {
   const e = await levantar(t);
   const r = await e.pedir('/mensual/1/correccion', { metodo: 'POST', cuerpo: { actividades: NUEVAS, estado: 'aprobado_coordinador', dias_laborados: 99, horas_reportadas: 99, num_reporte: 7, hash: 'x' } });
 
@@ -235,7 +235,7 @@ test('200 reenviar: vuelve al profesor con el snapshot intacto, hash/IP/sello en
   assert.deepEqual([revisiones[2].tipo_revisor, revisiones[2].estado, revisiones[2].hash_documento, revisiones[2].token_tsa], ['alumno', 'aprobado', sha256(guardado), TOKEN]);
   assert.ok(revisiones[2].ip_firma);
   assert.deepEqual(e.sellos, [sha256(guardado)]);
-  assert.deepEqual(e.avisos.notificaciones.map((n) => [n.usuarioId, n.rutaRelacionada]), [[301, '/profesor/reportes?destacar=1']]);
+  assert.deepEqual(e.avisos.notificaciones, [], 'ninguna notificación: la bandeja del profesor es calculada');
   assert.equal(fs.existsSync(path.join(e.rutaBaseDocumentos, '1/a.pdf')), true, 'el PDF anterior se conserva');
 
   // Y el PDF que ahora se ve es el corregido.

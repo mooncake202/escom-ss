@@ -5,6 +5,7 @@ import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/servi
 import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
 import { claveReporte } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
 import { destacadoDeConsulta, esNotificacionDeReporte } from "../../CU-REP-02-consultar-estatus-reporte/seguimientoReportes";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 // Sin aviso: mismos valores por omisión que backend/reportes-alumno.service.js (SIN_AVISO_PLAZO_ENVIO).
 const SIN_AVISO_PLAZO_ENVIO = {
@@ -80,6 +81,17 @@ export function useHistorialReportes() {
     );
     return () => { vigente = false; };
   }, [intento]);
+
+  // Socket — 'reporte:actualizado' llega cuando el profesor o Coordinación deciden un reporte: se recarga en
+  // silencio (sin pasar por "cargando"), mismo patrón que useSolicitudesPendientes.js.
+  const { socket } = useSocket();
+  const refrescarSilencioso = () => setIntento((n) => n + 1);
+  useEffect(() => {
+    if (!socket) return;
+    socket.on("reporte:actualizado", refrescarSilencioso);
+    return () => socket.off("reporte:actualizado", refrescarSilencioso);
+  }, [socket]);
+  useSocketReconectado(refrescarSilencioso);
 
   function recargar() {
     setCarga({ estado: "cargando", error: null });

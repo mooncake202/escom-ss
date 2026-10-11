@@ -224,31 +224,14 @@ test('reenviar tras un rechazo de COORDINACIÓN: vuelve al profesor (nunca direc
   const revisiones = revisionesDe(e.reporte);
   assert.deepEqual(revisiones.slice(0, antes.length), antes, 'la firma anterior del profesor y el rechazo de coordinación siguen como historia');
   assert.deepEqual(revisiones.slice(antes.length).map((x) => [x.tipo_revisor, x.estado]), [['alumno', 'aprobado']], 'solo una revisión nueva: la del alumno; ninguna del profesor se reutiliza');
-  assert.equal(e.notificaciones[0].usuarioId, PROFESOR_DEL_REPORTE, 'avisa al profesor, no a coordinación');
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja del profesor es calculada');
 });
 
-test('reenviar: avisa al profesor con la notificación existente (destacando el reporte) y el evento reporte:nuevo', async (t) => {
+test('reenviar: no avisa (persistido) a nadie, pero sí emite "reporte:nuevo" al profesor por socket para refrescar su bandeja calculada', async (t) => {
   const e = await escenario(t);
   await e.reenviar();
-  assert.deepEqual(e.notificaciones, [{
-    usuarioId: PROFESOR_DEL_REPORTE,
-    tipo: 'warning',
-    mensaje: 'ANA GARCIA LOPEZ corrigió y reenvió el Reporte Mensual No. 2 para tu revisión.',
-    rutaRelacionada: '/profesor/reportes?destacar=1',
-  }]);
+  assert.deepEqual(e.notificaciones, []);
   assert.deepEqual(e.emisiones, [{ usuarioId: PROFESOR_DEL_REPORTE, evento: 'reporte:nuevo', datos: { reporteId: 1 } }]);
-});
-
-test('reenviar: fail-open — si falla la notificación o el socket, el reenvío ya confirmado no se revierte', async (t) => {
-  const registro = t.mock.method(console, 'error', () => {});
-  const e = await escenario(t);
-  const r = await e.reenviar(ACTIVIDADES_NUEVAS, { deps: {
-    crearNotificacion: async () => { throw new Error('notificaciones caídas'); },
-    emitirAUsuario: () => { throw new Error('socket no inicializado'); },
-  } });
-  assert.equal(r.reporte.estadoReporte, 'pendiente_revision_profesor');
-  assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.PENDIENTE_REVISION_PROFESOR);
-  assert.equal(registro.mock.callCount(), 2);
 });
 
 // ── Quién y cuándo ───────────────────────────────────────────
@@ -437,7 +420,7 @@ test('si falla la persistencia en BD, todo se revierte (estado, actividades, doc
   }
 });
 
-test('dos reenvíos simultáneos — solo uno avanza; el otro recibe 409, su archivo se borra y se avisa una sola vez', async (t) => {
+test('dos reenvíos simultáneos — solo uno avanza; el otro recibe 409 y su archivo se borra', async (t) => {
   const e = await escenario(t, { tsa: async (hash) => { await new Promise((r) => setTimeout(r, 25)); return { token: `${TOKEN}-${hash.slice(0, 6)}`, fecha: new Date() }; } });
   const antes = revisionesDe(e.reporte).length;
   const resultados = await Promise.allSettled([e.reenviar(ACTIVIDADES_NUEVAS), e.reenviar(`${ACTIVIDADES_NUEVAS} Otra.`)]);
@@ -445,7 +428,7 @@ test('dos reenvíos simultáneos — solo uno avanza; el otro recibe 409, su arc
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(resultados.find((r) => r.status === 'rejected').reason.code, CODIGOS_ERROR.REPORTE_NO_CORREGIBLE);
   assert.equal(revisionesDe(e.reporte).length, antes + 1, 'una sola revisión nueva');
-  assert.equal(e.notificaciones.length, 1);
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja del profesor es calculada');
   const propios = archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/'));
   assert.equal(propios.length, 2, 'el PDF anterior y el registrado; el del perdedor se borró');
   assert.ok(propios.includes(e.reporte.documento.ruta_archivo));

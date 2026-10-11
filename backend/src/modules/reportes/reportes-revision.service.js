@@ -22,7 +22,6 @@ const {
   TIPO_REVISOR_PROFESOR,
   ESTADO_REVISION_FIRMADA,
   ESTADO_REVISION_RECHAZADA,
-  nombreCompleto,
 } = require('./reportes.shared');
 const { agregarRubricaProfesor } = require('./reportes.pdf');
 const { FILAS: FILAS_ASISTENCIA } = require('./reportes.asistencia');
@@ -32,6 +31,7 @@ const { normalizarIp, obtenerRubricaAlumno: obtenerRubricaGuardada } = require('
 const { crearError } = require('./reportes-preparacion');
 const {
   CODIGOS_ERROR: CODIGOS_ENVIO, OPCIONES_TRANSACCION, sha256, pedirSello, guardarPdfCifrado, descartarArchivo, avisarUsuario,
+  emitirATodosLosCoordinadores,
 } = require('./reportes-envio.service');
 const { resolverFuente, dePropiedadDe, errorNoEncontrado, leerPdfAlmacenado } = require('./reportes-profesor.service');
 
@@ -77,7 +77,7 @@ const seleccionRevisable = (cfg) => ({
       // `id` y el periodo oficial: el Control de asistencia (página 2) necesita saber qué registros lleva la tabla
       // para firmar solo esas celdas. Es el mismo grafo que usa cfg.periodo().
       id: true,
-      alumno: { select: { boleta: true, usuario_id: true, usuario: { select: { nombre: true, apellidos: true } } } },
+      alumno: { select: { boleta: true, usuario_id: true } },
       periodo_registro: { include: { evento_calendario: true } },
     },
   },
@@ -222,30 +222,11 @@ async function registrarAprobacion(tx, { cfg, id, profesor, usuarioId, fila, rut
   });
 }
 
-// Todas las bandejas de Coordinación son compartidas: se avisa a cada coordinador (fail-open, nunca invalida la aprobación).
-async function avisarACoordinacion(prisma, { cfg, fila, alumnoNombre, reporteId }, deps) {
-  let coordinadores;
-  try {
-    coordinadores = await prisma.coordinador.findMany({ select: { usuario_id: true } });
-  } catch (err) {
-    console.error('[reportes] No se pudo listar a los coordinadores para avisarles:', err.message);
-    return;
-  }
-  for (const { usuario_id: coordinadorId } of coordinadores) {
-    await avisarUsuario(coordinadorId, {
-      tipo: TIPOS_NOTIFICACION.PENDIENTE,
-      mensaje: `${alumnoNombre}: el ${cfg.etiqueta(fila)} fue aprobado por su profesor y espera tu validación.`,
-      rutaRelacionada: `/coordinacion/reportes?${cfg.consultaDestacar(reporteId)}`,
-      evento: 'reporte:nuevo',
-      datos: { reporteId },
-    }, deps);
-  }
-}
-
 /**
  * Aprueba y firma un reporte pendiente y lo envía a Coordinación. Requiere que el profesor ya tenga su rúbrica guardada.
- * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, agregarRubrica,
- * crearNotificacion, emitirAUsuario }.
+ * No avisa a Coordinación de forma persistida (su bandeja usa una notificación calculada), pero SÍ emite 'reporte:nuevo'
+ * por socket a cada coordinador para que esa bandeja (badge y lista) se refresque sola — mismo criterio que Ofertas.
+ * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, agregarRubrica, emitirAUsuario }.
  * Regresa { reporte: { id, numero, estadoReporte }, fechaRevision }.
  */
 async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
@@ -290,9 +271,7 @@ async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
     throw err;
   }
 
-  await avisarACoordinacion(prisma, {
-    cfg, fila, alumnoNombre: nombreCompleto(alumno.usuario.nombre, alumno.usuario.apellidos), reporteId: id,
-  }, deps);
+  await emitirATodosLosCoordinadores('reporte:nuevo', { reporteId: id }, deps);
 
   return {
     reporte: { id, numero: cfg.numero(fila), estadoReporte: ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR },

@@ -1,6 +1,8 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, RADIUS } from "@/themes/colors";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 import { ReporteItem } from "./components/ReporteItem";
 import { useHistorialReportes } from "./hooks/useHistorialReportes";
 import { VisorPdf } from "../compartido/VisorPdf";
@@ -18,6 +20,20 @@ export default function HistorialReportes() {
     pdf, reporteEnPdf, verPdf, cerrarVisor, descargarPdf, estadoPdfDe,
     plazoEnvio, periodoPendiente, limiteServicio,
   } = useHistorialReportes();
+
+  // Pantalla "ver todas" a la que navega el contador de SlotNotificacion cuando hay 2+ avisos de
+  // reportes sin leer (rechazo o validación). marcarLeidasPorRuta (BD) compara ruta_relacionada por
+  // IGUALDAD exacta, pero estas notificaciones siempre traen "?destacar=<id>" distinto por reporte, así
+  // que un match exacto contra la ruta base nunca encontraría ninguna — se filtran por prefijo en el
+  // cliente y se marcan una por una con su id real. Mismo patrón que HistorialOfertas.jsx.
+  useEffect(() => {
+    listarNotificacionesPendientes()
+      .then((notifs) => {
+        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/alumno/reportes?"));
+        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
+      })
+      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de reportes:", err));
+  }, []);
 
   // Acceso al reporte global (el backend decide si ya se puede generar: 480 h de bitácoras aprobadas).
   const botonGlobal = {

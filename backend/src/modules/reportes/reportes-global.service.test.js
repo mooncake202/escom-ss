@@ -489,28 +489,11 @@ test('envío: la rúbrica del alumno registrada se aplica al PDF (sin pedir otra
   nadaPersistido(sinRubrica);
 });
 
-test('envío: avisa al profesor con la notificación existente (destacando el reporte global) y el evento reporte:nuevo', async (t) => {
+test('envío: no avisa (persistido) a nadie, pero sí emite "reporte:nuevo" al profesor por socket para refrescar su bandeja calculada', async (t) => {
   const e = await escenario(t);
   const { reporte } = await e.enviar();
-  assert.deepEqual(e.notificaciones, [{
-    usuarioId: PROFESOR_USUARIO_ID,
-    tipo: 'warning',
-    mensaje: 'ANA GARCIA LOPEZ envió el Reporte Global para tu revisión.',
-    rutaRelacionada: `/profesor/reportes?destacar=${reporte.id}&tipo=global`,
-  }]);
+  assert.deepEqual(e.notificaciones, []);
   assert.deepEqual(e.emisiones, [{ usuarioId: PROFESOR_USUARIO_ID, evento: 'reporte:nuevo', datos: { reporteId: reporte.id } }]);
-});
-
-test('envío: fail-open — si falla la notificación o el socket, el envío confirmado no se revierte', async (t) => {
-  t.mock.method(console, 'error', () => {});
-  const e = await escenario(t);
-  const r = await e.enviar(ACTIVIDADES_EJEMPLO, {
-    crearNotificacion: async () => { throw new Error('notificaciones caídas'); },
-    emitirAUsuario: () => { throw new Error('socket no inicializado'); },
-  });
-  assert.equal(r.reporte.estadoReporte, 'pendiente_revision_profesor');
-  assert.equal(e.db.globales.length, 1);
-  assert.equal(archivosEn(e.rutaBaseDocumentos).length, 1);
 });
 
 // ── Validación en el backend ─────────────────────────────────
@@ -591,7 +574,7 @@ test('envíos simultáneos: solo uno crea el global; los demás reciben 409, su 
   assert.equal(e.db.documentos.length, 1);
   assert.equal(e.db.revisionesGlobales.length, 1);
   assert.equal(archivosEn(e.rutaBaseDocumentos).length, 1, 'los archivos de los que perdieron se borraron');
-  assert.equal(e.notificaciones.length, 1);
+  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja del profesor es calculada');
 });
 
 // ── Todo o nada ──────────────────────────────────────────────

@@ -1,11 +1,9 @@
-import { useEffect }                        from "react";
 import { useTheme, RADIUS }                from "@/themes/colors";
 import { DashboardLayout }                  from "@/components/layout/DashboardLayout";
 import { ReporteDetalle }                   from "./components/ReporteDetalle";
 import { CategoriaReportes }                from "./components/CategoriaReportes";
 import { useRevisarReportes }            from "./hooks/useRevisarReportes";
 import { useSesion, nombreCompletoSesion }  from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
-import { listarNotificacionesPendientes, marcarNotificacionLeida } from "@/services/notificacionesService";
 
 export default function RevisarReportes() {
   const { C } = useTheme();
@@ -26,17 +24,6 @@ export default function RevisarReportes() {
     loading, errorAccion,
     confirmarAprobacion, confirmarRechazo,
   } = useRevisarReportes();
-
-  // Al entrar se marcan como leídas las notificaciones de reportes (mismo patrón que Ofertas): la ruta trae
-  // "?destacar=<id>", así que se filtran por prefijo y se marcan una por una.
-  useEffect(() => {
-    listarNotificacionesPendientes()
-      .then((notifs) => {
-        const propias = notifs.filter((n) => n.ruta_relacionada?.startsWith("/profesor/reportes"));
-        return Promise.all(propias.map((n) => marcarNotificacionLeida(n.id)));
-      })
-      .catch((err) => console.error("No se pudieron marcar como leídas las notificaciones de reportes:", err));
-  }, []);
 
   // ── Carga inicial y error ────────────────────────────────────
   if (carga.estado !== "listo") {

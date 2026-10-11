@@ -793,7 +793,8 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         {/* CU-REP */}
         <Section title="Reportes" icon="document" {...T.danger} C={C} badge={resumen.reportesPorRevisar}>
           <ActionItem icon="pencil" {...T.danger} label="Revisar y firmar reporte" desc="Reportes esperan tu revisión y firma" onClick={() => navigate("/profesor/reportes")} C={C} />
-          <SlotNotificacion ruta="/profesor/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* Calculada únicamente (conteo en vivo de pendientes) — mismo criterio que Coordinación: ya no
+              depende de una fila en `notificacion` por cada envío o reenvío del alumno. */}
           <SlotNotificacionCalculada
             mostrar={(resumen.reportesPorRevisar ?? 0) > 0}
             mensaje={`${resumen.reportesPorRevisar} reporte(s) pendiente(s) de revisión`}
@@ -944,7 +945,8 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         {/* CU-REP */} {/* RUTA_PENDIENTE_SOL */}
         <Section title="Reportes" icon="document" {...T.teal} C={C} badge={resumen.reportesPorRevisar}>
           <ActionItem icon="pencil"   {...T.danger} label="Dictaminar reportes e historial"   desc="Reportes esperan dictamen" onClick={() => navigate("/coordinacion/reportes")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/reportes" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* Calculada únicamente (conteo en vivo de pendientes) — mismo criterio que Ofertas: ya no
+              depende de una fila en `notificacion` por cada reporte que el profesor aprueba. */}
           <SlotNotificacionCalculada
             mostrar={(resumen.reportesPorRevisar ?? 0) > 0}
             mensaje={`${resumen.reportesPorRevisar} reporte(s) pendiente(s) de dictamen`}

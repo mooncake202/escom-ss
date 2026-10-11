@@ -7,6 +7,7 @@ import {
 import { usePdfAlmacenado } from "../../compartido/usePdfAlmacenado";
 import { claveReporte, idsDestacados, esDestacado, tipoDeUrl, describirResultado } from "../../CU-REP-05-revisar-reportes-profesor/revisionReportes";
 import { CRITERIO, filtrarReportes, separarProcesados } from "../validacionReportes";
+import { useSocket, useSocketReconectado } from "@/context/SocketContext";
 
 export { CRITERIO };
 
@@ -67,6 +68,18 @@ export function useValidarReportes() {
   ), []);
 
   useEffect(() => { cargarLista(); }, [cargarLista]);
+
+  // Socket — 'reporte:nuevo' llega cuando un profesor aprueba un reporte (la bandeja de Coordinación es
+  // calculada, no depende de una notificación persistida): se recarga en silencio, mismo patrón que
+  // useSolicitudesPendientes.js.
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+    const refrescar = () => cargarLista(true);
+    socket.on("reporte:nuevo", refrescar);
+    return () => socket.off("reporte:nuevo", refrescar);
+  }, [socket, cargarLista]);
+  useSocketReconectado(() => cargarLista(true));
 
   function recargar() {
     setCarga({ estado: "cargando", error: null });

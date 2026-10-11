@@ -23,7 +23,6 @@ const {
   TIPO_REVISOR_COORDINADOR,
   ESTADO_REVISION_FIRMADA,
   ESTADO_REVISION_RECHAZADA,
-  nombreCompleto,
 } = require('./reportes.shared');
 const { agregarSelloValidacion } = require('./reportes.pdf');
 const { leerSello } = require('./reportes.assets');
@@ -59,7 +58,6 @@ const seleccionValidable = (cfg) => ({
   solicitud_registro: {
     select: {
       alumno: { select: { boleta: true, usuario_id: true, usuario: { select: { nombre: true, apellidos: true } } } },
-      oferta: { select: { profesor: { select: { usuario_id: true } } } },
     },
   },
 });
@@ -82,17 +80,15 @@ async function cargarReporteValidable(prisma, usuarioId, tipoReporte, reporteId)
 }
 
 const alumnoDe = (fila) => fila.solicitud_registro.alumno;
-const profesorUsuarioDe = (fila) => fila.solicitud_registro.oferta?.profesor?.usuario_id ?? null;
 
 // ── Avisos ───────────────────────────────────────────────────
 
-// Al alumno y al profesor, con la notificación existente (fail-open: nunca invalida una resolución ya confirmada).
+// Solo al alumno — decisión explícita del usuario: el profesor ya no se notifica cuando coordinación
+// resuelve (antes se le avisaba también a él). Queda en la tabla `notificacion` (vía avisarUsuario)
+// para que el alumno la vea como pendiente hasta que entre a su historial.
 async function avisarResolucion(cfg, fila, id, { exito }, deps) {
   const alumno = alumnoDe(fila);
-  const nombre = nombreCompleto(alumno.usuario.nombre, alumno.usuario.apellidos);
   const etiqueta = cfg.etiqueta(fila);
-  const evento = 'reporte:actualizado';
-  const datos = { reporteId: id };
 
   await avisarUsuario(alumno.usuario_id, {
     tipo: exito ? TIPOS_NOTIFICACION.APROBACION_FINAL : TIPOS_NOTIFICACION.RECHAZO,
@@ -100,17 +96,8 @@ async function avisarResolucion(cfg, fila, id, { exito }, deps) {
       ? `Coordinación validó tu ${etiqueta}.`
       : `Coordinación rechazó tu ${etiqueta}. Revisa el motivo y corrígelo.`,
     rutaRelacionada: `/alumno/reportes?${cfg.consultaDestacar(id)}`, // REP-03 abre la tarjeta de ese reporte
-    evento,
-    datos,
-  }, deps);
-  await avisarUsuario(profesorUsuarioDe(fila), {
-    tipo: exito ? TIPOS_NOTIFICACION.APROBACION_FINAL : TIPOS_NOTIFICACION.RECHAZO,
-    mensaje: exito
-      ? `Coordinación validó el ${etiqueta} de ${nombre}.`
-      : `Coordinación rechazó el ${etiqueta} de ${nombre}.`,
-    rutaRelacionada: `/profesor/reportes?${cfg.consultaDestacar(id)}`,
-    evento,
-    datos,
+    evento: 'reporte:actualizado',
+    datos: { reporteId: id },
   }, deps);
 }
 

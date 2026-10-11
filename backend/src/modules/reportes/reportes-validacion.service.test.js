@@ -25,7 +25,6 @@ const COORDINADOR = 70;
 const OTRO_COORDINADOR = 71;
 const PROFESOR_USUARIO = 50; // es profesor, no coordinador
 const ALUMNO_USUARIO = 201; // alumno del reporte 1
-const PROFESOR_DEL_REPORTE = 301; // usuario del profesor del reporte 1
 const IP = '187.190.10.20';
 const TOKEN = Buffer.from('TOKEN-TSA-DE-PRUEBA-NO-ES-UN-SELLO-REAL').toString('base64');
 const SELLO_PNG = crearPng(200, 200, [10, 120, 30]);
@@ -194,16 +193,14 @@ test('aprobar: con el sello institucional real (cifrado; reportes.assets.js lo d
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.APROBADO_COORDINADOR);
 });
 
-test('aprobar: avisa al alumno y al profesor con la notificación existente (destacando el reporte) y el evento reporte:actualizado', async (t) => {
+test('aprobar: avisa solo al alumno con la notificación existente (destacando el reporte) y el evento reporte:actualizado', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
   assert.deepEqual(e.notificaciones, [
     { usuarioId: ALUMNO_USUARIO, tipo: 'success', mensaje: 'Coordinación validó tu Reporte Mensual No. 2.', rutaRelacionada: '/alumno/reportes?destacar=1' },
-    { usuarioId: PROFESOR_DEL_REPORTE, tipo: 'success', mensaje: 'Coordinación validó el Reporte Mensual No. 2 de ANA GARCIA LOPEZ.', rutaRelacionada: '/profesor/reportes?destacar=1' },
   ]);
   assert.deepEqual(e.emisiones, [
     { usuarioId: ALUMNO_USUARIO, evento: 'reporte:actualizado', datos: { reporteId: 1 } },
-    { usuarioId: PROFESOR_DEL_REPORTE, evento: 'reporte:actualizado', datos: { reporteId: 1 } },
   ]);
 });
 
@@ -347,7 +344,7 @@ test('aprobar: dos aprobaciones simultáneas — solo una avanza; la otra recibe
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(resultados.find((r) => r.status === 'rejected').reason.code, CODIGOS_ERROR.REPORTE_NO_PENDIENTE);
   assert.equal(revisionesDe(e.reporte).length, antes + 1, 'una sola revisión de Coordinación');
-  assert.equal(e.notificaciones.length, 2, 'alumno y profesor, una sola vez');
+  assert.equal(e.notificaciones.length, 1, 'alumno, una sola vez');
   const propios = archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/'));
   assert.equal(propios.length, 2, 'el vigente anterior y el final registrado; el del perdedor se borró');
   assert.ok(propios.includes(e.reporte.documento.ruta_archivo));
@@ -424,14 +421,13 @@ test('rechazar: estado rechazado_coordinador + revisión rechazada con motivo, f
   assert.equal(e.reporte.documento.ruta_archivo, e.rutaVigente, 'el documento no cambia');
 });
 
-test('rechazar: avisa al alumno y al profesor con la notificación existente y el evento reporte:actualizado', async (t) => {
+test('rechazar: avisa solo al alumno con la notificación existente y el evento reporte:actualizado', async (t) => {
   const e = await escenario(t);
   await e.rechazar();
   assert.deepEqual(e.notificaciones, [
     { usuarioId: ALUMNO_USUARIO, tipo: 'urgente', mensaje: 'Coordinación rechazó tu Reporte Mensual No. 2. Revisa el motivo y corrígelo.', rutaRelacionada: '/alumno/reportes?destacar=1' },
-    { usuarioId: PROFESOR_DEL_REPORTE, tipo: 'urgente', mensaje: 'Coordinación rechazó el Reporte Mensual No. 2 de ANA GARCIA LOPEZ.', rutaRelacionada: '/profesor/reportes?destacar=1' },
   ]);
-  assert.deepEqual(e.emisiones.map((x) => [x.usuarioId, x.evento]), [[ALUMNO_USUARIO, 'reporte:actualizado'], [PROFESOR_DEL_REPORTE, 'reporte:actualizado']]);
+  assert.deepEqual(e.emisiones.map((x) => [x.usuarioId, x.evento]), [[ALUMNO_USUARIO, 'reporte:actualizado']]);
 });
 
 test('rechazar: el motivo es obligatorio (vacío, espacios, sin cuerpo, no texto) y tiene tope; no se cambia nada', async (t) => {
@@ -477,7 +473,7 @@ test('rechazar: fail-open — si falla la notificación o el socket, el rechazo 
   });
   assert.equal(r.reporte.estadoReporte, 'rechazado_coordinador');
   assert.equal(e.reporte.estado_reporte, ESTADOS_REPORTE.RECHAZADO_COORDINADOR);
-  assert.equal(registro.mock.callCount(), 4, 'dos avisos, cada uno con su notificación y su socket');
+  assert.equal(registro.mock.callCount(), 2, 'un aviso, con su notificación y su socket');
 });
 
 test('rechazar: dos rechazos simultáneos — solo uno se registra y el otro recibe 409', async (t) => {
