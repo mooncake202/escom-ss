@@ -86,8 +86,8 @@ function emitirResumenActualizadoAlumno(alumnoUsuarioId) {
 /**
  * Mismo patrón que resolverAlumnoYSolicitud en ah-alumno.service.js —
  * duplicado a propósito (RN de separación por actor, sin compartir código
- * entre módulos). Incluye `oferta` porque RN-LSS-02 depende de
- * tipo_oferta/estado_oferta.
+ * entre módulos). Incluye `oferta` para ubicar al profesor (avisos de todo
+ * el módulo); RN-LSS-02 ya NO depende de tipo_oferta/estado_oferta.
  */
 async function resolverAlumnoYSolicitud(alumnoUsuarioId) {
   const alumno = await prisma.alumno.findUnique({
@@ -125,7 +125,13 @@ async function resolverAlumnoYSolicitud(alumnoUsuarioId) {
  *   'aprobado', aunque el reporte en realidad volvió a
  *   pendiente_revision_profesor). El estado real y único que importa vive
  *   directo en reporte_mensual.estado_reporte / reporte_global.estado_reporte.
- * - Oferta 'Concluida': SOLO aplica si tipo_oferta === 'individual'.
+ * - Ya NO se exige que la oferta esté 'concluida' para el tipo individual (se quitó a propósito):
+ *   esa condición era un candado circular imposible de cumplir. Una oferta individual solo llega a
+ *   'concluida' cuando su único alumno activo ya tiene liberacion_proceso.estado en
+ *   ESTADOS_LSS_LIBERAN_CUPO (lib/cupos.js: 'solicitud_constancia_termino' o 'constancia_disponible'
+ *   — casi el FINAL de todo el proceso de LSS, pasos 9-11), pero liberacion_proceso no existe hasta
+ *   que este mismo CU-LSS-01 se completa. Ningún alumno de oferta individual podía cumplir esto nunca
+ *   por el camino real. El requisito de horas + reportes ya es el mismo para ambos tipos de oferta.
  */
 async function calcularRequisitos(solicitud, alumnoBoleta) {
   const [cumulo, reportesMensuales, reporteGlobal] = await Promise.all([
@@ -151,12 +157,7 @@ async function calcularRequisitos(solicitud, alumnoBoleta) {
   const globalAprobado = reporteGlobal?.estado_reporte === ESTADO_REPORTE_APROBADO_COORDINADOR;
   const cumpleReportes = cumpleMensuales && globalAprobado;
 
-  const aplicaOferta = solicitud.oferta?.tipo_oferta === 'individual';
-  // Valor real de oferta_servicio.estado_oferta (ofertas.service.js) es 'concluida', minúscula —
-  // comparar contra 'Concluida' nunca hacía match y bloqueaba a TODO alumno de oferta individual.
-  const cumpleOferta = aplicaOferta ? solicitud.oferta.estado_oferta === 'concluida' : true;
-
-  const cumpleTodos = cumpleHoras && cumpleReportes && cumpleOferta;
+  const cumpleTodos = cumpleHoras && cumpleReportes;
 
   return {
     cumpleTodos,
@@ -169,7 +170,6 @@ async function calcularRequisitos(solicitud, alumnoBoleta) {
         globalEnviado: !!reporteGlobal,
         globalAprobado,
       },
-      oferta: { aplica: aplicaOferta, cumple: aplicaOferta ? cumpleOferta : null },
     },
   };
 }

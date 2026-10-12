@@ -140,16 +140,9 @@ export default function ValidacionRequisitos() {
           </div>
 
           {/* Reportes */}
-          <div style={tarjetaEstilo(requisitos.reportes.cumple)}>
+          <div style={{ ...tarjetaEstilo(requisitos.reportes.cumple), marginBottom: "1.25rem" }}>
             {requisitos.reportes.cumple ? "✅" : "❌"} Reportes mensuales ({requisitos.reportes.totalMensualesEnviados}/6+) y global registrados y aprobados
           </div>
-
-          {/* Oferta concluida — solo aplica a ofertas individuales (RN-LSS-02) */}
-          {requisitos.oferta.aplica && (
-            <div style={{ ...tarjetaEstilo(requisitos.oferta.cumple), marginBottom: "1.25rem" }}>
-              {requisitos.oferta.cumple ? "✅" : "❌"} Oferta de servicio social concluida
-            </div>
-          )}
 
           {/* Confirmación */}
           <div style={{

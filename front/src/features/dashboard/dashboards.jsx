@@ -824,9 +824,18 @@ const DashboardProfesor = ({ C, sesion, resumen, notificaciones, onLeerNotificac
         </Section>
 
         {/* CU-LSS */}
-        <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C} badge={resumen.evaluacionesPendientes}>
+        <Section title="Liberación del Servicio Social" icon="star" {...T.warning} C={C} badge={resumen.alumnosConEvaluacionSolicitada}>
           <ActionItem icon="star" {...T.warning} label="Evaluar desempeño de alumno" desc="Evaluación pendiente de completar" onClick={() => navigate("/profesor/evaluar-alumno")} C={C} />
-          <SlotNotificacion ruta="/profesor/evaluar-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* Calculada únicamente (conteo en vivo) — mismo criterio que Reportes: ya no depende de
+              una fila en `notificacion` por cada evaluación solicitada o devuelta por coordinación. */}
+          <SlotNotificacionCalculada
+            mostrar={(resumen.alumnosConEvaluacionSolicitada ?? 0) > 0}
+            mensaje={`${resumen.alumnosConEvaluacionSolicitada} alumno(s) con evaluación pendiente`}
+            ruta="/profesor/evaluar-alumno"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
         </Section>
 
       </div>
@@ -991,9 +1000,18 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </Section>
 
         {/* CU-LSS */}
-        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C}>
+        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C} badge={resumen.evaluacionesPendientesDictamen}>
           <ActionItem icon="star"     {...T.warning} label="Dictaminar evaluación de desempeño" desc="Evaluación pendiente de dictamen" onClick={() => navigate("/coordinacion/revisar-evaluacion-alumno")} C={C} />
-          <SlotNotificacion ruta="/coordinacion/revisar-evaluacion-alumno" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
+          {/* Calculada únicamente — mismo criterio que Reportes: ya no depende de una fila en
+              `notificacion` por cada evaluación que el profesor aprueba. */}
+          <SlotNotificacionCalculada
+            mostrar={(resumen.evaluacionesPendientesDictamen ?? 0) > 0}
+            mensaje={`${resumen.evaluacionesPendientesDictamen} evaluación(es) pendiente(s) de dictamen`}
+            ruta="/coordinacion/revisar-evaluacion-alumno"
+            tipo="urgente"
+            navigate={navigate}
+            C={C}
+          />
           <ActionItem icon="document" {...T.blue}    label="Gestionar carta de término"         desc="Carta lista para entregar" onClick={() => navigate("/coordinacion/estado-carta-termino")} C={C} />
           <ActionItem icon="folder"   {...T.teal}    label="Dictaminar expediente"              desc="Expediente en revisión" onClick={() => navigate("/coordinacion/evaluacion-expediente")} C={C} />
           <SlotNotificacion ruta="/coordinacion/evaluacion-expediente" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />

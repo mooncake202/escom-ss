@@ -349,8 +349,11 @@ async function dictaminarRechazado(coordinadorUsuarioId, evaluacionId, motivoRec
   const profesorUsuarioId = profesorUsuarioIdDe(evaluacion);
   const alumnoUsuarioId = alumnoDe(evaluacion).usuario_id;
 
+  // Solo calculada (sin fila en `notificacion`): la bandeja propia del profesor usa
+  // alumnosConEvaluacionSolicitada (dashboard.service.js), que ya cuenta devuelta_para_correccion
+  // como pendiente — mismo criterio que Reportes (REP-05/06).
   if (profesorUsuarioId) {
-    await notificar(profesorUsuarioId, `Coordinación devolvió una evaluación para corrección: ${motivoRechazoCoordinacion}`, '/profesor/evaluar-alumno');
+    emitirResumenActualizado(profesorUsuarioId);
   }
   // RF-LSS-18: el alumno se entera, pero sin ninguna acción de su parte —
   // la corrección la hace el profesor (Camino A).
