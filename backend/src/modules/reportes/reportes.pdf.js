@@ -406,7 +406,7 @@ function textoEnCelda(contenido, { centroX, ancho, baseline, tamano, estilo = 'r
   return [texto({ texto: String(contenido), estilo, tamano: usado, baseline, centroX, color })];
 }
 
-/** Rúbrica del profesor dentro de una celda de la tabla, centrada y conservando proporción. */
+/** Rúbrica del alumno dentro de la celda Firma de un registro, centrada y conservando proporción. */
 function ubicarRubricaEnCelda(celda, imagen) {
   const zona = { ancho: celda.ancho - 4, alto: ASIS.TABLA.filas.alto - 2 };
   const { ancho, alto } = ajustarImagen(imagen, zona);
@@ -452,8 +452,9 @@ function campoDeAsistencia(campo, valor, { valorX = null, anchoValor = null } = 
 }
 
 /**
- * Elementos de la página 2. `imagenes.profesor` se dibuja en la celda de Firma de CADA registro usado y sobre la línea
- * del responsable directo; `imagenes.sello`, en la zona de sello. Son la MISMA imagen del flujo actual, repetida.
+ * Elementos de la página 2. `imagenes.alumno` se dibuja en la celda de Firma de CADA registro usado (las filas vacías
+ * quedan sin firma); `imagenes.profesor`, solo sobre la línea del responsable directo; `imagenes.sello`, en la zona de
+ * sello. Cada una es la MISMA imagen, repetida donde corresponde.
  */
 function planificarPaginaAsistencia(datos, imagenes = {}) {
   const elementos = [];
@@ -569,12 +570,13 @@ function planificarPaginaAsistencia(datos, imagenes = {}) {
         baseline: baselineDeFila(i), tamano: T.filas.tamano, estilo: T.filas.estilo,
       }));
     }
-    // Firma del profesor: la MISMA rúbrica del flujo actual, solo en las filas con registro.
-    if (fila.conRegistro && imagenes.profesor) {
+    // Firma del alumno: la MISMA rúbrica de "Elaboró", solo en las filas con registro. Se estampa al generar (envío y
+    // reenvío), así que queda cubierta por el hash y el sello de tiempo del alumno. El profesor ya no firma filas.
+    if (fila.conRegistro && imagenes.alumno) {
       const col = ASIS.geometriaColumna(ASIS.COLUMNA.FIRMA);
       elementos.push({
-        tipo: 'imagen', imagen: imagenes.profesor,
-        ...ubicarRubricaEnCelda({ x: col.x, ancho: col.ancho, top: ASIS.topDeFila(i) }, imagenes.profesor),
+        tipo: 'imagen', imagen: imagenes.alumno,
+        ...ubicarRubricaEnCelda({ x: col.x, ancho: col.ancho, top: ASIS.topDeFila(i) }, imagenes.alumno),
       });
     }
   });
@@ -862,33 +864,22 @@ async function agregarImagenesAlPdf(pdfOriginal, imagenBytes, etiqueta, colocaci
 }
 
 /**
- * Colocaciones de la rúbrica del PROFESOR: su firma de "Autorizó" en la página 1 (comportamiento actual intacto) y, en
- * la hoja de asistencia, la firma de cada registro usado más la del responsable directo.
- *
- * `filasConRegistro` son los índices de fila (0..23) que sí llevan bitácora; si no se conocen, solo se firma el
- * responsable directo.
+ * Colocaciones de la rúbrica del PROFESOR: solo la parte de abajo de cada hoja — "Autorizó" en la página 1 y el
+ * responsable directo en la página 2. Las celdas de Firma de los registros son del alumno (se estampan al generar).
  */
-function colocacionesRubricaProfesor(filasConRegistro = []) {
+function colocacionesRubricaProfesor() {
   return [
     { pagina: PAGINA_REPORTE, ubicar: (imagen) => ubicarRubrica(FIRMAS.autorizo, imagen) },
     { pagina: PAGINA_ASISTENCIA, ubicar: (imagen) => ubicarRubricaResponsable(imagen) },
-    ...filasConRegistro.map((i) => ({
-      pagina: PAGINA_ASISTENCIA,
-      ubicar: (imagen) => {
-        const col = ASIS.geometriaColumna(ASIS.COLUMNA.FIRMA);
-        return ubicarRubricaEnCelda({ x: col.x, ancho: col.ancho, top: ASIS.topDeFila(i) }, imagen);
-      },
-    })),
   ];
 }
 
 /**
- * Agrega la rúbrica del profesor (PNG/JPG) al PDF que firmó el alumno (CU-REP-05): "Autorizó" en la página 1 y, en la
- * hoja de asistencia, la firma de cada registro y la del responsable directo. Es la MISMA imagen, repetida: no se pide
- * otra firma ni se almacenan 24.
+ * Agrega la rúbrica del profesor (PNG/JPG) al PDF que firmó el alumno (CU-REP-05): "Autorizó" en la página 1 y el
+ * responsable directo en la página 2. Es la MISMA imagen, repetida.
  */
-const agregarRubricaProfesor = (pdfAlumno, rubricaProfesor, filasConRegistro = []) => agregarImagenesAlPdf(
-  pdfAlumno, rubricaProfesor, 'La rúbrica del profesor', colocacionesRubricaProfesor(filasConRegistro),
+const agregarRubricaProfesor = (pdfAlumno, rubricaProfesor) => agregarImagenesAlPdf(
+  pdfAlumno, rubricaProfesor, 'La rúbrica del profesor', colocacionesRubricaProfesor(),
 );
 
 /** Agrega el sello de validación (PNG/JPG) al PDF firmado por alumno y profesor (CU-REP-06), en las dos hojas. */

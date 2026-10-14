@@ -183,35 +183,138 @@ const imagenesDe = async (buffer) => {
 };
 
 // ── Firmas ───────────────────────────────────────────────────
+//
+// Regla vigente: el ALUMNO firma "Elaboró" (hoja 1) y la celda Firma de cada fila CON registro (hoja 2), al generar
+// el PDF (envío y reenvío). El PROFESOR solo firma "Autorizó" (hoja 1) y el responsable directo (hoja 2). Coordinación
+// solo sella.
 
-test('la rúbrica del profesor se coloca en la página 1 y, en la 2, por cada registro más el responsable', () => {
-  const colocaciones = colocacionesRubricaProfesor([0, 1, 2]);
+// Cada imagen DIBUJADA por página (operador Do sobre un XObject Image, también dentro de Form XObject anidados), con
+// su tamaño original y su caja en puntos PDF (origen abajo-izquierda), a partir de la matriz `cm` vigente.
+async function dibujosPorPagina(buffer) {
+  const { PDFName, PDFRawStream, PDFArray, decodePDFRawStream } = require('pdf-lib');
+  const doc = await PDFDocument.load(buffer);
+  const leer = (s) => Buffer.from(s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : s.getContents()).toString('latin1');
+  const res = [];
+  const recorrer = (contenido, recursos, pagina, base) => {
+    const xo = recursos?.lookup(PDFName.of('XObject'));
+    const pila = [];
+    let m = base;
+    const toks = contenido.split(/\s+/);
+    toks.forEach((t, i) => {
+      if (t === 'q') pila.push(m);
+      else if (t === 'Q') m = pila.pop() ?? base;
+      else if (t === 'cm') {
+        const [a, b, c, d, e, f] = toks.slice(i - 6, i).map(Number);
+        m = [a * m[0] + b * m[2], a * m[1] + b * m[3], c * m[0] + d * m[2], c * m[1] + d * m[3], e * m[0] + f * m[2] + m[4], e * m[1] + f * m[3] + m[5]];
+      } else if (t === 'Do') {
+        const obj = xo?.lookup(PDFName.of(toks[i - 1].replace('/', '')));
+        const tipo = obj?.dict.get(PDFName.of('Subtype'));
+        if (tipo === PDFName.of('Image')) {
+          res.push({ pagina, w: obj.dict.get(PDFName.of('Width')).asNumber(), h: obj.dict.get(PDFName.of('Height')).asNumber(), x: m[4], y: m[5], ancho: m[0], alto: m[3] });
+        } else if (tipo === PDFName.of('Form')) recorrer(leer(obj), obj.dict.lookup(PDFName.of('Resources')), pagina, m);
+      }
+    });
+  };
+  doc.getPages().forEach((p, i) => {
+    const c = p.node.Contents();
+    const partes = c instanceof PDFArray ? c.asArray().map((r) => doc.context.lookup(r)) : [c];
+    recorrer(partes.map(leer).join('\n'), p.node.Resources(), i, [1, 0, 0, 1, 0, 0]);
+  });
+  return res;
+}
+
+// Rúbricas de prueba con tamaños distintos: así cada dibujo se atribuye sin ambigüedad a quien firmó.
+const RUBRICA_ALUMNO = crearPng(400, 140);
+const RUBRICA_PROFESOR = crearPng(300, 100);
+const SELLO = crearPng(200, 200);
+const de = (dibujos, [w, h], pagina) => dibujos.filter((d) => d.w === w && d.h === h && d.pagina === pagina);
+const ALTO_PAGINA = 792;
+const COL_FIRMA = ASIS.geometriaColumna(ASIS.COLUMNA.FIRMA);
+// ¿El dibujo cae dentro de la celda Firma de la fila i? (layout medido desde arriba; PDF, desde abajo)
+const enCeldaFirma = (d, i) => d.x >= COL_FIRMA.x && d.x + d.ancho <= COL_FIRMA.xFin
+  && ALTO_PAGINA - (d.y + d.alto) >= ASIS.topDeFila(i) && ALTO_PAGINA - d.y <= ASIS.topDeFila(i) + ASIS.TABLA.filas.alto;
+
+const datosTresRegistros = () => datos({
+  asistencia: construirAsistencia({
+    bitacoras: [bitacora('2025-09-16', 4, '15', '19'), bitacora('2025-09-17', 3, '15', '18'), bitacora('2025-09-18', 2, '15', '17')],
+    totalDelMes: 9,
+    responsable: { nombre: 'LUIS ENRIQUE TORRES VEGA', cargo: 'Profesor base' },
+  }),
+});
+
+test('la rúbrica del profesor solo se coloca abajo: Autorizó (hoja 1) y responsable directo (hoja 2), ninguna fila', () => {
+  const colocaciones = colocacionesRubricaProfesor();
   const porPagina = colocaciones.reduce((acc, c) => ({ ...acc, [c.pagina]: (acc[c.pagina] ?? 0) + 1 }), {});
-  assert.equal(porPagina[PAGINA_REPORTE], 1, 'Autorizó, como siempre');
-  assert.equal(porPagina[PAGINA_ASISTENCIA], 4, 'responsable directo + 3 registros');
+  assert.deepEqual(porPagina, { [PAGINA_REPORTE]: 1, [PAGINA_ASISTENCIA]: 1 });
+  const img = { ancho: 300, alto: 100 };
+  for (const c of colocaciones.filter((x) => x.pagina === PAGINA_ASISTENCIA)) {
+    const { top } = c.ubicar(img);
+    assert.ok(top > ASIS.TOP_TOTALES, 'la firma de la hoja 2 queda debajo de la tabla, no en una celda');
+  }
 });
 
-test('sin registros solo se firma al responsable directo de la página 2', () => {
-  const colocaciones = colocacionesRubricaProfesor([]);
-  assert.equal(colocaciones.filter((c) => c.pagina === PAGINA_ASISTENCIA).length, 1);
+test('planificarPaginaAsistencia: la rúbrica del ALUMNO va en la celda Firma de cada fila con registro; las vacías no', () => {
+  const imagenes = { alumno: { ancho: 400, alto: 140 }, profesor: { ancho: 300, alto: 100 } };
+  const elementos = planificarPaginaAsistencia(datosTresRegistros(), imagenes);
+  const delAlumno = elementos.filter((e) => e.tipo === 'imagen' && e.imagen === imagenes.alumno);
+  const delProfesor = elementos.filter((e) => e.tipo === 'imagen' && e.imagen === imagenes.profesor);
+
+  assert.equal(delAlumno.length, 3, 'una por registro; las 21 filas vacías quedan sin firma');
+  delAlumno.forEach((e, i) => {
+    assert.ok(e.left >= COL_FIRMA.x && e.left + e.ancho <= COL_FIRMA.xFin, `fila ${i + 1}: dentro de la columna Firma`);
+    assert.ok(e.top >= ASIS.topDeFila(i) && e.top + e.alto <= ASIS.topDeFila(i) + ASIS.TABLA.filas.alto, `fila ${i + 1}: dentro de su renglón`);
+  });
+  assert.equal(delProfesor.length, 1, 'el profesor solo firma al responsable directo');
+  assert.ok(delProfesor[0].top > ASIS.TOP_TOTALES);
 });
 
-test('las filas VACÍAS no reciben firma: las colocaciones salen de los registros renderizados', () => {
-  // 3 registros → filas 0,1,2 firmadas; las 21 vacías, no.
-  const registros = [bitacora('2025-09-16', 4, '15', '19'), bitacora('2025-09-17', 3, '15', '18'), bitacora('2025-09-18', 2, '15', '17')];
-  const filas = filasDeAsistencia(registros);
-  const conRegistro = filas.map((f, i) => (f.conRegistro ? i : null)).filter((i) => i !== null);
+test('(a) envío: el PDF del alumno lleva su rúbrica en Elaboró y en las 3 filas con registro, nada en las vacías', async () => {
+  const delAlumno = await generarPdfReporteMensual(datosTresRegistros(), { rubricaAlumno: RUBRICA_ALUMNO });
+  const dibujos = await dibujosPorPagina(delAlumno);
 
-  assert.deepEqual(conRegistro, [0, 1, 2]);
-  const enAsistencia = colocacionesRubricaProfesor(conRegistro).filter((c) => c.pagina === PAGINA_ASISTENCIA);
-  assert.equal(enAsistencia.length, conRegistro.length + 1, 'una por fila poblada + el responsable directo');
+  assert.equal(de(dibujos, [400, 140], PAGINA_REPORTE).length, 1, 'Elaboró');
+  const enHoja2 = de(dibujos, [400, 140], PAGINA_ASISTENCIA);
+  assert.equal(enHoja2.length, 3);
+  for (let i = 0; i < ASIS.TABLA.filas.cantidad; i += 1) {
+    assert.equal(enHoja2.filter((d) => enCeldaFirma(d, i)).length, i < 3 ? 1 : 0, `fila ${i + 1}`);
+  }
+  assert.equal(de(dibujos, [300, 100], PAGINA_ASISTENCIA).length, 0, 'todavía no firma el profesor');
+});
+
+test('(b) firma del profesor: Autorizó y responsable directo; ninguna imagen nueva en las filas', async () => {
+  const delAlumno = await generarPdfReporteMensual(datosTresRegistros(), { rubricaAlumno: RUBRICA_ALUMNO });
+  const conProfesor = await agregarRubricaProfesor(delAlumno, RUBRICA_PROFESOR);
+  const antes = await dibujosPorPagina(delAlumno);
+  const despues = await dibujosPorPagina(conProfesor);
+
+  assert.equal(de(despues, [300, 100], PAGINA_REPORTE).length, 1, 'Autorizó');
+  const profesorHoja2 = de(despues, [300, 100], PAGINA_ASISTENCIA);
+  assert.equal(profesorHoja2.length, 1, 'solo el responsable directo');
+  for (let i = 0; i < ASIS.TABLA.filas.cantidad; i += 1) assert.equal(enCeldaFirma(profesorHoja2[0], i), false);
+  assert.ok(ALTO_PAGINA - profesorHoja2[0].y > ASIS.TOP_TOTALES, 'debajo de la tabla');
+  // Las firmas del alumno no se mueven ni se duplican.
+  assert.deepEqual(de(despues, [400, 140], PAGINA_ASISTENCIA), de(antes, [400, 140], PAGINA_ASISTENCIA));
+  assert.equal(await imagenesDe(conProfesor), (await imagenesDe(delAlumno)) + 1, 'una imagen nueva incrustada');
+});
+
+test('(c) coordinación: solo agrega el sello en las dos hojas; todo lo anterior queda igual', async () => {
+  const delAlumno = await generarPdfReporteMensual(datosTresRegistros(), { rubricaAlumno: RUBRICA_ALUMNO });
+  const conProfesor = await agregarRubricaProfesor(delAlumno, RUBRICA_PROFESOR);
+  const conSello = await agregarSelloValidacion(conProfesor, SELLO);
+  const antes = await dibujosPorPagina(conProfesor);
+  const despues = await dibujosPorPagina(conSello);
+
+  assert.equal(de(despues, [200, 200], PAGINA_REPORTE).length, 1);
+  assert.equal(de(despues, [200, 200], PAGINA_ASISTENCIA).length, 1);
+  assert.deepEqual(despues.filter((d) => d.w !== 200), antes, 'firmas de alumno y profesor intactas');
+  assert.equal(await imagenesDe(conSello), (await imagenesDe(conProfesor)) + 1);
 });
 
 test('el reporte GLOBAL no firma ninguna celda de asistencia: no tiene hoja 2', async () => {
   // Con un PDF de una sola página las colocaciones de la hoja 2 se omiten: solo queda "Autorizó".
   const global = await PDFDocument.create();
   global.addPage([612, 792]);
-  const firmado = await agregarRubricaProfesor(Buffer.from(await global.save()), crearPng(300, 100), [0, 1, 2]);
+  const firmado = await agregarRubricaProfesor(Buffer.from(await global.save()), RUBRICA_PROFESOR);
 
   assert.equal((await PDFDocument.load(firmado)).getPageCount(), 1);
   assert.equal(await imagenesDe(firmado), 1, 'una sola rúbrica, la de la página 1');
@@ -220,7 +323,7 @@ test('el reporte GLOBAL no firma ninguna celda de asistencia: no tiene hoja 2', 
 // ── PDF completo ─────────────────────────────────────────────
 
 test('el PDF generado tiene DOS páginas Carta', async () => {
-  const pdf = await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) });
+  const pdf = await generarPdfReporteMensual(datos(), { rubricaAlumno: RUBRICA_ALUMNO });
   const doc = await PDFDocument.load(pdf);
   assert.equal(doc.getPageCount(), 2);
   for (const p of doc.getPages()) {
@@ -228,26 +331,13 @@ test('el PDF generado tiene DOS páginas Carta', async () => {
   }
 });
 
-test('todo el flujo de firmado funciona sobre el PDF de dos páginas', async () => {
-  const delAlumno = await generarPdfReporteMensual(datos(), { rubricaAlumno: crearPng(400, 140) });
-  const conProfesor = await agregarRubricaProfesor(delAlumno, crearPng(300, 100), [0, 1, 2]);
-  const conSello = await agregarSelloValidacion(conProfesor, crearPng(200, 200));
-
-  for (const buffer of [conProfesor, conSello]) {
-    assert.equal((await PDFDocument.load(buffer)).getPageCount(), 2);
-  }
-  // Cada etapa incrusta UNA imagen nueva, por muchas veces que se dibuje.
-  assert.equal(await imagenesDe(conProfesor), (await imagenesDe(delAlumno)) + 1);
-  assert.equal(await imagenesDe(conSello), (await imagenesDe(conProfesor)) + 1);
-});
-
 test('COMPATIBILIDAD: un PDF histórico de UNA página se sigue firmando y sellando sin tocar nada más', async () => {
   const historico = await PDFDocument.create();
   historico.addPage([612, 792]);
   const unaPagina = Buffer.from(await historico.save());
 
-  const conProfesor = await agregarRubricaProfesor(unaPagina, crearPng(300, 100), [0, 1, 2]);
-  const conSello = await agregarSelloValidacion(conProfesor, crearPng(200, 200));
+  const conProfesor = await agregarRubricaProfesor(unaPagina, RUBRICA_PROFESOR);
+  const conSello = await agregarSelloValidacion(conProfesor, SELLO);
 
   // Sigue teniendo una sola página: las colocaciones de la hoja de asistencia se omiten en silencio.
   assert.equal((await PDFDocument.load(conProfesor)).getPageCount(), 1);

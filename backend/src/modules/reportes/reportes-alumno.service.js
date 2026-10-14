@@ -117,8 +117,8 @@ function consultarReportes(prisma, solicitudId) {
  * de siempre (estados que cuentan, por fecha_registro, orden cronológico), en la forma que consume
  * reportes.asistencia.js.
  *
- * Es la MISMA selección que usa la preparación; se comparte para que la corrección (CU-REP-04) y el estampado de la
- * firma del profesor no dupliquen el criterio ni puedan desincronizarse de lo que se renderiza.
+ * Es la MISMA selección que usa la preparación; se comparte para que la corrección (CU-REP-04) no duplique el criterio
+ * ni pueda desincronizarse de lo que se renderiza (y, con ello, de las filas que firma el alumno).
  */
 async function consultarAsistenciaDelPeriodo(prisma, solicitudId, periodo) {
   if (!periodo) return [];
