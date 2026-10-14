@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   LIMITE_FIRMA_BYTES, agruparDiasPorMes, nombreMes, etiquetaEstadoReporte, validarArchivoFirma, describirError, formatearFechaHoraMexico,
-  contarPendientesDeRevision, textoAvisoPendientes,
+  contarPendientesDeRevision, textoAvisoPendientes, hayBitacorasRechazadas, textoAvisoBitacorasRechazadas,
 } from "./reportesGeneracion.js";
 
 const dia = (fecha, extra = {}) => ({ fecha, tipo: "laborable_sin_bitacora", ...extra });
@@ -100,7 +100,9 @@ test("formatearFechaHoraMexico: sin horario de verano en México (mismo -6 en ve
   for (const invalido of [null, undefined, "", "no es fecha"]) assert.equal(formatearFechaHoraMexico(invalido), null);
 });
 
-test("contarPendientesDeRevision: cuenta solo pendiente_revision de diagnostico.bitacorasNoResueltas", () => {
+// Regla vigente (2bc94f8): cualquier bitácora del periodo sin decisión final bloquea el reporte
+// (BITACORAS_SIN_REVISAR); el conteo solo detalla el aviso.
+test("contarPendientesDeRevision: cuenta los tres estados sin resolver (en_curso, pendiente_datos y pendiente_revision)", () => {
   const diagnostico = {
     bitacorasNoResueltas: [
       { id: 38, estado: "pendiente_revision", fecha: "2026-09-08" },
@@ -109,19 +111,34 @@ test("contarPendientesDeRevision: cuenta solo pendiente_revision de diagnostico.
       { id: 41, estado: "en_curso", fecha: "2026-09-11" },
     ],
   };
-  assert.equal(contarPendientesDeRevision(diagnostico), 2);
+  assert.equal(contarPendientesDeRevision(diagnostico), 4);
 });
 
-test("contarPendientesDeRevision: sin diagnóstico o sin pendientes da 0 (no se muestra aviso)", () => {
+test("contarPendientesDeRevision: sin diagnóstico o sin bitácoras sin resolver da 0 (no se muestra aviso)", () => {
   assert.equal(contarPendientesDeRevision(undefined), 0);
   assert.equal(contarPendientesDeRevision({}), 0);
   assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [] }), 0);
-  assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [{ id: 1, estado: "pendiente_datos" }] }), 0);
+  assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [{ id: 1, estado: "pendiente_datos" }] }), 1);
+  assert.equal(contarPendientesDeRevision({ bitacorasNoResueltas: [{ id: 2, estado: "en_curso" }] }), 1);
 });
 
 test("textoAvisoPendientes: texto exacto con N", () => {
   assert.equal(
     textoAvisoPendientes(1),
-    "Tienes 1 bitácora(s) pendiente(s) de revisión en este periodo. Avísale a tu profesor para que las revise antes de generar tu reporte; las que sigan pendientes no se contabilizarán.",
+    "Tienes 1 bitácora(s) de este periodo sin revisar. No podrás generar tu reporte hasta que tu profesor las revise (apruebe o rechace) — avísale para que lo haga.",
+  );
+});
+
+test("hayBitacorasRechazadas: true solo si alguna bitácora del periodo está rechazada", () => {
+  assert.equal(hayBitacorasRechazadas([{ id: 1, estado: "aprobada" }, { id: 2, estado: "rechazada" }]), true);
+  assert.equal(hayBitacorasRechazadas([{ id: 1, estado: "aprobada" }, { id: 2, estado: "aprobada" }]), false);
+  assert.equal(hayBitacorasRechazadas([]), false);
+  assert.equal(hayBitacorasRechazadas(undefined), false);
+});
+
+test("textoAvisoBitacorasRechazadas: texto exacto", () => {
+  assert.equal(
+    textoAvisoBitacorasRechazadas,
+    "Al continuar, las bitácoras rechazadas de este periodo quedarán fijas: ya no podrán modificarse. Si alguna no debió rechazarse, coméntalo con tu profesor antes de generar tu reporte.",
   );
 });
