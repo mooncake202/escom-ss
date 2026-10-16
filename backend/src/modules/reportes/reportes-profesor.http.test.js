@@ -351,7 +351,7 @@ test('rechazar sin motivo → 400 con código; ajeno/inexistente → 404 idénti
 
 // ── Aprobar y firmar ─────────────────────────────────────────
 
-test('200 aprobar: PDF final = PDF del alumno + firma del profesor, con hash, IP y sello; pasa a Coordinación sin avisar a nadie', async (t) => {
+test('200 aprobar: PDF final = PDF del alumno + firma del profesor, con hash, IP y sello; pasa a Coordinación y avisa al alumno (informativo)', async (t) => {
   const e = await levantar(t);
   const r = await e.enviar('/mensual/1/aprobar', { cuerpo: { estado: 'aprobado', hash: 'x', rubrica: 'y', profesor_id: 2 } });
 
@@ -371,7 +371,11 @@ test('200 aprobar: PDF final = PDF del alumno + firma del profesor, con hash, IP
   assert.notEqual(ruta, '1/a.pdf');
   const { descifrarBuffer } = require('../../lib/fileEncryption');
   assert.equal(Buffer.compare(descifrarBuffer(fs.readFileSync(path.join(e.rutaBaseDocumentos, ruta))), final), 0);
-  assert.deepEqual(e.avisos.notificaciones, [], 'ninguna notificación: la bandeja de Coordinación es calculada');
+  // 128b595: el alumno sí se entera de forma persistida (informativo); la bandeja de Coordinación sigue siendo calculada.
+  assert.deepEqual(e.avisos.notificaciones, [{
+    usuarioId: 201, tipo: 'info', mensaje: 'Tu profesor aprobó tu Reporte Mensual No. 1. Ahora está en revisión de Coordinación.', rutaRelacionada: '/alumno/reportes?destacar=1',
+  }]);
+  assert.deepEqual(e.avisos.emisiones.filter((x) => x.usuarioId === 201), [{ usuarioId: 201, evento: 'reporte:actualizado', datos: { reporteId: 1 } }]);
 });
 
 test('aprobar: sin rúbrica 409; TSA caída 503 reintentable sin avanzar nada; ajeno 404; repetido 409', async (t) => {

@@ -246,8 +246,10 @@ test('REP-05: el profesor ve el global en su lista y detalle (sin número ni sna
   await assert.rejects(detalleProfesor(PROFESOR, 'global', 2, { prisma: e.prisma }), (err) => err.status === 404);
 });
 
-test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno, mismo Buffer para hash/TSA/archivo/BD, sin avisar a nadie', async (t) => {
+test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno, mismo Buffer para hash/TSA/archivo/BD, y avisa al alumno (informativo)', async (t) => {
   const e = await escenarioProfesor(t);
+  const emisiones = [];
+  e.deps.emitirAUsuario = (usuarioId, evento, datos) => { emisiones.push({ usuarioId, evento, datos }); };
   const antes = e.global.revision_reporte_global.map((r) => structuredClone(r));
   const mensualAntes = structuredClone(e.mensual);
 
@@ -262,7 +264,11 @@ test('REP-05: aprobar un global agrega SOLO la rúbrica al PDF exacto del alumno
   const nueva = e.global.revision_reporte_global.at(-1);
   assert.deepEqual([nueva.tipo_revisor, nueva.estado, nueva.hash_documento, nueva.token_tsa, nueva.usuario_id], ['profesor', 'aprobado', sha256(final), TOKEN, PROFESOR]);
   assert.deepEqual(e.mensual, mensualAntes, 'el mensual con el mismo id no se toca');
-  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja de Coordinación es calculada');
+  // 128b595: el alumno sí se entera de forma persistida (informativo); la bandeja de Coordinación sigue siendo calculada.
+  assert.deepEqual(e.notificaciones, [{
+    usuarioId: ALUMNO, tipo: 'info', mensaje: 'Tu profesor aprobó tu Reporte Global. Ahora está en revisión de Coordinación.', rutaRelacionada: '/alumno/reportes?destacar=1&tipo=global',
+  }]);
+  assert.deepEqual(emisiones.filter((x) => x.usuarioId === ALUMNO), [{ usuarioId: ALUMNO, evento: 'reporte:actualizado', datos: { reporteId: 1 } }]);
 });
 
 test('REP-05: si falla la TSA, un global no avanza; una aprobación repetida recibe 409 (CAS) y no queda nada duplicado', async (t) => {
