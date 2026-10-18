@@ -202,7 +202,10 @@ async function registrarAprobacion(tx, { cfg, id, profesor, usuarioId, fila, rut
  * Aprueba y firma un reporte pendiente y lo envía a Coordinación. Requiere que el profesor ya tenga su rúbrica guardada.
  * No avisa a Coordinación de forma persistida (su bandeja usa una notificación calculada), pero SÍ emite 'reporte:nuevo'
  * por socket a cada coordinador para que esa bandeja (badge y lista) se refresque sola — mismo criterio que Ofertas.
- * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, agregarRubrica, emitirAUsuario }.
+ * SÍ avisa al alumno de forma persistida (informativo, no es la aprobación final): mismo criterio que el rechazo del
+ * profesor y que las dos decisiones de Coordinación — cualquier decisión de un revisor hacia el reporte del alumno
+ * se persiste, no solo la final.
+ * deps (pruebas): { prisma, ahora, ip, rutaBaseRubricas, rutaBaseDocumentos, solicitarSelloTiempo, agregarRubrica, crearNotificacion, emitirAUsuario }.
  * Regresa { reporte: { id, numero, estadoReporte }, fechaRevision }.
  */
 async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
@@ -247,6 +250,16 @@ async function aprobarReporte(usuarioId, tipoReporte, reporteId, deps = {}) {
   }
 
   await emitirATodosLosCoordinadores('reporte:nuevo', { reporteId: id }, deps);
+
+  // Aviso al alumno de que su profesor ya decidió (persistido, igual que el rechazo): informativo, no es la
+  // aprobación final — esa la emite Coordinación (avisarResolucion, reportes-validacion.service.js) en verde.
+  await avisarUsuario(alumno.usuario_id, {
+    tipo: TIPOS_NOTIFICACION.INFORMATIVA,
+    mensaje: `Tu profesor aprobó tu ${cfg.etiqueta(fila)}. Ahora está en revisión de Coordinación.`,
+    rutaRelacionada: `/alumno/reportes?${cfg.consultaDestacar(id)}`,
+    evento: 'reporte:actualizado',
+    datos: { reporteId: id },
+  }, deps);
 
   return {
     reporte: { id, numero: cfg.numero(fila), estadoReporte: ESTADOS_REPORTE.PENDIENTE_REVISION_COORDINADOR },

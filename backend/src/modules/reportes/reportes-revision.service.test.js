@@ -292,11 +292,19 @@ test('aprobar: el PDF final conserva las dos hojas con la firma del alumno y UNA
   assert.equal(archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/')).length, 2);
 });
 
-test('aprobar: no avisa (persistido) a nadie, pero sí emite "reporte:nuevo" a cada coordinador por socket para refrescar su bandeja calculada', async (t) => {
+test('aprobar: avisa (persistido) al alumno de forma informativa, y además emite "reporte:nuevo" a cada coordinador por socket para refrescar su bandeja calculada', async (t) => {
   const e = await escenario(t);
   await e.aprobar();
-  assert.deepEqual(e.notificaciones, []);
-  assert.deepEqual(e.emisiones, COORDINADORES.map((usuarioId) => ({ usuarioId, evento: 'reporte:nuevo', datos: { reporteId: 1 } })));
+  assert.deepEqual(e.notificaciones, [{
+    usuarioId: ALUMNO_USUARIO,
+    tipo: 'info',
+    mensaje: 'Tu profesor aprobó tu Reporte Mensual No. 2. Ahora está en revisión de Coordinación.',
+    rutaRelacionada: '/alumno/reportes?destacar=1',
+  }]);
+  assert.deepEqual(e.emisiones, [
+    ...COORDINADORES.map((usuarioId) => ({ usuarioId, evento: 'reporte:nuevo', datos: { reporteId: 1 } })),
+    { usuarioId: ALUMNO_USUARIO, evento: 'reporte:actualizado', datos: { reporteId: 1 } },
+  ]);
 });
 
 test('aprobar: sin rúbrica registrada → 409 RUBRICA_NO_REGISTRADA; no se sella, no se escribe y no se cambia nada', async (t) => {
@@ -398,7 +406,7 @@ test('aprobar: dos aprobaciones simultáneas — solo una avanza; la otra recibe
   assert.equal(resultados.filter((r) => r.status === 'fulfilled').length, 1);
   assert.equal(resultados.find((r) => r.status === 'rejected').reason.code, CODIGOS_ERROR.REPORTE_NO_PENDIENTE);
   assert.equal(revisionesDe(e.reporte).length, antesRevisiones + 1, 'una sola revisión del profesor');
-  assert.deepEqual(e.notificaciones, [], 'ninguna notificación: la bandeja de Coordinación es calculada');
+  assert.equal(e.notificaciones.length, 1, 'solo la aprobación que ganó avisa al alumno');
   // Solo quedan el PDF del alumno y el final registrado: el del perdedor se borró.
   const propios = archivos(e.rutaBaseDocumentos).filter((a) => a.startsWith('2022630001/'));
   assert.equal(propios.length, 2);
