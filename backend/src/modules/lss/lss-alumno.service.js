@@ -649,7 +649,7 @@ async function subirExpedienteLss(alumnoUsuarioId, archivos) {
       // que coordinación (CU-LSS-09, no existe todavía) decida.
       await tx.liberacion_proceso.update({
         where: { id: proceso.id },
-        data: { estado: ESTADO_EXPEDIENTE_EN_REVISION },
+        data: { estado: ESTADO_EXPEDIENTE_EN_REVISION, expediente_enviado: true },
       });
     });
   } catch (err) {
