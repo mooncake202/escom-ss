@@ -94,5 +94,16 @@ coverage/
 *.tsbuildinfo
 
 
-backend/uploads/
+# backend/uploads/* (no backend/uploads/ a secas): con el patrón de
+# directorio completo, git nunca recorre su contenido y las negaciones de
+# abajo no tendrían efecto. Con /* ignora todo lo que hay DENTRO, pero sigue
+# permitiendo que las reglas de negación posteriores reincluyan subcarpetas
+# específicas.
+backend/uploads/*
+# Excepción: el sello institucional de coordinación sí se versiona (un solo
+# archivo cifrado, fijo, que todos los ambientes deben compartir) — el resto
+# de uploads/ (documentos de alumnos, rúbricas, etc.) se queda fuera.
+!backend/uploads/coordinador/
+!backend/uploads/coordinador/**
+backend/uploads/coordinador/**/*.bak-*
 docker-compose.override.yml

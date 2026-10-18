@@ -885,15 +885,6 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
             ruta: RUTA_BAJA_COORDINACION,
             tipo: "info",
           },
-
-          // CU-LSS-03/04: evaluación enviada por el profesor y pendiente
-          // de dictamen por Coordinación.
-          {
-            mostrar: (resumen.evaluacionesPendientesDictamen ?? 0) > 0,
-            mensaje: "Tienes evaluaciones de desempeño pendientes de dictaminar.",
-            ruta: "/coordinacion/revisar-evaluacion-alumno",
-            tipo: "urgente",
-          },
         ]}
         rutasPromovidas={[RUTA_BAJA_COORDINACION]}
       />
