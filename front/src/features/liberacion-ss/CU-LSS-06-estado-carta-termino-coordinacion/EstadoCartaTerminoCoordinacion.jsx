@@ -102,15 +102,25 @@ function ListaAlumnos({ alumnos, seleccionado, onSeleccionar, C }) {
                 gap: 8,
               }}
             >
-              <p style={{
-                margin: 0,
-                fontSize: 13,
-                fontWeight: esSel ? 600 : 400,
-                color: esSel ? C.accentText : C.textPrimary,
-                lineHeight: 1.3,
-              }}>
-                {a.nombre}
-              </p>
+              <div>
+                <p style={{
+                  margin: 0,
+                  fontSize: 13,
+                  fontWeight: esSel ? 600 : 400,
+                  color: esSel ? C.accentText : C.textPrimary,
+                  lineHeight: 1.3,
+                }}>
+                  {a.nombre}
+                </p>
+                <p style={{
+                  margin: 0,
+                  fontSize: 11,
+                  color: C.textDisabled,
+                  lineHeight: 1.3,
+                }}>
+                  {a.boleta}
+                </p>
+              </div>
               <EstadoBadge estado={a.estado} C={C} />
             </div>
           );
@@ -367,6 +377,9 @@ export default function EstadoCartaTerminoCoordinacion() {
                 <p style={{ margin: "2px 0 0", fontSize: 16, fontWeight: 600, color: C.textPrimary }}>
                   {alumnoSeleccionado.nombre}
                 </p>
+                <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>
+                    Boleta: {alumnoSeleccionado.boleta}
+                  </p>
                 <p style={{ margin: "2px 0 0", fontSize: 13, color: C.textMuted }}>
                     Profesor: {alumnoSeleccionado.profesor}
                   </p>

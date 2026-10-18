@@ -5,6 +5,7 @@ const { emitirAUsuario } = require('../../sockets/socket.server');
 const { descifrarBuffer, cifrarBuffer, generarNombreSeguro } = require('../../lib/fileEncryption');
 const { unirPdfs, comprimirPdfGhostscript } = require('../../lib/pdfExpediente');
 const { crearError, validarReportesValidadosSiss } = require('./validators');
+const { dictamenLabel } = require('../gr/gr.service');
 const {
   ESTADO_EVALUACION_SOLICITADA,
   ESTADO_REPORTE_APROBADO_COORDINADOR,
@@ -552,6 +553,7 @@ async function obtenerInfoExpediente(alumnoUsuarioId) {
   return {
     estado: estadoExpedienteVisible(documentoExpediente),
     requiereDictamen: solicitud.dictamen !== null,
+    dictamenTipo: dictamenLabel(solicitud.dictamen),
     nombreExpedienteSugerido: nombreExpedienteLss(alumno),
     observacionesRechazo: documentoExpediente?.estado_documento === ESTADO_DOCUMENTO_EXPEDIENTE_LSS_RECHAZADO ? (proceso.observaciones_rechazo ?? null) : null,
   };

@@ -20,7 +20,7 @@ const DOCUMENTOS_CONFIG_BASE = [
   {
     id: "dictamen",
     label: "Dictamen",
-    descripcion: "Documento de dictamen",
+    descripcion: "Constancia de créditos para servicio social vigente o carta pasante, según corresponda a tu caso",
     requerido: true, // Solo aparece en absoluto si requiereDictamen — cuando aparece, es obligatorio (RN-LSS-22).
   },
 ];
@@ -80,8 +80,13 @@ export function useIntegracionExpediente() {
   useSocketReconectado(cargar);
 
   // RN-LSS-22: el campo de dictamen NO se muestra en absoluto si no aplica
-  // (no solo "opcional", como tenía el mockup original).
-  const documentosConfig = DOCUMENTOS_CONFIG_BASE.filter((d) => d.id !== "dictamen" || info?.requiereDictamen);
+  // (no solo "opcional", como tenía el mockup original). Cuando sí aplica, la
+  // etiqueta incluye el tipo exacto de dictamen que el alumno declaró al
+  // registrarse (crédito / electiva / estancia profesional), para que sepa
+  // con precisión qué documento le corresponde anexar (Nota 3 de la ficha).
+  const documentosConfig = DOCUMENTOS_CONFIG_BASE
+    .filter((d) => d.id !== "dictamen" || info?.requiereDictamen)
+    .map((d) => (d.id === "dictamen" && info?.dictamenTipo) ? { ...d, label: `Dictamen (${info.dictamenTipo})` } : d);
 
   const subirArchivo = (docId, archivo) => {
     if (!archivo) return;

@@ -16,6 +16,7 @@ function mapearAlumno(c) {
   return {
     id: c.liberacionProcesoId,
     nombre: c.nombreCompleto,
+    boleta: c.boleta,
     estado: c.estado,
     proyecto: c.oferta,
     profesor: c.profesorNombre,
