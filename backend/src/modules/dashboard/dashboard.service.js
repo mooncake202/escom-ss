@@ -1,7 +1,7 @@
 const prisma = require('../../lib/prisma');
 const { ESTADOS_REPORTE } = require('../reportes/reportes.shared');
 const { tieneActividadesPendientes, faltaBitacoraHoy, tieneJornadaPendienteDatos, calcularDiaMexicoUTC, contarDiasHabilesTranscurridos, calcularHorasNetas, limiteHorasAlcanzado, evaluarAlertasActividad } = require('../ah/ah.shared');
-const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_EXPEDIENTE_EN_REVISION: ESTADO_LSS_EXPEDIENTE_EN_REVISION, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN, ESTADO_CARTA_LISTA_PARA_RECOGER } = require('../lss/lss.shared');
+const { ESTADO_EVALUACION_SOLICITADA: ESTADO_LSS_EVALUACION_SOLICITADA, ESTADO_TERMINAL: ESTADO_LSS_TERMINAL, ESTADO_EVALUACION_PENDIENTE_DICTAMEN, ESTADO_CARTA_LISTA_PARA_RECOGER, ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION } = require('../lss/lss.shared');
 const { contarAlumnosConEvaluacionSolicitada } = require('../lss/lss-profesor.service');
 const { obtenerEstadoRequisitos } = require('../lss/lss-alumno.service');
 
@@ -296,7 +296,14 @@ async function resumenCoordinacion() {
     reportesGlobalesPorRevisar,
   ] = await Promise.all([
     prisma.solicitud_registro.count(),
-    prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EXPEDIENTE_EN_REVISION } }),
+    // Bug real encontrado: liberacion_proceso.estado se queda fijo en
+    // 'expediente_en_revision' durante TODO el sub-ciclo LSS-07->08->09,
+    // incluso después de que coordinación ya aprobó/rechazó el documento
+    // (solo avanza cuando el ALUMNO hace la siguiente acción). Contar por
+    // ese campo sobre-cuenta expedientes que ya NO están pendientes de
+    // dictamen. El conteo real de pendientes vive en documento.estado_documento,
+    // mismo criterio que usa listarExpedientesPendientes (lss-coordinador.service.js).
+    prisma.documento.count({ where: { tipo_documento: 'expediente_lss', estado_documento: ESTADO_DOCUMENTO_EXPEDIENTE_LSS_EN_REVISION } }),
     prisma.liberacion_proceso.count({ where: { estado: ESTADO_LSS_EVALUACION_SOLICITADA } }),
     // CU-LSS-03/04: evaluaciones que el profesor ya registró y esperan el
     // dictamen de coordinación — distinto de evaluacionesPendientes (ese

@@ -1000,7 +1000,7 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
         </Section>
 
         {/* CU-LSS */}
-        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C} badge={resumen.evaluacionesPendientesDictamen}>
+        <Section title="Liberación del Servicio Social" icon="flag" {...T.purple} C={C} badge={(resumen.evaluacionesPendientesDictamen ?? 0) + (resumen.expedientesEnRevision ?? 0)}>
           <ActionItem icon="star"     {...T.warning} label="Dictaminar evaluación de desempeño" desc="Evaluación pendiente de dictamen" onClick={() => navigate("/coordinacion/revisar-evaluacion-alumno")} C={C} />
           {/* Calculada únicamente — mismo criterio que Reportes: ya no depende de una fila en
               `notificacion` por cada evaluación que el profesor aprueba. */}
