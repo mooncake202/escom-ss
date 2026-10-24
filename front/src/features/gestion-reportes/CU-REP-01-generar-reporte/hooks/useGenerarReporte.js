@@ -207,7 +207,7 @@ export function useGenerarReporte() {
     // Detalla el motivo de bloqueo BITACORAS_SIN_REVISAR (cuenta real: evaluarBloqueos ya lo bloqueó si hay 1+).
     pendientesDeRevision: contarPendientesDeRevision(datos?.diagnostico),
     // RN-REP: aviso de que seguir fija las bitácoras rechazadas del periodo (candado de AH).
-    hayBitacorasRechazadas: hayBitacorasRechazadas(datos?.bitacoras),
+    hayBitacorasRechazadas: hayBitacorasRechazadas(datos?.diagnostico),
     meses, mesActivo, setMesActivo, avances,
     pasoActual, numeroPaso: Math.min(indice, pasos.length - 1) + 1, totalPasos: pasos.length,
     actividades, handleActividadesChange, errores,

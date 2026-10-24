@@ -1,7 +1,7 @@
 // Datos del CONTROL DE ASISTENCIA (página 2 del PDF). Módulo PURO: sin BD ni reloj.
 //
 // No decide qué bitácoras entran: recibe las que ya seleccionó `prepararReporteMensual` con el criterio vigente de
-// Reportes (mismo alumno/solicitud, mismo periodo, estados 'aprobada' + 'rechazada', orden cronológico). Aquí solo se
+// Reportes (mismo alumno/solicitud, mismo periodo, solo estado 'aprobada', orden cronológico). Aquí solo se
 // da formato y se arman los dos totales.
 //
 // HORAS: se usa `horas_contabilizadas` tal como la guarda AH. NUNCA se recalcula como salida - entrada; las horas de

@@ -131,17 +131,18 @@ test('todo el contenido cae dentro de la hoja Carta', () => {
 
 // ── Estados que participan ───────────────────────────────────
 //
-// Reportes cuenta 'aprobada' + 'rechazada'; 'pendiente_revision' no cuenta ni aparece. La selección la hace
+// Reportes cuenta SOLO 'aprobada'; 'rechazada' y 'pendiente_revision' no cuentan ni aparecen. La selección la hace
 // consultarAsistenciaDelPeriodo con ESTADOS_BITACORA_QUE_CUENTAN — aquí se fija esa regla.
 
-test('los estados que cuentan son exactamente aprobada y rechazada', () => {
-  assert.deepEqual([...ESTADOS_BITACORA_QUE_CUENTAN].sort(), ['aprobada', 'rechazada']);
+test('el único estado que cuenta es aprobada', () => {
+  assert.deepEqual([...ESTADOS_BITACORA_QUE_CUENTAN], ['aprobada']);
+  assert.equal(ESTADOS_BITACORA_QUE_CUENTAN.includes('rechazada'), false, 'rechazada no debe contar');
   for (const pendiente of ESTADOS_BITACORA_NO_RESUELTOS) {
     assert.equal(ESTADOS_BITACORA_QUE_CUENTAN.includes(pendiente), false, `${pendiente} no debe contar`);
   }
 });
 
-test('aprobada y rechazada aparecen en la tabla; las pendientes no', async () => {
+test('solo la aprobada aparece en la tabla; la rechazada y las pendientes no', async () => {
   const filas = [
     { id: 1, estado: 'aprobada', fecha_registro: new Date('2025-09-16T00:00:00Z'), horas_contabilizadas: 4, hora_inicio: new Date('2025-09-16T15:00:00Z'), hora_fin: new Date('2025-09-16T19:00:00Z') },
     { id: 2, estado: 'rechazada', fecha_registro: new Date('2025-09-17T00:00:00Z'), horas_contabilizadas: 3, hora_inicio: new Date('2025-09-17T15:00:00Z'), hora_fin: new Date('2025-09-17T18:00:00Z') },
@@ -151,11 +152,11 @@ test('aprobada y rechazada aparecen en la tabla; las pendientes no', async () =>
 
   const registros = await consultarAsistenciaDelPeriodo(prisma, 42, { inicio: '2025-09-16', fin: '2025-10-15' });
 
-  assert.deepEqual(registros.map((r) => r.fecha), ['2025-09-16', '2025-09-17']);
-  assert.equal(registros.reduce((s, r) => s + r.horas, 0), 7, 'la rechazada también suma sus horas');
+  assert.deepEqual(registros.map((r) => r.fecha), ['2025-09-16']);
+  assert.equal(registros.reduce((s, r) => s + r.horas, 0), 4, 'la rechazada no suma sus horas');
 });
 
-test('rechazada → aprobada no cambia ni el conjunto ni las horas del reporte', async () => {
+test('la misma jornada rechazada no entra en la tabla; aprobada sí, con su fecha y sus horas', async () => {
   const base = { id: 1, fecha_registro: new Date('2025-09-16T00:00:00Z'), horas_contabilizadas: 4, hora_inicio: new Date('2025-09-16T15:00:00Z'), hora_fin: new Date('2025-09-16T19:00:00Z') };
   const periodo = { inicio: '2025-09-16', fin: '2025-10-15' };
   const prismaCon = (estado) => ({ bitacora: { findMany: async ({ where }) => (where.estado.in.includes(estado) ? [{ ...base, estado }] : []) } });
@@ -163,9 +164,9 @@ test('rechazada → aprobada no cambia ni el conjunto ni las horas del reporte',
   const comoRechazada = await consultarAsistenciaDelPeriodo(prismaCon('rechazada'), 42, periodo);
   const comoAprobada = await consultarAsistenciaDelPeriodo(prismaCon('aprobada'), 42, periodo);
 
-  // El estado no viaja a la página 2: la fila, su fecha, sus horas y su posición son idénticas.
-  assert.deepEqual(comoRechazada, comoAprobada);
-  assert.deepEqual(filasDeAsistencia(comoRechazada), filasDeAsistencia(comoAprobada));
+  assert.deepEqual(comoRechazada, []);
+  assert.deepEqual(comoAprobada.map((r) => [r.fecha, r.horas]), [['2025-09-16', 4]]);
+  assert.equal(filasDeAsistencia(comoRechazada).filter((f) => f.fecha).length, 0, 'sin renglones con registro');
 });
 
 // Mismo criterio que el resto de las pruebas del módulo: no se cuentan las máscaras de transparencia (SMask), que

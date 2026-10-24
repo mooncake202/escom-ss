@@ -128,7 +128,7 @@ function construirResultado({ alumno, solicitud }, cfg, fila, { bitacoras = [], 
 
 /**
  * Bitácoras del periodo del reporte que se corrige y horas ya reportadas antes de él. Reutiliza la MISMA consulta y el
- * MISMO filtro de la preparación normal (estados 'aprobada' + 'rechazada', por fecha_registro, orden cronológico): no
+ * MISMO filtro de la preparación normal (solo estado 'aprobada', por fecha_registro, orden cronológico): no
  * hay una segunda lógica de selección.
  *
  * El global no entra: su tabla de asistencia todavía no tiene una regla definida.

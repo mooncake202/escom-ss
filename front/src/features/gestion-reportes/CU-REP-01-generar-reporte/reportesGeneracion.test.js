@@ -129,16 +129,16 @@ test("textoAvisoPendientes: texto exacto con N", () => {
   );
 });
 
-test("hayBitacorasRechazadas: true solo si alguna bitácora del periodo está rechazada", () => {
-  assert.equal(hayBitacorasRechazadas([{ id: 1, estado: "aprobada" }, { id: 2, estado: "rechazada" }]), true);
-  assert.equal(hayBitacorasRechazadas([{ id: 1, estado: "aprobada" }, { id: 2, estado: "aprobada" }]), false);
-  assert.equal(hayBitacorasRechazadas([]), false);
+test("hayBitacorasRechazadas: true solo si el diagnóstico del periodo trae alguna bitácora rechazada", () => {
+  assert.equal(hayBitacorasRechazadas({ bitacorasRechazadas: [{ id: 2, fecha: "2025-10-17", horas: 3 }] }), true);
+  assert.equal(hayBitacorasRechazadas({ bitacorasRechazadas: [] }), false);
+  assert.equal(hayBitacorasRechazadas({}), false);
   assert.equal(hayBitacorasRechazadas(undefined), false);
 });
 
 test("textoAvisoBitacorasRechazadas: texto exacto", () => {
   assert.equal(
     textoAvisoBitacorasRechazadas,
-    "Al continuar, las bitácoras rechazadas de este periodo quedarán fijas: ya no podrán modificarse. Si alguna no debió rechazarse, coméntalo con tu profesor antes de generar tu reporte.",
+    "Las bitácoras rechazadas de este periodo no cuentan para tus horas y, al continuar, quedarán fijas: ya no podrán modificarse.",
   );
 });

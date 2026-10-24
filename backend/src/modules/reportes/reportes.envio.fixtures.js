@@ -179,7 +179,7 @@ function crearBdEnvio(opciones = {}) {
             : filas;
         }),
         // Suma de horas de las bitácoras contabilizables (las horas acumuladas del reporte global). Acepta tanto
-        // `estado: 'x'` como `estado: { in: [...] }` (Bloque 6: aprobada + rechazada), como lo haría Prisma real.
+        // `estado: 'x'` como `estado: { in: [...] }` (estados que cuentan), como lo haría Prisma real.
         aggregate: leer('bitacora.aggregate', async ({ where }) => {
           const estados = Array.isArray(where.estado?.in) ? where.estado.in : [where.estado];
           const filas = bitacoras.filter((b) => estados.includes(b.estado));

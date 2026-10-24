@@ -220,8 +220,8 @@ export default function GenerarReporte() {
             </div>
           )}
 
-          {/* RN-REP: si puede generar y hay bitácoras rechazadas en el periodo, avisar que al continuar
-              esas bitácoras quedan fijas (candado de AH) — antes de que el alumno siga adelante. */}
+          {/* RN-REP: si puede generar y hay bitácoras rechazadas en el periodo, avisar que no cuentan para sus horas
+              y que al continuar quedan fijas (candado de AH) — antes de que el alumno siga adelante. */}
           {g.puedeGenerar && g.hayBitacorasRechazadas && (
             <div style={{
               margin: "0 0 1.25rem", padding: "12px 14px", borderRadius: RADIUS.md,
@@ -258,7 +258,7 @@ export default function GenerarReporte() {
               )}
 
               <p style={{ margin: "0 0 1rem", fontSize: 12, color: C.accentText, lineHeight: 1.6 }}>
-                Los días y horas son de tus bitácoras válidas.
+                Los días y horas son de tus bitácoras aprobadas.
               </p>
 
               <div style={{

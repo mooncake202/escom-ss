@@ -41,8 +41,9 @@ const bitacoras = (horas, extra = []) => [
   ...extra,
 ];
 // Sin decidir todavía: no cuentan para las 480 h del global (mismo criterio que dias_laborados/horas_reportadas del
-// mensual). 'rechazada' SÍ cuenta desde Bloque 6 — no va en esta lista.
+// mensual). 'rechazada' tampoco cuenta: solo suman las aprobadas.
 const NO_CUENTAN = [
+  { id: 9100, estado: 'rechazada', fecha_registro: utc('2026-01-02'), horas_contabilizadas: 4 },
   { id: 9101, estado: 'pendiente_revision', fecha_registro: utc('2026-01-05'), horas_contabilizadas: 4 },
   { id: 9102, estado: 'pendiente_datos', fecha_registro: utc('2026-01-06'), horas_contabilizadas: 4 },
   { id: 9103, estado: 'en_curso', fecha_registro: utc('2026-01-07'), horas_contabilizadas: null },
@@ -139,24 +140,25 @@ test('480 h justas habilitan el global; 479 no; más de 480 sí — se suma hora
   assert.equal((await variadas.preparar()).horas.acumuladas, 480);
 });
 
-test('Bloque 6 — horas: cuentan aprobada Y rechazada; en_curso, pendiente_datos y pendiente_revision NO', async (t) => {
-  const e = await escenario(t, { horas: 476 }); // + 3 filas que NUNCA cuentan (NO_CUENTAN), 4 h cada una si contaran
+test('horas: solo cuenta aprobada; rechazada, en_curso, pendiente_datos y pendiente_revision NO', async (t) => {
+  const e = await escenario(t, { horas: 476 }); // + 4 filas que NUNCA cuentan (NO_CUENTAN), 4 h cada una si contaran
   const r = await e.preparar();
   assert.equal(r.horas.acumuladas, 476);
   assert.equal(r.puedeGenerar, false);
   assert.equal(codigos(r).includes('HORAS_INSUFICIENTES'), true);
 });
 
-test('Bloque 6 — horas: una bitácora rechazada cuenta igual que una aprobada', async (t) => {
+test('horas: una bitácora rechazada no suma', async (t) => {
   const e = await escenario(t, {
     bd: { bitacoras: [{ id: 1, estado: 'rechazada', fecha_registro: utc('2025-10-16'), horas_contabilizadas: 480 }] },
   });
   const r = await e.preparar();
-  assert.equal(r.horas.acumuladas, 480);
-  assert.equal(r.puedeGenerar, true);
+  assert.equal(r.horas.acumuladas, 0);
+  assert.equal(r.puedeGenerar, false);
+  assert.equal(codigos(r).includes('HORAS_INSUFICIENTES'), true);
 });
 
-test('Bloque 6 — horas: aprobada + rechazada se suman', async (t) => {
+test('horas: aprobada + rechazada solo suma la aprobada', async (t) => {
   const e = await escenario(t, {
     bd: {
       bitacoras: [
@@ -166,8 +168,24 @@ test('Bloque 6 — horas: aprobada + rechazada se suman', async (t) => {
     },
   });
   const r = await e.preparar();
-  assert.equal(r.horas.acumuladas, 480);
-  assert.equal(r.puedeGenerar, true);
+  assert.equal(r.horas.acumuladas, 240);
+  assert.equal(r.puedeGenerar, false);
+});
+
+test('global con 470 h aprobadas + 10 h rechazadas no se habilita (HORAS_INSUFICIENTES, "bitácoras aprobadas")', async (t) => {
+  const e = await escenario(t, {
+    bd: {
+      bitacoras: [
+        { id: 1, estado: 'aprobada', fecha_registro: utc('2025-10-16'), horas_contabilizadas: 470 },
+        { id: 2, estado: 'rechazada', fecha_registro: utc('2025-10-17'), horas_contabilizadas: 10 },
+      ],
+    },
+  });
+  const r = await e.preparar();
+  assert.deepEqual(r.horas, { acumuladas: 470, requeridas: 480, suficientes: false });
+  assert.equal(r.puedeGenerar, false);
+  assert.deepEqual(codigos(r), ['HORAS_INSUFICIENTES']);
+  assert.match(r.motivosBloqueo[0].mensaje, /480 horas de bitácoras aprobadas/);
 });
 
 test('sin bitácoras aprobadas: 0 horas y bloqueado', async (t) => {

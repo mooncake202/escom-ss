@@ -79,9 +79,10 @@ const ESTADO_BITACORA_PENDIENTE_REVISION = 'pendiente_revision';
 const ESTADO_BITACORA_PENDIENTE_DATOS = 'pendiente_datos';
 const ESTADO_BITACORA_EN_CURSO = 'en_curso';
 
-// Cuentan para dias_laborados/horas_reportadas del reporte mensual y global (nuevas reglas, Bloque 1): aprobada Y
-// rechazada, porque el profesor ya decidió esa jornada (aceptada o no).
-const ESTADOS_BITACORA_QUE_CUENTAN = Object.freeze([ESTADO_BITACORA_APROBADA, ESTADO_BITACORA_RECHAZADA]);
+// Cuentan para dias_laborados/horas_reportadas del reporte mensual y global: SOLO la aprobada. Una rechazada ya tiene
+// decisión final (no bloquea el reporte), pero no suma días ni horas; se expone aparte para avisar al alumno
+// (`diagnostico.bitacorasRechazadas` en prepararReporteMensual).
+const ESTADOS_BITACORA_QUE_CUENTAN = Object.freeze([ESTADO_BITACORA_APROBADA]);
 
 // NO cuentan ni bloquean el reporte: la jornada todavía no tiene una decisión final (del alumno o del profesor).
 // Se detectan para avisar al alumno (ver `diagnostico.bitacorasNoResueltas` en prepararReporteMensual).
@@ -119,8 +120,7 @@ function nombreInstitucionalCarrera(codigo) {
   return Object.hasOwn(CARRERAS_NOMBRE_INSTITUCIONAL, logico) ? CARRERAS_NOMBRE_INSTITUCIONAL[logico] : null;
 }
 
-// Horas contabilizables (aprobada + rechazada; ver ESTADOS_BITACORA_QUE_CUENTAN) desde las que se habilita el
-// reporte global.
+// Horas de bitácoras aprobadas (ver ESTADOS_BITACORA_QUE_CUENTAN) desde las que se habilita el reporte global.
 const HORAS_MINIMAS_REPORTE_GLOBAL = 480;
 
 // Renglones del Control de Asistencia (página 2): el formato oficial tiene exactamente 24 y no crece. Se toma de la
@@ -174,7 +174,7 @@ const MENSAJES_BLOQUEO = Object.freeze({
   [MOTIVOS_BLOQUEO.REPORTE_YA_EXISTE]:
     'Ya existe un reporte para este periodo.',
   [MOTIVOS_BLOQUEO.HORAS_INSUFICIENTES]:
-    `El reporte global se habilita al completar ${HORAS_MINIMAS_REPORTE_GLOBAL} horas contabilizables (bitácoras aprobadas o rechazadas).`,
+    `El reporte global se habilita al completar ${HORAS_MINIMAS_REPORTE_GLOBAL} horas de bitácoras aprobadas.`,
   [MOTIVOS_BLOQUEO.MENSUAL_DE_HORAS_FINALES_NO_ENVIADO]:
     'Primero envía el reporte mensual del periodo en el que completaste tus horas; después podrás generar el reporte global.',
   [MOTIVOS_BLOQUEO.REPORTE_GLOBAL_YA_EXISTE]:

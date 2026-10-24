@@ -1,10 +1,11 @@
 // CU-REP-01 fase 1: datos para preparar el reporte mensual. Solo lectura.
 // Inicio/fin del servicio: solicitud → periodo_registro → evento_calendario (nunca las bitácoras).
 // Una bitácora pertenece al periodo cuya fecha_registro (el día de la jornada, @db.Date) cae dentro de [inicio, fin] —
-// NUNCA por fecha_revision (nuevas reglas, Bloque 1). Cuentan las bitácoras 'aprobada' y 'rechazada' (el profesor ya
-// decidió esa jornada, aceptada o no); 'en_curso', 'pendiente_datos' y 'pendiente_revision' (sin decisión final) no
-// cuentan para días/horas; si hay alguna, SÍ bloquean el reporte (BITACORAS_SIN_REVISAR) y además se listan en
-// diagnostico.bitacorasNoResueltas para que la pantalla pueda señalar cuáles son.
+// NUNCA por fecha_revision (nuevas reglas, Bloque 1). Solo cuentan las bitácoras 'aprobada'. La 'rechazada' ya tiene
+// decisión final: no cuenta para días/horas ni bloquea, y se lista en diagnostico.bitacorasRechazadas para avisar al
+// alumno. 'en_curso', 'pendiente_datos' y 'pendiente_revision' (sin decisión final) no cuentan para días/horas; si hay
+// alguna, SÍ bloquean el reporte (BITACORAS_SIN_REVISAR) y además se listan en diagnostico.bitacorasNoResueltas para
+// que la pantalla pueda señalar cuáles son.
 // diasLaborados = cantidad de esas bitácoras del periodo; horas = SUM(horas_contabilizadas) tal como las guarda AH.
 // El reporte se puede generar desde el primer día hábil ADMINISTRATIVO posterior a fecha_fin del periodo (L-V, sin
 // evento Inhabil ni Vacacional; nuevas reglas, Bloque 2) — no basta con que el periodo ya haya terminado. Para el
@@ -24,6 +25,7 @@ const {
   ESTADOS_REPORTE_RECHAZADOS,
   ESTADOS_BITACORA_QUE_CUENTAN,
   ESTADOS_BITACORA_NO_RESUELTOS,
+  ESTADO_BITACORA_RECHAZADA,
   TIPOS_EVENTO_NO_LABORABLE,
   DESFASE_MEXICO_HORAS,
   MOTIVOS_BLOQUEO,
@@ -175,14 +177,14 @@ function mapearEventosNoLaborables(filas) {
 }
 
 // Bitácoras del periodo (Bloque 1): pertenece la que su fecha_registro (día de la jornada; @db.Date, sin hora) cae en
-// [inicio, fin]. Trae 'aprobada' y 'rechazada' (cuentan para dias_laborados/horas_reportadas) y también las tres sin
-// decisión final —'en_curso', 'pendiente_datos', 'pendiente_revision'— que no cuentan ni bloquean, solo se detectan
-// para avisar al alumno. prepararReporteMensual separa cada grupo.
+// [inicio, fin]. Trae 'aprobada' (la única que cuenta para dias_laborados/horas_reportadas), 'rechazada' (no cuenta;
+// solo para avisar al alumno) y las tres sin decisión final —'en_curso', 'pendiente_datos', 'pendiente_revision'—, que
+// no cuentan y bloquean el reporte. prepararReporteMensual separa cada grupo.
 function consultarBitacorasDelPeriodo(prisma, solicitudId, inicio, fin) {
   return prisma.bitacora.findMany({
     where: {
       solicitud_registro_id: solicitudId,
-      estado: { in: [...ESTADOS_BITACORA_QUE_CUENTAN, ...ESTADOS_BITACORA_NO_RESUELTOS] },
+      estado: { in: [...ESTADOS_BITACORA_QUE_CUENTAN, ESTADO_BITACORA_RECHAZADA, ...ESTADOS_BITACORA_NO_RESUELTOS] },
       fecha_registro: { gte: aDateUTC(inicio), lte: aDateUTC(fin) },
     },
     orderBy: { fecha_registro: 'asc' },
@@ -205,8 +207,8 @@ async function consultarActividadesConRegistros(prisma, solicitudId, fin) {
     prisma.registro_bitacora_actividades.findMany({
       where: {
         actividad: { solicitud_registro_id: solicitudId },
-        // Mismas bitácoras contabilizables que dias_laborados/horas_reportadas (aprobada + rechazada; nunca las sin
-        // decisión final) — el avance ya no se queda corto solo porque el profesor rechazó una jornada trabajada.
+        // Mismas bitácoras que dias_laborados/horas_reportadas (solo aprobadas): el avance de una jornada rechazada o
+        // sin decisión final no se toma en cuenta.
         bitacora: { estado: { in: ESTADOS_BITACORA_QUE_CUENTAN }, fecha_registro: { lte: aDateUTC(fin) } },
       },
       select: {
@@ -220,8 +222,8 @@ async function consultarActividadesConRegistros(prisma, solicitudId, fin) {
 }
 
 /**
- * Avance con bitácoras contabilizables (aprobada + rechazada; nunca en_curso/pendiente_datos/pendiente_revision —
- * mismo criterio que dias_laborados/horas_reportadas). Cada registro guarda el % acumulado de ese día, así que
+ * Avance con las bitácoras que cuentan (solo aprobadas; nunca rechazada, en_curso, pendiente_datos ni
+ * pendiente_revision — mismo criterio que dias_laborados/horas_reportadas). Cada registro guarda el % acumulado de ese día, así que
  * alInicio/alCierre son el ÚLTIMO registro antes del periodo / hasta su fin (no el máximo).
  * porcentajeActual (actividad.porcentaje_progreso) incluye avances aún no aprobados (bitácoras sin decisión final).
  */
@@ -545,6 +547,7 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
       diagnostico: {
         inconsistenciasCalendario: [],
         bitacorasNoResueltas: [],
+        bitacorasRechazadas: [],
         plazoEnvio: SIN_AVISO_PLAZO_ENVIO,
         // Sin periodo oficial utilizable no se consultan eventos, y sin ellos el conteo de días hábiles sería
         // incorrecto: se informa neutro, igual que plazoEnvio.
@@ -571,11 +574,13 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
     consultarActividadesConRegistros(prisma, solicitud.id, periodo.fin),
   ]);
 
-  // Cuentan para dias_laborados/horas_reportadas: aprobada + rechazada. Las tres sin decisión final (en_curso,
-  // pendiente_datos, pendiente_revision) se separan aparte: no cuentan para días/horas, pero SÍ bloquean el
-  // reporte (evaluarBloqueos recibe hayBitacorasSinResolver) y se exponen en diagnostico para señalarlas.
+  // Cuentan para dias_laborados/horas_reportadas: solo aprobada. La rechazada no cuenta ni bloquea; se expone en
+  // diagnostico para el aviso de que quedará fija. Las tres sin decisión final (en_curso, pendiente_datos,
+  // pendiente_revision) tampoco cuentan, pero SÍ bloquean el reporte (evaluarBloqueos recibe hayBitacorasSinResolver)
+  // y se exponen en diagnostico para señalarlas.
   const bitacorasFilas = bitacorasDelPeriodo.filter((b) => ESTADOS_BITACORA_QUE_CUENTAN.includes(b.estado));
   const bitacorasNoResueltasFilas = bitacorasDelPeriodo.filter((b) => ESTADOS_BITACORA_NO_RESUELTOS.includes(b.estado));
+  const bitacorasRechazadasFilas = bitacorasDelPeriodo.filter((b) => b.estado === ESTADO_BITACORA_RECHAZADA);
 
   const bitacoras = bitacorasFilas.map((b) => ({
     id: b.id,
@@ -589,6 +594,7 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
     horaFin: b.hora_fin ? b.hora_fin.toISOString() : null,
   }));
   const bitacorasNoResueltas = bitacorasNoResueltasFilas.map((b) => ({ id: b.id, estado: b.estado, fecha: normalizarFechaISO(b.fecha_registro) }));
+  const bitacorasRechazadas = bitacorasRechazadasFilas.map((b) => ({ id: b.id, fecha: normalizarFechaISO(b.fecha_registro), horas: b.horas_contabilizadas ?? 0 }));
 
   const eventosMapeados = mapearEventosNoLaborables(eventosFilas);
 
@@ -659,7 +665,7 @@ async function prepararReporteMensual(usuarioId, deps = {}) {
     actividades: calcularAvanceActividades({ actividades, registros, inicio: periodo.inicio, fin: periodo.fin }),
     puedeGenerar: motivosBloqueo.length === 0,
     motivosBloqueo,
-    diagnostico: { inconsistenciasCalendario: calendario.inconsistencias, bitacorasNoResueltas, plazoEnvio, limiteServicio },
+    diagnostico: { inconsistenciasCalendario: calendario.inconsistencias, bitacorasNoResueltas, bitacorasRechazadas, plazoEnvio, limiteServicio },
   };
 }
 

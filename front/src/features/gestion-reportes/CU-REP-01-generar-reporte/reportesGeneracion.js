@@ -57,11 +57,14 @@ export const contarPendientesDeRevision = (diagnostico) => (diagnostico?.bitacor
 export const textoAvisoPendientes = (n) => `Tienes ${n} bitácora(s) de este periodo sin revisar. `
   + "No podrás generar tu reporte hasta que tu profesor las revise (apruebe o rechace) — avísale para que lo haga.";
 
-/** Si el periodo del reporte tiene al menos una bitácora rechazada (RN-REP: candado de AH). */
-export const hayBitacorasRechazadas = (bitacoras = []) => bitacoras.some((b) => b.estado === "rechazada");
+/**
+ * Si el periodo del reporte tiene al menos una bitácora rechazada (RN-REP: candado de AH). Las rechazadas ya no
+ * cuentan para días ni horas, así que no vienen en `bitacoras`: el backend las informa en diagnostico.bitacorasRechazadas.
+ */
+export const hayBitacorasRechazadas = (diagnostico) => (diagnostico?.bitacorasRechazadas ?? []).length > 0;
 
-export const textoAvisoBitacorasRechazadas = "Al continuar, las bitácoras rechazadas de este periodo quedarán "
-  + "fijas: ya no podrán modificarse. Si alguna no debió rechazarse, coméntalo con tu profesor antes de generar tu reporte.";
+export const textoAvisoBitacorasRechazadas = "Las bitácoras rechazadas de este periodo no cuentan para tus horas y, "
+  + "al continuar, quedarán fijas: ya no podrán modificarse.";
 
 /** Validación previa de la firma (el servidor valida de verdad: estructura, dimensiones y tamaño). */
 export function validarArchivoFirma(archivo) {

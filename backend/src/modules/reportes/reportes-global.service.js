@@ -40,9 +40,9 @@ const CODIGOS_ERROR = Object.freeze({ ...CODIGOS_ENVIO });
 // ── Preparación (solo lectura) ───────────────────────────────
 
 /**
- * Horas CONTABILIZABLES del alumno (suma de horas_contabilizadas, de todo el servicio): aprobada + rechazada —
- * mismo criterio que dias_laborados/horas_reportadas del mensual (ESTADOS_BITACORA_QUE_CUENTAN). en_curso,
- * pendiente_datos y pendiente_revision NO cuentan.
+ * Horas del alumno que cuentan (suma de horas_contabilizadas, de todo el servicio): solo bitácoras aprobadas —
+ * mismo criterio que dias_laborados/horas_reportadas del mensual (ESTADOS_BITACORA_QUE_CUENTAN). rechazada,
+ * en_curso, pendiente_datos y pendiente_revision NO cuentan.
  */
 async function consultarHorasAprobadas(prisma, solicitudId) {
   const { _sum: suma } = await prisma.bitacora.aggregate({
@@ -52,7 +52,7 @@ async function consultarHorasAprobadas(prisma, solicitudId) {
   return Number(suma?.horas_contabilizadas ?? 0);
 }
 
-/** Las mismas bitácoras contabilizables, en orden cronológico, para ubicar con cuál se llega a las 480 h. */
+/** Las mismas bitácoras que cuentan (aprobadas), en orden cronológico, para ubicar con cuál se llega a las 480 h. */
 function consultarBitacorasContabilizables(prisma, solicitudId) {
   return prisma.bitacora.findMany({
     where: { solicitud_registro_id: solicitudId, estado: { in: ESTADOS_BITACORA_QUE_CUENTAN } },
@@ -97,7 +97,7 @@ function derivarMensualDeHorasFinales({ bitacoras, reportesMensuales, fechaInici
  * lectura. deps (pruebas): { prisma, ahora }.
  *
  * Condiciones para GENERAR (todas, sin sustituir ninguna por otra):
- *  - >= HORAS_MINIMAS_REPORTE_GLOBAL horas contabilizables (aprobada + rechazada, suma sobre bitacora).
+ *  - >= HORAS_MINIMAS_REPORTE_GLOBAL horas de bitácoras aprobadas (suma sobre bitacora).
  *  - El reporte mensual del periodo donde el alumno ALCANZA esas horas ya debe estar ENVIADO (existe la fila, con
  *    cualquier estado_reporte). Ya NO se exige que todos los mensuales estén aprobado_coordinador: el alumno no
  *    depende de que profesor/coordinación terminen de revisar.
