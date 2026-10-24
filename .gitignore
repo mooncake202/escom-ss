@@ -107,3 +107,10 @@ backend/uploads/*
 !backend/uploads/coordinador/**
 backend/uploads/coordinador/**/*.bak-*
 docker-compose.override.yml
+
+# Pruebas de rendimiento (k6): resultados y cualquier archivo con credenciales o datos generados.
+pruebas/k6/resultados/
+pruebas/k6/**/*.env
+pruebas/k6/**/.env*
+pruebas/k6/datos/generados/
+pruebas/k6/datos/*.json

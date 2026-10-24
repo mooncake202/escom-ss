@@ -1,0 +1,6 @@
+{
+  "name": "pruebas-k6",
+  "private": true,
+  "type": "module",
+  "description": "Solo para que Node cargue lib/config.js (ESM) desde datos/*.js; k6 no lo usa."
+}
