@@ -132,6 +132,35 @@ k6 run -e BASE_URL=http://localhost -e K6_NOMBRE=pr04-consultas pruebas/k6/pr02-
 k6 run -e BASE_URL=https://ttservicio.com pruebas/k6/pr05-estres.js
 ```
 
+## PR-06: navegación entre módulos (Lighthouse)
+
+PR-06 no usa k6: mide en el navegador cuánto tarda en pintarse cada módulo (LCP, *Largest Contentful Paint*).
+
+1. **Antes de medir, reconstruye el front** (`front/dist`, ver "Requisitos del entorno en Azure"): Lighthouse mide lo
+   que sirve Nginx, no el código fuente.
+2. Abre Chrome en una **ventana de incógnito** e inicia sesión en el dominio de Azure (`https://ttservicio.com`) con un
+   usuario de prueba de cada rol (por ejemplo, del lote: `kseisalumno0001@alumno.ipn.mx`, `kseisprofesor01@ipn.mx`,
+   `kseiscoord01@ipn.mx`, contraseña `12345678`).
+3. Abre el módulo a medir y, en las herramientas de desarrollo (F12), la pestaña **Lighthouse**.
+4. Configuración:
+   - Modo: **Navegación**.
+   - Dispositivo: **Escritorio**.
+   - Categorías: solo **Rendimiento**.
+   - En los ajustes (engrane), **desmarca "Borrar almacenamiento"** para conservar la sesión; si no, Lighthouse borra el
+     token y mide la pantalla de inicio de sesión.
+5. Ejecuta el análisis y anota el **LCP**. Repite **3 veces por módulo** y reporta la **mediana**.
+6. Módulos a medir:
+
+   | Rol | Módulo | LCP 1 | LCP 2 | LCP 3 | Mediana |
+   |---|---|---|---|---|---|
+   | Alumno | Inicio | | | | |
+   | Alumno | Reportes | | | | |
+   | Alumno | Perfil | | | | |
+   | Profesor | Bandeja de reportes | | | | |
+   | Profesor | Alumnos asignados | | | | |
+   | Coordinación | Bandeja de reportes | | | | |
+   | Coordinación | Ofertas pendientes | | | | |
+
 ## Validación local (no oficial)
 
 Solo para comprobar que los scripts y los datos funcionan; sus números **no** son resultados de la matriz.
