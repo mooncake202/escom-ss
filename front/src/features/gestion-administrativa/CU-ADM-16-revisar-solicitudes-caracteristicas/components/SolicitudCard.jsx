@@ -1,7 +1,8 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const fechaLegible = (valor) => (valor
-  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  ? formatearFechaMexico(valor, { day: "numeric", month: "long", year: "numeric" })
   : null);
 
 const ESTADO_ESTILO = {

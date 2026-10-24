@@ -12,6 +12,7 @@ import { OfertaCard } from "./components/OfertaCard";
 import { FormCorreccion } from "./components/FormCorreccion";
 import { CerrarOfertaPanel } from "../CU-PRO-04-gestionar-estado-oferta/components/CerrarOfertaPanel";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { formatearFechaUTC } from "@/utils/fechas";
 
 export default function HistorialOfertas() {
   const { C } = useTheme();
@@ -213,7 +214,7 @@ export default function HistorialOfertas() {
                             <ModalidadBadge modalidad={seleccionada.tipo} />
                             {seleccionada.fechaRegistro && (
                               <span style={{ fontSize: 12, color: C.textDisabled }}>
-                                {new Date(seleccionada.fechaRegistro + "T00:00:00").toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" })}
+                                {formatearFechaUTC(seleccionada.fechaRegistro, { day: "2-digit", month: "short", year: "numeric" })}
                               </span>
                             )}
                           </div>

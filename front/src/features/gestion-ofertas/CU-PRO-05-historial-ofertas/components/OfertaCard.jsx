@@ -1,12 +1,13 @@
 import { useTheme, RADIUS } from "@/themes/colors";
 import { EstatusBadge } from "./EstatusBadge";
 import { ModalidadBadge } from "@/features/gestion-ofertas/components/ModalidadBadge";
+import { formatearFechaUTC } from "@/utils/fechas";
 
+// fechaRegistro llega como AAAA-MM-DD (día de México, ya calculado por el backend): se muestra tal cual con
+// formatearFechaUTC, igual que CU-PRO-03, para que la zona del navegador no lo corra un día.
 function formatFecha(iso) {
   if (!iso) return null;
-  return new Date(iso + "T00:00:00").toLocaleDateString("es-MX", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
+  return formatearFechaUTC(iso, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function OfertaCard({ oferta, seleccionadaId, onSelect, destacado }) {

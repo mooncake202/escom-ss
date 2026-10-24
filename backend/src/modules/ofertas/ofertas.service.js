@@ -10,6 +10,7 @@ const {
   ESTADOS_LSS_LIBERAN_CUPO,
 } = require('../../lib/cupos');
 const { ESTADOS_QUE_OCUPAN_CUPO_PROFESOR } = require('../gr/gr.shared');
+const { calcularDiaMexicoUTC } = require('../../lib/fechas');
 
 const CACHE_KEY_OFERTAS = 'cache:ofertas';
 const CACHE_TTL_OFERTAS = 30; // segundos — corto a propósito: cupos cambian con cada aceptación/rechazo
@@ -24,6 +25,10 @@ const MENSAJE_TIPO_OFERTA_INVALIDO = "tipo_oferta debe ser 'individual' o 'proye
 // Normalización para buscar sin distinguir mayúsculas ni acentos. Mismo comportamiento que
 // `sinAcentos` de front/.../CU-REP-05-revisar-reportes-profesor/revisionReportes.js; se duplica
 // porque esta búsqueda corre en el backend y los dos árboles no comparten paquete.
+// fecha_registro es un DateTime real: la API entrega su día calendario en hora de México (AAAA-MM-DD), no el día UTC
+// (una oferta registrada a las 23:30 de México ya es el día siguiente en UTC).
+const diaRegistroMexico = (fechaRegistro) => calcularDiaMexicoUTC(fechaRegistro).toISOString().slice(0, 10);
+
 const sinAcentos = (texto) => String(texto).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 
 // Entero estricto para `cupos_ofertados`. `parseInt` NO sirve aquí: trunca en silencio, así que 2.9
@@ -493,7 +498,7 @@ async function listarMisOfertas(profesorId) {
       estatus: ESTATUS_POR_ESTADO[o.estado_oferta.toLowerCase()] ?? 'desconocido',
       carreras: o.deseo_de_carrera.map((d) => d.carrera.nombre),
       motivoRechazo: o.motivo_rechazo,
-      fechaRegistro: o.fecha_registro.toISOString().slice(0, 10),
+      fechaRegistro: diaRegistroMexico(o.fecha_registro),
     };
   });
 }
@@ -575,7 +580,7 @@ async function consultarOfertas({ vista, busqueda, tipoOferta, estadoOferta }) {
     cuposTotalesProfesor: o.profesor.cupos_totales,
     perfilCarrera: o.deseo_de_carrera.map((d) => d.carrera.nombre),
     motivoRechazo: o.motivo_rechazo,
-    fechaRegistro: o.fecha_registro.toISOString().slice(0, 10),
+    fechaRegistro: diaRegistroMexico(o.fecha_registro),
   }));
 }
 

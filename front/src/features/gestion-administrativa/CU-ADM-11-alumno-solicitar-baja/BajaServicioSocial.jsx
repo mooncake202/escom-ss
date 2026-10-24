@@ -3,6 +3,7 @@ import { DashboardLayout }           from "@/components/layout/DashboardLayout";
 import { InstruccionesExpediente }   from "./components/InstruccionesExpediente";
 import { CargaExpediente }           from "./components/CargaExpediente";
 import { useBajaServicioSocial }     from "./hooks/useBajaServicioSocial";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 // Estados reales de solicitud_baja. Una baja APROBADA ya NO elimina la cuenta: la fila sobrevive y
 // puede aparecer en el historial si el alumno vuelve a estar asignado más adelante.
@@ -33,7 +34,7 @@ const SEGUIMIENTO_POR_ETAPA = {
 };
 
 const fechaLegible = (valor) => (valor
-  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  ? formatearFechaMexico(valor, { day: "numeric", month: "long", year: "numeric" })
   : "—");
 
 // Solicitudes anteriores del alumno. Lo habitual son las RECHAZADAS, y lo importante es que pueda

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { obtenerAnuncios } from "@/services/anunciosService";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 // Resumen de anuncios para el dashboard del alumno. Vive en la carpeta de CU-ADM-02 porque es el
 // MISMO caso de uso: el dashboard solo muestra los más recientes y la pantalla completa el
@@ -78,5 +79,5 @@ export function tiempoRelativo(iso) {
   if (dias === 1) return "Ayer";
   if (dias < 7) return `Hace ${dias} días`;
 
-  return f.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" });
+  return formatearFechaMexico(iso, { day: "numeric", month: "short", year: "numeric" });
 }

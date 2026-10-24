@@ -1,4 +1,5 @@
 import { RADIUS } from "@/themes/colors";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 // CU-ADM-09 — seguimiento de una baja en curso, en SOLO LECTURA.
 //
@@ -40,7 +41,7 @@ const ETAPAS = {
 };
 
 const fechaLegible = (valor) => (valor
-  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  ? formatearFechaMexico(valor, { day: "numeric", month: "long", year: "numeric" })
   : "—");
 
 function Dato({ etiqueta, children, C }) {

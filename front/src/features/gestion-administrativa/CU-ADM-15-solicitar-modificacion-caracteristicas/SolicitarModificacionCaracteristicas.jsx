@@ -5,6 +5,7 @@ import { CaracteristicasActuales }         from "./components/CaracteristicasAct
 import { CaracteristicaSelector }          from "./components/CaracteristicaSelector";
 import { useSolicitarModificacion }        from "./hooks/useSolicitarModificacion";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 const SUBTITULO = "CU-ADM-15 · Profesor";
 
@@ -15,7 +16,7 @@ const ESTADO_ESTILO = {
 };
 
 const fechaLegible = (valor) => (valor
-  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  ? formatearFechaMexico(valor, { day: "numeric", month: "long", year: "numeric" })
   : null);
 
 // El destino de una solicitud puede ser una característica o la vuelta a Profesor base (null).

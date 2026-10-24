@@ -1,3 +1,4 @@
+import { formatearFechaMexico } from "@/utils/fechas";
 // ============================================================
 //  ESCOM — Sistema de Servicio Social
 //  Presentación del expediente documental (CU-ADM-13)
@@ -24,9 +25,8 @@ export const etiquetaResponsable = (responsable) =>
 
 export function formatFecha(iso) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
+  if (Number.isNaN(new Date(iso).getTime())) return "—";
+  return formatearFechaMexico(iso, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 /**

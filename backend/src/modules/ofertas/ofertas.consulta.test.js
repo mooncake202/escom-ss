@@ -304,3 +304,16 @@ test('PRO-03: un `busqueda` no string no revienta y conserva su comportamiento',
     assert.deepEqual(ids(await consultar({ vista: 'pendientes', busqueda: valor })), sinBusqueda, JSON.stringify(valor));
   }
 });
+
+// fecha_registro es un DateTime real: la API debe entregar el día calendario de MÉXICO, no el día UTC.
+test('PRO-03: fechaRegistro es el día de México (23:30 del 23-oct = 05:30Z del 24 → "2026-10-23")', async () => {
+  montar({
+    ofertas: [
+      { ...OFERTAS[0], fecha_registro: new Date('2026-10-24T05:30:00Z') }, // 23:30 del 23-oct en México
+      { ...OFERTAS[1], fecha_registro: new Date('2026-10-24T06:30:00Z') }, // 00:30 del 24-oct en México
+    ],
+    profesores: PROFESORES,
+  });
+  const r = await consultar({ vista: 'pendientes' });
+  assert.deepEqual(r.map((o) => [o.id, o.fechaRegistro]).sort(), [[1, '2026-10-23'], [2, '2026-10-24']]);
+});

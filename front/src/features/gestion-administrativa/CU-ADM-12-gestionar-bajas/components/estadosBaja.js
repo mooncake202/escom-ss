@@ -1,3 +1,4 @@
+import { formatearFechaMexico } from "@/utils/fechas";
 // Estados canónicos de solicitud_baja, compartidos por la tarjeta y el detalle.
 // Viven aquí y no junto a un componente para no romper fast-refresh.
 export const ESTADO_CONFIG = {
@@ -10,5 +11,5 @@ export const ESTADO_CONFIG = {
 export const ORIGEN_LABEL = { alumno: "El propio alumno", profesor: "Su profesor" };
 
 export const fechaLegible = (valor) => (valor
-  ? new Date(valor).toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" })
+  ? formatearFechaMexico(valor, { day: "numeric", month: "long", year: "numeric" })
   : "—");

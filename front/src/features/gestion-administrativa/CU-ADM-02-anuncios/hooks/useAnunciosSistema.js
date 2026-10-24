@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { obtenerAnuncios, marcarAnuncioVisto } from "@/services/anunciosService";
+import { formatearFechaMexico, formatearHoraMexico } from "@/utils/fechas";
 
 // Datos reales. El backend decide qué anuncios ve el alumno (Coordinación + su profesor actual);
 // aquí no se filtra ni se ordena nada por nuestra cuenta: llegan ya en orden descendente.
@@ -10,18 +11,20 @@ import { obtenerAnuncios, marcarAnuncioVisto } from "@/services/anunciosService"
 // Corto, para el encabezado de la tarjeta cerrada: "23 sep. 2026".
 export function formatFecha(iso) {
   const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-  const f = new Date(iso);
-  if (Number.isNaN(f.getTime())) return "";
-  return `${f.getDate()} ${meses[f.getMonth()]}. ${f.getFullYear()}`;
+  if (!iso || Number.isNaN(new Date(iso).getTime())) return "";
+  // Día, mes y año en hora de México (no los getters locales del navegador).
+  const dia = formatearFechaMexico(iso, { day: "numeric" });
+  const mes = Number(formatearFechaMexico(iso, { month: "numeric" }));
+  const anio = formatearFechaMexico(iso, { year: "numeric" });
+  return `${dia} ${meses[mes - 1]}. ${anio}`;
 }
 
 // Completo con hora, para el pie de la tarjeta expandida: "23 de septiembre de 2026, 03:27".
 // La fecha se muestra en UN solo formato a la vez: corto si está cerrada, largo si está abierta.
 export function formatFechaHora(iso) {
-  const f = new Date(iso);
-  if (Number.isNaN(f.getTime())) return "";
-  const fecha = f.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
-  const hora = f.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+  if (!iso || Number.isNaN(new Date(iso).getTime())) return "";
+  const fecha = formatearFechaMexico(iso, { day: "numeric", month: "long", year: "numeric" });
+  const hora = formatearHoraMexico(iso);
   return `${fecha}, ${hora}`;
 }
 

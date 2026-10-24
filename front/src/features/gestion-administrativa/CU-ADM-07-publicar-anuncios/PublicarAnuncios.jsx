@@ -5,6 +5,7 @@ import { AnuncioItem }        from "./components/AnuncioItem";
 import { DestinatariosBar, AlcanceGlobalBar } from "./components/DestinatariosBar";
 import { usePublicarAnuncios } from "./hooks/usePublicarAnuncios";
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
+import { formatearFechaMexico, formatearHoraMexico } from "@/utils/fechas";
 
 // CU-ADM-07 — misma pantalla para profesor y coordinación; cambia el alcance, no el flujo.
 // Publicar y consultar el historial propio. Ni editar ni eliminar: lo publicado es histórico.
@@ -21,10 +22,9 @@ const CONFIG = {
 };
 
 function formatFechaHora(iso) {
-  const f = new Date(iso);
-  if (Number.isNaN(f.getTime())) return "";
-  const fecha = f.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
-  const hora = f.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+  if (!iso || Number.isNaN(new Date(iso).getTime())) return "";
+  const fecha = formatearFechaMexico(iso, { day: "numeric", month: "long", year: "numeric" });
+  const hora = formatearHoraMexico(iso);
   return `${fecha}, ${hora}`;
 }
 

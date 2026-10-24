@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   obtenerRecursos, crearRecurso, actualizarRecurso, eliminarRecurso,
 } from "@/services/recursosService";
+import { formatearFechaMexico } from "@/utils/fechas";
 
 // CU-ADM-05 — Coordinación administra los recursos. Datos reales, sin mocks.
 //
@@ -16,9 +17,8 @@ const FORM_VACIO = { nombre: "", url: "", tipo: "" };
 /** "15 de enero de 2026" — la fecha llega en ISO desde el backend. */
 export function formatFecha(iso) {
   if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("es-MX", { day: "numeric", month: "long", year: "numeric" });
+  if (Number.isNaN(new Date(iso).getTime())) return "—";
+  return formatearFechaMexico(iso, { day: "numeric", month: "long", year: "numeric" });
 }
 
 export function useGestionarRecursos() {
