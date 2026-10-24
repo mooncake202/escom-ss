@@ -52,6 +52,11 @@ services:
       CORREO_DOMINIOS_EXTRA: "gmail.com"
       TZ: "America/Mexico_City"
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # Sello de tiempo RFC 3161 (backend/src/lib/timestampTsa.js). Sin valores en .env: FreeTSA, sin respaldo y 15 s,
+      # exactamente como antes. TSA_URL_RESPALDO se intenta solo si la principal falla.
+      TSA_URL: ${TSA_URL:-https://freetsa.org/tsr}
+      TSA_URL_RESPALDO: ${TSA_URL_RESPALDO:-}
+      TSA_TIMEOUT_MS: ${TSA_TIMEOUT_MS:-15000}
     depends_on:
       mariadb:
         condition: service_healthy

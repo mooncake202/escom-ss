@@ -4,11 +4,40 @@ const { TimeStampReq } = require('@xevolab/timestamping-token');
 
 // Cliente RFC 3161 (sello de tiempo de confianza) contra una TSA pública.
 // @xevolab/timestamping-token es una librería de TSA (lado servidor): aquí solo se usa para CONSTRUIR
-// el TimeStampReq. Para LEER el TimeStampResp que regresa FreeTSA no trae nada, así que se decodifica
-// con asn1js (su propia dependencia). El módulo no toca disco ni BD y no imprime nada.
+// el TimeStampReq. Para LEER el TimeStampResp que regresa la TSA no trae nada, así que se decodifica
+// con asn1js (su propia dependencia). El módulo no toca disco ni BD; solo deja en el log qué TSA selló.
+//
+// TSA principal y de RESPALDO (variables de entorno, ver .env.example):
+//   TSA_URL           TSA principal. Sin la variable: FreeTSA, igual que antes.
+//   TSA_URL_RESPALDO  TSA de respaldo, opcional. Sin ella no hay segundo intento (comportamiento anterior).
+//   TSA_TIMEOUT_MS    Tiempo máximo de espera POR TSA (por omisión 15000 ms).
+// Por qué existe el respaldo: firmar un reporte, una evaluación o un dictamen depende de que una TSA externa
+// responda. Si la única TSA se cae, limita peticiones (FreeTSA admite ~1 cada 15 s por IP) o responde algo
+// inválido, ninguna firma se puede registrar. Con un respaldo, ese caso se resuelve con un segundo servicio y
+// solo se rechaza la operación si AMBOS fallan, con el mismo error de siempre.
+//
+// Verificación posterior de un sello (fuera de la aplicación, p. ej. con `openssl ts -verify`): cada TSA firma
+// con su propia cadena de certificados. Un sello de FreeTSA se verifica con su CA (fixtures-tsa/freetsa/); uno de
+// DigiCert, con la raíz "DigiCert Trusted Root G4" (fixtures-tsa/digicert/DigiCertTrustedRootG4.crt, también en el almacén del
+// sistema). El token completo se guarda en token_tsa y trae dentro los certificados de quien lo emitió (certReq).
 const URL_FREETSA = 'https://freetsa.org/tsr';
 // FreeTSA acepta como máximo una petición cada ~15 segundos por IP.
 const TIMEOUT_MS = 15000;
+
+/**
+ * Configuración vigente de la TSA, leída del entorno EN CADA SOLICITUD (así una prueba puede cambiarla sin reiniciar
+ * el proceso). Una variable vacía cuenta como ausente: docker-compose las declara con valor vacío por omisión.
+ */
+function configuracionTsa(entorno = process.env) {
+  const texto = (v) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  const timeout = Number(texto(entorno.TSA_TIMEOUT_MS));
+  return {
+    principal: texto(entorno.TSA_URL) ?? URL_FREETSA,
+    respaldo: texto(entorno.TSA_URL_RESPALDO),
+    // Un valor no numérico o <= 0 no rompe la firma: se usa el de siempre.
+    timeoutMs: Number.isInteger(timeout) && timeout > 0 ? timeout : TIMEOUT_MS,
+  };
+}
 const CONTENT_TYPE_SOLICITUD = 'application/timestamp-query';
 
 const OID_SIGNED_DATA = '1.2.840.113549.1.7.2';      // el token es un CMS SignedData
@@ -166,13 +195,10 @@ function interpretarRespuesta(bytesRespuesta, { hash, nonce }) {
 }
 
 /**
- * Pide a la TSA un sello de tiempo para un hash SHA-256 (hex, 64 caracteres, p. ej. el resultado de
- * crypto.createHash('sha256').update(buffer).digest('hex')).
- * Regresa { token, fecha, solicitud } (ver interpretarRespuesta) o lanza ErrorTsa con un mensaje claro.
- * `solicitud` es el TimeStampReq DER exacto que se envió, en base64: INSTRUMENTACIÓN DE PRUEBA para poder
- * verificar el token con `openssl ts -verify -queryfile`. Aún no se decide guardarlo en BD.
+ * UNA petición a UNA TSA. Regresa { token, fecha, solicitud } (ver interpretarRespuesta) o lanza ErrorTsa.
+ * Cada intento arma su propia solicitud (nonce nuevo): un nonce nunca se reutiliza entre TSA distintas.
  */
-async function solicitarSelloTiempo(hashHex, { url = URL_FREETSA, timeoutMs = TIMEOUT_MS } = {}) {
+async function pedirA(url, hashHex, timeoutMs) {
   const { der, hash, nonce } = construirSolicitud(hashHex);
 
   let respuesta;
@@ -193,7 +219,7 @@ async function solicitarSelloTiempo(hashHex, { url = URL_FREETSA, timeoutMs = TI
   if (!respuesta.ok) {
     const cuerpo = (await respuesta.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 200);
     throw new ErrorTsa(
-      `La TSA respondió HTTP ${respuesta.status}${cuerpo ? `: ${cuerpo}` : ''}. FreeTSA limita a una petición cada ~15 segundos.`,
+      `La TSA respondió HTTP ${respuesta.status}${cuerpo ? `: ${cuerpo}` : ''}.${url.includes('freetsa.org') ? ' FreeTSA limita a una petición cada ~15 segundos.' : ''}`,
       'TSA_HTTP',
     );
   }
@@ -202,4 +228,46 @@ async function solicitarSelloTiempo(hashHex, { url = URL_FREETSA, timeoutMs = TI
   return { ...sello, solicitud: der.toString('base64') };
 }
 
-module.exports = { solicitarSelloTiempo, construirSolicitud, interpretarRespuesta, ErrorTsa };
+/**
+ * Pide un sello de tiempo para un hash SHA-256 (hex, 64 caracteres, p. ej. el resultado de
+ * crypto.createHash('sha256').update(buffer).digest('hex')).
+ * Regresa { token, fecha, solicitud, tsa } o lanza ErrorTsa con un mensaje claro:
+ *   - `solicitud` es el TimeStampReq DER exacto que se envió, en base64: INSTRUMENTACIÓN DE PRUEBA para poder
+ *     verificar el token con `openssl ts -verify -queryfile`. Aún no se decide guardarlo en BD.
+ *   - `tsa` es la URL que emitió el sello (la principal o la de respaldo).
+ *
+ * Orden: TSA principal → si falla por CUALQUIER motivo de la TSA (sin conexión, timeout, HTTP de error, respuesta
+ * inválida o rechazada, hash o nonce distintos) y hay respaldo configurado → TSA de respaldo. Si la respaldo también
+ * falla, se lanza el error de la PRINCIPAL, el mismo que antes de existir el respaldo, así que quien llama (Reportes,
+ * LSS) responde igual que siempre y no registra nada. Un hash mal formado (HASH_INVALIDO) es un error de quien llama,
+ * no de la TSA: no se reintenta.
+ *
+ * Con `url` explícito se usa SOLO esa TSA, sin respaldo (lo usan los scripts de prueba que fijan FreeTSA).
+ */
+async function solicitarSelloTiempo(hashHex, { url, timeoutMs } = {}) {
+  const config = configuracionTsa();
+  const espera = timeoutMs ?? config.timeoutMs;
+  const principal = url ?? config.principal;
+  const respaldo = url ? null : config.respaldo;
+
+  try {
+    const sello = await pedirA(principal, hashHex, espera);
+    console.info(`[TSA] Sello emitido por la TSA principal: ${principal}`);
+    return { ...sello, tsa: principal };
+  } catch (errorPrincipal) {
+    if (!respaldo || !(errorPrincipal instanceof ErrorTsa) || errorPrincipal.codigo === 'HASH_INVALIDO') throw errorPrincipal;
+    console.warn(`[TSA] La TSA principal (${principal}) falló [${errorPrincipal.codigo}]: ${errorPrincipal.message} Se intenta la de respaldo: ${respaldo}`);
+    try {
+      const sello = await pedirA(respaldo, hashHex, espera);
+      console.info(`[TSA] Sello emitido por la TSA de RESPALDO: ${respaldo}`);
+      return { ...sello, tsa: respaldo };
+    } catch (errorRespaldo) {
+      console.error(`[TSA] También falló la TSA de respaldo (${respaldo}) [${errorRespaldo.codigo ?? errorRespaldo.name}]: ${errorRespaldo.message}`);
+      // Mismo error que antes de existir el respaldo; el del respaldo viaja adjunto para diagnóstico.
+      errorPrincipal.errorRespaldo = errorRespaldo;
+      throw errorPrincipal;
+    }
+  }
+}
+
+module.exports = { solicitarSelloTiempo, construirSolicitud, interpretarRespuesta, configuracionTsa, ErrorTsa, URL_FREETSA, TIMEOUT_MS };
