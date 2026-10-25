@@ -984,9 +984,6 @@ const DashboardCoordinacion = ({ C, sesion, resumen, notificaciones, onLeerNotif
           <ActionItem icon="flag"     {...T.danger}  label="Solicitudes de baja"          desc="Gestionar solicitudes de baja" onClick={() => navigate("/coordinacion/gestionar-bajas")} C={C} />
           <SlotNotificacion ruta="/coordinacion/gestionar-bajas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="users" {...T.blue} label="Consultar información de alumnos por profesor" desc="Datos y cantidad" onClick={() => navigate("/coordinacion/usuarios-asignados")} C={C} />
-          {/* RUTA_PENDIENTE Ruta suelta, sin prefijo /coordinacion/ — confirmar */}
-          <ActionItem icon="flag" {...T.danger} label="Gestión de faltas alumnos" desc="Pendientes" onClick={() => navigate("/gestion-faltas")} C={C} />
-          <SlotNotificacion ruta="/gestion-faltas" notificaciones={notificaciones} onLeer={onLeerNotificacion} navigate={navigate} C={C} />
           <ActionItem icon="users" {...T.blue} label="Crear o editar usuarios" desc="Profesor o Coordinador" onClick={() => navigate("/crear-usuario")} C={C} />
         </Section>
 

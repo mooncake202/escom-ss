@@ -96,7 +96,6 @@ import GestionEstadoConstanciaTermino from './features/liberacion-ss/CU-LSS-11-e
 import CartaCompromisoFirmada from './features/gestion-admin/001- enviar-carta-firmada/CartaCompromisofirmada'
 import DocumentosAlumnosAsignados from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteAlumno'
 import DocumentosAlumnosAsignadosCoordinacion from './features/gestion-admin/002-docuemtnos-alumnos/ExpedienteCoordinacion'
-import GestionFaltas from './features/gestion-admin/003-gestion incidentes/GestionIncidencias'
 
 
 // Roles usados en RutaProtegida — coinciden con el enum RolUsuario del backend.
@@ -392,9 +391,6 @@ function App() {
         } />
         <Route path="/coordinación-alumnoasignado-documentacion" element={
           <RutaProtegida roles={COORDINADOR}><DocumentosAlumnosAsignadosCoordinacion /></RutaProtegida>
-        } />
-        <Route path="/gestion-faltas" element={
-          <RutaProtegida><GestionFaltas /></RutaProtegida>
         } />
 
       </Routes>

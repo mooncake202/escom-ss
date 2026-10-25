@@ -37,7 +37,7 @@ export default function CalendarioInstitucional() {
   return (
     <DashboardLayout
       titulo="Calendario institucional"
-      subtitulo={puedeAdministrar ? "CU-ADM-08 · Coordinación" : "CU-ADM-08 · Solo lectura"}
+      subtitulo={puedeAdministrar ? "Periodos, días inhábiles y periodos vacacionales" : "Consulta de periodos, días inhábiles y periodos vacacionales"}
       rol={sesion?.rol ?? "coordinacion"}
       usuario={nombreCompletoSesion(sesion)}
     >

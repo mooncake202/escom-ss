@@ -7,7 +7,7 @@ import { useSolicitarModificacion }        from "./hooks/useSolicitarModificacio
 import { useSesion, nombreCompletoSesion } from "@/features/login/CU-CRED-03-crear-usuarios/hooks/useSesion";
 import { formatearFechaMexico } from "@/utils/fechas";
 
-const SUBTITULO = "CU-ADM-15 · Profesor";
+const SUBTITULO = "Solicitud de cambio de característica y cupos";
 
 const ESTADO_ESTILO = {
   pendiente: { bg: "rgba(234,179,8,0.12)", color: "#ca8a04", borde: "rgba(234,179,8,0.3)", texto: "Pendiente" },

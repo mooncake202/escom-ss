@@ -43,7 +43,7 @@ export default function GestionarBajas() {
   return (
     <DashboardLayout
       titulo="Gestionar solicitudes de baja"
-      subtitulo="CU-ADM-12 · Coordinación"
+      subtitulo="Revisión y resolución de solicitudes de baja"
       rol="coordinacion"
       usuario={nombreCompletoSesion(usuario)}
     >

@@ -43,7 +43,7 @@ export default function RevisarSolicitudesCaracteristicas() {
   return (
     <DashboardLayout
       titulo="Solicitudes de modificación de características"
-      subtitulo="CU-ADM-16 · Coordinación"
+      subtitulo="Revisión y resolución de solicitudes de características"
       rol="coordinacion"
       usuario={nombreCompletoSesion(usuario)}
     >
