@@ -33,6 +33,20 @@ app.set('trust proxy', true);
 // Se quita una vez identificado el cuello de botella real de PR-03/PR-05; no debe quedar en el código final.
 if (process.env.PDF_DEBUG_TIEMPOS === '1') {
   app.use((req, res, next) => { req._t0 = process.hrtime.bigint(); next(); });
+
+  // Monitor de atasco del event loop: un setInterval ideal dispara cada 100ms; si tarda más, algo síncrono
+  // bloqueó el hilo principal durante ese excedente. Esto detecta bloqueo del hilo principal AUNQUE ocurra ANTES
+  // de que la petición llegue a Express (el middleware de arriba solo marca el momento en que Express YA empezó
+  // a atenderla, no cuánto esperó la conexión en la cola de Node mientras el hilo estaba ocupado con otra cosa).
+  const INTERVALO_MS = 100;
+  let ultimoTick = process.hrtime.bigint();
+  setInterval(() => {
+    const ahora = process.hrtime.bigint();
+    const transcurridoMs = Number(ahora - ultimoTick) / 1e6;
+    ultimoTick = ahora;
+    const atasco = transcurridoMs - INTERVALO_MS;
+    if (atasco > 50) console.log(`[fase] event-loop-atasco ms=${atasco.toFixed(1)}`);
+  }, INTERVALO_MS);
 }
 
 app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
