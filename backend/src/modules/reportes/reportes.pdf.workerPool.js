@@ -72,11 +72,27 @@ function despacharSiguiente(entrada) {
   entrada.worker.postMessage({ id: tarea.id, tipo: tarea.tipo, ...tarea.carga });
 }
 
+// Diagnóstico temporal (PDF_DEBUG_TIEMPOS=1): mide cuánto tarda cada tarea del pool de punta a punta — incluye el
+// tiempo que pasa esperando en `cola` si todos los hilos están ocupados, no solo la ejecución real. Se quita una
+// vez identificado el cuello de botella real de PR-03/PR-05; no debe quedar en el código final.
+const DEBUG_TIEMPOS = process.env.PDF_DEBUG_TIEMPOS === '1';
+
 /** Encola una tarea genérica { tipo, carga } y despacha a un hilo libre si hay uno disponible ya mismo. */
 function encolar(tipo, carga) {
+  const inicio = DEBUG_TIEMPOS ? process.hrtime.bigint() : null;
+  const delanteAlLlegar = cola.length; // cuántas tareas ya esperaban antes de esta, no importa el tipo
   return new Promise((resolve, reject) => {
     const id = siguienteId += 1;
-    pendientes.set(id, { resolve, reject });
+    pendientes.set(id, {
+      resolve: (valor) => {
+        if (DEBUG_TIEMPOS) {
+          const ms = Number(process.hrtime.bigint() - inicio) / 1e6;
+          console.log(`[fase] pool tipo=${tipo} ms=${ms.toFixed(1)} delanteAlLlegar=${delanteAlLlegar}`);
+        }
+        resolve(valor);
+      },
+      reject,
+    });
     cola.push({ id, tipo, carga });
     const libre = obtenerHilos().find((h) => !h.ocupado);
     if (libre) despacharSiguiente(libre);
