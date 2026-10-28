@@ -28,6 +28,13 @@ app.set('trust proxy', true);
 // "safelisted" por CORS. Bug real encontrado: las descargas de expediente
 // LSS ponían el nombre real en Content-Disposition pero el frontend nunca
 // podía leerlo, y terminaba guardando el archivo con un nombre genérico.
+// Diagnóstico temporal (PDF_DEBUG_TIEMPOS=1): marca la llegada real de la petición, ANTES de cualquier middleware
+// (CORS, body-parser, auth, rate limiter), para poder medir cuánto tiempo pasa ahí vs. dentro del controlador.
+// Se quita una vez identificado el cuello de botella real de PR-03/PR-05; no debe quedar en el código final.
+if (process.env.PDF_DEBUG_TIEMPOS === '1') {
+  app.use((req, res, next) => { req._t0 = process.hrtime.bigint(); next(); });
+}
+
 app.use(cors({ exposedHeaders: ['Content-Disposition'] }));
 app.use(express.json());
 

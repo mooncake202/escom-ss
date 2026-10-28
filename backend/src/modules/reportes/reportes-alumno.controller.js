@@ -66,9 +66,14 @@ function postRubrica(req, res) {
 }
 
 // Vista previa: el PDF se genera en memoria y se entrega tal cual; no se guarda ni se firma nada.
+const DEBUG_TIEMPOS = process.env.PDF_DEBUG_TIEMPOS === '1';
+
 async function postVistaPreviaReporteMensual(req, res) {
   try {
     const { pdf, numeroReporte } = await vistaPreviaService.generarVistaPreviaReporteMensual(req.usuario.sub, req.body?.actividades);
+    if (DEBUG_TIEMPOS && req._t0) {
+      console.log(`[fase] totalDesdeLlegada ms=${(Number(process.hrtime.bigint() - req._t0) / 1e6).toFixed(1)}`);
+    }
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Length': String(pdf.length),
