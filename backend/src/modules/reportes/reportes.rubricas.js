@@ -13,8 +13,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { cifrarBuffer, descifrarBuffer } = require('../../lib/fileEncryption');
+const { cifrarBuffer } = require('../../lib/fileEncryption');
 const { prepararImagen } = require('./reportes.pdf');
+const { descifrarRubricaEnPool } = require('./reportes.pdf.workerPool');
 const { RUTA_BASE_DOCUMENTOS, RUTA_BASE_PROFESORES } = require('./reportes.shared');
 
 const LIMITE_BYTES = 3 * 1024 * 1024;
@@ -161,7 +162,9 @@ async function obtenerRubricaAlumno(usuarioId, { prisma, rutaBase } = {}) {
   try {
     const absoluta = resolverRuta(identidad.rubricaImagen, identidad.clave, identidad.rutaBase);
     if (!absoluta) throw new Error('ruta fuera de la carpeta del usuario');
-    return descifrarBuffer(await fs.promises.readFile(absoluta));
+    // await explícito (no solo `return`): descifrarRubricaEnPool es ahora asíncrona (corre en el pool), y un
+    // `return` sin await no deja que el catch de abajo intercepte su rechazo.
+    return await descifrarRubricaEnPool(await fs.promises.readFile(absoluta));
   } catch (err) {
     console.error(`No se pudo leer la rúbrica del usuario ${usuarioId}:`, err.message);
     throw crearError('No se pudo recuperar tu rúbrica guardada. Contacta a soporte.', 500, CODIGOS_ERROR.RUBRICA_NO_DISPONIBLE);
