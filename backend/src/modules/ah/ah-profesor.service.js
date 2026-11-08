@@ -126,7 +126,7 @@ async function listarAlumnosDeProfesor(profesorUsuarioId) {
   const solicitudes = await prisma.solicitud_registro.findMany({
     where: { estado_solicitud: 'alumno_asignado', oferta: { profesor_id: profesor.id } },
     include: {
-      alumno: { include: { usuario: true } },
+      alumno: { include: { usuario: true, cumulo_horas_y_faltas: true } },
       oferta: true,
       periodo_registro: { include: { evento_calendario: true } },
       actividad: true,

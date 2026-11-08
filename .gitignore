@@ -47,6 +47,9 @@ lerna-debug.log*
 # ===========================
 *.sql
 !prisma/migrations/**/*.sql
+# Respaldos de BD de seeds-demo-final (ver backend/src/seeds/backup/README.md):
+# estos sí se versionan a propósito, a diferencia del resto de dumps sueltos.
+!backend/src/seeds/backup/**/*.sql
 
 # ===========================
 # Scripts locales de desarrollo

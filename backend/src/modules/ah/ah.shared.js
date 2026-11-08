@@ -222,13 +222,22 @@ const ESTADOS_ACTIVOS_ALERTA = ['sin_comenzar', 'en_progreso'];
  * resumen agregado del dashboard (dashboard.service.js, boolean por
  * profesor) como el listado de AH-01 (ah-profesor.service.js, por alumno,
  * para resaltar en la lista a quien disparó cada alerta). `solicitud` debe
- * traer `actividad` (todas, sin filtrar por estado) y
- * `periodo_registro.evento_calendario.fecha_inicio`.
+ * traer `actividad` (todas, sin filtrar por estado),
+ * `periodo_registro.evento_calendario.fecha_inicio` y
+ * `alumno.cumulo_horas_y_faltas`.
  */
 function evaluarAlertasActividad(solicitud, hoy) {
   const activas = solicitud.actividad.filter((a) => ESTADOS_ACTIVOS_ALERTA.includes(a.estado));
 
   if (activas.length === 0) {
+    // RN-AH-17: un alumno que ya completó sus 480 horas netas no necesita
+    // que le sigan asignando actividades — ya terminó su servicio social,
+    // aunque su estado_solicitud siga en 'alumno_asignado'. Mismo criterio
+    // que ya usa contabilizarFaltasDiarias (ah.cron.js) para no seguir
+    // "cobrándole" nada después de terminar.
+    if (limiteHorasAlcanzado(solicitud.alumno?.cumulo_horas_y_faltas)) {
+      return { proximaACaducar: false, sinActividades: false };
+    }
     const fechaInicio = solicitud.periodo_registro?.evento_calendario?.fecha_inicio;
     if (!fechaInicio) return { proximaACaducar: false, sinActividades: false };
     const diasHastaInicio = Math.round((new Date(fechaInicio) - hoy) / 86400000);

@@ -33,6 +33,7 @@ async function calcularAlertasActividadesProfesor(profesorId) {
     select: {
       periodo_registro: { select: { evento_calendario: { select: { fecha_inicio: true } } } },
       actividad: { where: { estado: { in: ESTADOS_ACTIVOS } }, select: { estado: true, fecha_limite: true } },
+      alumno: { select: { cumulo_horas_y_faltas: true } },
     },
   });
 
