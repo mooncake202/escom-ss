@@ -10,6 +10,46 @@ cero** con todos los casos y variantes de usuarios necesarios para:
 2. Un video tutorial de un solo recorrido, camino feliz, de principio a fin
    (`video-tutorial/` — **aún no se construye**, se define después).
 
+## 📅 Fecha de la presentación: 23 de noviembre de 2026
+
+`demo-final/` se va a mostrar en vivo ese día, con la fecha real del
+sistema (no se simula ningún reloj) — así que **todo dato cuyo estado
+dependa de la fecha debe seguir viéndose correcto el 23 de noviembre de
+2026**, no solo hoy. Ejemplos de lo que esto afecta: que el periodo de
+registro usado siga vigente (`fecha_max_expediente >= 23 nov 2026`), que
+una actividad pensada para verse "próxima a vencer" tenga su
+`fecha_limite` cerca de esa fecha (no de hoy), que las bitácoras/faltas
+acumuladas correspondan a una línea de tiempo coherente hasta ese día, etc.
+
+Regla de trabajo para cada seed de `demo-final/` que incluya fechas:
+1. **Se construye y se prueba HOY** contra el código real (no esperamos al
+   23 para descubrir que algo no corre).
+2. Las fechas que use **se fijan pensando en el 23 de noviembre de 2026**
+   como "hoy" del escenario, no en la fecha real de cuando se corrió el
+   seed — igual que ya se hizo en `video-tutorial/ah/01-actividades-variadas.js`
+   (fechas ancladas a octubre 2026 en vez de "relativas a hoy").
+3. **Ojo con los crons reales** (`ah.cron.js`, `gr.cron.js` — de verdad
+   registrados en `server.js`, corren solos cada noche si el backend sigue
+   prendido): no basta con que la fecha ya esté "bien puesta hoy", hay que
+   revisar que **ningún cron la vaya a mover sola** entre hoy y el 23.
+   Specifically:
+   - `marcarActividadesVencidas`: cualquier actividad `sin_comenzar`/
+     `en_progreso` con `fecha_limite` antes del 23 se volverá `vencida` sola.
+   - `contabilizarFaltasDiarias`: cualquier `alumno_asignado` cuyo periodo
+     ya inició y cuyo `cumulo_horas_y_faltas.fecha_ultima_evaluacion_faltas`
+     NO esté fijado (o esté fijado antes del 23) va a acumular faltas reales
+     y retroactivas la próxima vez que corra el cron. Por eso todo alumno ya
+     iniciado que no deba acumular faltas (porque el escenario no es sobre
+     eso) necesita esa fecha fijada a propósito más allá del 23 (ver
+     `04-ah.js`, Gerardo/Itzel/Sofía).
+   - Mismo criterio para `gr.cron.js` (Reloj 1/Reloj 2): cualquier solicitud
+     que deba seguir "pendiente de decidir en vivo" el 23 necesita que su
+     `fecha_max_expediente`/`fecha_inicio` (según el reloj que le toque)
+     caiga después del 23, no solo después de hoy.
+4. Antes de la demo, se vuelve a verificar cada escenario (sin volver a
+   sembrar nada, el dato ya quedó fijo) para confirmar que sigue viéndose
+   bien con la fecha real de ese día.
+
 ## ⚠️ Antes de correr cualquier cosa de aquí
 
 **Haz una copia de tu base de datos de pruebas actual** antes de ejecutar estos seeds.
@@ -245,8 +285,57 @@ agregar o mover fechas del calendario mismo.
 - [x] `demo-final/00-comun/` — corrido y verificado en vivo en el navegador
       (login, calendario, recursos, contacto institucional, características) —
       ver detalle abajo en "Estado actual".
-- [ ] `demo-final/cred-gr-ah-lss/` — sin empezar.
+- [x] `demo-final/cred-gr-ah-lss/01-cred.js` — corrido y verificado en vivo
+      en el navegador (con túnel). Ver detalle abajo en "Estado actual".
+- [x] `demo-final/cred-gr-ah-lss/02-ofertas-minimas.js` — 13 ofertas ya aprobadas.
+- [x] `demo-final/cred-gr-ah-lss/03-gr.js` — 13 escenarios de GR, verificados
+      contra la BD y en el navegador. Ver `demo-final/CUENTAS.md`, sección GR.
+- [x] `demo-final/cred-gr-ah-lss/04-ah.js` — 8 escenarios de AH (3 alumnos
+      nuevos/reutilizados), verificados contra la BD, las funciones reales
+      del módulo y el navegador. Ver `demo-final/CUENTAS.md`, sección AH.
+- [x] `demo-final/cred-gr-ah-lss/05-reportes-minimos.js` — placeholder
+      mínimo de REP (480h + 7 reportes mensuales + global, todos aprobados,
+      Itzel) usando las funciones reales de reportes. Firmas de profesor y
+      alumno ya commiteadas en `demo-final/firmas-referencia/`, reutilizables
+      por cualquier seed vía `guardarRubrica` real.
+- [x] `demo-final/cred-gr-ah-lss/06-lss.js` — 4 escenarios de LSS (Itzel +
+      3 alumnos nuevos, cada uno recorriendo GR+AH+REP completos antes de
+      llegar a su checkpoint), verificados contra la BD y el navegador. Ver
+      `demo-final/CUENTAS.md`, sección LSS.
+- [x] `demo-final/cred-gr-ah-lss/index.js` — encadena los 6 pasos de arriba.
+      Verificado con **3 corridas completas desde cero** (BD vaciada +
+      `00-comun/index.js` + este): la 1ª y 2ª encontraron bugs reales
+      (ver "Correcciones encontradas al verificar todo junto" abajo); la 3ª,
+      ya con todo corregido en el código, terminó con 0 errores y 0 riesgos
+      de fecha. `demo-final/cred-gr-ah-lss/` queda completo: CRED → ofertas →
+      GR → AH → REP mínimo → LSS.
 - [ ] `demo-final/amd-pro-rep/` — sin empezar (de Sol).
+
+### Correcciones encontradas al verificar todo junto
+
+Nadie había corrido los 6 pasos completos **desde una BD vacía, de un
+jalón**, hasta esta verificación — cada módulo se había probado por su
+cuenta. Aparecieron 3 bugs reales, los 3 ya corregidos en el código (no
+solo parchados en la BD) y reverificados:
+
+1. **Rúbricas: el seed no era idempotente de verdad.** `sembrarRubricaSiFalta`
+   (en `05-reportes-minimos.js` y `06-lss.js`) solo revisaba si
+   `usuario.rubrica_imagen` ya tenía valor en la BD — pero `guardarRubrica`
+   real también falla si el **archivo físico** ya existe en disco (mismo
+   correo/boleta → misma ruta fija), algo que pasa si vacías la BD sin
+   limpiar `uploads/` entre corridas. Se corrigió para que, si eso pasa,
+   la BD se sincronice con el archivo que ya existe, en vez de tronar.
+2. **4 actividades de AH con `fecha_limite` antes del 23 de noviembre**
+   (la de Sofía que debía quedarse "sin comenzar", y 3 de Gerardo) — ya
+   estaban corregidas a mano en la BD de una sesión anterior, pero nunca en
+   el código de `04-ah.js`, así que reaparecieron al reconstruir desde
+   cero. El cron real `marcarActividadesVencidas` las habría vuelto
+   `vencida` solas antes de la demo.
+3. **A Sofía le faltaba el "seguro" contra el cron de faltas**
+   (`fecha_ultima_evaluacion_faltas`) — mismo caso que el punto 2: ya
+   corregido a mano antes, nunca en el código. Sin esto, el cron real
+   `contabilizarFaltasDiarias` le habría contado faltas retroactivas desde
+   su fecha de inicio (16 de octubre) la próxima vez que corriera.
 
 ## Estado actual
 
@@ -255,7 +344,36 @@ agregar o mover fechas del calendario mismo.
 `03-calendario.js`, `04-recursos-contacto.js`, `index.js`). Es idempotente — correrlo
 de nuevo no duplica nada.
 
-Pendiente (sin empezar): `cred-gr-ah-lss/` y `amd-pro-rep/`, módulo por módulo,
-verificando cada uno contra el código real antes de avanzar al siguiente. También
-pendiente: confirmar `VACACIONES_2027` (ver `03-calendario.js` — se dejó vacío a
-propósito, no se inventó nada).
+**`cred-gr-ah-lss/01-cred.js` ya está implementado y probado.** Siembra 7
+profesores (uno "de base" sin característica + uno por cada una de las 6
+características reales del catálogo de `00-comun`), usando las funciones
+REALES del módulo en vez de insertar filas directas: `usuarios.service.js::crearUsuario`
+(CU-CRED-03 — password aleatoria + token de bienvenida) y luego
+`password.service.js::restablecerContrasena` (CU-CRED-02, mismo camino real
+que `/establecer-contrasena/:token`) para dejarlos todos en la contraseña
+fija del seed (`JAjaja1818#`). El bloqueo de cuenta por intentos fallidos y
+la recuperación de contraseña se demuestran en vivo durante la demo —
+decisión de equipo, no se siembra ningún estado para esos 2 casos.
+
+Verificado en el navegador (vía túnel, `https://ttservicio.com`): login del
+coordinador, lista de 9 usuarios (7 profesores + 2 coordinadores) en
+"Gestión de Usuarios", detalle de un profesor con característica (cupos
+calculados correctos), y login real de un profesor con la contraseña del
+seed.
+
+**Tabla de cuentas por escenario**: [`demo-final/CUENTAS.md`](demo-final/CUENTAS.md)
+— qué correo usar para cada caso que pidan mostrar en la demo (y qué
+combinación de cuentas usar cuando el caso necesita más de una ya
+relacionada entre sí). Se actualiza cada vez que un seed nuevo agrega un
+usuario o un escenario demostrable.
+
+**`cred-gr-ah-lss/` completo** (01-cred → 02-ofertas-minimas → 03-gr →
+04-ah → 05-reportes-minimos → 06-lss, encadenados en `index.js`) —
+verificado con 3 corridas completas desde cero, la última con 0 errores y
+0 riesgos de fecha (ver "Correcciones encontradas al verificar todo
+junto" arriba). Detalle completo de cada escenario, actores y pasos para
+reproducirlos en vivo: [`demo-final/CUENTAS.md`](demo-final/CUENTAS.md).
+
+Pendiente: `demo-final/amd-pro-rep/` (de Sol). También pendiente: confirmar
+`VACACIONES_2027` (ver `03-calendario.js` — se dejó vacío a propósito, no
+se inventó nada).

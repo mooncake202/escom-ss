@@ -226,3 +226,41 @@ test('Bloque 4 — una bitácora EXISTENTE (en_curso o pendiente_datos) no se to
   assert.equal(finalizada.bitacoraId, 901);
   assert.equal(finalizada.fase, 'formulario');
 });
+
+// ── servicioNoIniciado: validators.js::validarFechaLimiteContraInicio permite al profesor asignar actividades
+// ANTES de que el periodo del alumno inicie (solo la fecha_limite debe caer en/después del inicio) — eso dejaba
+// un hueco real: con una actividad ya asignada, `sinActividades` deja de bloquear y nada más revisaba
+// fecha_inicio, así que el alumno podía adelantarse a registrar horas antes de que su servicio arrancara. ──────
+
+test('servicioNoIniciado — fecha_inicio en el futuro bloquea aunque ya haya actividades asignadas', async (t) => {
+  crearEscenario({ fechaInicio: '2026-12-01' }); // futuro respecto al "hoy" fijado abajo
+  fijarHoy(t, '2026-11-09'); // lunes, día hábil — aísla el bloqueo del de "no es día laborable"
+  const estado = await ahAlumnoService.obtenerEstadoJornadaActual(7);
+  assert.equal(estado.bloqueos.servicioNoIniciado, true);
+  assert.equal(estado.bloqueos.sinActividades, false, 'sí tiene actividad asignada (default del fixture)');
+  assert.equal(estado.fase, 'bloqueado');
+});
+
+test('servicioNoIniciado — iniciarJornada también lo rechaza, no solo la vista', async (t) => {
+  crearEscenario({ fechaInicio: '2026-12-01' });
+  fijarHoy(t, '2026-11-09');
+  await assert.rejects(
+    () => ahAlumnoService.iniciarJornada(7),
+    (err) => /todavía no inicia/i.test(err.message),
+  );
+});
+
+test('servicioNoIniciado — el propio día de inicio ya es válido, no bloquea', async (t) => {
+  crearEscenario({ fechaInicio: '2026-11-09' }); // mismo día que "hoy" (lunes, día hábil)
+  fijarHoy(t, '2026-11-09');
+  const estado = await ahAlumnoService.obtenerEstadoJornadaActual(7);
+  assert.equal(estado.bloqueos.servicioNoIniciado, false);
+  assert.equal(estado.fase, 'inicio');
+});
+
+test('servicioNoIniciado — fecha_inicio ya pasada no bloquea (caso normal, regresión)', async (t) => {
+  crearEscenario({ fechaInicio: '2025-10-16' }); // default del fixture, ya pasado
+  fijarHoy(t, '2025-10-20');
+  const estado = await ahAlumnoService.obtenerEstadoJornadaActual(7);
+  assert.equal(estado.bloqueos.servicioNoIniciado, false);
+});

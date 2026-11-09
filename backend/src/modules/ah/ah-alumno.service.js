@@ -165,7 +165,19 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
   const horasAcumuladas = cumulo?.horas_acumuladas ?? 0;
   const horasNetas = calcularHorasNetas(cumulo);
 
+  // RN-AH-03/validators.js::validarFechaLimiteContraInicio ya permite al
+  // profesor asignar actividades ANTES de que el servicio social del alumno
+  // inicie (solo la fecha_limite debe caer en o después del inicio) — eso
+  // dejaba un hueco real: con una actividad ya asignada, `sinActividades`
+  // deja de bloquear y nada más revisaba fecha_inicio, así que el alumno
+  // podía iniciar jornada y registrar horas antes de que su periodo
+  // arrancara. `servicioNoIniciado` cierra ese hueco explícitamente, igual
+  // que `servicioIniciado` ya hace (solo visualmente) en CU-AH-02.
+  const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+  const servicioNoIniciado = fechaInicioPeriodo ? hoy < new Date(fechaInicioPeriodo) : false;
+
   const bloqueos = {
+    servicioNoIniciado,
     noEsDiaLaborable: !esLaborable,
     limiteHorasAlcanzado: limiteHorasAlcanzado(cumulo),
     sinActividades: actividades.length === 0,
@@ -186,7 +198,7 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
     bitacoraActiva = bitacoraHoy;
   } else if (bloqueos.yaRegistroHoy) {
     fase = 'enviado';
-  } else if (bloqueos.noEsDiaLaborable || bloqueos.limiteHorasAlcanzado || bloqueos.sinActividades || bloqueos.reporteMensualVencido) {
+  } else if (bloqueos.servicioNoIniciado || bloqueos.noEsDiaLaborable || bloqueos.limiteHorasAlcanzado || bloqueos.sinActividades || bloqueos.reporteMensualVencido) {
     // reporteMensualVencido solo bloquea llegar a 'inicio' (una jornada NUEVA) — nunca las ramas de arriba
     // (jornada pendiente de capturar o en curso): esas ya existen y este bloqueo no las toca.
     fase = 'bloqueado';
@@ -212,6 +224,15 @@ async function obtenerEstadoJornadaActual(alumnoUsuarioId) {
 async function iniciarJornada(alumnoUsuarioId) {
   const { alumno, solicitud } = await resolverAlumnoYSolicitud(alumnoUsuarioId);
   const hoy = calcularDiaMexicoUTC();
+
+  // Mismo hueco que cierra `servicioNoIniciado` en obtenerEstadoJornadaActual:
+  // validators.js::validarFechaLimiteContraInicio permite al profesor asignar
+  // actividades antes de que el periodo del alumno inicie, así que
+  // `sinActividades` por sí solo ya no basta para impedirle adelantarse.
+  const fechaInicioPeriodo = solicitud.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
+  if (fechaInicioPeriodo && hoy < new Date(fechaInicioPeriodo)) {
+    throw crearError('Tu servicio social todavía no inicia; no puedes registrar jornada antes de esa fecha.');
+  }
 
   if (!(await puedeIniciarJornadaAhora())) {
     throw crearError('Hoy no es un día laborable; no puedes registrar jornada.');

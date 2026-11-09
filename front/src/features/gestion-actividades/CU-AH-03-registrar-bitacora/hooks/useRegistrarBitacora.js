@@ -18,6 +18,7 @@ function segundosAHHMM(seg) {
 const AVANCE_VACIO = { actividadId: "", progreso: 0, descripcion: "", evidencia: "" };
 
 const MENSAJES_BLOQUEO = {
+  servicioNoIniciado: "Tu servicio social todavía no inicia. Aunque ya tengas actividades asignadas, no puedes registrar bitácora antes de tu fecha de inicio.",
   limiteHorasAlcanzado: "Ya completaste tus 480 horas de servicio social. No necesitas seguir registrando bitácoras.",
   sinActividades: "No tienes actividades asignadas. Tu profesor debe asignarte al menos una antes de que puedas registrar bitácora.",
   noEsDiaLaborable: "Hoy no es día laborable (fin de semana, día inhábil o periodo vacacional). No puedes iniciar una jornada.",
@@ -210,6 +211,7 @@ export function useRegistrarBitacora() {
   // mismo tiempo; sin esta prioridad se mostraba el mensaje equivocado
   // ("sin actividades" en vez de "ya completaste tus horas").
   const mensajeBloqueo =
+    (bloqueos.servicioNoIniciado && MENSAJES_BLOQUEO.servicioNoIniciado) ||
     (bloqueos.limiteHorasAlcanzado && MENSAJES_BLOQUEO.limiteHorasAlcanzado) ||
     (bloqueos.sinActividades && MENSAJES_BLOQUEO.sinActividades) ||
     (bloqueos.noEsDiaLaborable && MENSAJES_BLOQUEO.noEsDiaLaborable) ||
