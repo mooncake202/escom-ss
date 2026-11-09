@@ -49,7 +49,14 @@ const CORREO_COORDINADOR = 'coordinadorherrera@ipn.mx';
 // para los que siguen vigentes; estos 2 son nuevos para AH.
 const PERIODO = {
   HISTORIA_VARIADA: 20, // fecha_inicio 2026-10-01 — suficiente historial para faltas/bitácoras variadas
-  HORAS_480: 15,         // fecha_inicio 2026-06-01 — suficiente margen para acumular 480h reales antes del 23 nov
+  // id 15 (fecha_inicio 2026-06-01) se cambió por id 13 (2026-05-04): con
+  // 120 días hábiles reales (vacaciones de verano + festivos incluidos) el
+  // inicio de junio terminaba generando bitácoras hasta el 10 de diciembre
+  // de 2026 — DESPUÉS del 23 de noviembre, lo que en la demo mostraría a
+  // Itzel con "ya registraste tu bitácora de hoy" en vez de "ya completaste
+  // tus 480 horas". Verificado con el código real (`esDiaLaborable`): desde
+  // el 4 de mayo, el día 120 cae el 12 de noviembre — 11 días de margen.
+  HORAS_480: 13,         // fecha_inicio 2026-05-04
 };
 
 let PDF_BASE = null;
@@ -429,12 +436,12 @@ async function sembrarHoras480({ solicitudId }) {
       entregable_esperado: 'Avance acumulado del archivo digitalizado, con respaldo verificado.',
       fecha_limite: utc('2027-01-15'),
       estado: 'sin_comenzar',
-      fecha_asignacion: utc('2026-06-01'),
+      fecha_asignacion: utc('2026-05-04'),
     },
   });
 
   let horasAcumuladas = 0;
-  let dia = utc('2026-06-01');
+  let dia = utc('2026-05-04');
   let diasCreados = 0;
 
   while (horasAcumuladas < HORAS_OBJETIVO) {

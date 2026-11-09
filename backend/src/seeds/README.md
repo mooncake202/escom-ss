@@ -76,7 +76,9 @@ backend/src/seeds/
 - **`amd-pro-rep/`**: se construye **sobre** `00-comun/` y `cred-gr-ah-lss/`, pero
   **no los modifica ni los reemplaza**. Para sus propios casos de demo, crea sus
   propios usuarios (no reutiliza los alumnos de `cred-gr-ah-lss/`), siguiendo el mismo
-  patrón/estilo pero con su propio rango de boleta/correo para no chocar.
+  patrón/estilo pero con su propio rango de boleta/correo para no chocar. `cred-gr-ah-lss/`
+  ya usa los sufijos `0101` a `1801` (ver tabla completa en `demo-final/CUENTAS.md`,
+  secciones "Alumnos de GR/AH/LSS") — `amd-pro-rep/` debe empezar en `1901` en adelante.
 - **Fuente de verdad**: el código real de cada módulo (servicios, validadores,
   esquema de Prisma), **no** los seeds ad-hoc previos. `seed-maestro-gr.js` y
   similares solo sirven como banco de piezas/referencia de patrón, no como base.
@@ -377,3 +379,24 @@ reproducirlos en vivo: [`demo-final/CUENTAS.md`](demo-final/CUENTAS.md).
 Pendiente: `demo-final/amd-pro-rep/` (de Sol). También pendiente: confirmar
 `VACACIONES_2027` (ver `03-calendario.js` — se dejó vacío a propósito, no
 se inventó nada).
+
+### Verificación módulo por módulo en el navegador (post-AH-video)
+
+Después de terminar la grabación de AH del video, se repitió la corrida
+completa desde cero y se verificó cada escenario de `cred-gr-ah-lss/` contra
+la BD real y contra la pantalla real (vía túnel). Se encontraron y
+corrigieron 2 problemas reales más, no detectables solo revisando el código:
+
+1. **El servidor no reflejaba el código más reciente** — `front/dist`
+   llevaba días sin recompilarse y `nodemon` del backend no había recogido
+   un cambio reciente pese al modo watch. Un `npm run build` en `front/` y
+   un `docker compose restart backend` lo resolvieron. **Si se toca código
+   en los días previos a la demo, repetir ambos pasos.**
+2. **Itzel (480h, `04-ah.js`) terminaba sus bitácoras el 10 de diciembre**,
+   después de la demo, por el periodo que usaba (vacaciones de verano +
+   festivos reales alargaban los 120 días hábiles más de lo estimado) —
+   cambiado a un periodo que inicia antes, corregido en el código, verificado
+   que ahora termina el 12 de noviembre.
+
+Detalle completo, escenario por escenario, en
+[`demo-final/VERIFICACION-23NOV.md`](demo-final/VERIFICACION-23NOV.md).

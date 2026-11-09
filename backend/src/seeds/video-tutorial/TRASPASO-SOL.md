@@ -18,9 +18,13 @@ nuevo**, reutiliza estos.
 3. Cuando termines PRO: limpia tu base de datos local (vacía todas las
    tablas, o reinicia el contenedor de MariaDB con el volumen borrado) y
    restaura el archivo que Karen te va a pasar:
-   `backend/src/seeds/backup/karen/respaldo_20261108_1358.sql`
+   `backend/src/seeds/backup/karen/respaldo_20261108_1358.sql`. Usa `root` y
+   tu propia variable `$MYSQL_ROOT_PASSWORD` (la de TU `.env`, no la de
+   Karen) — así no depende de que tu usuario/contraseña de MySQL coincidan
+   con los de nadie más:
    ```bash
-   docker compose exec -T mariadb mysql -uescomuser -pNuevoPassword123! escom_ss < respaldo_20261108_1358.sql
+   docker compose cp respaldo_20261108_1358.sql mariadb:/tmp/restore.sql
+   docker compose exec -T mariadb sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE" < /tmp/restore.sql'
    ```
 4. Con eso ya tienes, para grabar REP: los 2 coordinadores, Ricardo
    (profesor), su oferta aprobada, Daniela ya `alumno_asignado`, sus 6
@@ -143,6 +147,14 @@ El componente real es
 [`FirmaCanvas.jsx`](../../../../../front/src/features/gestion-reportes/compartido/FirmaCanvas.jsx):
 se dibuja con mouse/trackpad/táctil, se exporta como PNG. El backend solo
 valida tamaño (≤3 MB) y dimensiones (máx. 4000px de lado).
+
+**Ojo:** Daniela (como alumna) también necesita su propia rúbrica registrada
+antes de poder enviar su primer reporte — si no la tiene, el backend
+rechaza el envío con "Registra tu rúbrica antes de continuar con el
+reporte." No es nada que tengas que resolver aparte: la misma pantalla de
+generar reporte (CU-REP-01) ya tiene su propio `FirmaCanvas` para que ella
+la dibuje ahí mismo la primera vez, igual que el profesor/coordinación con
+las suyas.
 
 **CORRECCIÓN IMPORTANTE (2026-11-08):** la firma del profesor SÍ se comparte
 automáticamente entre REP y LSS cuando ambas ocurren sobre la misma base de

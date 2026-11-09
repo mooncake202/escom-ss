@@ -296,11 +296,15 @@ reconstruir historia (mismo criterio que ya se usó en el video).
 
 ### 2. Alumno sin ninguna actividad asignada
 - **Qué muestra:** CU-AH-02 Flujo Alterno 2.1 (mensaje de "aún no se han
-  asignado actividades") y la alerta calculada del profesor
-  (`alumnoSinActividades`) — la misma que corregí para que NO se dispare en
-  alumnos que ya completaron sus 480h.
+  asignado actividades") desde la vista de la alumna.
 - **Actor:** Alumna `quintero0401@alumno.ipn.mx` (solo inicia sesión; su
   periodo tampoco ha iniciado, ver GR escenario 5).
+- **Ojo (verificado contra el código real, `ah.shared.js::evaluarAlertasActividad`):**
+  la alerta calculada del PROFESOR (`sinActividades`, visible en su dashboard)
+  **NO se va a ver el 23 de noviembre** — solo se activa cuando faltan ≤1 día
+  para que inicie el periodo del alumno, y el de Mónica empieza el 1° de
+  diciembre (más de 1 semana después de la demo). Este escenario solo
+  demuestra el mensaje en la vista de la ALUMNA, no la alerta del profesor.
 
 ### 3-7. "Historia variada" — Gerardo Rangel Osorio
 - **Qué muestra:** 5 reglas de negocio distintas conviviendo en la misma
