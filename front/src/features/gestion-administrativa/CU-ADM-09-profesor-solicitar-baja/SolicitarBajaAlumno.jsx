@@ -184,7 +184,7 @@ export default function BajaAlumnoProfesor() {
                     Enviar amonestación
                   </p>
                   <p style={{ margin: 0, fontSize: 11, color: C.textMuted }}>
-                    Enviarle una notificación con tus observaciones. No modifica sus faltas.
+                    Enviarle una notificación con tus observaciones. 
                   </p>
                 </div>
               </button>

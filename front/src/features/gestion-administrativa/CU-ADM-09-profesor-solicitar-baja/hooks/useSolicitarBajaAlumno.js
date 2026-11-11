@@ -10,8 +10,7 @@ import {
 // Las faltas son APOYO para decidir, no requisito: cualquier alumno asignado puede darse de baja
 // aunque tenga 0 faltas, y el backend tampoco las consulta al crear la solicitud.
 //
-// La amonestación NO reinicia faltas ni deja historial: solo envía una notificación al alumno.
-// AH sigue siendo la única fuente de verdad de los contadores.
+
 export function useBajaAlumnoProfesor() {
   const [carga, setCarga] = useState({ estado: "cargando", error: null }); // cargando | listo | error
   const [alumnos, setAlumnos] = useState([]);
@@ -111,7 +110,7 @@ export function useBajaAlumnoProfesor() {
     setEnviando(true);
     try {
       await amonestarAlumno({ alumnoBoleta: alumnoSeleccionado.boleta, observaciones: observaciones.trim() });
-      // Sus faltas NO cambian: la amonestación es solo un aviso.
+      
       mostrarToast(`Amonestación enviada a ${alumnoSeleccionado.nombre}.`);
       cerrar();
     } catch (err) {

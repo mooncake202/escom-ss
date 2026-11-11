@@ -57,7 +57,7 @@ export function AmonestacionForm({ alumno, observaciones, errores, onObservacion
           fontSize: 13, lineHeight: 1.5,
         }}>
           <strong>Amonestación:</strong> El alumno recibirá una notificación con tus observaciones.
-          Sus faltas no se modifican: el registro de asistencia sigue su curso normal.
+          
         </div>
 
         {/* Campo observaciones */}

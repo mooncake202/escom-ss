@@ -17,7 +17,7 @@ cero, la última con 0 errores y 0 riesgos) para que se vean exactamente
 así ese día, sin que ningún cron real los mueva antes. Ver "Fecha de la
 presentación" en `../README.md` para el detalle de esa verificación.
 
-## Por módulo — CASO → correo(s)
+## Por módulo — CASO → correo(s)✅
 
 Esta es la forma rápida de buscar: te piden un caso, buscas el módulo,
 encuentras el correo (o los correos, si el caso necesita más de uno).
@@ -27,8 +27,8 @@ encuentras el correo (o los correos, si el caso necesita más de uno).
 | Caso | Correo(s) |
 |---|---|
 | Coordinador genérico (cualquier caso de coordinación) | `coordinadorherrera@ipn.mx` o `coordinadorvillagran@ipn.mx` |
-| Profesor sin característica (base, 3 cupos) | `profesorcastillo@ipn.mx` |
-| Profesor con característica Investigador (+1, 4 cupos) | `profesorvaldez@ipn.mx` |
+| Profesor sin característica (base, 3 cupos) | `profesorcastillo@ipn.mx` |✅
+| Profesor con característica Investigador (+1, 4 cupos) | `profesorvaldez@ipn.mx` |✅
 | Profesor con característica Presidente de academia (+2, 5 cupos) | `profesorromero@ipn.mx` |
 | Profesor con característica Coordinador [de academia] (+2, 5 cupos) | `profesorochoa@ipn.mx` |
 | Profesor con característica Jefe de departamento (+3, 6 cupos) | `profesorsandoval@ipn.mx` |
