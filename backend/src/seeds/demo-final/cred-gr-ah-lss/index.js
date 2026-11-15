@@ -20,6 +20,7 @@ const gr = require('./03-gr');
 const ah = require('./04-ah');
 const reportesMinimos = require('./05-reportes-minimos');
 const lss = require('./06-lss');
+const { revisarConclusionAutomatica } = require('../../../modules/ofertas/ofertas.service');
 
 async function main() {
   console.log('── 1. CRED (7 profesores) ──');
@@ -39,6 +40,19 @@ async function main() {
 
   console.log('── 6. LSS (4 escenarios) ──');
   await lss.main();
+
+  // 7. Conclusión automática de ofertas (RN-PRO-18/19, misma función real que
+  // corre el cron de medianoche México, ofertas.cron.js). Sin esto, una oferta
+  // 'individual' que ya cumple la regla (cupos_disponibles=0 y su único alumno
+  // ya en el hito de liberación LSS) se queda sembrada como 'aprobada' hasta
+  // que el cron real corra por su cuenta — se adelanta aquí para que el seed
+  // deje el estado final correcto desde el primer momento, sin depender de
+  // cuándo se vuelva a correr este archivo respecto a medianoche. Caso real
+  // en esta demo: la oferta de bravo1801 (LSS checkpoint 4, ya en
+  // 'solicitud_constancia_termino').
+  console.log('── 7. Conclusión automática de ofertas (RN-PRO-18) ──');
+  const ofertasConcluidas = await revisarConclusionAutomatica();
+  console.log(`✅ ${ofertasConcluidas} oferta(s) concluida(s) automáticamente.`);
 
   console.log('✅ cred-gr-ah-lss completo.');
 }

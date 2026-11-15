@@ -42,6 +42,69 @@ const PERIODO = {
   YA_INICIO: 21,       // fecha_inicio 2026-10-16 — ya inició, con semanas de margen para AH
 };
 
+// Periodo EXCLUSIVO para Mónica (E) — NO es uno de los 38 oficiales de
+// 00-comun/03-calendario.js (esos ya los usan ibarra1101/pacheco1201 —
+// PERIODO.FUTURO, id 24 — y moverles la fecha a ellos adelantaría su propio
+// Reloj 2 real). Mónica necesita una fecha muy específica para que el 23 de
+// noviembre sigan cumpliéndose A LA VEZ 2 condiciones que antes se
+// contradecían:
+//   - GR-5 "su periodo aún no inicia":  hoy(23) <  fecha_inicio  → fecha_inicio debe ser 24 nov o después
+//   - AH-2 alerta del profesor (ah.shared.js::evaluarAlertasActividad, diasHastaInicio <= 1)
+//     → fecha_inicio - hoy(23) <= 1 día → fecha_inicio debe ser 24 nov o antes
+// La única fecha que cumple ambas es el 24 de noviembre.
+//
+// fecha_max_expediente NO puede ponerse en el pasado (primer intento, con
+// error real): aunque 'alumno_asignado' (destino final) está en
+// ESTADOS_SIN_RELOJ, LOS PASOS INTERMEDIOS de avanzarHastaAsignado (p.ej.
+// 'adjuntar_expediente') SÍ están sujetos al Reloj 1 — subirExpediente real
+// (gr.service.js) llama a verificarYAplicarVencimiento ANTES de aceptar el
+// envío. Con fecha_max_expediente en el pasado, la propia cadena de registro
+// la rechazaba a medio camino ("Tu solicitud no está en el paso de subir
+// expediente") antes de llegar a alumno_asignado. Se deja en 2026-12-01
+// (mismo valor que ya usan los periodos oficiales 24/25) — con margen de
+// sobra sobre cualquier día en que se vuelva a correr este seed hasta el 23
+// de noviembre inclusive. Como efecto secundario, este periodo SÍ puede
+// aparecer en el selector de "periodos vigentes" del registro en vivo
+// (GR-1) junto a los oficiales — no rompe nada, es solo una opción más.
+const FECHA_INICIO_PERIODO_MONICA = '2026-11-24';
+const FECHA_MAX_EXPEDIENTE_PERIODO_MONICA = '2026-12-01';
+
+async function obtenerOCrearPeriodoMonica(coordinadorTablaId) {
+  const existente = await prisma.evento_calendario.findFirst({
+    where: { tipo: 'Periodo', fecha_inicio: new Date(FECHA_INICIO_PERIODO_MONICA) },
+    include: { periodo_registro: true },
+  });
+  if (existente) return existente.periodo_registro.id;
+
+  const evento = await prisma.evento_calendario.create({
+    data: {
+      coordinador_id: coordinadorTablaId,
+      nombre: 'Servicio Social 2027-1 (inicio 24/11/2026) — exclusivo demo, Mónica Quintero',
+      tipo: 'Periodo',
+      fecha_inicio: new Date(FECHA_INICIO_PERIODO_MONICA),
+      fecha_fin: new Date('2027-06-24'),
+    },
+  });
+  const periodo = await prisma.periodo_registro.create({
+    data: { evento_calendario_id: evento.id, anio: '2027', semestre: 's01', fecha_max_expediente: new Date(FECHA_MAX_EXPEDIENTE_PERIODO_MONICA) },
+  });
+  return periodo.id;
+}
+
+// Marca como leída la notificación real de bienvenida
+// (MODAL_BIENVENIDA_ALUMNO_ASIGNADO, gr-coordinador.service.js) para un
+// alumno que la demo representa con semanas/meses de historia — sin esto, el
+// modal "¡Felicidades, ya eres Alumno Asignado!" (dashboards.jsx) le volvería
+// a salir el 23 de noviembre a alguien que en la narrativa ya lleva tiempo
+// trabajando. NO se usa con Mónica (E): su escenario sí es "recién asignada,
+// aún no inicia".
+async function marcarBienvenidaLeida(usuarioId) {
+  await prisma.notificacion.updateMany({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+    data: { leida: true, fecha_leida: new Date() },
+  });
+}
+
 let PDF_BASE = null;
 async function pdfDummy() {
   if (!PDF_BASE) {
@@ -280,16 +343,20 @@ async function main() {
     console.log(`   -> D forzado a: ${resultado.estado_solicitud} (${resultado.motivo_rechazo})`);
   }
 
-  // ── E — alumno_asignado, periodo aún no inicia ───────────────────────────
+  // ── E — alumno_asignado, periodo aún no inicia (24 nov, ver nota arriba) ─
   {
-    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.E, ofertas.E1.ofertaId, PERIODO.FUTURO);
+    const coordinadorTabla = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
+    const periodoMonicaId = await obtenerOCrearPeriodoMonica(coordinadorTabla.id);
+    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.E, ofertas.E1.ofertaId, periodoMonicaId);
     await avanzarHastaAsignado(usuarioId, solicitudId, ofertas.E1.profesorUsuarioId, coordinadorUsuarioId);
+    // Sin marcarBienvenidaLeida a propósito: su escenario ES "recién asignada".
   }
 
   // ── F — alumno_asignado, ya inició, sin actividades (para 04-ah.js) ─────
   {
     const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.F, ofertas.F1.ofertaId, PERIODO.YA_INICIO);
     await avanzarHastaAsignadoHistorico(usuarioId, solicitudId, ofertas.F1.profesorUsuarioId, coordinadorUsuarioId);
+    await marcarBienvenidaLeida(usuarioId); // Sofía ya lleva semanas trabajando
   }
 
   // ── G1/G2 — 2 alumnos esperando el mismo cupo (sin tocar más) ────────────

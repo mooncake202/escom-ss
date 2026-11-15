@@ -83,7 +83,7 @@ async function resumenAlumno(usuarioId) {
     include: {
       cumulo_horas_y_faltas: true,
       solicitud_registro: {
-        include: { oferta: true, periodo_registro: true },
+        include: { oferta: true, periodo_registro: { include: { evento_calendario: true } } },
       },
     },
   });
@@ -92,7 +92,7 @@ async function resumenAlumno(usuarioId) {
     return {
       horasAcumuladas: 0, horasNetas: 0, faltasAcumuladas: 0, faltasConsecutivas: 0,
       actividadesAsignadas: 0, reportesAprobados: 0,
-      ofertaNombre: null, periodoLabel: null,
+      ofertaNombre: null, periodoLabel: null, periodoInicioFecha: null,
       bitacoraHoyPendiente: false, jornadaSinTerminar: false,
       baja: null,
       cumpleRequisitosLiberacion: false, tieneProcesoLiberacionIniciado: false, estadoLiberacion: null,
@@ -101,6 +101,7 @@ async function resumenAlumno(usuarioId) {
   }
 
   const solicitudId = alumno.solicitud_registro.id;
+  const fechaInicioPeriodo = alumno.solicitud_registro.periodo_registro?.evento_calendario?.fecha_inicio ?? null;
 
   const [actividadesAsignadas, reportesAprobados, actividadesPendientes, bitacoraHoyPendiente, jornadaSinTerminar, estadoLiberacion, cartaTermino] = await Promise.all([
 
@@ -110,7 +111,7 @@ async function resumenAlumno(usuarioId) {
     // Solo los aprobados por coordinación (aprobación final); no cuenta pendientes ni rechazados.
     prisma.reporte_mensual.count({ where: { solicitud_registro_id: solicitudId, estado_reporte: ESTADOS_REPORTE.APROBADO_COORDINADOR } }),
     tieneActividadesPendientes(solicitudId),
-    faltaBitacoraHoy(solicitudId),
+    faltaBitacoraHoy(solicitudId, fechaInicioPeriodo),
     tieneJornadaPendienteDatos(solicitudId),
     // Widget "Proceso de Liberación del Servicio Social" — reutiliza TAL
     // CUAL la validación de RN-LSS-02 ya construida en CU-LSS-01, no la
@@ -153,6 +154,9 @@ async function resumenAlumno(usuarioId) {
     jornadaSinTerminar,
     ofertaNombre: alumno.solicitud_registro.oferta?.nombre_proyecto ?? null,
     periodoLabel: formatearPeriodo(alumno.solicitud_registro.periodo_registro),
+    // Fecha exacta de inicio (no solo el semestre) — mismo campo que ya expone
+    // ah-profesor.service.js (periodoInicio) para AsignarActividades.jsx.
+    periodoInicioFecha: fechaInicioPeriodo,
     // null si no tiene ninguna baja en curso.
     baja,
     tieneProcesoLiberacionIniciado: estadoLiberacion.yaExiste,

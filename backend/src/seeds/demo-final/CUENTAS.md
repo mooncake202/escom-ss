@@ -1,3 +1,5 @@
+monica 
+Reporte de Sofía (punto 1)	Margen exacto	Es el ÚNICO caso con margen cero — vale la pena probarlo en vivo apenas empiece el día, como dices
 # Cuentas de `demo-final` — qué correo usar para cada escenario
 
 `demo-final/` siembra **muchos casos y variantes** (a diferencia de
@@ -27,34 +29,43 @@ encuentras el correo (o los correos, si el caso necesita más de uno).
 | Caso | Correo(s) |
 |---|---|
 | Coordinador genérico (cualquier caso de coordinación) | `coordinadorherrera@ipn.mx` o `coordinadorvillagran@ipn.mx` |
-| Profesor sin característica (base, 3 cupos) | `profesorcastillo@ipn.mx` |✅
-| Profesor con característica Investigador (+1, 4 cupos) | `profesorvaldez@ipn.mx` |✅
-| Profesor con característica Presidente de academia (+2, 5 cupos) | `profesorromero@ipn.mx` |
-| Profesor con característica Coordinador [de academia] (+2, 5 cupos) | `profesorochoa@ipn.mx` |
-| Profesor con característica Jefe de departamento (+3, 6 cupos) | `profesorsandoval@ipn.mx` |
-| Profesor con característica Funcionario (+3, 6 cupos) | `profesorfigueroa@ipn.mx` |
-| Profesor con característica Profesor coordinador de clubes (+3, 6 cupos) | `profesorvega@ipn.mx` |
+✅| Profesor sin característica (base, 3 cupos) | `profesorcastillo@ipn.mx` |
+✅| Profesor con característica Investigador (+1, 4 cupos) | `profesorvaldez@ipn.mx` |
+✅| Profesor con característica Presidente de academia (+2, 5 cupos) | `profesorromero@ipn.mx` |
+✅| Profesor con característica Coordinador [de academia] (+2, 5 cupos) | `profesorochoa@ipn.mx` |
+✅| Profesor con característica Jefe de departamento (+3, 6 cupos) | `profesorsandoval@ipn.mx` |
+✅| Profesor con característica Funcionario (+3, 6 cupos) | `profesorfigueroa@ipn.mx` |
+✅| Profesor con característica Profesor coordinador de clubes (+3, 6 cupos) | `profesorvega@ipn.mx` |
 | Ver quién creó a quién (`creado_por_id`) | `coordinadorherrera@ipn.mx` creó a los 7 profesores de arriba; `coordinadorvillagran@ipn.mx` fue creado por `coordinadorherrera@ipn.mx` |
 
 ### GR
 
 | Caso | Correo(s) |
 |---|---|
-| Oferta disponible para registrar un alumno EN VIVO (CU-GR-01 completo) | Oferta "Desarrollo de portal de trámites escolares", profesor `profesorcastillo@ipn.mx` |
-| Alumno esperando respuesta del profesor | `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
-| Rechazo por perfil (profesor rechaza, no por cupos) | mismo `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
-| Venció Reloj 1 (nunca envió expediente a tiempo) — pantalla de rechazo definitivo | `camacho0201@alumno.ipn.mx` |
-| Venció Reloj 2 (expediente nunca aprobado, el periodo ya inició) — pantalla de rechazo definitivo | `briones0301@alumno.ipn.mx` |
-| Alumno asignado, su periodo aún no inicia | `quintero0401@alumno.ipn.mx` |
-| Alumno asignado, ya inició — para grabar AH en vivo ese día | `barrera0501@alumno.ipn.mx` — profesor `profesorfigueroa@ipn.mx` |
-| Cupos dinámicos: auto-rechazo al llenarse el cupo | `estrada0601@alumno.ipn.mx` + `nava0701@alumno.ipn.mx` — profesor `profesorvega@ipn.mx` |
-| Cambiar de oferta tras un rechazo | el que quede rechazado del punto anterior (`estrada0601` o `nava0701`, según a cuál acepte el profesor) |
-| Corrección de registro SISS | `guerrero0801@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` (su 2ª oferta) |
-| Corrección de documentos iniciales | `maldonado0901@alumno.ipn.mx` — profesor `profesorromero@ipn.mx` (su 2ª oferta) |
-| Rechazo definitivo a mano por coordinación (no por cron) | `cervantes1001@alumno.ipn.mx` — profesor `profesorochoa@ipn.mx` (su 2ª oferta) |
-| Expediente con correcciones, todavía vigente — corregir y reenviar | `ibarra1101@alumno.ipn.mx` — profesor `profesorsandoval@ipn.mx` (su 2ª oferta) |
-| Expediente pendiente de revisión, sin decidir — coordinación decide en vivo | `pacheco1201@alumno.ipn.mx` — profesor `profesorfigueroa@ipn.mx` (su 2ª oferta) |
-| Carta compromiso entregada, esperando que coordinación confirme recepción | `olvera1301@alumno.ipn.mx` — profesor `profesorvega@ipn.mx` (su 2ª oferta) |
+✅| Oferta disponible para registrar un alumno EN VIVO (CU-GR-01 completo) | Oferta "Desarrollo de portal de trámites escolares"    
+      profesor `profesorcastillo@ipn.mx` | **16/12**
+✅| Alumno esperando respuesta del profesor | `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
+✅| Rechazo por perfil (profesor rechaza, no por cupos) | mismo `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
+✅| Venció Reloj 1 (nunca envió expediente a tiempo) — pantalla de rechazo definitivo | `camacho0201@alumno.ipn.mx` |
+✅| Venció Reloj 2 (expediente nunca aprobado, el periodo ya inició) — pantalla de rechazo definitivo | `briones0301@alumno.ipn.mx` |
+✅| Alumno asignado, su periodo aún no inicia | `quintero0401@alumno.ipn.mx` |
+✅| Alumno asignado, ya inició — para grabar AH en vivo ese día | `barrera0501@alumno.ipn.mx` — profesor `profesorfigueroa@ipn.mx` |
+✅| Cupos dinámicos: auto-rechazo al llenarse el cupo | `estrada0601@alumno.ipn.mx` + `nava0701@alumno.ipn.mx` — profesor 
+      `profesorvega@ipn.mx` |
+✅| Cambiar de oferta tras un rechazo | el que quede rechazado del punto anterior (`estrada0601` o `nava0701`, según a cuál acepte el 
+      profesor) |
+
+✅| Corrección de registro SISS | `guerrero0801@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` (su 2ª oferta) |
+✅| Corrección de documentos iniciales | `maldonado0901@alumno.ipn.mx` — profesor `profesorromero@ipn.mx` (su 2ª oferta) |
+✅| Rechazo definitivo a mano por coordinación (no por cron) | `cervantes1001@alumno.ipn.mx` — profesor `profesorochoa@ipn.mx` (su 2ª 
+      oferta) |
+✅| Carta compromiso entregada, esperando que coordinación confirme recepción | `olvera1301@alumno.ipn.mx` — profesor 
+      `profesorvega@ipn.mx` (su 2ª oferta) |
+✅| Expediente con correcciones, todavía vigente — corregir y reenviar | `ibarra1101@alumno.ipn.mx` — profesor `profesorsandoval@ipn.
+      mx` (su 2ª oferta) |
+✅| Expediente pendiente de revisión, sin decidir — coordinación decide en vivo | `pacheco1201@alumno.ipn.mx` — profesor 
+      `profesorfigueroa@ipn.mx` (su 2ª oferta) |
+
 
 Ver la sección **"GR — detalle de cada escenario"** más abajo para los pasos
 exactos de cómo reproducir cada uno en vivo, con sus actores.
@@ -63,14 +74,19 @@ exactos de cómo reproducir cada uno en vivo, con sus actores.
 
 | Caso | Correo(s) |
 |---|---|
-| Actividades variadas (vencida, completada a tiempo, completada tarde) + una sin asignar todavía, para asignar y grabar bitácora EN VIVO | `barrera0501@alumno.ipn.mx` — profesor `profesorfigueroa@ipn.mx` |
-| Alumno sin ninguna actividad asignada (dispara la alerta del profesor) | `quintero0401@alumno.ipn.mx` |
-| Bitácora rechazada que se queda rechazada | `rangel1401@alumno.ipn.mx` ("historia variada") — profesor `profesorvaldez@ipn.mx` (su 2ª oferta) |
-| Bitácora rechazada y luego reaprobada desde el historial | mismo `rangel1401@alumno.ipn.mx` |
-| Bitácora pendiente de revisión hace más de 5 días hábiles (recordatorio al profesor) | mismo `rangel1401@alumno.ipn.mx` |
-| 5+ faltas consecutivas y 18 faltas acumuladas a la vez | mismo `rangel1401@alumno.ipn.mx` |
-| Actividad editada / actividad con fecha límite extendida | mismo `rangel1401@alumno.ipn.mx` |
-| 480 horas netas completas — ya no puede iniciar jornada | `fuentes1501@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` (su 2ª oferta) |
+✅🟧 | Actividades variadas (vencida, completada a tiempo, completada tarde) + una sin asignar todavía para asignar y grabar      
+      bitácoraEN VIVO | `barrera0501@alumno.ipn.mx` — profesor `profesorfigueroa@ipn.mx` | ****************no se va a bloquear la bitacora por el reporte para el 23 de noviembre?**********************************************************
+✅🟧| Alumno sin ninguna actividad asignada (dispara la alerta del profesor) | `quintero0401@alumno.ipn.mx` | profesorsandoval@ipn.mx
+      **no dispara alerta porque no ha inciiado su periodo recuerda que es el 23 de nov la presentación**  
+✅| Bitácora rechazada que se queda rechazada | `rangel1401@alumno.ipn.mx` ("historia variada") — profesor `profesorvaldez@ipn.mx`   
+      (su 2ª oferta) | **NO HACER NADA**
+✅| Bitácora rechazada y luego reaprobada desde el historial | mismo `rangel1401@alumno.ipn.mx` |— profesor `profesorvaldez@ipn.mx`
+      **NO debes tocar 27 de octubre de 2026, actividad “Actualizar inventario de equipo de cómputo”**
+      **ES LA DEL 08 DE OCT**
+✅| Bitácora pendiente de revisión hace más de 5 días hábiles (recordatorio al profesor) | mismo `rangel1401@alumno.ipn.mx` |
+✅| 5+ faltas consecutivas y 18 faltas acumuladas a la vez | mismo `rangel1401@alumno.ipn.mx` |
+✅| Actividad editada / actividad con fecha límite extendida | mismo `rangel1401@alumno.ipn.mx` |
+✅| 480 horas netas completas — ya no puede iniciar jornada | `fuentes1501@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` (su 2ª oferta) 
 
 Ver la sección **"AH — detalle de cada escenario"** más abajo.
 
@@ -78,18 +94,23 @@ Ver la sección **"AH — detalle de cada escenario"** más abajo.
 
 | Caso | Correo(s) |
 |---|---|
-| Alumno con 480h + 7 reportes mensuales + global, todos aprobados (requisito de LSS) | `fuentes1501@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` |
+✅| Alumno con 480h + 7 reportes mensuales + global, todos aprobados (requisito de LSS) | `fuentes1501@alumno.ipn.mx` — profesor      
+    `profesorcastillo@ipn.mx` | 
+  **ALLUMNO SIN INICIAR**
 
 El REP completo (todos los escenarios de reportes, rechazos, etc.) lo construye Sol en `amd-pro-rep/`.
 
 ### LSS
 
+
 | Caso | Correo(s) |
 |---|---|
-| Evaluación de desempeño sin evaluar — profesor evalúa y firma en vivo, luego coordinación dictamina en vivo | `fuentes1501@alumno.ipn.mx` — profesor `profesorcastillo@ipn.mx` |
-| Evaluación ya aprobada, carta de término "solicitada" — coordinación la marca lista para recoger en vivo, luego el alumno confirma la recogida en vivo | `rosado1601@alumno.ipn.mx` — profesor `profesorromero@ipn.mx` (3ª oferta) |
-| Carta recogida, expediente de liberación enviado ("en revisión") — coordinación lo dictamina en vivo | `duarte1701@alumno.ipn.mx` — profesor `profesorochoa@ipn.mx` (3ª oferta) |
-| Expediente aprobado, constancia de término solicitada — coordinación redacta el mensaje en vivo | `bravo1801@alumno.ipn.mx` — profesor `profesorsandoval@ipn.mx` (3ª oferta) |
+✅| Evaluación de desempeño sin evaluar — profesor evalúa y firma en vivo, luego coordinación dictamina en vivo | `fuentes1501@alumno.
+  ipn.mx` — profesor `profesorcastillo@ipn.mx` | **ELLA LA INCIIA**
+✅| Evaluación ya aprobada, carta de término "solicitada" — coordinación la marca lista para recoger en vivo, luego el alumno confirma 
+  la recogida en vivo | `rosado1601@alumno.ipn.mx` — profesor `profesorromero@ipn.mx` (3ª oferta) |
+✅| Carta recogida, expediente de liberación enviado ("en revisión") — coordinación lo dictamina en vivo | `duarte1701@alumno.ipn.mx` — profesor `profesorochoa@ipn.mx` (3ª oferta) |
+✅| Expediente aprobado, constancia de término solicitada — coordinación redacta el mensaje en vivo | `bravo1801@alumno.ipn.mx` — profesor `profesorsandoval@ipn.mx` (3ª oferta) |
 
 Ver la sección **"LSS — detalle de cada escenario"** más abajo.
 
@@ -161,7 +182,10 @@ que la acción en vivo del 23 de noviembre sea la que complete ese paso.
   habilita actividades porque su fecha de inicio no ha llegado.
 - **Actor:** Alumna `quintero0401@alumno.ipn.mx` (solo inicia sesión).
 - Pantalla de espera de inicio de servicio social — su periodo empieza el
-  1° de diciembre de 2026, después de la demo.
+  **24 de noviembre de 2026** (periodo exclusivo para ella, creado en
+  `03-gr.js`, no uno de los 38 oficiales): el 23, "hoy < fecha_inicio" sigue
+  siendo cierto (aún no inicia) y además activa la alerta real del profesor
+  en AH-2 de abajo (solo se dispara con ≤1 día de margen).
 
 ### 6. Alumno asignado, ya inició — puente a AH
 - **Qué muestra:** el mismo estado final que el escenario 5
@@ -299,12 +323,14 @@ reconstruir historia (mismo criterio que ya se usó en el video).
   asignado actividades") desde la vista de la alumna.
 - **Actor:** Alumna `quintero0401@alumno.ipn.mx` (solo inicia sesión; su
   periodo tampoco ha iniciado, ver GR escenario 5).
-- **Ojo (verificado contra el código real, `ah.shared.js::evaluarAlertasActividad`):**
+- **Actualizado (verificado contra el código real, `ah.shared.js::evaluarAlertasActividad`):**
   la alerta calculada del PROFESOR (`sinActividades`, visible en su dashboard)
-  **NO se va a ver el 23 de noviembre** — solo se activa cuando faltan ≤1 día
-  para que inicie el periodo del alumno, y el de Mónica empieza el 1° de
-  diciembre (más de 1 semana después de la demo). Este escenario solo
-  demuestra el mensaje en la vista de la ALUMNA, no la alerta del profesor.
+  **SÍ se va a ver el 23 de noviembre** — se activa cuando faltan ≤1 día para
+  que inicie el periodo del alumno, y el de Mónica se movió a propósito al
+  **24 de noviembre** (periodo exclusivo, `03-gr.js`) para que esto se
+  cumpliera sin romper el escenario 5 de GR ("aún no inicia"). Antes el
+  periodo de Mónica era el 1° de diciembre y la alerta no se veía — se
+  corrigió moviendo solo su periodo, sin tocar ningún alumno más.
 
 ### 3-7. "Historia variada" — Gerardo Rangel Osorio
 - **Qué muestra:** 5 reglas de negocio distintas conviviendo en la misma
@@ -354,18 +380,22 @@ CU-LSS-01, RN-LSS-02). Firmas de profesor y alumno ya guardadas de verdad
 (`guardarRubrica` real con los PNG de `firmas-referencia/`); el sello de
 coordinación ya estaba sembrado de antes.
 
-### 1. Evaluación sin evaluar — profesor evalúa, coordinación dictamina
-- **Qué muestra:** el arranque real de todo LSS (CU-LSS-01, ya hecho por el
-  seed) y las 2 firmas que de verdad importan: el profesor calificando por
-  los 7 factores reales y firmando (CU-LSS-03), y coordinación dictaminando
-  con su sello (CU-LSS-04).
+### 1. Evaluación sin evaluar — alumna solicita, profesor evalúa, coordinación dictamina
+- **Qué muestra:** el arranque real de todo LSS COMPLETO en vivo — a
+  diferencia de los otros 3 checkpoints, aquí Itzel solo cumple los
+  requisitos (480h + 7 reportes, `cumpleRequisitosLiberacion: true`) pero
+  **todavía no presiona el botón**: ella misma solicita la evaluación
+  (CU-LSS-01) el 23 de noviembre, antes de que el profesor califique por los
+  7 factores reales y firme (CU-LSS-03), y coordinación dictamine con su
+  sello (CU-LSS-04).
 - **Actores:** Alumna `fuentes1501@alumno.ipn.mx`; profesor `profesorcastillo@ipn.mx`;
   cualquier coordinador.
-- **Pasos:** el profesor entra a "Evaluar desempeño de alumno" (su dashboard
-  ya muestra "1 alumno con evaluación pendiente"), selecciona a Itzel,
-  confirma que sus reportes están validados en SISS, califica los 7
-  factores y firma. Coordinación entra a su propia bandeja de dictámenes,
-  revisa y aprueba.
+- **Pasos:** Itzel entra a su dashboard y solicita su evaluación de
+  desempeño. El profesor entra a "Evaluar desempeño de alumno" (su dashboard
+  ya muestra "1 alumno con evaluación pendiente" apenas ella la solicita),
+  selecciona a Itzel, confirma que sus reportes están validados en SISS,
+  califica los 7 factores y firma. Coordinación entra a su propia bandeja de
+  dictámenes, revisa y aprueba.
 - **Resultado esperado:** `evaluacion_desempeno.estado` pasa de inexistente
   a `pendiente_dictamen` y luego a `aprobado_coordinador`.
 

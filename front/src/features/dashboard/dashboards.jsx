@@ -432,7 +432,11 @@ const DashboardAlumno = ({ C, sesion, resumen, notificaciones, onLeerNotificacio
           Bienvenido, <span style={{ color: C.accentText }}>{nombreCompletoSesion(sesion)}</span>
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: C.textMuted }}>
-          Inicio de servicio social: <strong style={{ color: C.textSecondary }}>{resumen.periodoLabel || "—"}</strong>
+          Inicio de servicio social: <strong style={{ color: C.textSecondary }}>
+            {resumen.periodoInicioFecha
+              ? new Date(resumen.periodoInicioFecha).toLocaleDateString("es-MX", { timeZone: "UTC" })
+              : resumen.periodoLabel || "—"}
+          </strong>
           {" · "}Oferta: <em>{resumen.ofertaNombre || "Sin asignar"}</em>
         </p>
       </div>

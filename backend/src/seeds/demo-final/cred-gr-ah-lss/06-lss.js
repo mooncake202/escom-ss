@@ -12,8 +12,9 @@
 // siquiera llamar a CU-LSS-01, y luego avanza por la cadena REAL de LSS
 // hasta su checkpoint:
 //
-//   Itzel   -> evaluacion_solicitada (CU-LSS-01 ya hecho)
-//              EN VIVO: profesor evalúa y firma (LSS-03) -> coordinador dictamina (LSS-04)
+//   Itzel   -> solo cumple los requisitos (CU-LSS-01 NO hecho a propósito)
+//              EN VIVO: ella misma solicita la evaluación (LSS-01) -> profesor evalúa y
+//              firma (LSS-03) -> coordinador dictamina (LSS-04)
 //   Nuevo B -> evaluación ya aprobada, carta_termino "solicitada"
 //              EN VIVO: coordinador la marca lista para recoger (LSS-06) -> alumno confirma recogida (LSS-05)
 //   Nuevo C -> carta recogida, expediente enviado ("expediente_en_revision")
@@ -144,6 +145,19 @@ async function avanzarHastaAsignado(usuarioId, solicitudId, profesorUsuarioId, c
   await grService.continuarAExpediente(usuarioId);
   await subirExpedienteSinChequeoDeFecha(usuarioId, solicitudId);
   await grCoordinadorService.decidirExpediente(solicitudId, 'aprobar', null, coordinadorUsuarioId);
+}
+
+// Marca como leída la notificación real de bienvenida
+// (MODAL_BIENVENIDA_ALUMNO_ASIGNADO, gr-coordinador.service.js) — sin esto,
+// el modal "¡Felicidades, ya eres Alumno Asignado!" (dashboards.jsx) le
+// volvería a salir el 23 de noviembre a B/C/D, que en la narrativa ya
+// recorrieron GR + 480h de AH + 7 reportes de REP. Mismo helper que usa
+// 03-gr.js/04-ah.js.
+async function marcarBienvenidaLeida(usuarioId) {
+  await prisma.notificacion.updateMany({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+    data: { leida: true, fecha_leida: new Date() },
+  });
 }
 
 // ── AH: 480h reales (mismo patrón de 04-ah.js::sembrarHoras480) ──────────
@@ -289,6 +303,7 @@ async function construirAlumnoBase(datosAlumno, ofertaId, profesorUsuarioId, coo
   if (sol.estado_solicitud === 'espera_respuesta_de_profesor') {
     await avanzarHastaAsignado(usuarioId, solicitudId, profesorUsuarioId, coordinadorUsuarioId);
   }
+  await marcarBienvenidaLeida(usuarioId); // ya recorrió 480h + 7 reportes reales, no es "recién asignado"
 
   await generarHoras480(solicitudId, datosAlumno.boleta, tituloActividad);
 
@@ -388,9 +403,10 @@ async function main() {
   const ofertas = await ofertasSeed.main();
   const coordinador = await prisma.usuario.findUnique({ where: { correo_institucional: CORREO_COORDINADOR } });
 
-  // ── Itzel (reusada): CU-LSS-01 ya hecho, el resto se demuestra en vivo ──
-  const itzel = await prisma.usuario.findUnique({ where: { correo_institucional: 'fuentes1501@alumno.ipn.mx' } });
-  await pasoIniciarEvaluacion(itzel.id);
+  // ── Itzel (reusada): solo cumple los requisitos, CU-LSS-01 se demuestra en vivo ──
+  // (antes el seed llamaba aquí a pasoIniciarEvaluacion(itzel.id) — se quitó a propósito:
+  // el botón "solicitar evaluación" no debe estar ya presionado, eso es justo lo que la
+  // alumna hace en vivo el 23 de noviembre, antes de que el profesor evalúe.)
 
   // ── B: evaluación ya aprobada, carta de término "solicitada" ────────────
   const b = await construirAlumnoBase(ALUMNO_B, ofertas.P1.ofertaId, ofertas.P1.profesorUsuarioId, coordinador.id, 'Dar seguimiento al rediseño de la plataforma de becas');

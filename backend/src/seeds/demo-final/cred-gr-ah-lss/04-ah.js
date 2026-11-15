@@ -155,6 +155,18 @@ async function avanzarHastaAsignado(usuarioId, solicitudId, profesorUsuarioId, c
   await grCoordinadorService.decidirExpediente(solicitudId, 'aprobar', null, coordinadorUsuarioId);
 }
 
+// Marca como leída la notificación real de bienvenida
+// (MODAL_BIENVENIDA_ALUMNO_ASIGNADO, gr-coordinador.service.js) — sin esto,
+// el modal "¡Felicidades, ya eres Alumno Asignado!" (dashboards.jsx) le
+// volvería a salir el 23 de noviembre a Gerardo e Itzel, que en la narrativa
+// ya llevan semanas/meses trabajando. Mismo helper que usa 03-gr.js.
+async function marcarBienvenidaLeida(usuarioId) {
+  await prisma.notificacion.updateMany({
+    where: { usuario_id: usuarioId, ruta_relacionada: 'MODAL_BIENVENIDA_ALUMNO_ASIGNADO', leida: false },
+    data: { leida: true, fecha_leida: new Date() },
+  });
+}
+
 // ── Helpers de bitácora histórica (replican confirmarBitacora, ver ah-alumno.service.js) ──
 
 function utc(iso) {
@@ -248,6 +260,7 @@ async function main() {
   if ((await prisma.solicitud_registro.findUnique({ where: { id: hv.solicitudId } })).estado_solicitud === 'espera_respuesta_de_profesor') {
     await avanzarHastaAsignado(hv.usuarioId, hv.solicitudId, ofertas.N1.profesorUsuarioId, coordinador.id);
   }
+  await marcarBienvenidaLeida(hv.usuarioId); // Gerardo ya lleva semanas trabajando
   await sembrarHistoriaVariada(hv, ofertas.N1.profesorUsuarioId);
 
   // ── Alumno "480 horas" ───────────────────────────────────────────────────
@@ -255,6 +268,7 @@ async function main() {
   if ((await prisma.solicitud_registro.findUnique({ where: { id: h480.solicitudId } })).estado_solicitud === 'espera_respuesta_de_profesor') {
     await avanzarHastaAsignado(h480.usuarioId, h480.solicitudId, ofertas.O1.profesorUsuarioId, coordinador.id);
   }
+  await marcarBienvenidaLeida(h480.usuarioId); // Itzel ya lleva meses trabajando
   await sembrarHoras480(h480);
 
   console.log('✅ 04-ah.js terminado.');

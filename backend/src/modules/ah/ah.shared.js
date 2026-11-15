@@ -140,9 +140,16 @@ async function obtenerBitacoraDelDia(solicitudRegistroId, diaUTC) {
 /**
  * Notificación tipo A #1 ("Falta tu bitácora del día"): hoy es día laboral
  * Y no existe ninguna bitácora de hoy (en cualquier estado) para la solicitud.
+ *
+ * `fechaInicioPeriodo` (opcional) cierra el mismo hueco que `servicioNoIniciado`
+ * ya cierra en `obtenerEstadoJornadaActual` (ah-alumno.service.js): sin esto, un
+ * alumno cuyo periodo todavía no inicia se veía notificado de una bitácora que
+ * ni siquiera puede registrar todavía (la pantalla de AH-03 ya lo bloquea, pero
+ * esta notificación del dashboard no lo sabía).
  */
-async function faltaBitacoraHoy(solicitudRegistroId) {
+async function faltaBitacoraHoy(solicitudRegistroId, fechaInicioPeriodo = null) {
   const hoy = calcularDiaMexicoUTC();
+  if (fechaInicioPeriodo && hoy < new Date(fechaInicioPeriodo)) return false;
   if (!(await esDiaLaborable(hoy))) return false;
   const existente = await obtenerBitacoraDelDia(solicitudRegistroId, hoy);
   return !existente;
