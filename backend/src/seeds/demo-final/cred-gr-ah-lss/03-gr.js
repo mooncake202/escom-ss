@@ -91,6 +91,43 @@ async function obtenerOCrearPeriodoMonica(coordinadorTablaId) {
   return periodo.id;
 }
 
+// Periodo EXCLUSIVO para K/L (Valeria Ibarra / Emiliano Pacheco) — mismo
+// motivo que el de Mónica arriba: el oficial PERIODO.FUTURO (id 24) tiene
+// fecha_max_expediente = 2026-11-18, que ya pasó para cualquier corrida de
+// este seed en o después del 18 de noviembre de 2026 (incluido el 23, día
+// real de la demo) — subirExpediente real (RF-GR-90) lo rechaza antes de
+// llegar a expediente_pendiente_revision/con_correcciones. No se toca el
+// periodo oficial 24 (aparece en el selector de registro en vivo, GR-1, y
+// es responsabilidad compartida de 00-comun) — se crea uno exclusivo, con
+// margen amplio sobre el 23 de noviembre tanto en fecha_max_expediente
+// (Reloj 1, antes de subir) como en fecha_inicio (Reloj 2, después de
+// subir — K y L terminan en expediente_con_correcciones/pendiente_revision,
+// ambos sujetos a Reloj 2, ver ESTADOS_RELOJ_2).
+const FECHA_INICIO_PERIODO_KL = '2026-12-20';
+const FECHA_MAX_EXPEDIENTE_PERIODO_KL = '2026-12-05';
+
+async function obtenerOCrearPeriodoKL(coordinadorTablaId) {
+  const existente = await prisma.evento_calendario.findFirst({
+    where: { tipo: 'Periodo', fecha_inicio: new Date(FECHA_INICIO_PERIODO_KL) },
+    include: { periodo_registro: true },
+  });
+  if (existente) return existente.periodo_registro.id;
+
+  const evento = await prisma.evento_calendario.create({
+    data: {
+      coordinador_id: coordinadorTablaId,
+      nombre: 'Servicio Social 2027-1 (inicio 20/12/2026) — exclusivo demo, Ibarra/Pacheco',
+      tipo: 'Periodo',
+      fecha_inicio: new Date(FECHA_INICIO_PERIODO_KL),
+      fecha_fin: new Date('2027-06-20'),
+    },
+  });
+  const periodo = await prisma.periodo_registro.create({
+    data: { evento_calendario_id: evento.id, anio: '2027', semestre: 's01', fecha_max_expediente: new Date(FECHA_MAX_EXPEDIENTE_PERIODO_KL) },
+  });
+  return periodo.id;
+}
+
 // Marca como leída la notificación real de bienvenida
 // (MODAL_BIENVENIDA_ALUMNO_ASIGNADO, gr-coordinador.service.js) para un
 // alumno que la demo representa con semanas/meses de historia — sin esto, el
@@ -383,7 +420,9 @@ async function main() {
 
   // ── K — expediente_con_correcciones (vigente) ───────────────────────────
   {
-    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.K, ofertas.K1.ofertaId, PERIODO.FUTURO);
+    const coordinadorTabla = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
+    const periodoKLId = await obtenerOCrearPeriodoKL(coordinadorTabla.id);
+    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.K, ofertas.K1.ofertaId, periodoKLId);
     await avanzarHastaExpedientePendiente(usuarioId, solicitudId, ofertas.K1.profesorUsuarioId, coordinadorUsuarioId);
     const existente = await prisma.solicitud_registro.findUnique({ where: { id: solicitudId } });
     if (existente.estado_solicitud === 'expediente_pendiente_revision') {
@@ -393,7 +432,9 @@ async function main() {
 
   // ── L — expediente_pendiente_revision, sin decidir (para coordinación en vivo) ─
   {
-    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.L, ofertas.L1.ofertaId, PERIODO.FUTURO);
+    const coordinadorTabla = await prisma.coordinador.findUnique({ where: { usuario_id: coordinadorUsuarioId } });
+    const periodoKLId = await obtenerOCrearPeriodoKL(coordinadorTabla.id);
+    const { usuarioId, solicitudId } = await crearYRegistrar(ALUMNOS.L, ofertas.L1.ofertaId, periodoKLId);
     await avanzarHastaExpedientePendiente(usuarioId, solicitudId, ofertas.L1.profesorUsuarioId, coordinadorUsuarioId);
   }
 
