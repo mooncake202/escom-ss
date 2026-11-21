@@ -55,6 +55,9 @@ lerna-debug.log*
 # Scripts locales de desarrollo
 # ===========================
 *.bat
+# Excepción: todo lo de demo-final sí se versiona a propósito (incluye
+# scripts .bat de conveniencia, como reset-y-sembrar-demo.bat).
+!backend/src/seeds/demo-final/**
 
 # ===========================
 # Editores / IDEs
