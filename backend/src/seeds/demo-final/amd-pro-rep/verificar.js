@@ -154,7 +154,8 @@ async function misCasos() {
 
 // ── Acceso real del servidor (usuario `node`) a mis archivos ──────────────
 //
-// El backend corre como `node`; si un archivo no es legible/escribible por ese
+// En local el backend corre como `node` (en la VM corre como root y esta prueba
+// siempre pasa); si un archivo no es legible/escribible por ese
 // usuario, la pantalla falla (500 EACCES en el historial de REP, 404 en ADM-13).
 // La prueba se hace DE VERDAD como node:
 //   - si verificar.js corre como root (lo normal: `docker compose exec`), lanza un
@@ -166,26 +167,13 @@ async function misCasos() {
 function probarAccesoComoNode(plan) {
   const fs = require('fs');
   const path = require('path');
-  const r = { leer: [], escribir: [], carpetasAjenas: [] };
+  const r = { leer: [], escribir: [] };
   for (const f of plan.leer) {
     try { fs.readFileSync(f); r.leer.push([f, true]); } catch (e) { r.leer.push([f, e.code]); }
   }
   for (const d of plan.escribir) {
     const t = path.join(d, `.verificar-node-${process.pid}`);
     try { fs.writeFileSync(t, 'x'); fs.unlinkSync(t); r.escribir.push([d, true]); } catch (e) { r.escribir.push([d, e.code]); }
-  }
-  // Carpetas ajenas: ¿node puede recorrerlas y leer todo lo que hay dentro?
-  const recorrer = (ruta) => {
-    const st = fs.lstatSync(ruta);
-    if (st.isDirectory()) { for (const h of fs.readdirSync(ruta)) recorrer(path.join(ruta, h)); } else { fs.closeSync(fs.openSync(ruta, 'r')); }
-  };
-  for (const c of plan.ajenas) {
-    let lectura = true;
-    let escritura = true;
-    try { recorrer(c); } catch (e) { lectura = e.code; }
-    const t = path.join(c, `.verificar-node-${process.pid}`);
-    try { fs.writeFileSync(t, 'x'); fs.unlinkSync(t); } catch (e) { escritura = e.code; }
-    r.carpetasAjenas.push([c, lectura, escritura]);
   }
   return r;
 }
@@ -217,7 +205,7 @@ function archivosDe(carpeta) {
 async function verificarAccesoNode() {
   console.log('\n· Acceso del servidor (usuario node) a mis archivos');
   const alumnos = [...ALUMNOS, ...ALUMNOS_BAJAS];
-  const plan = { leer: [], escribir: [], ajenas: [] };
+  const plan = { leer: [], escribir: [] };
   const porDueño = new Map(); // ruta → etiqueta del usuario mío al que pertenece
 
   for (const al of alumnos) {
@@ -245,14 +233,6 @@ async function verificarAccesoNode() {
   }
   plan.escribir = [...new Set(plan.escribir)];
 
-  // Carpetas de Karen (solo informativo): todo lo que NO es mío, sin coordinador/.
-  for (const n of fs.existsSync(RUTA_BASE_DOCUMENTOS) ? fs.readdirSync(RUTA_BASE_DOCUMENTOS) : []) {
-    if (!esBoletaMia(n)) plan.ajenas.push(path.join(RUTA_BASE_DOCUMENTOS, n));
-  }
-  for (const n of fs.existsSync(RUTA_BASE_PROFESORES) ? fs.readdirSync(RUTA_BASE_PROFESORES) : []) {
-    if (!CORREOS_PROFESORES.includes(n)) plan.ajenas.push(path.join(RUTA_BASE_PROFESORES, n));
-  }
-
   let r;
   try { r = ejecutarComoNode(plan); } catch (e) { falla(e.message); return; }
 
@@ -269,10 +249,7 @@ async function verificarAccesoNode() {
   } else {
     for (const [quien, lista] of malos) falla(`node no puede acceder (${quien}): ${lista.slice(0, 3).join(', ')}${lista.length > 3 ? ` … y ${lista.length - 3} más` : ''}`);
   }
-  ACCESO_KAREN = r.carpetasAjenas;
 }
-
-let ACCESO_KAREN = null;
 
 async function verificarOfertas() {
   console.log('\n· Ofertas (PRO)');
@@ -725,19 +702,6 @@ async function verificarPdfsConTexto() {
 
 async function datosDeKaren() {
   console.log('\n══ DATOS DE KAREN (solo informativo) ══');
-
-  console.log('\n· Acceso del servidor (usuario node) a sus carpetas de uploads/');
-  if (ACCESO_KAREN) {
-    const lista = (xs) => `${xs.slice(0, 6).map(([c]) => path.basename(c)).join(', ')}${xs.length > 6 ? ' …' : ''}`;
-    const sinLectura = ACCESO_KAREN.filter(([, l]) => l !== true);
-    const sinEscritura = ACCESO_KAREN.filter(([, , e]) => e !== true);
-    if (!sinLectura.length && !sinEscritura.length) ok(`node puede leer y escribir sus ${ACCESO_KAREN.length} carpeta(s)`);
-    else {
-      if (sinLectura.length) aviso(`node no puede LEER ${sinLectura.length} de ${ACCESO_KAREN.length} carpeta(s) suyas (firmas/reportes de root): ${lista(sinLectura)}`);
-      if (sinEscritura.length) aviso(`node no puede ESCRIBIR en ${sinEscritura.length} de ${ACCESO_KAREN.length} carpeta(s) suyas (subidas en vivo fallarían): ${lista(sinEscritura)}`);
-      aviso('propuesta (no aplicada): docker compose exec -T backend chown -R node:node /app/backend/uploads/documentos /app/backend/uploads/profesores');
-    }
-  }
 
   console.log('\n· Coordinadores');
   const coords = await prisma.usuario.findMany({ where: { rol: 'coordinador' } });

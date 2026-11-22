@@ -10,25 +10,52 @@ Se va actualizando conforme se siembra cada parte:
 - Parte 3 (REP): ✅ 6 alumnos de `profesorlozano` + su solicitud de característica.
 - Parte 4 (ADM): ✅ característica de `profesorsalinas`, 3 alumnos de bajas, anuncios y carta firmada de `rojas2301`.
 
-## ⚠️ Avisos para Karen (afectan pantallas compartidas)
+## ⚠️ Avisos para Karen
 
-- **Panel de coordinación → "Ofertas por validar" = 2** (antes 0): son S1 y S2 de
-  `profesorsalinas`, mi caso en vivo (una se aprueba y otra se rechaza). Es un
-  conteo calculado, no una notificación: no se puede marcar como leído.
+**a) Falta `TSA_URL_RESPALDO` en el `.env` de la VM.** El servidor en marcha no
+tiene TSA de respaldo: si la principal (FreeTSA) no responde durante la demo,
+firmar, validar o generar reportes en vivo falla. En la siembra se pasa con `-e`
+(ver abajo), pero eso no le llega al servidor.
+
+**b) El `.env` de la VM tiene permisos `-rw--w----`.** Otros usuarios del grupo
+pueden escribir en él pero no leerlo (por eso mis pasos usan `docker exec` y no
+`docker compose`, que necesita leer el `.env`).
+
+**c) En la VM tus seeds mandan correos reales**, que rebotan (cuentas `@ipn.mx`
+ficticias). Se evita corriendo tu paso con `-e SMTP_HOST=` (vacío): el mailer
+pasa a modo simulado e imprime en consola. Mi seed ya lo hace internamente.
+
+**d) Documentos de GR de tus alumnos en blanco**: `pdfDummy` genera PDFs sin
+texto (carta de créditos, constancia del seguro, expediente), así que al abrirlos
+en vivo se ven páginas vacías. Los de mis alumnos usan PDFs de ejemplo con texto.
+
+**e) Tu seed se queda colgado por Redis** (la conexión de `lib/redis.js` nunca se
+cierra). Es seguro hacer Ctrl+C en cuanto imprime "✅ cred-gr-ah-lss completo." y
+luego terminar el proceso que queda dentro del contenedor (ver paso 3 abajo).
+
+**f) Rúbricas viejas de pruebas en `uploads/` de la VM** (boletas `20196390xx`,
+`20266xxxxx`, correos tipo `kseis…`, entre otras). `migrate reset` no limpia
+`uploads/`: si en vivo alguien se registra con esa boleta o correo y llega a firmar,
+`guardarRubrica` encuentra el `rubrica.enc` anterior y responde 409
+`RUBRICA_YA_REGISTRADA`. Mi seed solo limpia las carpetas de mis usuarios.
+
+**g) Lo que verás en coordinación por mis casos:**
+- **"Ofertas por validar" = 2** (antes 0): S1 y S2 de `profesorsalinas`, mi caso
+  en vivo (una se aprueba y otra se rechaza). Es un conteo calculado, no una
+  notificación: no se puede marcar como leído.
 - **Catálogo de ofertas de los alumnos** (registro en vivo GR-1 y los alumnos que
   cambian de oferta tras un rechazo, p. ej. `rosales0101` y `nava0701`): además
-  de tus ofertas aparece **"Banco de reactivos para exámenes de Cálculo"**
+  de tus ofertas aparece **S3 "Banco de reactivos para exámenes de Cálculo"**
   (`profesorsalinas`, 1 cupo). Mis demás ofertas aprobadas están llenas con mis
   alumnos y no salen.
-  - ⚠️ **Si en vivo apruebo la baja de `zamora2701`**, su oferta **"Clasificación de
-    imágenes para el acervo fotográfico"** (`profesoraguirre`) recupera 1 cupo y
-    **vuelve a aparecer en el catálogo** desde ese momento.
+  - ⚠️ **Si en vivo apruebo la baja de `zamora2701`**, su oferta **A1
+    "Clasificación de imágenes para el acervo fotográfico"** (`profesoraguirre`)
+    recupera 1 cupo y **vuelve a aparecer en el catálogo** desde ese momento.
 - **Historial de ofertas de coordinación (PRO-03)**: además de tus 17 aparecen 8
   mías (aprobadas o rechazadas). Las cerradas y concluidas no salen en ese historial.
-- **Panel de coordinación → reportes por validar = 1**: el Reporte 4 de
-  `espinoza2101` (caso en vivo).
-- **Campana de coordinación: 3 notificaciones SIN LEER por coordinador (6 en
-  total, herrera y villagrán)**, todas de mis casos en vivo de ADM:
+- **Reportes por validar = 1**: el Reporte 4 de `espinoza2101` (caso en vivo).
+- **Campana: 3 notificaciones SIN LEER por coordinador (6 en total, herrera y
+  villagrán)**, todas de mis casos en vivo de ADM:
   1. "Roberto Lozano Medina solicitó un cambio de característica: Jefe de
      departamento → Investigador" (21 sep).
   2. "Elena Salinas Corona solicitó un cambio de característica: Profesor base →
@@ -37,58 +64,53 @@ Se va actualizando conforme se siembra cada parte:
      adjuntó su expediente" (18 nov).
   Además les dejo 4 notificaciones ya leídas por coordinador (bajas de
   `dominguez2501` y `zamora2701`, del 9 al 11 nov). Tus seeds no les crean ninguna.
-- **Bandeja de bajas de coordinación**: 2 activas mías (`castro2601` pendiente y
-  `zamora2701` en revisión) y 1 rechazada en el historial (`dominguez2501`).
+- **Bandeja de bajas**: 2 activas mías (`castro2601` pendiente y `zamora2701` en
+  revisión) y 1 rechazada en el historial (`dominguez2501`).
 - **Carta compromiso firmada (ADM-14)**: la lista muestra a todos los alumnos
   asignados (también los tuyos, todos pendientes); de los míos, solo `rojas2301`
   la tiene.
 - Ningún anuncio de coordinación: tus alumnos no ven anuncios míos.
-- ⚠️ **Permisos de archivos en `uploads/` (afecta también tus casos en vivo)**:
-  - **Causa:** el backend corre como el usuario `node` (uid 1000; el contenedor
-    arranca con `runuser -u node -- npx nodemon server.js`), pero los seeds corren
-    como root con `docker compose exec`. Todo lo que crean queda `root:root`, y los
-    servicios de REP además crean carpetas 700 y archivos 600
-    (`reportes-envio.service.js:83-85`, `reportes.rubricas.js:121-123`).
-  - **Efecto:** `node` no puede leer firmas ni PDFs de reportes (historial de
-    reportes → 500 `EACCES`; ADM-13 → 404 "El archivo ya no está disponible") ni
-    escribir en esas carpetas: fallan en vivo generar, firmar, validar y corregir
-    reportes, el global, y cualquier subida de GR, LSS o bajas en una carpeta de
-    alumno creada por el seed.
-  - **Tus carpetas afectadas (comprobado el 22-nov):** `node` no puede **leer** 8
-    (las de `fuentes1501`, `rosado1601`, `duarte1701`, `bravo1801` y las de
-    `profesorcastillo`, `profesorochoa`, `profesorromero`, `profesorsandoval`), y
-    no puede **escribir** en 18: todas las que crea tu seed (son de root).
-    `verificar.js` lo muestra con ⚠️ en "DATOS DE KAREN".
-  - **Mis carpetas ya están resueltas:** `amd-pro-rep/index.js` (paso 7,
-    `_permisos.js`) cambia a `node:node` solo mis carpetas.
-  - **Propuesta para las tuyas (no aplicada, hay que acordarla):** después de tu
-    seed, un paso como root:
-    `docker compose exec -T backend chown -R node:node /app/backend/uploads/documentos /app/backend/uploads/profesores`
-    Solo cambia el dueño (no el contenido, la BD ni el cifrado); las carpetas base y
-    `coordinador/` ya son de `node`.
 
 ## Siembra del lunes 23 de noviembre de 2026
 
 Los seeds de Karen dependen del día en que se corren, así que la cadena es única
-y se corre **el mismo lunes, temprano (propuesta: ~8:00)**, sobre BD vacía:
+y se corre **el mismo lunes, temprano (propuesta: ~8:00)**, sobre BD vacía.
 
-1. `docker compose exec -T backend npx prisma migrate reset --force`
-2. `docker compose exec -T backend node backend/src/seeds/demo-final/00-comun/index.js`
-3. `docker compose exec -T backend node backend/src/seeds/demo-final/cred-gr-ah-lss/index.js`
-   (al terminar imprime "✅ cred-gr-ah-lss completo." y se queda colgado: cancelar)
-4. `docker compose exec -T backend node backend/src/seeds/demo-final/amd-pro-rep/index.js`
+En la VM mi usuario no puede leer el `.env`, y `docker compose` lo necesita; por
+eso los pasos van con **`docker exec escom_backend …`** (el contenedor ya trae su
+entorno y su directorio de trabajo es `/app`). Karen puede usar cualquiera de las
+dos formas (`docker compose exec -T backend …` también funciona para ella).
+
+0. `docker exec escom_redis redis-cli FLUSHDB` (limpia sesiones y colas de la BD anterior)
+1. `docker exec escom_backend npx prisma migrate reset --force`
+2. `docker exec escom_backend node backend/src/seeds/demo-final/00-comun/index.js`
+3. `docker exec -e TSA_URL_RESPALDO=http://timestamp.digicert.com escom_backend node backend/src/seeds/demo-final/cred-gr-ah-lss/index.js`
+   Al terminar imprime "✅ cred-gr-ah-lss completo." y se queda colgado: Ctrl+C y
+   luego `docker exec escom_backend pkill -f cred-gr-ah-lss/index.js` (el Ctrl+C
+   corta el cliente, pero el proceso sigue vivo dentro del contenedor).
+4. `docker exec -e TSA_URL_RESPALDO=http://timestamp.digicert.com escom_backend node backend/src/seeds/demo-final/amd-pro-rep/index.js`
    (termina solo con código 0; tarda ~30 s, en el peor caso ~11 min si la TSA
    principal no responde y cada firma espera al respaldo)
 
+`-e TSA_URL_RESPALDO=…` solo aplica a **ese** proceso: en el `.env` de la VM falta
+la TSA de respaldo y así los seeds no dependen solo de FreeTSA. No cambia el
+`.env` ni el servidor en marcha (que sigue sin respaldo, ver aviso a).
+
+En Windows los mismos comandos funcionan igual: todo corre dentro del contenedor.
+
 **A las 9:30 solo se corre la verificación** (solo lectura, ~3 s):
-`docker compose exec -T backend node backend/src/seeds/demo-final/amd-pro-rep/verificar.js`
+`docker exec escom_backend node backend/src/seeds/demo-final/amd-pro-rep/verificar.js`
 
 Se corre así, como root (no hace falta `-u node`): para probar el acceso real del
 servidor, `verificar.js` lanza un proceso hijo con el uid/gid del usuario `node`
 (leídos de `/etc/passwd` del contenedor), que lee cada firma y PDF de mis
 usuarios y crea y borra un archivo temporal en sus carpetas. Si se corre con
-`docker compose exec -T -u node backend node …`, hace la misma prueba
+`docker exec -u node escom_backend node …`, hace la misma prueba
 directamente. Si `node` no puede leer o escribir algo mío: ❌ y código 1.
+En la VM el servidor corre como root (comprobado con `docker top`), así que ahí
+esta prueba siempre pasa; el problema de dueño `root` vs `node` solo existe en
+entornos donde el servidor corre como `node` (mi local), y el paso 7 de mi
+`index.js` lo resuelve para mis carpetas.
 
 También revisa la regla de rúbricas: cada usuario mío tiene rúbrica ⇔ ya firmó
 algo, y quien no tiene no deja carpeta `Rubrica/` en disco. ⚠️ Si se ensaya en
