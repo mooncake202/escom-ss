@@ -38,6 +38,13 @@ const CREDITOS_MAX_DICTAMEN_CREDITOS = 70;
 const SEMESTRE_MIN_DICTAMEN_CREDITOS = 6;
 // RN-GR-03: alumno.creditos ahora es Decimal(5,2), ya no hace falta redondear.
 const CREDITOS_MIN_DICTAMEN_ELECTIVA = 96.01;
+// Semestre: entero positivo, tope razonable (nadie real pasa de 30 semestres).
+const SEMESTRE_MIN = 1;
+const SEMESTRE_MAX = 30;
+const semestreInvalido = (semestre) => {
+  const n = Number(semestre);
+  return !Number.isInteger(n) || n < SEMESTRE_MIN || n > SEMESTRE_MAX;
+};
 
 
 const DICTAMEN_MAP = { creditos: 1, estancia: 2, electiva: 3 };
@@ -190,8 +197,11 @@ async function enviarSolicitudRegistro(datos) {
     throw crearError('Describe tu motivo de postulación (mínimo 20 caracteres).');
   }
 
-  if (!creditos || !semestre || isNaN(Number(creditos)) || isNaN(Number(semestre)) ) {
+  if (!creditos || !semestre || isNaN(Number(creditos)) || isNaN(Number(semestre))) {
     throw crearError('Créditos y semestre son obligatorios y válidos.');
+  }
+  if (semestreInvalido(semestre)) {
+    throw crearError(`El semestre debe ser un número entero entre ${SEMESTRE_MIN} y ${SEMESTRE_MAX}.`);
   }
 
   const dictamenNumerico = validarDictamenYCreditos(tipoLiberacion, Number(creditos), Number(semestre));
@@ -912,6 +922,9 @@ async function reenviarSolicitudModificada(usuarioId, datos) {
 
   if (!creditos || !semestre || isNaN(Number(creditos)) || isNaN(Number(semestre))) {
     throw crearError('Créditos y semestre son obligatorios y válidos.');
+  }
+  if (semestreInvalido(semestre)) {
+    throw crearError(`El semestre debe ser un número entero entre ${SEMESTRE_MIN} y ${SEMESTRE_MAX}.`);
   }
 
   const dictamenNumerico = validarDictamenYCreditos(tipoLiberacion, Number(creditos), Number(semestre));

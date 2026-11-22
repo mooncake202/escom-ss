@@ -99,7 +99,7 @@ export function StepDatosAcademicos({ form, errors, handleChange, C, periodos}) 
       </Field>
 
       <Field label="Semestre actual" hint="Coloca el semestre exacto que muestra tu constancia" C={C}>
-        <InputField C={C} name="semestre" type="number" placeholder="Ej. 7" min="0" max="100" value={form.semestre} onChange={handleChange} />
+        <InputField C={C} name="semestre" type="number" placeholder="Ej. 7" min="1" max="30" value={form.semestre} onChange={handleChange} />
         <ErrorMsg field="semestre" errors={errors} C={C} />
 
       </Field>

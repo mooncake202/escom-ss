@@ -50,6 +50,11 @@ export function validateStep(step, form, aceptaCreditos) {
 
     if (!form.creditos) errors.creditos = "Campo requerido";
     if (!form.semestre)  errors.semestre  = "Campo requerido";
+    else {
+      const semestreNum = Number(form.semestre);
+      if (!Number.isInteger(semestreNum) || semestreNum < 1 || semestreNum > 30)
+        errors.semestre = "El semestre debe ser un número entero entre 1 y 30";
+    }
     if (!form.periodo)  errors.periodo  = "Selecciona un periodo";
 
     // RN-GR-02 / RN-GR-03 / Flujos Alternos A y B: el umbral de créditos

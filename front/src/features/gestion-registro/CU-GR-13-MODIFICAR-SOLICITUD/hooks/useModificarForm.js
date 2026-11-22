@@ -45,6 +45,11 @@ function validarPaso(step, form, acepta) {
     if (!form.carrera) errs.carrera = "Selecciona una carrera";
     if (!form.creditos) errs.creditos = "Campo requerido";
     if (!form.semestre) errs.semestre = "Campo requerido";
+    else {
+      const semestreNum = Number(form.semestre);
+      if (!Number.isInteger(semestreNum) || semestreNum < 1 || semestreNum > 30)
+        errs.semestre = "El semestre debe ser un número entero entre 1 y 30";
+    }
     if (!form.periodo) errs.periodo = "Selecciona un periodo";
 
     if (form.creditos && form.semestre) {
