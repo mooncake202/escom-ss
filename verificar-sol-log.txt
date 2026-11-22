@@ -1,0 +1,91 @@
+verificar.js · 22/11/2026, 3:05:32 p.m. (México)
+
+══ MIS CASOS (deciden el resultado) ══
+
+· Profesores
+  ✅ P1 profesorlozano@ipn.mx · Jefe_de_departamento · 6 cupos · creado por herrera · contraseña OK
+  ✅ P2 profesorsalinas@ipn.mx · base · 3 cupos · creado por herrera · contraseña OK
+  ✅ P3 profesoraguirre@ipn.mx · base · 3 cupos · creado por herrera · contraseña OK
+  ✅ 3 profesores míos, sin duplicados
+
+· Alta de mis profesores
+  ✅ P1 fecha_creacion 2026-02-03
+  ✅ P2 fecha_creacion 2026-02-03
+  ✅ P3 fecha_creacion 2026-02-03
+
+· Ofertas (PRO)
+  ✅ S1 Asistente virtual para dudas de inscripción · pendiente_revision · registro 2026-11-19
+  ✅ S2 Tablero de asistencia a asesorías de Ciencias Básicas · pendiente_revision · registro 2026-11-20
+  ✅ S3 Banco de reactivos para exámenes de Cálculo · aprobada · registro 2026-11-09 · coordinadorherrera
+  ✅ S4 Apoyo general en laboratorio · rechazada · registro 2026-11-04 · coordinadorvillagran
+  ✅ S5 Captura de calificaciones históricas de Álgebra · cerrada · registro 2026-09-14 · coordinadorherrera
+  ✅ S6 Material didáctico de Matemáticas Discretas · concluida · registro 2026-02-09 · coordinadorvillagran
+  ✅ L1 Sistema de seguimiento de egresados · aprobada · registro 2026-02-26 · coordinadorherrera
+  ✅ L2 Migración del portal departamental · aprobada · registro 2026-06-02 · coordinadorherrera
+  ✅ L3 Inventario de equipo de laboratorios · aprobada · registro 2026-08-26 · coordinadorherrera
+  ✅ L4 Automatización de constancias internas · aprobada · registro 2026-09-09 · coordinadorherrera
+  ✅ A1 Clasificación de imágenes para el acervo fotográfico · aprobada · registro 2026-09-23 · coordinadorvillagran
+  ✅ 6 ofertas mías aprobadas; ninguna la concluiría el cron
+  ✅ P2 salinas: 0 cupos ocupados
+
+· Reportes (REP)
+  ✅ sello de coordinación (uploads/coordinador) se descifra con la ENCRYPTION_KEY de este entorno
+  ✅ P1 con firma registrada (BD y disco)
+  ✅ P1 lozano: 6 de 6 cupos ocupados
+  ✅ 1901 ortega1901@alumno.ipn.mx · 24 bitácoras, 96 h · [sin reportes] · 23-nov: R1 generable · preventivo 5/5
+  ✅ 2001 mejia2001@alumno.ipn.mx · 25 bitácoras, 100 h · [sin reportes] · 23-nov: R1 generable · vencido · AH bloqueada
+  ✅ 2101 espinoza2101@alumno.ipn.mx · 84 bitácoras, 336 h · [AC AC RC PC] · 23-nov: R5 PERIODO_NO_CERRADO
+  ✅ 2201 padilla2201@alumno.ipn.mx · 84 bitácoras, 336 h · [AC RP AC PP] · 23-nov: R5 PERIODO_NO_CERRADO
+  ✅ 2301 rojas2301@alumno.ipn.mx · 120 bitácoras, 480 h · [AC AC AC AC AC AC AC] · 23-nov: global listo
+  ✅ 2401 hernandez2401@alumno.ipn.mx · 19 bitácoras, 76 h · [sin reportes] · 23-nov: R1 BITACORAS_SIN_REVISAR · preventivo 5/5
+  ✅ P1 solicita Investigador: pendiente · capacidad resultante 4 · 6 ocupados · "ya no puede aprobarse" (liberar 2)
+
+· Rúbricas (con rúbrica ⇔ ya firmó algo)
+  ✅ con rúbrica (ya firmaron): P1, 2101, 2201, 2301 · sin rúbrica ni carpeta Rubrica/ (la dibujan en vivo): P2, P3, 1901, 2001, 2401, 2501, 2601, 2701
+
+· Administrativo (ADM)
+  ✅ P2 solicita Investigador: pendiente · capacidad resultante 4 · 0 ocupados · aprobable en vivo
+  ✅ 2501 dominguez2501@alumno.ipn.mx · baja rechazada (rechazada, origen profesor) · amonestación sin leer
+  ✅ 2601 castro2601@alumno.ipn.mx · baja pendiente (pendiente_coordinacion, origen alumno)
+  ✅ 2701 zamora2701@alumno.ipn.mx · baja en_revision (en_revision_autoridades, origen profesor)
+  ✅ P3 aguirre: todas sus notificaciones leídas
+  ✅ coordinadores: 6 notificaciones sin leer (3 por coordinador: características de P1 y P2, baja de 2601)
+  ✅ anuncio P1 "Reunión de seguimiento del viernes 6 de noviembre" · 2026-11-03 · visto 6/6
+  ✅ anuncio P1 "Recordatorio: revisen el plazo de su reporte mensual" · 2026-11-17 · visto 0/6
+  ✅ anuncio P3 "Reunión de arranque del proyecto" · 2026-11-04 · visto 2/3
+  ✅ ningún anuncio de coordinación
+  ✅ carta firmada 1901: pendiente (se sube en vivo)
+  ✅ carta firmada 2101: pendiente
+  ✅ carta firmada 2201: pendiente
+  ✅ carta firmada 2301: enviada 2026-11-20 (etapa Término de ADM-13)
+  ✅ ADM-13 rojas2301: 11 documentos (inicio + carta firmada + 7 reportes mensuales)
+  ✅ ADM-17: lozano 6 alumnos · salinas 0 · aguirre 3
+
+· Documentos de ejemplo de mis alumnos (texto legible)
+  ✅ 31 documentos con texto en todas sus páginas (carta_creditos 9, constancia_seguro_social 9, expediente 9, expediente_baja 3, carta_compromiso_firmada 1)
+
+· uploads/ de mis usuarios
+  ✅ 10 carpeta(s) mía(s) en uploads, ninguna huérfana ni con rubrica.enc vieja
+
+· Acceso del servidor (usuario node) a mis archivos
+  ❌ node no puede acceder (P3 profesoraguirre (base profesores/)): profesores (EACCES)
+
+══ DATOS DE KAREN (solo informativo) ══
+
+· Coordinadores
+  ✅ 2 coordinadores: herrera y villagrán
+
+· Profesores
+  ✅ 7 profesores con su característica y cupos esperados
+
+· Alumnos y solicitudes
+  ✅ 18 alumnos con su solicitud en el estado esperado
+  ✅ 27 usuarios de 00-comun + Karen (2 + 7 + 18)
+  ✅ 18 solicitudes de Karen
+
+· Ofertas
+  ✅ 18 ofertas: 17 aprobadas + 1 concluida
+
+══ Resultado ══
+  MIS CASOS: ❌ 1 falla(s)
+  DATOS DE KAREN: ✅ como se esperaba

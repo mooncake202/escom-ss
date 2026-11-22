@@ -1,0 +1,627 @@
+── 1. CRED (7 profesores) ──
+✅ profesor creado: profesorcastillo@ipn.mx (base)
+✅ profesor creado: profesorvaldez@ipn.mx (Investigador)
+✅ profesor creado: profesorromero@ipn.mx (Presidente_de_academia)
+✅ profesor creado: profesorochoa@ipn.mx (Coordinador)
+✅ profesor creado: profesorsandoval@ipn.mx (Jefe_de_departamento)
+✅ profesor creado: profesorfigueroa@ipn.mx (Funcionario)
+✅ profesor creado: profesorvega@ipn.mx (Profesor_coordinador_de_clubes)
+── 2. Ofertas mínimas (placeholder de PRO) ──
+✅ oferta A1 creada y aprobada: Desarrollo de portal de trámites escolares (id 1, profesor 3)
+✅ oferta H1 creada y aprobada: Automatización de reportes de biblioteca (id 2, profesor 3)
+✅ oferta O1 creada y aprobada: Digitalización del archivo histórico escolar (id 3, profesor 3)
+✅ oferta B1 creada y aprobada: Sistema de recomendación para tutorías académicas (id 4, profesor 4)
+✅ oferta N1 creada y aprobada: Monitoreo de laboratorios de cómputo (id 5, profesor 4)
+✅ oferta C1 creada y aprobada: Plataforma de seguimiento de prácticas profesionales (id 6, profesor 5)
+✅ oferta I1 creada y aprobada: Rediseño del catálogo de servicios estudiantiles (id 7, profesor 5)
+✅ oferta P1 creada y aprobada: Rediseño de la plataforma de becas (liberación) (id 8, profesor 5)
+✅ oferta D1 creada y aprobada: Análisis de datos de deserción escolar (id 9, profesor 6)
+✅ oferta J1 creada y aprobada: Visualización de indicadores institucionales (id 10, profesor 6)
+✅ oferta Q1 creada y aprobada: Visualización de indicadores institucionales (liberación) (id 11, profesor 6)
+✅ oferta E1 creada y aprobada: Modernización del sistema de control escolar (id 12, profesor 7)
+✅ oferta K1 creada y aprobada: Integración de firma electrónica en trámites internos (id 13, profesor 7)
+✅ oferta R1 creada y aprobada: Monitoreo de laboratorios de cómputo (liberación) (id 14, profesor 7)
+✅ oferta F1 creada y aprobada: Sistema de seguimiento académico (id 15, profesor 8)
+✅ oferta L1 creada y aprobada: Rediseño de la plataforma de becas (id 16, profesor 8)
+✅ oferta G1 creada y aprobada: Club de robótica — apoyo en talleres (id 17, profesor 9)
+✅ oferta M1 creada y aprobada: Difusión de actividades deportivas y culturales (id 18, profesor 9)
+── 3. GR (13 escenarios) ──
+↷ oferta A1 ya existía: Desarrollo de portal de trámites escolares (id 1)
+↷ oferta H1 ya existía: Automatización de reportes de biblioteca (id 2)
+↷ oferta O1 ya existía: Digitalización del archivo histórico escolar (id 3)
+↷ oferta B1 ya existía: Sistema de recomendación para tutorías académicas (id 4)
+↷ oferta N1 ya existía: Monitoreo de laboratorios de cómputo (id 5)
+↷ oferta C1 ya existía: Plataforma de seguimiento de prácticas profesionales (id 6)
+↷ oferta I1 ya existía: Rediseño del catálogo de servicios estudiantiles (id 7)
+↷ oferta P1 ya existía: Rediseño de la plataforma de becas (liberación) (id 8)
+↷ oferta D1 ya existía: Análisis de datos de deserción escolar (id 9)
+↷ oferta J1 ya existía: Visualización de indicadores institucionales (id 10)
+↷ oferta Q1 ya existía: Visualización de indicadores institucionales (liberación) (id 11)
+↷ oferta E1 ya existía: Modernización del sistema de control escolar (id 12)
+↷ oferta K1 ya existía: Integración de firma electrónica en trámites internos (id 13)
+↷ oferta R1 ya existía: Monitoreo de laboratorios de cómputo (liberación) (id 14)
+↷ oferta F1 ya existía: Sistema de seguimiento académico (id 15)
+↷ oferta L1 ya existía: Rediseño de la plataforma de becas (id 16)
+↷ oferta G1 ya existía: Club de robótica — apoyo en talleres (id 17)
+↷ oferta M1 ya existía: Difusión de actividades deportivas y culturales (id 18)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: rosales0101@alumno.ipn.mx (solicitud 1)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: camacho0201@alumno.ipn.mx (solicitud 2)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+   -> C forzado a: rechazada_definitivamente (Plazo de envío de expediente vencido)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: briones0301@alumno.ipn.mx (solicitud 3)
+Conectado a Redis.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+   -> D forzado a: rechazada_definitivamente (Tu periodo de servicio social inició sin que tu expediente quedara aprobado)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: quintero0401@alumno.ipn.mx (solicitud 4)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: barrera0501@alumno.ipn.mx (solicitud 5)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: estrada0601@alumno.ipn.mx (solicitud 6)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: nava0701@alumno.ipn.mx (solicitud 7)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: guerrero0801@alumno.ipn.mx (solicitud 8)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: maldonado0901@alumno.ipn.mx (solicitud 9)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: cervantes1001@alumno.ipn.mx (solicitud 10)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: ibarra1101@alumno.ipn.mx (solicitud 11)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: pacheco1201@alumno.ipn.mx (solicitud 12)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: olvera1301@alumno.ipn.mx (solicitud 13)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 03-gr.js terminado.
+── 4. AH (8 escenarios) ──
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+↷ oferta A1 ya existía: Desarrollo de portal de trámites escolares (id 1)
+↷ oferta H1 ya existía: Automatización de reportes de biblioteca (id 2)
+↷ oferta O1 ya existía: Digitalización del archivo histórico escolar (id 3)
+↷ oferta B1 ya existía: Sistema de recomendación para tutorías académicas (id 4)
+↷ oferta N1 ya existía: Monitoreo de laboratorios de cómputo (id 5)
+↷ oferta C1 ya existía: Plataforma de seguimiento de prácticas profesionales (id 6)
+↷ oferta I1 ya existía: Rediseño del catálogo de servicios estudiantiles (id 7)
+↷ oferta P1 ya existía: Rediseño de la plataforma de becas (liberación) (id 8)
+↷ oferta D1 ya existía: Análisis de datos de deserción escolar (id 9)
+↷ oferta J1 ya existía: Visualización de indicadores institucionales (id 10)
+↷ oferta Q1 ya existía: Visualización de indicadores institucionales (liberación) (id 11)
+↷ oferta E1 ya existía: Modernización del sistema de control escolar (id 12)
+↷ oferta K1 ya existía: Integración de firma electrónica en trámites internos (id 13)
+↷ oferta R1 ya existía: Monitoreo de laboratorios de cómputo (liberación) (id 14)
+↷ oferta F1 ya existía: Sistema de seguimiento académico (id 15)
+↷ oferta L1 ya existía: Rediseño de la plataforma de becas (id 16)
+↷ oferta G1 ya existía: Club de robótica — apoyo en talleres (id 17)
+↷ oferta M1 ya existía: Difusión de actividades deportivas y culturales (id 18)
+✅ Sofía: 4 actividades sembradas (más la que se asigna en vivo el 23).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: rangel1401@alumno.ipn.mx (solicitud 14)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ Gerardo (historia variada): bitácoras, faltas y actividades sembradas.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: fuentes1501@alumno.ipn.mx (solicitud 15)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ Itzel (480 horas): 120 bitácoras aprobadas, 480h netas.
+✅ 04-ah.js terminado.
+── 5. Reportes mínimos (placeholder de REP, para LSS) ──
+↷ usuario 3 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+↷ usuario 24 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+Último periodo con bitácoras reales: #7.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ reporte mensual #1 enviado (id 1).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por coordinación.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ reporte mensual #2 enviado (id 2).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por coordinación.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ reporte mensual #3 enviado (id 3).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> aprobado por coordinación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ reporte mensual #4 enviado (id 4).
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> aprobado por coordinación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ reporte mensual #5 enviado (id 5).
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> aprobado por coordinación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ reporte mensual #6 enviado (id 6).
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> aprobado por coordinación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ reporte mensual #7 enviado (id 7).
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> aprobado por profesor.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> aprobado por coordinación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ reporte global enviado (id 1).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+  -> global aprobado por profesor.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+  -> global aprobado por coordinación.
+✅ 05-reportes-minimos.js terminado.
+── 6. LSS (4 escenarios) ──
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+↷ oferta A1 ya existía: Desarrollo de portal de trámites escolares (id 1)
+↷ oferta H1 ya existía: Automatización de reportes de biblioteca (id 2)
+↷ oferta O1 ya existía: Digitalización del archivo histórico escolar (id 3)
+↷ oferta B1 ya existía: Sistema de recomendación para tutorías académicas (id 4)
+↷ oferta N1 ya existía: Monitoreo de laboratorios de cómputo (id 5)
+↷ oferta C1 ya existía: Plataforma de seguimiento de prácticas profesionales (id 6)
+↷ oferta I1 ya existía: Rediseño del catálogo de servicios estudiantiles (id 7)
+↷ oferta P1 ya existía: Rediseño de la plataforma de becas (liberación) (id 8)
+↷ oferta D1 ya existía: Análisis de datos de deserción escolar (id 9)
+↷ oferta J1 ya existía: Visualización de indicadores institucionales (id 10)
+↷ oferta Q1 ya existía: Visualización de indicadores institucionales (liberación) (id 11)
+↷ oferta E1 ya existía: Modernización del sistema de control escolar (id 12)
+↷ oferta K1 ya existía: Integración de firma electrónica en trámites internos (id 13)
+↷ oferta R1 ya existía: Monitoreo de laboratorios de cómputo (liberación) (id 14)
+↷ oferta F1 ya existía: Sistema de seguimiento académico (id 15)
+↷ oferta L1 ya existía: Rediseño de la plataforma de becas (id 16)
+↷ oferta G1 ya existía: Club de robótica — apoyo en talleres (id 17)
+↷ oferta M1 ya existía: Difusión de actividades deportivas y culturales (id 18)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: rosado1601@alumno.ipn.mx (solicitud 16)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 2020631601: 480h netas sembradas.
+↷ usuario 5 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+↷ usuario 25 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ 7 reportes mensuales + global, todos aprobados (solicitud 16).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-01: evaluación solicitada.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-03: profesor evaluó y firmó.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ CU-LSS-04: coordinación aprobó la evaluación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-02: evaluación descargada/confirmada; carta de término solicitada.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: duarte1701@alumno.ipn.mx (solicitud 17)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 2019631701: 480h netas sembradas.
+↷ usuario 6 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+↷ usuario 26 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 7 reportes mensuales + global, todos aprobados (solicitud 17).
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-01: evaluación solicitada.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-03: profesor evaluó y firmó.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ CU-LSS-04: coordinación aprobó la evaluación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-02: evaluación descargada/confirmada; carta de término solicitada.
+✅ CU-LSS-06: carta marcada como lista para recoger.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-05: alumno confirmó la recogida de la carta.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-07: expediente de liberación enviado.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ alumno registrado: bravo1801@alumno.ipn.mx (solicitud 18)
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 2020631801: 480h netas sembradas.
+↷ usuario 7 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+↷ usuario 27 ya tenía un archivo de rúbrica físico de una corrida anterior — BD sincronizada con esa ruta.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ 7 reportes mensuales + global, todos aprobados (solicitud 18).
+✅ CU-LSS-01: evaluación solicitada.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-03: profesor evaluó y firmó.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[TSA] Sello emitido por la TSA principal: https://freetsa.org/tsr
+✅ CU-LSS-04: coordinación aprobó la evaluación.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-02: evaluación descargada/confirmada; carta de término solicitada.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-06: carta marcada como lista para recoger.
+✅ CU-LSS-05: alumno confirmó la recogida de la carta.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-07: expediente de liberación enviado.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-09: expediente de liberación aprobado.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.
+✅ CU-LSS-08: constancia de término solicitada.
+✅ 06-lss.js terminado.
+── 7. Conclusión automática de ofertas (RN-PRO-18) ──
+✅ 1 oferta(s) concluida(s) automáticamente.
+✅ cred-gr-ah-lss completo.
+[socket.server] emitirAUsuario llamado antes de inicializarSocketServer.

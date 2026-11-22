@@ -42,8 +42,7 @@ encuentras el correo (o los correos, si el caso necesita más de uno).
 
 | Caso | Correo(s) |
 |---|---|
-✅| Oferta disponible para registrar un alumno EN VIVO (CU-GR-01 completo) | Oferta "Desarrollo de portal de trámites escolares"    
-      profesor `profesorcastillo@ipn.mx` | **16/12**
+✅| Oferta disponible para registrar un alumno EN VIVO (CU-GR-01 completo) | Oferta "Desarrollo de portal de trámites escolares"  profesor `profesorcastillo@ipn.mx` | **fecha----16/12**
 ✅| Alumno esperando respuesta del profesor | `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
 ✅| Rechazo por perfil (profesor rechaza, no por cupos) | mismo `rosales0101@alumno.ipn.mx` — profesor `profesorvaldez@ipn.mx` |
 ✅| Venció Reloj 1 (nunca envió expediente a tiempo) — pantalla de rechazo definitivo | `camacho0201@alumno.ipn.mx` |
