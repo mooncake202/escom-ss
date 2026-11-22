@@ -201,7 +201,7 @@ async function enviarSolicitudRegistro(datos) {
     throw crearError('Créditos y semestre son obligatorios y válidos.');
   }
   if (semestreInvalido(semestre)) {
-    throw crearError(`El semestre debe ser un número entero entre ${SEMESTRE_MIN} y ${SEMESTRE_MAX}.`);
+    throw crearError(`El semestre debe ser un número válido.`);
   }
 
   const dictamenNumerico = validarDictamenYCreditos(tipoLiberacion, Number(creditos), Number(semestre));
@@ -924,7 +924,7 @@ async function reenviarSolicitudModificada(usuarioId, datos) {
     throw crearError('Créditos y semestre son obligatorios y válidos.');
   }
   if (semestreInvalido(semestre)) {
-    throw crearError(`El semestre debe ser un número entero entre ${SEMESTRE_MIN} y ${SEMESTRE_MAX}.`);
+    throw crearError(`El semestre debe ser un número válido.`);
   }
 
   const dictamenNumerico = validarDictamenYCreditos(tipoLiberacion, Number(creditos), Number(semestre));

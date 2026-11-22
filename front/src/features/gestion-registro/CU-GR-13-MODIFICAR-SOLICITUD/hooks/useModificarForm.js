@@ -48,7 +48,7 @@ function validarPaso(step, form, acepta) {
     else {
       const semestreNum = Number(form.semestre);
       if (!Number.isInteger(semestreNum) || semestreNum < 1 || semestreNum > 30)
-        errs.semestre = "El semestre debe ser un número entero entre 1 y 30";
+        errs.semestre = "El semestre debe ser un número válido";
     }
     if (!form.periodo) errs.periodo = "Selecciona un periodo";
 
