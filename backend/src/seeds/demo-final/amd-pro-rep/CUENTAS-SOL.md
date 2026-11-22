@@ -57,11 +57,16 @@ servidor en marcha (ver aviso a).
 1. `git pull`
 2. `docker exec escom_redis redis-cli FLUSHDB`
 3. `bash backend/src/seeds/demo-final/reset-y-sembrar-demo.sh` (reset, 00-comun y
-   cred-gr-ah-lss; Ctrl+C cuando imprima "✅ cred-gr-ah-lss completo.")
+   cred-gr-ah-lss). Al terminar imprime "✅ cred-gr-ah-lss completo." y se queda
+   colgado: Ctrl+C y luego `docker exec escom_backend pkill -f cred-gr-ah-lss/index.js`
+   (el Ctrl+C corta el cliente, pero el proceso sigue vivo dentro del contenedor).
 4. `docker compose exec -T backend node backend/src/seeds/demo-final/amd-pro-rep/index.js`
 5. `docker compose exec -T backend node backend/src/seeds/demo-final/amd-pro-rep/verificar.js`
 
-Si el `.env` aún no tiene `TSA_URL_RESPALDO`, el paso 4 va así:
+Si el `.env` aún no tiene `TSA_URL_RESPALDO`, lo ideal es **agregarlo antes de
+empezar** (ver aviso a): `reset-y-sembrar-demo.sh` también pide sellos de tiempo y,
+sin respaldo, se detiene si FreeTSA rechaza uno (así falló el 22-nov en la VM). Si
+aun así se siembra sin agregarlo, el paso 4 va con el `-e`:
 `docker compose exec -T -e TSA_URL_RESPALDO=http://timestamp.digicert.com backend node backend/src/seeds/demo-final/amd-pro-rep/index.js`
 
 En Windows los mismos comandos funcionan igual: todo corre dentro del contenedor.
