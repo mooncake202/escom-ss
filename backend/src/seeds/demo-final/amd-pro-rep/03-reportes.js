@@ -373,10 +373,12 @@ async function sembrarAlumno(alumno, ctx) {
 
   const ah = await sembrarAH(alumno, solicitudId);
 
-  // Rúbrica del alumno: antes de su primer envío (o en la fecha de _datos.js).
-  const primerEnvio = alumno.reportes.length ? (await fechasReporte(alumno.periodoInicio, 1)).envio : null;
-  const fechaRubrica = primerEnvio ? new Date(primerEnvio.getTime() - 30 * 60 * 1000) : H.enHoraMexico(alumno.rubrica, '10:00');
-  await H.sembrarRubricaSiFalta(usuarioId, H.FIRMA_ALUMNO, fechaRubrica);
+  // Rúbrica del alumno SOLO si ya firmó algo (al menos un envío): 30 min antes
+  // de su primer envío. Quien no ha enviado nada la dibuja en vivo la primera vez.
+  if (alumno.reportes.length) {
+    const primerEnvio = (await fechasReporte(alumno.periodoInicio, 1)).envio;
+    await H.sembrarRubricaSiFalta(usuarioId, H.FIRMA_ALUMNO, new Date(primerEnvio.getTime() - 30 * 60 * 1000));
+  }
 
   const reportes = await sembrarReportes(alumno, usuarioId, solicitudId, ctx);
   await ajustarNotificacionesREP(usuarioId, solicitudId);

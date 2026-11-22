@@ -121,6 +121,7 @@ async function misCasos() {
 
   await verificarOfertas();
   await verificarREP();
+  await verificarRubricas();
   await verificarADM();
   await verificarPdfsConTexto();
 
@@ -411,7 +412,6 @@ async function verificarREP() {
     if (sol?.oferta?.nombre_proyecto !== oferta.titulo) problemas.push(`oferta ${sol?.oferta?.nombre_proyecto}`);
     const inicio = sol?.periodo_registro?.evento_calendario?.fecha_inicio?.toISOString().slice(0, 10);
     if (inicio !== al.periodoInicio) problemas.push(`periodo ${inicio}`);
-    if (!u.rubrica_imagen || !fs.existsSync(path.join(RUTA_BASE_DOCUMENTOS, u.rubrica_imagen))) problemas.push('sin firma en BD o disco');
 
     // Bitácoras y horas
     const bits = await prisma.bitacora.findMany({ where: { solicitud_registro_id: sol.id }, orderBy: { fecha_registro: 'asc' } });
@@ -491,6 +491,8 @@ async function verificarREP() {
       if (d.puedeGenerar !== esp.puede || bloqueos.join() !== esp.bloqueos.join()) problemas.push(`${hora}: puedeGenerar ${d.puedeGenerar}, bloqueos [${bloqueos.join()}]`);
       if ((plazo?.aplica ? plazo.estado : null) !== esp.plazo || (esp.dia && plazo.diaHabilActual !== esp.dia)) problemas.push(`${hora}: plazo ${plazo?.estado} día ${plazo?.diaHabilActual}`);
       if (ah !== esp.ah) problemas.push(`${hora}: bloqueo de jornada en AH ${ah} ≠ ${esp.ah}`);
+      // Sin envíos → sin rúbrica: el asistente debe pedirla (paso "firma") la primera vez.
+      if (d.firma?.requiereSubirRubrica !== !al.reportes.length) problemas.push(`${hora}: requiereSubirRubrica ${d.firma?.requiereSubirRubrica} (esperado ${!al.reportes.length})`);
       if (esp.global) {
         const g = await prepararReporteGlobal(u.id, { ahora: momento });
         if (!g.puedeGenerar || g.horas?.acumuladas !== 480) problemas.push(`${hora}: global puedeGenerar ${g.puedeGenerar} (${g.motivosBloqueo?.map((m) => m.codigo).join()})`);
@@ -510,6 +512,38 @@ async function verificarREP() {
   revisar(det.estado === 'pendiente' && det.puedeAprobarse === false && det.capacidadResultante === 4 && det.profesor.ocupados === 6 && det.cuposALiberar === 2,
     `P1 solicita Investigador: pendiente · capacidad resultante 4 · 6 ocupados · "ya no puede aprobarse" (liberar 2)`,
     `característica de P1: ${JSON.stringify({ estado: det.estado, puede: det.puedeAprobarse, cap: det.capacidadResultante, ocup: det.profesor?.ocupados })}`);
+}
+
+// Regla: un usuario mío tiene rúbrica sembrada ⇔ ya firmó algo (envío como
+// alumno o aprobación como profesor, de un reporte mensual o global). Quien no
+// ha firmado nada no tiene rúbrica en BD ni carpeta Rubrica/ en disco: la dibuja
+// en vivo la primera vez (si no, guardarRubrica daría 409 RUBRICA_YA_REGISTRADA).
+async function verificarRubricas() {
+  console.log('\n· Rúbricas (con rúbrica ⇔ ya firmó algo)');
+  const usuarios = [
+    ...Object.values(PROFESORES).map((p) => ({ etiqueta: `${p.clave} ${p.correo}`, correo: p.correo, base: RUTA_BASE_PROFESORES, clave: p.correo })),
+    ...[...ALUMNOS, ...ALUMNOS_BAJAS].map((a) => ({ etiqueta: `${a.sufijo} ${a.correoInst}`, correo: a.correoInst, base: RUTA_BASE_DOCUMENTOS, clave: a.boleta })),
+  ];
+  const con = [];
+  const sin = [];
+  for (const x of usuarios) {
+    const u = await prisma.usuario.findUnique({ where: { correo_institucional: x.correo } });
+    if (!u) { falla(`${x.etiqueta}: no existe`); continue; }
+    const donde = { usuario_id: u.id, tipo_revisor: { in: ['alumno', 'profesor'] }, estado: 'aprobado' };
+    const firmas = await prisma.revision_reporte_mensual.count({ where: donde }) + await prisma.revision_reporte_global.count({ where: donde });
+    const carpeta = path.join(x.base, x.clave, 'Rubrica');
+    const problemas = [];
+    if (firmas > 0) {
+      if (!u.rubrica_imagen) problemas.push(`firmó ${firmas} vez/veces pero rubrica_imagen es null`);
+      else if (!fs.existsSync(path.join(x.base, u.rubrica_imagen))) problemas.push(`rubrica_imagen ${u.rubrica_imagen} no existe en disco`);
+    } else {
+      if (u.rubrica_imagen || u.rubrica_fecha_registro) problemas.push('tiene rúbrica en BD sin haber firmado nada');
+      if (fs.existsSync(carpeta)) problemas.push('existe la carpeta Rubrica/ en disco sin haber firmado nada');
+    }
+    if (problemas.length) falla(`${x.etiqueta}: ${problemas.join('; ')}`);
+    else (firmas > 0 ? con : sin).push(x.etiqueta.split(' ')[0]);
+  }
+  if (con.length || sin.length) ok(`con rúbrica (ya firmaron): ${con.join(', ') || 'ninguno'} · sin rúbrica ni carpeta Rubrica/ (la dibujan en vivo): ${sin.join(', ') || 'ninguno'}`);
 }
 
 const ESPERADO_BAJA = {

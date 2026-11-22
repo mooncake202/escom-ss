@@ -90,6 +90,13 @@ usuarios y crea y borra un archivo temporal en sus carpetas. Si se corre con
 `docker compose exec -T -u node backend node …`, hace la misma prueba
 directamente. Si `node` no puede leer o escribir algo mío: ❌ y código 1.
 
+También revisa la regla de rúbricas: cada usuario mío tiene rúbrica ⇔ ya firmó
+algo, y quien no tiene no deja carpeta `Rubrica/` en disco. ⚠️ Si se ensaya en
+vivo con `ortega1901`, `mejia2001` o `hernandez2401` (o con `profesorsalinas`,
+`profesoraguirre` o los de bajas), su rúbrica queda registrada: volver a sembrar
+**desde cero** (reset → pasos 2–4) para que la pida otra vez; correr solo el paso 4
+no la quita.
+
 Si el paso 4 se detiene por la TSA (ambas caídas), se vuelve a correr el paso 4:
 retoma donde quedó, sin duplicar nada.
 
@@ -180,6 +187,15 @@ fechas pasadas: envío el primer día generable, revisión del profesor 1 día h
 después y validación de coordinación 1 día hábil después de esa. Bitácoras de 4 h
 en días hábiles. Notificaciones leídas, salvo los 2 rechazos por corregir.
 
+**Rúbricas (firmas).** Solo tiene rúbrica sembrada quien ya firmó algo:
+`profesorlozano` (ya revisó reportes) y `espinoza2101`, `padilla2201` y `rojas2301`
+(ya enviaron reportes). `ortega1901`, `mejia2001` y `hernandez2401` no han enviado
+nada: **no tienen rúbrica** y el asistente de Generar reporte les agrega el paso
+"Firma" para dibujarla/subirla en vivo la primera vez (sin ella, la vista previa y el
+envío responden 409 `RUBRICA_NO_REGISTRADA`). `profesorsalinas`, `profesoraguirre` y
+los alumnos de bajas (`2501`–`2701`) tampoco tienen. Lleva a la demo una imagen de
+firma (PNG/JPG, máx. 3 MB) o dibújala en el momento.
+
 | Alumno | Nombre | Oferta · inicio | Bitácoras | Reportes | Qué ve el 23 nov |
 |---|---|---|---|---|---|
 | `ortega1901` | Jimena Ortega Salazar | L4 · 16 oct | 24 aprobadas (96 h) | ninguno | R1 (16 oct–13 nov) listo para generar; plazo día 5 de 5 |
@@ -190,14 +206,16 @@ en días hábiles. Notificaciones leídas, salvo los 2 rechazos por corregir.
 | `hernandez2401` | Bruno Hernández Galván | L4 · 16 oct | 18 aprobadas + 1 pendiente (12 nov) | ninguno | R1 bloqueado por bitácora sin revisar; plazo día 5 de 5 |
 
 **1. Generar y firmar el reporte en vivo.** `ortega1901` → Mis reportes → Generar
-R1 → enviar. Va a `profesorlozano`, que lo firma; coordinación lo valida con el
+R1 → calendario → actividades → **Firma** (registra su rúbrica, primera vez) →
+vista previa → enviar. Va a `profesorlozano`, que lo firma; coordinación lo valida con el
 sello. ⚠️ El 23 es el último día del plazo: el 24 ya sale vencido.
 
 **2. Reporte vencido.** `mejia2001` ve el aviso rojo en Mis reportes (puede
-generarlo igual) y en AH no puede iniciar jornada hasta enviarlo.
+generarlo igual; también le pide su rúbrica la primera vez) y en AH no puede iniciar jornada hasta enviarlo.
 
 **3. Bitácora pendiente.** `hernandez2401` no puede generar R1 ("bitácoras sin
-revisar"). `profesorlozano` aprueba la bitácora del 12 nov y el alumno ya puede generarlo.
+revisar"). `profesorlozano` aprueba la bitácora del 12 nov y el alumno ya puede
+generarlo (con el paso "Firma", porque aún no tiene rúbrica).
 
 **4. Revisión del profesor.** `profesorlozano` → Reportes por revisar → R4 de
 `padilla2201` → aprobar y firmar (o rechazar con motivo).

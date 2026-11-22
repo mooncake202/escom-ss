@@ -368,7 +368,7 @@ const ALUMNOS = [
     telefono: '5571936428', boleta: '2020631901', correoPersonal: 'jimena.ortega.personal@gmail.com',
     carrera: 'ISC', creditos: '84.00', semestre: 8,
     motivacion: 'Me interesa automatizar trámites del departamento; ya hice un proyecto similar con plantillas y generación de PDF en la materia de Ingeniería de Software.',
-    periodoInicio: '2026-10-16', rubrica: '2026-11-17',
+    periodoInicio: '2026-10-16',
     bitacoras: { hasta: '2026-11-20' },
     reportes: [],
   },
@@ -378,7 +378,7 @@ const ALUMNOS = [
     telefono: '5548271093', boleta: '2021632001', correoPersonal: 'rodrigo.mejia.personal@gmail.com',
     carrera: 'IA', creditos: '78.00', semestre: 7,
     motivacion: 'Quiero apoyar en el inventario de los laboratorios porque paso mucho tiempo en ellos y conozco las fallas más comunes del equipo.',
-    periodoInicio: '2026-10-01', rubrica: '2026-11-03',
+    periodoInicio: '2026-10-01',
     // AH lo bloquea desde el 9-nov (plazo vencido): sin bitácoras desde entonces.
     bitacoras: { hasta: '2026-11-06' },
     reportes: [],
@@ -425,7 +425,7 @@ const ALUMNOS = [
     telefono: '5527058346', boleta: '2021632401', correoPersonal: 'bruno.hernandez.personal@gmail.com',
     carrera: 'ISC', creditos: '76.00', semestre: 7,
     motivacion: 'Busco un proyecto donde pueda programar automatizaciones; el de constancias internas encaja con lo que he hecho en Python.',
-    periodoInicio: '2026-10-16', rubrica: '2026-11-17',
+    periodoInicio: '2026-10-16',
     // Falta algunos días; la del 12-nov queda pendiente de revisión.
     bitacoras: { hasta: '2026-11-19', faltas: ['2026-10-20', '2026-10-29', '2026-11-05', '2026-11-10'], pendiente: '2026-11-12' },
     reportes: [],
