@@ -252,8 +252,8 @@ async function main() {
   const ofertas = await ofertasSeed.main();
   const coordinador = await prisma.usuario.findUnique({ where: { correo_institucional: CORREO_COORDINADOR } });
 
-  // ── Sofía (barrera0501) — actividades variadas, sin bitácoras (CU-AH-01→03 en vivo) ──
-  await sembrarActividadesSofia();
+  // ── Sofía (barrera0501) — actividades variadas + 1 bitácora ya aprobada (CU-AH-01→03 en vivo) ──
+  await sembrarActividadesSofia(ofertas.F1.profesorUsuarioId);
 
   // ── Alumno "historia variada" ───────────────────────────────────────────
   const hv = await crearYRegistrar(ALUMNO_HV, ofertas.N1.ofertaId, PERIODO.HISTORIA_VARIADA);
@@ -275,7 +275,7 @@ async function main() {
 }
 
 // ── Sofía: actividades variadas, igual que el patrón ya usado en el video ──
-async function sembrarActividadesSofia() {
+async function sembrarActividadesSofia(profesorUsuarioId) {
   const barrera = await prisma.alumno.findUnique({ where: { boleta: '2019630501' } });
   if (!barrera) throw new Error('No existe barrera0501 — corre primero 03-gr.js.');
   const solicitud = await prisma.solicitud_registro.findFirst({ where: { alumno_id: barrera.boleta } });
@@ -297,8 +297,9 @@ async function sembrarActividadesSofia() {
     { titulo: 'Elaborar reporte de pruebas funcionales', estado: 'completada_tarde', fecha_limite: '2026-10-20', porcentaje_progreso: 100, fecha_completada: '2026-10-23' },
   ];
 
+  const actividadesCreadas = [];
   for (const a of ACTIVIDADES) {
-    await prisma.actividad.create({
+    const act = await prisma.actividad.create({
       data: {
         solicitud_registro_id: solicitud.id,
         titulo: a.titulo,
@@ -311,20 +312,67 @@ async function sembrarActividadesSofia() {
         fecha_completada: a.fecha_completada ? utc(a.fecha_completada) : null,
       },
     });
+    actividadesCreadas.push(act);
   }
-  // Sofía ya es alumno_asignado con periodo ya iniciado (16 oct) pero SIN
-  // ninguna bitácora todavía (se graba en vivo el 23) — sin este pin, el
-  // cron real contabilizarFaltasDiarias le contaría faltas retroactivas
-  // desde el 16 de octubre la próxima vez que corra, ensuciando su estado
-  // de "recién asignada, lista para grabar" (mismo caso ya encontrado y
-  // corregido para Gerardo/Itzel).
+
+  // 1 bitácora ya aprobada que JUSTIFICA el avance de las 3 actividades que
+  // ya no están en 0% (índices 1-3: 100%, 20%, 100%) — NO toca "Diseñar
+  // diagrama..." (índice 0, sigue en 0%/sin_comenzar) y NO recalcula ni
+  // mueve el estado/porcentaje/fecha_completada de esas 3: ya están
+  // correctos desde que se crearon arriba: esta bitácora solo añade el
+  // registro (registro_bitacora_actividades) que las respalda.
+  const actividadesConAvance = actividadesCreadas.slice(1); // Configurar entorno, Documentar manual, Elaborar reporte
+  // 2026-10-23 (viernes): día hábil real (esDiaLaborable) y coincide con la
+  // fecha_completada real de "Elaborar reporte de pruebas funcionales".
+  const fechaBitacora = utc('2026-10-23');
+  const horaInicio = new Date('2026-10-23T14:00:00.000Z');
+  const horasBitacora = 4;
+  const horaFin = new Date(horaInicio.getTime() + horasBitacora * 3600 * 1000);
+
+  const bitacoraInicial = await prisma.$transaction(async (tx) => {
+    const b = await tx.bitacora.create({
+      data: {
+        solicitud_registro_id: solicitud.id,
+        hora_inicio: horaInicio,
+        hora_fin: horaFin,
+        horas_contabilizadas: horasBitacora,
+        fecha_registro: fechaBitacora,
+        estado: 'pendiente_revision',
+      },
+    });
+    for (const [act, a] of actividadesConAvance.map((act, i) => [act, ACTIVIDADES[i + 1]])) {
+      await tx.registro_bitacora_actividades.create({
+        data: {
+          bitacora_id: b.id,
+          actividad_id: act.id,
+          descripcion: `Avance de "${act.titulo}" (${a.porcentaje_progreso}%).`,
+          evidencia: 'https://drive.example.com/evidencia-oct24',
+          porcentaje_avance_registrado: a.porcentaje_progreso,
+        },
+      });
+    }
+    await tx.cumulo_horas_y_faltas.upsert({
+      where: { alumno_id: barrera.boleta },
+      update: { horas_acumuladas: { increment: horasBitacora } },
+      create: { alumno_id: barrera.boleta, horas_acumuladas: horasBitacora },
+    });
+    return b;
+  });
+  await ahProfesorService.aprobarBitacora(profesorUsuarioId, bitacoraInicial.id);
+
+  // Sofía ya es alumno_asignado con periodo ya iniciado (16 oct) y ya con
+  // UNA bitácora aprobada (arriba, 23-oct) — el resto se graba en vivo el
+  // 23. Sin este pin, el cron real contabilizarFaltasDiarias le contaría
+  // faltas retroactivas desde el 24 de octubre la próxima vez que corra,
+  // ensuciando su estado de "recién asignada, lista para grabar" (mismo
+  // caso ya encontrado y corregido para Gerardo/Itzel).
   await prisma.cumulo_horas_y_faltas.upsert({
     where: { alumno_id: barrera.boleta },
     update: { fecha_ultima_evaluacion_faltas: utc('2026-12-01') },
     create: { alumno_id: barrera.boleta, fecha_ultima_evaluacion_faltas: utc('2026-12-01') },
   });
 
-  console.log(`✅ Sofía: ${ACTIVIDADES.length} actividades sembradas (más la que se asigna en vivo el 23).`);
+  console.log(`✅ Sofía: ${ACTIVIDADES.length} actividades + 1 bitácora aprobada (23-oct, justifica 3 de ellas) sembradas (el resto se graba en vivo el 23).`);
 }
 
 // ── Alumno "historia variada" ────────────────────────────────────────────
