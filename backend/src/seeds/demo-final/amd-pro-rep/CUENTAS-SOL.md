@@ -12,10 +12,9 @@ Se va actualizando conforme se siembra cada parte:
 
 ## ⚠️ Avisos para Karen
 
-**a) Falta la TSA de respaldo en el `.env` de la VM.** Hay que agregar
-`TSA_URL_RESPALDO=http://timestamp.digicert.com` y recrear el backend
-(`docker compose up -d backend`). Sin eso, en vivo cualquier rechazo de FreeTSA
-hace fallar firmas y aprobaciones.
+**a) ✅ RESUELTO (22-nov, Karen).** Ya se agregó `TSA_URL_RESPALDO=http://timestamp.digicert.com`
+al `.env` de la VM y se recreó el backend (`docker compose up -d backend`); se verificó que la
+variable llegó al contenedor y que el backend responde normal.
 
 **b) Lo que verás en coordinación por mis casos:**
 - 2 ofertas por validar (S1 y S2 de `profesorsalinas`, caso en vivo).
